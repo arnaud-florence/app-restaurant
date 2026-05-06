@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
@@ -247,6 +248,9 @@ export default function ServeurClient({
                 <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
               ))}
             </select>
+            <Link href="/caisse" className="text-sm px-3 h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold whitespace-nowrap">
+              💰 Caisse
+            </Link>
           </div>
         </div>
 
@@ -334,7 +338,14 @@ export default function ServeurClient({
           serveurId={serveurId}
           employes={employes}
           onClose={() => setEncaisserCmd(null)}
-          onSuccess={() => { setEncaisserCmd(null); flashOk('Encaissement validé'); router.refresh() }}
+          onSuccess={() => {
+            const id = encaisserCmd.id
+            setEncaisserCmd(null)
+            flashOk('Encaissement validé — ticket envoyé à l\'impression')
+            // Ouvre le ticket client en nouvel onglet (auto-print)
+            try { window.open(`/print/ticket/${id}?auto=1`, '_blank', 'noopener') } catch { /* ignore */ }
+            router.refresh()
+          }}
         />
       )}
     </div>
@@ -443,9 +454,18 @@ function ListeAServir({
                 </span>
                 <span className="text-xs text-zinc-300">{c.numero}</span>
               </div>
-              <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 text-xs font-bold animate-pulse">
-                {articlesPrets.length} prêt{articlesPrets.length > 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`/print/bons/${c.id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+                  title="Réimprimer les bons de préparation"
+                >🖨</a>
+                <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 text-xs font-bold animate-pulse">
+                  {articlesPrets.length} prêt{articlesPrets.length > 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
             {/* Articles prêts */}
@@ -530,7 +550,16 @@ function ListeAEncaisser({
               <span className="text-sm font-bold">
                 {c.numero_table ? `T${c.numero_table}` : c.numero}
               </span>
-              <span className="text-xs text-zinc-300">{c.numero}</span>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={`/print/ticket/${c.id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+                  title="Aperçu du ticket client (avant règlement)"
+                >🖨 Note</a>
+                <span className="text-xs text-zinc-300">{c.numero}</span>
+              </div>
             </div>
             <ul className="px-3 py-2 divide-y divide-zinc-800">
               {c.articles.map(a => (

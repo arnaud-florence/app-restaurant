@@ -17,6 +17,19 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
   const [, startTransition] = useTransition()
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
+  const [autoPrint, setAutoPrint] = useState(false)
+  const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
+
+  useEffect(() => {
+    try { setAutoPrint(localStorage.getItem('bar_auto_print') === '1') } catch { /* ignore */ }
+  }, [])
+  function toggleAutoPrint() {
+    setAutoPrint(v => {
+      const nv = !v
+      try { localStorage.setItem('bar_auto_print', nv ? '1' : '0') } catch { /* ignore */ }
+      return nv
+    })
+  }
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
@@ -26,11 +39,25 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
   useEffect(() => {
     setCommandes(initial)
     const newIds = new Set(initial.map(c => c.id))
-    let nbNouvelles = 0
-    for (const id of newIds) if (!previousIdsRef.current.has(id)) nbNouvelles++
-    if (nbNouvelles > 0 && audioReadyRef.current) playDing()
+    const nouvelles = initial.filter(c => !previousIdsRef.current.has(c.id))
+    if (nouvelles.length > 0 && audioReadyRef.current) playDing()
+    if (nouvelles.length > 0 && autoPrint) {
+      const jobs: Array<{ key: string; src: string }> = []
+      for (const c of nouvelles) {
+        if (c.articles.some(a => a.tag_destination === 'BAR')) {
+          jobs.push({ key: `${c.id}-BAR-${Date.now()}`, src: `/print/bons/${c.id}?dest=BAR&auto=1` })
+        }
+      }
+      if (jobs.length > 0) setPrintJobs(prev => [...prev, ...jobs])
+    }
     previousIdsRef.current = newIds
-  }, [initial])
+  }, [initial, autoPrint])
+
+  useEffect(() => {
+    if (printJobs.length === 0) return
+    const t = setTimeout(() => setPrintJobs([]), 8000)
+    return () => clearTimeout(t)
+  }, [printJobs])
 
   useEffect(() => {
     const supabase = createClient()
@@ -93,9 +120,32 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
                 🔔 Activer son
               </button>
             )}
+            <button
+              onClick={toggleAutoPrint}
+              className={cn(
+                'text-xs px-3 py-2 rounded-md border transition-colors',
+                autoPrint
+                  ? 'bg-emerald-600 border-emerald-500 text-white'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+              )}
+              title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
+            >
+              🖨 Auto-impression : {autoPrint ? 'ON' : 'OFF'}
+            </button>
           </div>
         </div>
       </header>
+
+      {/* iframes cachées pour auto-impression bons */}
+      {printJobs.map(j => (
+        <iframe
+          key={j.key}
+          src={j.src}
+          aria-hidden
+          tabIndex={-1}
+          style={{ position: 'fixed', width: 0, height: 0, border: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      ))}
 
       <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {articles.length === 0 ? (
@@ -146,8 +196,17 @@ function Ticket({
           </span>
           {commande.numero_table && <span className="text-sm font-bold">T{commande.numero_table}</span>}
         </div>
-        <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
-          ⏱ {formatEcoule(commande.created_at, now)}
+        <div className="flex items-center gap-1.5">
+          <a
+            href={`/print/bons/${commande.id}?dest=BAR`}
+            target="_blank"
+            rel="noopener"
+            className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+            title="Réimprimer le bon bar"
+          >🖨</a>
+          <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
+            ⏱ {formatEcoule(commande.created_at, now)}
+          </div>
         </div>
       </div>
 

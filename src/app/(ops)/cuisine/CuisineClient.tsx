@@ -19,6 +19,20 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
   const [, startTransition] = useTransition()
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
+  const [autoPrint, setAutoPrint] = useState(false)
+  const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
+
+  // Persistance auto-print en localStorage
+  useEffect(() => {
+    try { setAutoPrint(localStorage.getItem('cuisine_auto_print') === '1') } catch { /* ignore */ }
+  }, [])
+  function toggleAutoPrint() {
+    setAutoPrint(v => {
+      const nv = !v
+      try { localStorage.setItem('cuisine_auto_print', nv ? '1' : '0') } catch { /* ignore */ }
+      return nv
+    })
+  }
 
   // Tick minuteur (1 seconde)
   useEffect(() => {
@@ -29,17 +43,34 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
   // Sync depuis props quand le server renvoie une nouvelle liste
   useEffect(() => {
     setCommandes(initial)
-    // Détecte les nouvelles commandes pour le ding
+    // Détecte les nouvelles commandes : ding + auto-impression bons
     const newIds = new Set(initial.map(c => c.id))
-    let nbNouvelles = 0
-    for (const id of newIds) {
-      if (!previousIdsRef.current.has(id)) nbNouvelles++
+    const nouvelles: typeof initial = []
+    for (const c of initial) {
+      if (!previousIdsRef.current.has(c.id)) nouvelles.push(c)
     }
-    if (nbNouvelles > 0 && audioReadyRef.current) {
-      playDing()
+    if (nouvelles.length > 0 && audioReadyRef.current) playDing()
+    if (nouvelles.length > 0 && autoPrint) {
+      const jobs: Array<{ key: string; src: string }> = []
+      for (const c of nouvelles) {
+        const dests = new Set(c.articles
+          .filter(a => a.tag_destination === 'CUISINE' || a.tag_destination === 'PIZZA')
+          .map(a => a.tag_destination))
+        for (const d of dests) {
+          jobs.push({ key: `${c.id}-${d}-${Date.now()}`, src: `/print/bons/${c.id}?dest=${d}&auto=1` })
+        }
+      }
+      if (jobs.length > 0) setPrintJobs(prev => [...prev, ...jobs])
     }
     previousIdsRef.current = newIds
-  }, [initial])
+  }, [initial, autoPrint])
+
+  // Cleanup des iframes auto-print après 8s
+  useEffect(() => {
+    if (printJobs.length === 0) return
+    const t = setTimeout(() => setPrintJobs([]), 8000)
+    return () => clearTimeout(t)
+  }, [printJobs])
 
   // Realtime : écoute les changements et déclenche router.refresh()
   useEffect(() => {
@@ -132,9 +163,32 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
                 🔔 Activer son
               </button>
             )}
+            <button
+              onClick={toggleAutoPrint}
+              className={cn(
+                'text-xs px-3 py-2 rounded-md border transition-colors',
+                autoPrint
+                  ? 'bg-emerald-600 border-emerald-500 text-white'
+                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+              )}
+              title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
+            >
+              🖨 Auto-impression : {autoPrint ? 'ON' : 'OFF'}
+            </button>
           </div>
         </div>
       </header>
+
+      {/* iframes cachées pour auto-impression bons */}
+      {printJobs.map(j => (
+        <iframe
+          key={j.key}
+          src={j.src}
+          aria-hidden
+          tabIndex={-1}
+          style={{ position: 'fixed', width: 0, height: 0, border: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      ))}
 
       {/* 2 colonnes : CUISINE / PIZZA */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-px bg-zinc-800">
@@ -238,8 +292,17 @@ function Ticket({
           )}
           <span className="text-[10px] text-zinc-500 truncate">{commande.numero}</span>
         </div>
-        <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
-          ⏱ {formatEcoule(commande.created_at, now)}
+        <div className="flex items-center gap-1.5">
+          <a
+            href={`/print/bons/${commande.id}?dest=${article.tag_destination}`}
+            target="_blank"
+            rel="noopener"
+            className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+            title="Réimprimer le bon de préparation"
+          >🖨</a>
+          <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
+            ⏱ {formatEcoule(commande.created_at, now)}
+          </div>
         </div>
       </div>
 
