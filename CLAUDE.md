@@ -18,6 +18,8 @@ Cible matérielle : tablettes Android/iPad pour le service, desktop pour l'admin
 
 ## 3. Architecture des routes
 
+### Livrées
+
 ```
 /                              → landing (à faire)
 /admin/setup                   → wizard config initiale (Module 2)
@@ -39,27 +41,128 @@ print/bons/[id]                → Module 9B — bons de prep 80mm (?dest=CUISIN
 print/ticket/[id]              → Module 9B — ticket client 80mm (?auto=1)
 ```
 
-Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en service). Les routes `/print/*` sont en dehors et héritent uniquement du root layout (fond blanc pour impression).
+### Planifiées (Modules 10-28)
+
+```
+/equipes                       → Module 10 (com interne, hors /admin car aussi accessible postes)
+/admin/hygiene                 → Module 11 (HACCP, températures, checklists)
+/admin/allergenes              → Module 12 (14 allergènes, QR salle, alerte cuisine)
+/admin/rh                      → Module 13 (fiches employés, planning, paie, pourboires)
+/admin/finances                → Module 14 (P&L, trésorerie, simulateurs, exports)
+/admin/energie                 → Module 15 (élec/gaz/eau, alertes conso)
+/admin/maintenance             → Module 16 (équipements, contrôles obligatoires)
+/admin/legal                   → Module 17 (licences, assurances, échéances)
+/admin/dechets                 → Module 18 (pesées, gaspillage, registre)
+/admin/groupes                 → Module 19 (TO, menus négociés, arrhes)
+/admin/clients                 → Module 20 (CRM, fidélité, campagnes, WiFi)
+/admin/reservations            → Module 21 (chambres + événementiel + terrasse)
+/admin/previsionnel            → Module 22 (météo, IA prévisions CA/stock)
+/admin/journal                 → Module 23 (journal gérant + analyse IA 6 mois)
+/admin/assistant               → Module 24 (chat IA connecté aux données)
+/admin/pilotage                → Module 25 (10 KPI, objectifs, PWA mobile gérant)
+/admin/affichage               → Module 26 (TV salle, QR tables)
+/admin/formation               → Module 27 (guides, fiches poste, quiz)
+/admin/securite                → Module 28 (RBAC, 2FA, journal d'audit, sauvegardes)
+```
+
+Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en service). Les routes `/print/*` sont en dehors et héritent uniquement du root layout (fond blanc pour impression). Les routes `/admin/*` sont en thème clair par défaut. `/equipes` (Module 10) sera neutre — accessible aux postes de service comme à l'admin.
 
 ## 4. État d'avancement
 
-| Module | Périmètre | Statut | Migrations |
+### Tableau de bord
+
+| Module | Périmètre court | Statut | Migrations |
 |---|---|---|---|
 | 1  | Fondations (schéma 27 tables) | ✅ | 0001, 0002 |
-| 2  | Setup wizard 7 étapes (établissement, horaires, zones/tables, TVA, livraison, employés) | ✅ | — |
+| 2  | Setup wizard 7 étapes | ✅ | — |
 | 3  | Ingrédients + historique prix + allergènes | ✅ | 0003, 0004 |
-| 4  | Recettes + food cost (calcul portion, marge, statut couleur) | ✅ | 0005 |
-| 5  | Menu Engineering (matrice popularité × marge) | ✅ | 0006 |
-| 6  | Boissons (vins/bières/softs avec marges multi-format verre/btl/pinte + accords mets-vins) | ✅ | 0007, 0008 |
-| 7  | Stocks (entrées, pertes, inventaires, mouvements, déduction auto à 'servi') | ✅ | 0009 |
-| 8  | Fournisseurs + bons de commande + factures + réception | ✅ | 0010, 0011 |
-| 9A | Écrans service temps réel (cuisine/bar/serveur), sessions caisse, encaissement multi-paiement, tips, plan de salle grille, Z-report | ✅ | 0012, 0013 |
-| 9B | Tickets imprimables 80mm (bons prep par destination, ticket client) + auto-impression KDS | ✅ | — (sans schema) |
-| 10–20 | Non encore définis | ⏳ | — |
-| 21 | Réservations (tables + chambres) | 🔜 | — |
-| 22–28 | Non encore définis | ⏳ | — |
+| 4  | Recettes + food cost | ✅ | 0005 |
+| 5  | Menu Engineering | ✅ | 0006 |
+| 6  | Boissons (multi-format + accords mets-vins) | ✅ | 0007, 0008 |
+| 7  | Stocks (déduction auto à 'servi') | ✅ | 0009 |
+| 8  | Fournisseurs + bons + factures + réception | ✅ | 0010, 0011 |
+| 9A | Écrans service temps réel + caisse + Z-report | ✅ | 0012, 0013 |
+| 9B | Tickets imprimables 80mm (bons + client) | ✅ | — |
+| 10 | Communication interne équipes | ⏳ | — |
+| 11 | Hygiène & sécurité alimentaire (HACCP) | ⏳ | — |
+| 12 | Allergènes & traçabilité | ⏳ | — |
+| 13 | Ressources humaines | ⏳ | — |
+| 14 | Finances & pilotage (P&L, trésorerie) | ⏳ | — |
+| 15 | Gestion énergie | ⏳ | — |
+| 16 | Maintenance & équipements | ⏳ | — |
+| 17 | Obligations légales | ⏳ | — |
+| 18 | Gestion des déchets | ⏳ | — |
+| 19 | Gestion des groupes (TO) | ⏳ | — |
+| 20 | Relation client & fidélité | ⏳ | — |
+| 21 | Réservations & événementiel | ⏳ | — |
+| 22 | Météo & prévisionnel intelligent | ⏳ | — |
+| 23 | Journal de bord gérant | ⏳ | — |
+| 24 | Assistant IA gérant | ⏳ | — |
+| 25 | Pilotage stratégique (KPI + PWA) | ⏳ | — |
+| 26 | Affichage dynamique salle (TV + QR) | ⏳ | — |
+| 27 | Formation des équipes | ⏳ | — |
+| 28 | Sécurité & accès (RBAC, 2FA, audit) | ⏳ | — |
 
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
+
+### Roadmap détaillée 10-28
+
+**Module 10 — Communication interne équipes** `/equipes`
+Messagerie interne entre postes, tableau d'affichage digital infos du jour, notifications push employés, compte-rendu réunion archivé, attribution matériel par employé.
+
+**Module 11 — Hygiène & sécurité alimentaire** `/admin/hygiene`
+Plan HACCP avec CCP (points critiques), relevés températures 2× par jour avec alertes, traçabilité produits lot/DLC/fournisseur, checklists ouverture/fermeture/hebdo/mensuel avec signature numérique, plan de nettoyage, registre non-conformités, registre antiparasitaire.
+
+**Module 12 — Allergènes & traçabilité** `/admin/allergenes`
+14 allergènes par plat, fiche allergènes QR code en salle, alerte cuisine pour clients allergiques, procédure réaction allergique, traçabilité complète par lot.
+
+**Module 13 — Ressources humaines** `/admin/rh`
+Fiches employés avec documents, planning avec calcul coût par shift, alerte masse salariale > 35% CA, pointage arrivée/départ, heures supplémentaires automatiques, gestion congés avec solde, formations obligatoires, productivité par employé, registre personnel obligatoire, suivi pourboires.
+
+**Module 14 — Finances & pilotage** `/admin/finances`
+Compte de résultat temps réel, seuil rentabilité quotidien, charges fixes avec alertes prélèvements, TVA collectée et déductible, trésorerie 30/60/90 jours, simulateur CA, simulateur "Et si", export CSV comptable, rapport mensuel PDF, notes de frais.
+
+**Module 15 — Gestion énergie** `/admin/energie`
+Suivi mensuel électricité/gaz/eau, comparaison annuelle, alerte consommation anormale, coût énergétique par plat, suggestions réduction coûts.
+
+**Module 16 — Maintenance & équipements** `/admin/maintenance`
+Registre équipements avec garanties, planning maintenance préventive, suivi pannes et réparations, contrôles obligatoires électricité/gaz/extincteurs/hotte avec alertes 1 mois avant.
+
+**Module 17 — Obligations légales** `/admin/legal`
+Licence IV, permis exploitation, affichages obligatoires, formations HACCP par employé, assurances avec échéances, bail commercial, registre sécurité, alertes 1 mois avant chaque échéance.
+
+**Module 18 — Gestion des déchets** `/admin/dechets`
+Pesée quotidienne par type, calcul gaspillage en euros, registre collectes, rapport annuel obligatoire.
+
+**Module 19 — Gestion des groupes** `/admin/groupes`
+Fiche groupe avec tour-opérateur, menu groupe avec prix négocié, facturation directe, planning groupes sur calendrier, gestion arrhes et soldes.
+
+**Module 20 — Relation client & fidélité** `/admin/clients`
+Fichier clients avec historique, allergies mémorisées, programme fidélité avec points et niveaux, segmentation, campagnes email et SMS, gestion réclamations, retours plats avec impact food cost, WiFi clients avec collecte email, parrainage.
+
+**Module 21 — Réservations & événementiel** `/admin/reservations`
+Calendrier multi-chambres, check-in/check-out avec facture PDF, devis événementiel automatique, contrat privatisation PDF, fiche technique équipes, gestion matériel, suivi acomptes, bilan post-événement, gestion terrasse.
+
+**Module 22 — Météo & prévisionnel intelligent** `/admin/previsionnel`
+Météo locale 7 jours via OpenWeatherMap, corrélation météo et fréquentation, prévision CA semaine suivante, prévision stock et couverts, alertes préventives, suggestions IA.
+
+**Module 23 — Journal de bord gérant** `/admin/journal`
+Note quotidienne avec météo et CA associés automatiquement, photos joignables, recherche historique, analyse IA corrélations sur 6 mois.
+
+**Module 24 — Assistant IA gérant** `/admin/assistant`
+Chat connecté à toutes les données, alertes "3 actions prioritaires du jour", analyse hebdomadaire automatique, détection anomalies, rapport mensuel, tableau de bord prédictif.
+
+**Module 25 — Pilotage stratégique** `/admin/pilotage`
+Les 10 indicateurs clés en 2 minutes, objectifs mensuels et annuels, plan d'action mensuel, analyse saisonnière, **PWA mobile gérant installable**.
+
+**Module 26 — Affichage dynamique salle** `/admin/affichage`
+Écran TV avec menu du jour et événements, météo locale, QR codes tables pour allergènes et appel serveur, contenu mis à jour depuis dashboard.
+
+**Module 27 — Formation des équipes** `/admin/formation`
+Guides interactifs par poste, fiches de poste PDF, quiz de validation, procédures urgence, suivi progression par employé.
+
+**Module 28 — Sécurité & accès** `/admin/securite`
+Connexion sécurisée avec rôles par poste, authentification 2FA gérant, journal des actions, alertes connexion inconnue, sauvegarde automatique quotidienne, cadenas discret en footer.
 
 ## 5. Règles métier absolues
 
@@ -215,17 +318,38 @@ npm install
 # dev
 npm run dev          # http://localhost:3000
 
-# tests par module (le dev server doit tourner pour la partie HTTP)
+# tests par module — livrés (le dev server doit tourner pour la partie HTTP)
 node scripts/verify-supabase.mjs
-node scripts/test-setup-save.mjs
-node scripts/test-ingredients.mjs
-node scripts/test-recettes.mjs
-node scripts/test-engineering.mjs
-node scripts/test-boissons.mjs
-node scripts/test-stock.mjs
-node scripts/test-fournisseurs.mjs
-node scripts/test-service.mjs
-PORT=3000 node scripts/test-tickets.mjs
+node scripts/test-setup-save.mjs                 # Module 2
+node scripts/test-ingredients.mjs                # Module 3
+node scripts/test-recettes.mjs                   # Module 4
+node scripts/test-engineering.mjs                # Module 5
+node scripts/test-boissons.mjs                   # Module 6
+node scripts/test-stock.mjs                      # Module 7
+node scripts/test-fournisseurs.mjs               # Module 8
+node scripts/test-service.mjs                    # Module 9A
+PORT=3000 node scripts/test-tickets.mjs          # Module 9B
+
+# tests à créer au fil des modules suivants (un fichier par module, même pattern)
+# node scripts/test-equipes.mjs                  # Module 10
+# node scripts/test-hygiene.mjs                  # Module 11
+# node scripts/test-allergenes.mjs               # Module 12
+# node scripts/test-rh.mjs                       # Module 13
+# node scripts/test-finances.mjs                 # Module 14
+# node scripts/test-energie.mjs                  # Module 15
+# node scripts/test-maintenance.mjs              # Module 16
+# node scripts/test-legal.mjs                    # Module 17
+# node scripts/test-dechets.mjs                  # Module 18
+# node scripts/test-groupes.mjs                  # Module 19
+# node scripts/test-clients.mjs                  # Module 20
+# node scripts/test-reservations.mjs             # Module 21
+# node scripts/test-previsionnel.mjs             # Module 22
+# node scripts/test-journal.mjs                  # Module 23
+# node scripts/test-assistant.mjs                # Module 24
+# node scripts/test-pilotage.mjs                 # Module 25
+# node scripts/test-affichage.mjs                # Module 26
+# node scripts/test-formation.mjs                # Module 27
+# node scripts/test-securite.mjs                 # Module 28
 
 # build prod
 npm run build && npm start
