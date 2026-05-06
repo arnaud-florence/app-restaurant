@@ -8,7 +8,7 @@ import {
   type CommandeService, type StatutTable, type TagDestination,
   STATUT_TABLE_STYLE, STATUT_ARTICLE_LABEL, TAG_DEST_LABEL, fmtPrix,
 } from '@/lib/service'
-import { creerCommande } from '../actions'
+import { creerCommande, changerStatutArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
 
 type Table = {
@@ -39,7 +39,7 @@ type LignePanier = {
   commentaire: string
 }
 
-type Tab = 'plan' | 'a_encaisser'
+type Tab = 'plan' | 'a_servir' | 'a_encaisser'
 
 export default function ServeurClient({
   initialCommandes, tables, recettes, employes,
@@ -100,6 +100,29 @@ export default function ServeurClient({
     () => commandes.filter(c => c.statut === 'servi').sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
     [commandes]
   )
+
+  // Articles prêts à servir (statut = 'pret') groupés par commande
+  const cmdsAvecPrets = useMemo(
+    () => commandes
+      .filter(c => c.articles.some(a => a.statut === 'pret'))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [commandes]
+  )
+  const nbArticlesPrets = useMemo(
+    () => commandes.reduce((s, c) => s + c.articles.filter(a => a.statut === 'pret').length, 0),
+    [commandes]
+  )
+
+  // Map table → nb articles prêts (pour badge sur le plan)
+  const pretsParTable = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of commandes) {
+      if (!c.numero_table) continue
+      const n = c.articles.filter(a => a.statut === 'pret').length
+      if (n > 0) m.set(c.numero_table, (m.get(c.numero_table) ?? 0) + n)
+    }
+    return m
+  }, [commandes])
 
   function flashOk(m: string) { setSuccess(m); setErreur(''); setTimeout(() => setSuccess(''), 1800) }
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
@@ -165,6 +188,43 @@ export default function ServeurClient({
     })
   }
 
+  function marquerServi(article_id: string) {
+    // Optimistic
+    setCommandes(prev => prev.map(c => ({
+      ...c,
+      articles: c.articles.map(a => a.id === article_id ? { ...a, statut: 'servi' as const } : a),
+    })))
+    startTransition(async () => {
+      try {
+        await changerStatutArticle({ article_id, nouveau_statut: 'servi' })
+        flashOk('Plat marqué servi')
+      } catch (e) {
+        flashKo(e)
+        router.refresh()
+      }
+    })
+  }
+
+  function marquerToutServi(commande: CommandeService) {
+    const ids = commande.articles.filter(a => a.statut === 'pret').map(a => a.id)
+    if (ids.length === 0) return
+    setCommandes(prev => prev.map(c => c.id === commande.id ? {
+      ...c,
+      articles: c.articles.map(a => ids.includes(a.id) ? { ...a, statut: 'servi' as const } : a),
+    } : c))
+    startTransition(async () => {
+      try {
+        for (const id of ids) {
+          await changerStatutArticle({ article_id: id, nouveau_statut: 'servi' })
+        }
+        flashOk(`${ids.length} plat${ids.length > 1 ? 's' : ''} servi${ids.length > 1 ? 's' : ''}`)
+      } catch (e) {
+        flashKo(e)
+        router.refresh()
+      }
+    })
+  }
+
   const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
 
   return (
@@ -191,9 +251,17 @@ export default function ServeurClient({
         </div>
 
         {/* Tabs */}
-        <div className="px-4 pb-2 flex gap-1">
+        <div className="px-4 pb-2 flex gap-1 overflow-x-auto">
           <TabButton active={tab === 'plan'} onClick={() => setTab('plan')}>
             🪑 Plan de salle
+          </TabButton>
+          <TabButton active={tab === 'a_servir'} onClick={() => setTab('a_servir')}>
+            🔔 À servir
+            {nbArticlesPrets > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold animate-pulse">
+                {nbArticlesPrets}
+              </span>
+            )}
           </TabButton>
           <TabButton active={tab === 'a_encaisser'} onClick={() => setTab('a_encaisser')}>
             💰 À encaisser
@@ -212,7 +280,15 @@ export default function ServeurClient({
           <PlanSalle
             zones={zones}
             cmdParTable={cmdParTable}
+            pretsParTable={pretsParTable}
             onOuvrir={ouvrirTable}
+          />
+        )}
+        {tab === 'a_servir' && (
+          <ListeAServir
+            commandes={cmdsAvecPrets}
+            onMarquerServi={marquerServi}
+            onMarquerToutServi={marquerToutServi}
           />
         )}
         {tab === 'a_encaisser' && (
@@ -282,10 +358,11 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 // ─── Plan de salle ───────────────────────────────────────────────────
 function PlanSalle({
-  zones, cmdParTable, onOuvrir,
+  zones, cmdParTable, pretsParTable, onOuvrir,
 }: {
   zones: [string, Table[]][]
   cmdParTable: Map<string, CommandeService>
+  pretsParTable: Map<string, number>
   onOuvrir: (t: Table) => void
 }) {
   return (
@@ -296,6 +373,7 @@ function PlanSalle({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {tables.map(t => {
               const cmd = cmdParTable.get(t.numero)
+              const nbPrets = pretsParTable.get(t.numero) ?? 0
               // Statut d'affichage : a_encaisser si commande servi sur cette table, sinon t.statut
               const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
                 : cmd ? 'occupee'
@@ -306,10 +384,15 @@ function PlanSalle({
                   key={t.id}
                   onClick={() => onOuvrir(t)}
                   className={cn(
-                    'min-h-[120px] rounded-xl ring-4 transition-all active:scale-95 p-3 flex flex-col items-center justify-center gap-1',
+                    'relative min-h-[120px] rounded-xl ring-4 transition-all active:scale-95 p-3 flex flex-col items-center justify-center gap-1',
                     sty.bg, sty.text, sty.ring,
                   )}
                 >
+                  {nbPrets > 0 && (
+                    <span className="absolute -top-2 -right-2 min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 border-2 border-zinc-900 text-xs font-bold flex items-center justify-center shadow-lg animate-pulse">
+                      🔔 {nbPrets}
+                    </span>
+                  )}
                   <p className="text-3xl font-bold">T{t.numero}</p>
                   <p className="text-xs opacity-90">{t.capacite} couvert{t.capacite > 1 ? 's' : ''}</p>
                   <p className="text-[10px] uppercase tracking-wider font-bold opacity-90">{sty.label}</p>
@@ -324,6 +407,100 @@ function PlanSalle({
           </div>
         </section>
       ))}
+    </div>
+  )
+}
+
+// ─── Liste à servir ──────────────────────────────────────────────────
+function ListeAServir({
+  commandes, onMarquerServi, onMarquerToutServi,
+}: {
+  commandes: CommandeService[]
+  onMarquerServi: (article_id: string) => void
+  onMarquerToutServi: (commande: CommandeService) => void
+}) {
+  if (commandes.length === 0) {
+    return (
+      <div className="text-center py-16 text-zinc-500">
+        <p className="text-6xl mb-3">✨</p>
+        <p className="text-base">Aucun plat prêt à servir pour le moment.</p>
+        <p className="text-sm mt-2 text-zinc-600">La cuisine et le bar marquent les plats « prêts ».<br/>Tu les retrouveras ici dès qu&apos;un est terminé.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      {commandes.map(c => {
+        const articlesPrets = c.articles.filter(a => a.statut === 'pret')
+        const autresArticles = c.articles.filter(a => a.statut !== 'pret')
+        return (
+          <div key={c.id} className="rounded-lg border-2 border-emerald-500/60 bg-zinc-900 overflow-hidden">
+            {/* Header */}
+            <div className="px-3 py-2 bg-emerald-600/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold">
+                  {c.numero_table ? `🪑 T${c.numero_table}` : c.numero}
+                </span>
+                <span className="text-xs text-zinc-300">{c.numero}</span>
+              </div>
+              <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 text-xs font-bold animate-pulse">
+                {articlesPrets.length} prêt{articlesPrets.length > 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Articles prêts */}
+            <ul className="px-3 py-2 divide-y divide-zinc-800">
+              {articlesPrets.map(a => (
+                <li key={a.id} className="py-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm">
+                      <span className="text-emerald-400 font-bold tabular-nums">×{a.quantite}</span> {a.recette_nom}
+                    </p>
+                    {a.commentaire && (
+                      <p className="text-[11px] text-amber-300 italic mt-0.5">⚠ {a.commentaire}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onMarquerServi(a.id)}
+                    className="min-h-[44px] px-3 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors active:scale-95"
+                  >
+                    ✓ Servi
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {/* Autres articles (en cours / déjà servis) — informatif */}
+            {autresArticles.length > 0 && (
+              <div className="px-3 pb-2 pt-1 border-t border-zinc-800 text-[11px] text-zinc-500 space-y-0.5">
+                {autresArticles.map(a => {
+                  const sta = STATUT_ARTICLE_LABEL[a.statut]
+                  return (
+                    <p key={a.id}>
+                      <span className="opacity-60">×{a.quantite} {a.recette_nom}</span>
+                      <span className={cn('ml-1.5 px-1.5 py-0.5 rounded text-[9px]', sta.bg, sta.text)}>
+                        {sta.emoji} {sta.label}
+                      </span>
+                    </p>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Action globale */}
+            {articlesPrets.length > 1 && (
+              <div className="px-3 pb-3 pt-1 border-t border-zinc-800">
+                <button
+                  onClick={() => onMarquerToutServi(c)}
+                  className="w-full min-h-[48px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold uppercase tracking-wider text-sm transition-colors active:scale-[0.97]"
+                >
+                  ✓ Tout marquer servi ({articlesPrets.length})
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
