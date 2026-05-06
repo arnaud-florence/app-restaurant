@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -105,11 +106,19 @@ export default function RecettesClient({
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Carte & food cost</p>
               <h1 className="text-xl sm:text-2xl font-bold">📖 Recettes</h1>
             </div>
-            <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
-              <span className="text-lg">+</span>
-              <span className="hidden sm:inline">Nouvelle recette</span>
-              <span className="sm:hidden">Ajouter</span>
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/admin/recettes/engineering">
+                <Button size="lg" variant="outline">
+                  <span className="hidden sm:inline">📊 Menu engineering</span>
+                  <span className="sm:hidden">📊 Engineering</span>
+                </Button>
+              </Link>
+              <Button size="lg" onClick={() => setCreating(true)}>
+                <span className="text-lg">+</span>
+                <span className="hidden sm:inline">Nouvelle recette</span>
+                <span className="sm:hidden">Ajouter</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
