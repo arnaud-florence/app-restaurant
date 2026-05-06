@@ -265,6 +265,233 @@ export async function annulerCommande(commande_id: string, motif: string) {
   return { ok: true as const }
 }
 
+// ─── Caisse : ouvrir / clôturer / résumé Z ───────────────────────────
+
+const ouvrirSessionSchema = z.object({
+  fond_initial: z.number().min(0),
+  ouverte_par: z.string().uuid().optional().nullable(),
+  notes: z.string().max(500).optional().nullable(),
+})
+
+export async function ouvrirSessionCaisse(input: unknown) {
+  const p = ouvrirSessionSchema.parse(input)
+  const supabase = await createClient()
+
+  // Refuse si une session est déjà ouverte aujourd'hui
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: deja } = await supabase
+    .from('sessions_caisse')
+    .select('id')
+    .is('fermee_at', null)
+    .eq('date_session', today)
+    .maybeSingle()
+  if (deja) throw new Error('Une session est déjà ouverte aujourd\'hui')
+
+  const { data, error } = await supabase
+    .from('sessions_caisse')
+    .insert({
+      date_session: today,
+      fond_initial: p.fond_initial,
+      ouverte_par: p.ouverte_par || null,
+      notes: p.notes || null,
+    })
+    .select('id')
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Erreur ouverture session')
+
+  revalidatePath('/caisse')
+  return { id: data.id as string }
+}
+
+const fermerSessionSchema = z.object({
+  session_id: z.string().uuid(),
+  fond_final: z.number().min(0),
+  ca_compte: z.number().min(0),
+  fermee_par: z.string().uuid().optional().nullable(),
+  notes: z.string().max(500).optional().nullable(),
+})
+
+export async function fermerSessionCaisse(input: unknown) {
+  const p = fermerSessionSchema.parse(input)
+  const supabase = await createClient()
+
+  // Vérifie session encore ouverte
+  const { data: sess, error: sErr } = await supabase
+    .from('sessions_caisse')
+    .select('id, fermee_at, fond_initial')
+    .eq('id', p.session_id)
+    .single()
+  if (sErr || !sess) throw new Error('Session introuvable')
+  if (sess.fermee_at) throw new Error('Session déjà clôturée')
+
+  // Calcule ca_attendu = sum montants espèces de la session
+  const { data: especes } = await supabase
+    .from('paiements_caisse')
+    .select('montant')
+    .eq('session_caisse_id', p.session_id)
+    .eq('methode', 'especes')
+  const caAttendu = (especes ?? []).reduce((s, x) => s + Number(x.montant ?? 0), 0)
+  // Le "ca_compte" attendu en caisse = fond_initial + sum especes
+  const caisseAttendue = Number(sess.fond_initial ?? 0) + caAttendu
+  const ecart = Math.round((p.ca_compte - caisseAttendue) * 100) / 100
+
+  const { error } = await supabase
+    .from('sessions_caisse')
+    .update({
+      fermee_at: new Date().toISOString(),
+      fond_final: p.fond_final,
+      ca_attendu: caAttendu,
+      ca_compte: p.ca_compte,
+      ecart,
+      fermee_par: p.fermee_par || null,
+      notes: p.notes ?? null,
+    })
+    .eq('id', p.session_id)
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/caisse')
+  return { ok: true as const, ecart }
+}
+
+export type ResumeSession = {
+  session: {
+    id: string
+    date_session: string
+    ouverte_at: string
+    fermee_at: string | null
+    fond_initial: number
+    fond_final: number | null
+    ca_attendu: number | null
+    ca_compte: number | null
+    ecart: number | null
+    notes: string | null
+    ouverte_par_nom: string | null
+    fermee_par_nom: string | null
+  }
+  paiements_par_methode: Array<{ methode: string; nb: number; montant: number; pourboire: number }>
+  tips_par_serveur: Array<{ serveur_id: string | null; serveur_nom: string; nb: number; pourboire: number }>
+  nb_commandes_encaissees: number
+  ca_total_ttc: number
+  pourboires_total: number
+  caisse_attendue: number  // fond_initial + sum especes
+}
+
+export async function getResumeSession(session_id?: string): Promise<ResumeSession | null> {
+  const supabase = await createClient()
+
+  let sessQuery = supabase
+    .from('sessions_caisse')
+    .select(`
+      id, date_session, ouverte_at, fermee_at, fond_initial, fond_final,
+      ca_attendu, ca_compte, ecart, notes,
+      ouverte:employes!ouverte_par(prenom, nom),
+      fermee:employes!fermee_par(prenom, nom)
+    `)
+  sessQuery = session_id
+    ? sessQuery.eq('id', session_id)
+    : sessQuery.is('fermee_at', null).eq('date_session', new Date().toISOString().slice(0, 10))
+
+  const { data: sess } = await sessQuery.maybeSingle()
+  if (!sess) return null
+
+  // Paiements de la session avec serveur joint
+  const { data: paiements } = await supabase
+    .from('paiements_caisse')
+    .select(`
+      methode, montant, pourboire, serveur_id,
+      serveur:employes!serveur_id(prenom, nom)
+    `)
+    .eq('session_caisse_id', sess.id)
+
+  // Agrégat par méthode
+  const mMethodes = new Map<string, { nb: number; montant: number; pourboire: number }>()
+  // Agrégat tips par serveur
+  const mTips = new Map<string, { serveur_id: string | null; serveur_nom: string; nb: number; pourboire: number }>()
+
+  for (const p of paiements ?? []) {
+    const meth = p.methode as string
+    const cur = mMethodes.get(meth) ?? { nb: 0, montant: 0, pourboire: 0 }
+    cur.nb += 1
+    cur.montant += Number(p.montant ?? 0)
+    cur.pourboire += Number(p.pourboire ?? 0)
+    mMethodes.set(meth, cur)
+
+    const tip = Number(p.pourboire ?? 0)
+    if (tip > 0) {
+      const sid = (p.serveur_id as string) ?? null
+      const serv = p.serveur as { prenom?: string; nom?: string } | null
+      const nom = serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : '— Non attribué —'
+      const key = sid ?? '__none__'
+      const c = mTips.get(key) ?? { serveur_id: sid, serveur_nom: nom, nb: 0, pourboire: 0 }
+      c.nb += 1
+      c.pourboire += tip
+      mTips.set(key, c)
+    }
+  }
+
+  // Nb commandes encaissées dans la session
+  const { count: nbCmd } = await supabase
+    .from('commandes')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_caisse_id', sess.id)
+    .eq('statut', 'encaisse')
+
+  const especes = mMethodes.get('especes')?.montant ?? 0
+  const caTotal = Array.from(mMethodes.values()).reduce((s, m) => s + m.montant, 0)
+  const tipsTotal = Array.from(mMethodes.values()).reduce((s, m) => s + m.pourboire, 0)
+
+  const ouvR = sess.ouverte as { prenom?: string; nom?: string } | null
+  const ferR = sess.fermee as { prenom?: string; nom?: string } | null
+
+  return {
+    session: {
+      id: sess.id as string,
+      date_session: sess.date_session as string,
+      ouverte_at: sess.ouverte_at as string,
+      fermee_at: (sess.fermee_at as string) ?? null,
+      fond_initial: Number(sess.fond_initial ?? 0),
+      fond_final: sess.fond_final !== null ? Number(sess.fond_final) : null,
+      ca_attendu: sess.ca_attendu !== null ? Number(sess.ca_attendu) : null,
+      ca_compte: sess.ca_compte !== null ? Number(sess.ca_compte) : null,
+      ecart: sess.ecart !== null ? Number(sess.ecart) : null,
+      notes: (sess.notes as string) ?? null,
+      ouverte_par_nom: ouvR ? `${ouvR.prenom ?? ''} ${ouvR.nom ?? ''}`.trim() : null,
+      fermee_par_nom: ferR ? `${ferR.prenom ?? ''} ${ferR.nom ?? ''}`.trim() : null,
+    },
+    paiements_par_methode: Array.from(mMethodes.entries())
+      .map(([methode, v]) => ({ methode, ...v }))
+      .sort((a, b) => b.montant - a.montant),
+    tips_par_serveur: Array.from(mTips.values()).sort((a, b) => b.pourboire - a.pourboire),
+    nb_commandes_encaissees: nbCmd ?? 0,
+    ca_total_ttc: caTotal,
+    pourboires_total: tipsTotal,
+    caisse_attendue: Number(sess.fond_initial ?? 0) + especes,
+  }
+}
+
+export async function listSessionsFermees(limit = 30) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('sessions_caisse')
+    .select('id, date_session, ouverte_at, fermee_at, fond_initial, fond_final, ca_attendu, ca_compte, ecart')
+    .not('fermee_at', 'is', null)
+    .order('date_session', { ascending: false })
+    .order('ouverte_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map(s => ({
+    id: s.id as string,
+    date_session: s.date_session as string,
+    ouverte_at: s.ouverte_at as string,
+    fermee_at: s.fermee_at as string,
+    fond_initial: Number(s.fond_initial ?? 0),
+    fond_final: s.fond_final !== null ? Number(s.fond_final) : null,
+    ca_attendu: s.ca_attendu !== null ? Number(s.ca_attendu) : null,
+    ca_compte: s.ca_compte !== null ? Number(s.ca_compte) : null,
+    ecart: s.ecart !== null ? Number(s.ecart) : null,
+  }))
+}
+
 // ─── Lectures partagées ──────────────────────────────────────────────
 
 /**
