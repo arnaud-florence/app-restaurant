@@ -27,7 +27,7 @@ export default async function BonsPrintPage({
     .select(`
       id, numero, source, numero_table, notes, created_at,
       serveur:employes!serveur_id(prenom, nom),
-      commande_articles(id, quantite, tag_destination, commentaire, recette:recettes(nom))
+      commande_articles(id, quantite, tag_destination, commentaire, allergenes_a_eviter, recette:recettes(nom))
     `)
     .eq('id', id)
     .maybeSingle()
@@ -46,6 +46,7 @@ export default async function BonsPrintPage({
     quantite: number | null
     tag_destination: string
     commentaire: string | null
+    allergenes_a_eviter: string[] | null
     recette?: { nom?: string } | null
   }
   const rawArticles = ((cmd.commande_articles ?? []) as ArticleRow[])
@@ -56,6 +57,7 @@ export default async function BonsPrintPage({
       quantite: Number(a.quantite ?? 1),
       tag_destination: a.tag_destination as TagDestination,
       commentaire: a.commentaire ?? null,
+      allergenes_a_eviter: a.allergenes_a_eviter ?? [],
     }))
     .filter(a => filterDest === null || a.tag_destination === filterDest)
 

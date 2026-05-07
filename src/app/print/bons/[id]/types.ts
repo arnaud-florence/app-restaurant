@@ -6,6 +6,7 @@ export type BonArticle = {
   quantite: number
   tag_destination: TagDestination
   commentaire: string | null
+  allergenes_a_eviter: string[]   // Module 12 — alerte cuisine sur le bon imprimé
 }
 
 export type BonsPrintData = {

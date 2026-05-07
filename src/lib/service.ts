@@ -30,6 +30,7 @@ export type ArticleService = {
   prix_unitaire_ht: number
   tag_destination: TagDestination
   commentaire: string | null
+  allergenes_a_eviter: string[]       // Module 12 — alerte cuisine
   statut: StatutArticle
 }
 

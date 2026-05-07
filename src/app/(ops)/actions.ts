@@ -91,6 +91,7 @@ const articleInputSchema = z.object({
   prix_unitaire_ht: z.number().min(0),
   tag_destination: z.enum(['CUISINE','PIZZA','BAR']),
   commentaire: z.string().max(500).optional().nullable(),
+  allergenes_a_eviter: z.array(z.string()).optional(),  // Module 12
 })
 
 const creerCommandeSchema = z.object({
@@ -144,6 +145,7 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
       prix_unitaire_ht: a.prix_unitaire_ht,
       tag_destination: a.tag_destination,
       commentaire: a.commentaire || null,
+      allergenes_a_eviter: a.allergenes_a_eviter ?? [],
       statut: 'en_attente',
     }))
   )
@@ -505,7 +507,7 @@ export async function listCommandesActives() {
     .select(`
       id, numero, source, numero_table, statut, notes, created_at,
       serveur:employes!serveur_id(prenom, nom),
-      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, statut, recette:recettes(nom))
+      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
     .not('statut', 'in', '(encaisse,annule)')
     .order('created_at', { ascending: true })
@@ -531,6 +533,7 @@ export async function listCommandesActives() {
         prix_unitaire_ht: Number(a.prix_unitaire_ht ?? 0),
         tag_destination: a.tag_destination as 'CUISINE' | 'PIZZA' | 'BAR',
         commentaire: (a.commentaire as string) ?? null,
+        allergenes_a_eviter: (a.allergenes_a_eviter as string[] | undefined) ?? [],
         statut: a.statut as StatutArticle,
       })),
     }

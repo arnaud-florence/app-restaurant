@@ -11,6 +11,7 @@ import {
 } from '@/lib/service'
 import { creerCommande, changerStatutArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
+import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 
 type Table = {
   id: string
@@ -38,6 +39,7 @@ type LignePanier = {
   tag_destination: TagDestination
   quantite: number
   commentaire: string
+  allergenes_a_eviter: Allergene[]   // Module 12 — alerte cuisine
 }
 
 type Tab = 'plan' | 'a_servir' | 'a_encaisser'
@@ -151,6 +153,7 @@ export default function ServeurClient({
         tag_destination: r.tag_destination,
         quantite: 1,
         commentaire: '',
+        allergenes_a_eviter: [],
       }]
     })
   }
@@ -163,6 +166,13 @@ export default function ServeurClient({
   }
   function modifierCommentaire(id: string, c: string) {
     setPanier(prev => prev.map(p => p.recette_id === id ? { ...p, commentaire: c } : p))
+  }
+  function toggleAllergene(id: string, a: Allergene) {
+    setPanier(prev => prev.map(p => {
+      if (p.recette_id !== id) return p
+      const has = p.allergenes_a_eviter.includes(a)
+      return { ...p, allergenes_a_eviter: has ? p.allergenes_a_eviter.filter(x => x !== a) : [...p.allergenes_a_eviter, a] }
+    }))
   }
 
   function envoyerCommande() {
@@ -180,6 +190,7 @@ export default function ServeurClient({
             prix_unitaire_ht: p.prix_unitaire_ht,
             tag_destination: p.tag_destination,
             commentaire: p.commentaire || null,
+            allergenes_a_eviter: p.allergenes_a_eviter,
           })),
         })
         flashOk(`Commande envoyée pour T${tableSelectionnee.numero}`)
@@ -326,6 +337,7 @@ export default function ServeurClient({
           onAjouter={ajouterAuPanier}
           onModifierQte={modifierQte}
           onModifierCommentaire={modifierCommentaire}
+          onToggleAllergene={toggleAllergene}
           onClose={fermerCatalogue}
           onEnvoyer={envoyerCommande}
         />
@@ -591,7 +603,7 @@ function ListeAEncaisser({
 // ─── Catalogue (Modal) ───────────────────────────────────────────────
 function CatalogueModal({
   table, recettes, panier, totalPanier, commandeExistante,
-  onAjouter, onModifierQte, onModifierCommentaire, onClose, onEnvoyer,
+  onAjouter, onModifierQte, onModifierCommentaire, onToggleAllergene, onClose, onEnvoyer,
 }: {
   table: Table
   recettes: Recette[]
@@ -601,6 +613,7 @@ function CatalogueModal({
   onAjouter: (r: Recette) => void
   onModifierQte: (id: string, delta: number) => void
   onModifierCommentaire: (id: string, c: string) => void
+  onToggleAllergene: (id: string, a: Allergene) => void
   onClose: () => void
   onEnvoyer: () => void
 }) {
@@ -721,9 +734,40 @@ function CatalogueModal({
                     type="text"
                     value={p.commentaire}
                     onChange={e => onModifierCommentaire(p.recette_id, e.target.value)}
-                    placeholder="Commentaire (allergies, cuisson…)"
+                    placeholder="Commentaire (cuisson, ajout, sans X…)"
                     className="mt-1.5 w-full px-2 py-1 text-xs rounded bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 outline-none"
                   />
+                  {/* Allergènes à éviter (Module 12) */}
+                  <details className="mt-1.5">
+                    <summary className={cn(
+                      'text-[10px] cursor-pointer px-2 py-1 rounded font-bold',
+                      p.allergenes_a_eviter.length > 0
+                        ? 'bg-red-900/40 text-red-300 border border-red-800'
+                        : 'text-zinc-400 hover:text-zinc-200',
+                    )}>
+                      🚨 ALLERGIE — {p.allergenes_a_eviter.length === 0
+                        ? 'aucune (cliquer pour signaler)'
+                        : `${p.allergenes_a_eviter.length} allergène${p.allergenes_a_eviter.length > 1 ? 's' : ''} à éviter`}
+                    </summary>
+                    <div className="flex flex-wrap gap-1 mt-1.5 p-1.5 bg-zinc-950 border border-zinc-800 rounded">
+                      {ALLERGENES_EU.map(a => {
+                        const sel = p.allergenes_a_eviter.includes(a)
+                        const info = ALLERGENE_INFO[a]
+                        return (
+                          <button key={a} onClick={() => onToggleAllergene(p.recette_id, a)}
+                            className={cn(
+                              'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                              sel
+                                ? 'bg-red-600 text-white border-red-400'
+                                : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:bg-zinc-800',
+                            )}
+                            title={info.label}>
+                            {info.emoji} {info.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </details>
                 </div>
               ))
             )}

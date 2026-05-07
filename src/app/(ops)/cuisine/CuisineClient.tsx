@@ -8,6 +8,7 @@ import {
   type CommandeService, type StatutArticle,
   STATUT_ARTICLE_LABEL, SOURCE_LABEL, statutMinuteur, STATUT_MINUTEUR_STYLE, formatEcoule, playDing,
 } from '@/lib/service'
+import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 
 type ColonneTag = 'CUISINE' | 'PIZZA'
@@ -308,6 +309,17 @@ function Ticket({
 
       {/* Corps : article(s) */}
       <div className="px-3 py-3">
+        {article.allergenes_a_eviter.length > 0 && (
+          <div className="mb-2 -mx-3 -mt-3 px-3 py-2 bg-red-600 text-white border-b-4 border-red-300 animate-pulse">
+            <p className="text-[10px] font-black uppercase tracking-wider opacity-90">🚨 ALLERGIE CLIENT</p>
+            <p className="text-sm font-bold mt-0.5">
+              ⛔ Éviter : {article.allergenes_a_eviter.map(a => {
+                const info = ALLERGENE_INFO[a as Allergene]
+                return info ? `${info.emoji} ${info.label}` : a
+              }).join(' · ')}
+            </p>
+          </div>
+        )}
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold tabular-nums">×{article.quantite}</span>
           <p className="text-lg font-semibold leading-tight">{article.recette_nom}</p>
