@@ -1,41 +1,31 @@
 'use client'
 
-// Barre de navigation tactile en bas d'écran pour les postes opérationnels.
-// Visible uniquement sur mobile (caché ≥ md). Le contenu de la page doit
-// inclure pb-mobile-nav pour ne pas être masqué par la barre.
+// Barre de navigation tactile en bas d'écran pour l'espace OPÉRATIONNEL
+// (/serveur, /cuisine, /bar, /caisse). 4 boutons fixes, identiques sur les
+// 4 pages, accessible au pouce. Visible en mobile + tablette ; cachée
+// uniquement sur desktop large où on a déjà la sidebar admin.
+//
+// Le contenu de la page doit inclure pb-mobile-nav pour ne pas être masqué.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-type Role = 'serveur' | 'barman' | 'caisse'
+const NAV: Array<{ href: string; label: string; emoji: string }> = [
+  { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
+  { href: '/cuisine', label: 'Cuisine', emoji: '👨‍🍳' },
+  { href: '/bar',     label: 'Bar',     emoji: '🍺' },
+  { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
+]
 
-const NAV_PAR_ROLE: Record<Role, Array<{ href: string; label: string; emoji: string }>> = {
-  serveur: [
-    { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
-    { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
-  ],
-  barman: [
-    { href: '/bar',    label: 'Bar',    emoji: '🍺' },
-    { href: '/caisse', label: 'Caisse', emoji: '💰' },
-  ],
-  // /caisse est utilisé par les 2 postes — on affiche les 3 raccourcis.
-  caisse: [
-    { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
-    { href: '/bar',     label: 'Bar',     emoji: '🍺' },
-    { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
-  ],
-}
-
-export default function OpsBottomNav({ role }: { role: Role }) {
+export default function OpsBottomNav() {
   const pathname = usePathname()
-  const items = NAV_PAR_ROLE[role]
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t flex shadow-[0_-2px_10px_rgba(0,0,0,0.05)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      {items.map(it => {
+      {NAV.map(it => {
         const active = pathname === it.href || pathname?.startsWith(it.href + '/')
         return (
           <Link
@@ -46,7 +36,7 @@ export default function OpsBottomNav({ role }: { role: Role }) {
               active ? 'text-emerald-700 bg-emerald-50' : 'text-zinc-700 hover:bg-zinc-50',
             )}
           >
-            <span className="text-2xl">{it.emoji}</span>
+            <span className="text-2xl leading-none">{it.emoji}</span>
             <span>{it.label}</span>
           </Link>
         )

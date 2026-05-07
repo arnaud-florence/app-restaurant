@@ -108,7 +108,7 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      <OpsBottomNav role="barman" />
+      <OpsBottomNav />
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>

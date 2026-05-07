@@ -10,6 +10,7 @@ import {
 } from '@/lib/service'
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
+import OpsBottomNav from '@/components/OpsBottomNav'
 
 type ColonneTag = 'CUISINE' | 'PIZZA'
 type Role = 'cuisinier' | 'pizzaiolo'
@@ -145,7 +146,10 @@ export default function CuisineClient({ initial, role = 'cuisinier' }: { initial
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-mobile-nav">
+      {/* Bottom nav mobile (espace opérationnel — masqué pour le pizzaiolo
+          qui a une vue concentrée sur sa colonne uniquement). */}
+      {role !== 'pizzaiolo' && <OpsBottomNav />}
       {/* Header sombre */}
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">

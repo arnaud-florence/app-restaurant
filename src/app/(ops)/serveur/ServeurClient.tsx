@@ -346,8 +346,8 @@ export default function ServeurClient({
         />
       )}
 
-      {/* Bottom nav mobile */}
-      <OpsBottomNav role="serveur" />
+      {/* Bottom nav mobile (espace opérationnel — 4 boutons uniformes) */}
+      <OpsBottomNav />
 
       {/* Modal Encaissement */}
       {encaisserCmd && (
