@@ -97,7 +97,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 21 | Réservations (chambres calendrier + tables/terrasse + événements + facture/devis/contrat imprimables) | ✅ | 0035, 0036 |
 | 22 | Prévisionnel (météo OWM + régression CA + prévision 7j + suggestions règles) | ✅ | 0037, 0038 |
 | 23 | Journal (entrées humeurs + tags + photos + analyses 6 mois + snapshot auto météo/CA) | ✅ | 0039, 0040 |
-| 24 | Assistant IA gérant | ⏳ | — |
+| 24 | Assistant IA gérant (chat Claude streaming + snapshot KPIs + alertes) | ✅ | 0041, 0042 |
 | 25 | Pilotage stratégique (KPI + PWA) | ⏳ | — |
 | 26 | Affichage dynamique salle (TV + QR) | ⏳ | — |
 | 27 | Formation des équipes | ⏳ | — |
@@ -309,6 +309,8 @@ fmtPct(n)   // 12,3 %
 
 - **Auto-impression KDS** : le toggle ON/OFF est persistant en `localStorage` par poste (`cuisine_auto_print`, `bar_auto_print`). Implémenté via iframe cachée qui appelle `window.print()` au montage. Nécessite que l'utilisateur ait interagi au moins une fois avec la page (politique navigateur).
 
+- **Assistant IA (Module 24)** : nécessite `ANTHROPIC_API_KEY=sk-ant-api03-...` dans `.env.local` (un seul `sk-ant-`, attention aux préfixes dupliqués au copier/coller). Modèle par défaut `claude-haiku-4-5`. Prompt caching activé sur le bloc persona du system prompt (~2 KB stable) ; le snapshot KPI volatile est dans un 2ᵉ bloc system non caché. Le snapshot est gelé à la création de la conversation — bouton "rafraîchir" disponible. Tarif Haiku : $1/$5 par million tokens, donc ~0,001 $ par message moyen.
+
 ## 9. Quick start
 
 ```sh
@@ -344,8 +346,10 @@ PORT=3000 node scripts/test-reservations.mjs     # Module 21
 PORT=3000 node scripts/test-previsionnel.mjs     # Module 22
 PORT=3000 node scripts/test-journal.mjs          # Module 23
 
+node scripts/test-assistant.mjs                  # Module 24 (data-only)
+PORT=3002 node scripts/test-assistant-e2e.mjs    # Module 24 (E2E streaming Claude — nécessite ANTHROPIC_API_KEY + crédit)
+
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
-# node scripts/test-assistant.mjs                # Module 24
 # node scripts/test-pilotage.mjs                 # Module 25
 # node scripts/test-affichage.mjs                # Module 26
 # node scripts/test-formation.mjs                # Module 27
