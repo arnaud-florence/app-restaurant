@@ -99,7 +99,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 23 | Journal (entrées humeurs + tags + photos + analyses 6 mois + snapshot auto météo/CA) | ✅ | 0039, 0040 |
 | 24 | Assistant IA gérant (chat Claude streaming + snapshot KPIs + alertes) | ✅ | 0041, 0042 |
 | 25 | Pilotage stratégique (10 KPIs + objectifs + plan d'action kanban + saisonnier 12 mois + PWA installable) | ✅ | 0043, 0044 |
-| 26 | Affichage dynamique salle (TV + QR) | ⏳ | — |
+| 26 | Affichage salle (TV publique rotative + menu du jour + promos + QR appel serveur realtime) | ✅ | 0045, 0046 |
 | 27 | Formation des équipes | ⏳ | — |
 | 28 | Sécurité & accès (RBAC, 2FA, audit) | ⏳ | — |
 
@@ -313,6 +313,10 @@ fmtPct(n)   // 12,3 %
 
 - **PWA Module 25** : `public/icon-192.png` et `icon-512.png` sont générés en couleur unie #10b981 par `scripts/generate-pwa-icons.mjs` (sans dépendance native). Pour un rendu de qualité, installer `sharp` puis remplacer le contenu de ces deux PNG en rasterisant `public/icon.svg`. Le service worker (`public/sw.js`) est minimal : juste assez pour rendre la PWA installable, pas de cache offline. Modifier le SW invalide la PWA installée — incrémenter une constante de version si besoin.
 
+- **Module 26 — Page TV `/affichage/tv`** : pensée pour 1920×1080 paysage, plein écran via F11/borne TV. Rotation auto 10 s entre 4 écrans (menu / météo / événements / promos). Skip silencieux des écrans sans contenu. Realtime sur `menu_du_jour` et `affichage_promos` → la TV se rafraîchit dès qu'un item est ajouté côté admin. Page publique sans authentification.
+
+- **Module 26 — QR appel serveur** : QR par table générés côté admin via lib `qrcode` (déjà installée Module 12, dynamic import client-side). URL pointée : `/table/[numero]/appel`. Anti-spam : 1 appel max par table toutes les 10 s. Le banner sur `/serveur` joue `playDing()` du Module 9A à chaque INSERT realtime — nécessite que le navigateur ait reçu une interaction utilisateur au moins une fois (politique audio).
+
 ## 9. Quick start
 
 ```sh
@@ -351,6 +355,7 @@ PORT=3000 node scripts/test-journal.mjs          # Module 23
 node scripts/test-assistant.mjs                  # Module 24 (data-only)
 PORT=3002 node scripts/test-assistant-e2e.mjs    # Module 24 (E2E streaming Claude — nécessite ANTHROPIC_API_KEY + crédit)
 PORT=3000 node scripts/test-pilotage.mjs         # Module 25
+PORT=3000 node scripts/test-affichage.mjs        # Module 26
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26

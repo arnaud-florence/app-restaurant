@@ -12,6 +12,7 @@ import {
 import { creerCommande, changerStatutArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
 import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
+import AppelsServeurBanner from './AppelsServeurBanner'
 
 type Table = {
   id: string
@@ -264,6 +265,7 @@ export default function ServeurClient({
             </Link>
           </div>
         </div>
+        <AppelsServeurBanner serveurId={serveurId || null} />
 
         {/* Tabs */}
         <div className="px-4 pb-2 flex gap-1 overflow-x-auto">
