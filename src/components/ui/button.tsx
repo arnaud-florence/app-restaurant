@@ -16,10 +16,11 @@ const buttonVariants = cva(
         success:     'bg-emerald-600 text-white hover:bg-emerald-700',
       },
       size: {
-        default: 'h-11 px-4 py-2 sm:h-10',
-        sm:      'h-9 rounded-md px-3',
+        // Mobile-first : 48px (h-12) sur tactile, plus compact sur desktop.
+        default: 'h-12 px-4 py-2 sm:h-10',
+        sm:      'h-10 rounded-md px-3 sm:h-9',
         lg:      'h-12 rounded-md px-6 text-base',
-        icon:    'h-10 w-10',
+        icon:    'h-12 w-12 sm:h-10 sm:w-10',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

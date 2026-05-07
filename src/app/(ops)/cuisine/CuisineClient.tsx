@@ -192,7 +192,7 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
       ))}
 
       {/* 2 colonnes : CUISINE / PIZZA */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-px bg-zinc-800">
+      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-800">
         <Colonne
           tag="CUISINE"
           icone="👨‍🍳"

@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-stone-50">
       <AdminNav profil={profil} />
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="flex-1 min-w-0 pb-mobile-nav">{children}</div>
     </div>
   )
 }

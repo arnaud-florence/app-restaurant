@@ -90,23 +90,61 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
+  // Raccourcis bottom-nav mobile (4 + bouton menu = 5 zones tactiles)
+  const BOTTOM_NAV: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+    { href: '/admin/pilotage',  label: 'KPIs',      icon: BarChart3 },
+    { href: '/admin/assistant', label: 'Assistant', icon: Sparkles },
+    { href: '/admin/securite',  label: 'Sécurité',  icon: ShieldCheck },
+    { href: '/caisse',          label: 'Caisse',    icon: Wallet },
+  ]
+
   return (
     <>
-      {/* Top bar mobile */}
-      <header className="md:hidden sticky top-0 z-40 bg-white border-b flex items-center px-3 h-12">
-        <button onClick={() => setOpen(true)} aria-label="Menu" className="p-2 -ml-2">
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="flex-1 text-center font-semibold truncate text-sm">
-          {GROUPES.flatMap(g => g.items).find(i => pathname?.startsWith(i.href))?.label ?? 'Admin'}
-        </div>
+      {/* Top bar mobile (titre courant + logo) */}
+      <header className="md:hidden sticky top-0 z-30 bg-white border-b flex items-center px-3 h-12">
         <Building2 className="h-5 w-5 text-emerald-600" />
+        <div className="flex-1 text-center font-semibold truncate text-sm">
+          {GROUPES.flatMap(g => g.items).find(i => pathname === i.href || pathname?.startsWith(i.href + '/'))?.label ?? 'Admin'}
+        </div>
+        <div className="w-5" />
       </header>
 
       {/* Overlay mobile */}
       {open && (
-        <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 bg-black/40 z-50 md:hidden" onClick={() => setOpen(false)} />
       )}
+
+      {/* Bottom nav mobile — accessible au pouce */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t flex items-stretch"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {BOTTOM_NAV.map(it => {
+          const active = pathname === it.href || pathname?.startsWith(it.href + '/')
+          const Icon = it.icon
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={cn(
+                'flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5',
+                active ? 'text-emerald-700' : 'text-zinc-600',
+              )}
+            >
+              <Icon className="h-6 w-6" />
+              <span>{it.label}</span>
+            </Link>
+          )
+        })}
+        <button
+          onClick={() => setOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5 text-zinc-600"
+          aria-label="Plus de modules"
+        >
+          <Menu className="h-6 w-6" />
+          <span>Plus</span>
+        </button>
+      </nav>
 
       {/* Sidebar */}
       <aside className={cn(

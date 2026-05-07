@@ -56,4 +56,35 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Améliore la zone tactile des contrôles natifs sur mobile (48px conseil WCAG/Apple). */
+  button, [role='button'], a.btn, input[type='button'], input[type='submit'], input[type='reset'] {
+    touch-action: manipulation;
+  }
+
+  /* Évite le zoom auto iOS sur focus d'un input < 16 px. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, select, textarea { font-size: inherit; }
+  }
+}
+
+@layer components {
+  /* Wrapper standard pour rendre un tableau scrollable horizontalement sur mobile. */
+  .table-wrap {
+    @apply -mx-3 sm:mx-0 overflow-x-auto;
+  }
+  .table-wrap > table {
+    @apply min-w-full;
+  }
+
+  /* Padding bas pour laisser place à la barre de nav fixe mobile (Module 28 admin). */
+  .pb-mobile-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+  @media (min-width: 768px) {
+    .pb-mobile-nav { padding-bottom: 0; }
+  }
 }

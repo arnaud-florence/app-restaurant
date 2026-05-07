@@ -138,11 +138,11 @@ function CRTab({ cr, moisLibelle, chargesFixesMensuelles, masseSalariale }: {
         <BigStat label="Résultat net" value={fmtPrix(cr.resultat_net)} accent={cr.resultat_net < 0 ? 'rouge' : cr.marge_nette_pct < 5 ? 'orange' : 'vert'} subtitle={`Marge ${fmtPct(cr.marge_nette_pct)}`} />
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white">
+      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
         <header className="px-4 py-2 border-b border-zinc-200">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📋 Compte de résultat détaillé — {moisLibelle}</h2>
         </header>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[480px]">
           <tbody className="divide-y divide-zinc-100">
             <tr className="bg-emerald-50">
               <td className="px-4 py-2 font-bold">+ Chiffre d&apos;affaires HT</td>

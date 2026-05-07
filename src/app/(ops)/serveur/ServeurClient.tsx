@@ -253,14 +253,14 @@ export default function ServeurClient({
             <select
               value={serveurId}
               onChange={e => setServeurId(e.target.value)}
-              className="text-sm px-3 h-10 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100"
+              className="text-base px-3 h-12 sm:h-10 sm:text-sm rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100"
             >
               <option value="">— Choisir serveur —</option>
               {employes.map(e => (
                 <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
               ))}
             </select>
-            <Link href="/caisse" className="text-sm px-3 h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold whitespace-nowrap">
+            <Link href="/caisse" className="text-base sm:text-sm px-4 h-12 sm:h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold whitespace-nowrap">
               💰 Caisse
             </Link>
           </div>
@@ -372,7 +372,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex items-center px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
+        'inline-flex items-center px-4 min-h-[44px] sm:min-h-0 sm:py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
         active ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
       )}
     >

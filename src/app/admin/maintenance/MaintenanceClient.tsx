@@ -342,11 +342,11 @@ function PlanningTab({ equipements, onError, onOk }: { equipements: Equipement[]
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-600">Trié par échéance. Click "+ Intervention" pour enregistrer une visite et planifier la prochaine.</p>
-      <section className="rounded-lg border border-zinc-200 bg-white">
+      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
         {sorted.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune maintenance préventive planifiée.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Équipement</th>
@@ -562,11 +562,11 @@ function ControlesTab({ equipements, onError, onOk }: { equipements: Equipement[
         Doivent être réalisés par un organisme certifié (APAVE, BUREAU VERITAS, SOCOTEC…). Conserver les rapports 5 ans.
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white">
+      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
         {concernes.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun équipement marqué comme soumis à contrôle obligatoire. Édite tes équipements pour les renseigner.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Équipement</th>
