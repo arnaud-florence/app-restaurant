@@ -15,6 +15,7 @@ type LigneEdit = {
   quantite_recue: number
   temperature_reception: string
   dlc_observee: string
+  lot_numero: string                                   // Module 11 — traçabilité
   etat_emballage: BonCommandeLigne['etat_emballage'] | ''
   note_qualite_ligne: number | null
   commentaire: string
@@ -39,6 +40,7 @@ export default function ReceptionModal({
       quantite_recue: l.quantite_recue || l.quantite_commandee,
       temperature_reception: l.temperature_reception != null ? String(l.temperature_reception) : '',
       dlc_observee: l.dlc_observee ?? '',
+      lot_numero: '',
       etat_emballage: l.etat_emballage ?? '',
       note_qualite_ligne: l.note_qualite_ligne ?? 5,
       commentaire: l.commentaire ?? '',
@@ -61,6 +63,7 @@ export default function ReceptionModal({
           quantite_recue: l.quantite_recue,
           temperature_reception: l.temperature_reception ? parseFloat(l.temperature_reception) : null,
           dlc_observee: l.dlc_observee || null,
+          lot_numero: l.lot_numero || null,
           etat_emballage: l.etat_emballage || null,
           note_qualite_ligne: l.note_qualite_ligne,
           commentaire: l.commentaire || null,
@@ -139,6 +142,23 @@ export default function ReceptionModal({
                       <option key={k} value={k}>{ETAT_EMBALLAGE_LABEL[k].label}</option>
                     ))}
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px]">N° lot (traçabilité)</Label>
+                  <Input
+                    value={l.lot_numero}
+                    onChange={e => set(idx, { lot_numero: e.target.value })}
+                    placeholder="LOT-2026-001"
+                    className="h-9 font-mono text-xs"
+                  />
+                </div>
+                <div className="space-y-1 flex flex-col justify-end">
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Si renseigné, un lot est créé automatiquement dans /admin/hygiene (Module 11).
+                  </p>
                 </div>
               </div>
 

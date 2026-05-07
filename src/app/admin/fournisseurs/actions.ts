@@ -51,6 +51,7 @@ const receptionLigneSchema = z.object({
   quantite_recue: z.number().min(0),
   temperature_reception: z.number().optional().nullable(),
   dlc_observee: z.string().optional().nullable(),
+  lot_numero: z.string().max(100).optional().nullable(),  // Module 11 — traçabilité
   etat_emballage: z.enum(['parfait','correct','abime','rejete']).optional().nullable(),
   note_qualite_ligne: z.number().int().min(1).max(5).optional().nullable(),
   commentaire: z.string().max(500).optional().nullable(),
@@ -346,8 +347,13 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
   if (!bon_id) throw new Error('bon_id manquant')
   const supabase = await createClient()
 
+  // Map ligne_id → lot_numero pour la création des lots_produits (Module 11)
+  const lotsParLigne = new Map<string, string>()
+
   for (const raw of lignes) {
     const p = receptionLigneSchema.parse(raw)
+    if (p.lot_numero && p.lot_numero.trim()) lotsParLigne.set(p.ligne_id, p.lot_numero.trim())
+
     const { error } = await supabase.from('bon_commande_lignes').update({
       quantite_recue: p.quantite_recue,
       temperature_reception: p.temperature_reception,
@@ -362,18 +368,20 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
   // Passe le bon à 'recu'
   await supabase.from('bons_commande').update({ statut: 'recu' }).eq('id', bon_id)
 
-  // Pour chaque ligne reçue : insère un mouvement_stock 'entree' + maj stock
+  // Pour chaque ligne reçue : mouvement_stock 'entree' + maj stock + lot Module 11
   const { data: lignesRecues } = await supabase
     .from('bon_commande_lignes')
-    .select('ingredient_id, quantite_recue, prix_unitaire_ht, dlc_observee')
+    .select('id, ingredient_id, quantite_recue, prix_unitaire_ht, dlc_observee, ingredient:ingredients(unite)')
     .eq('bon_commande_id', bon_id)
     .gt('quantite_recue', 0)
 
   const { data: bon } = await supabase.from('bons_commande').select('fournisseur_id, fournisseurs(nom)').eq('id', bon_id).single()
+  const fournisseurId = (bon?.fournisseur_id as string | null) ?? null
   const fournisseurNom = (bon?.fournisseurs as unknown as { nom?: string } | null)?.nom
 
   for (const l of lignesRecues ?? []) {
     if (!l.ingredient_id) continue
+
     await supabase.from('mouvements_stock').insert({
       ingredient_id: l.ingredient_id,
       type: 'entree',
@@ -383,16 +391,36 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
       date_peremption: l.dlc_observee || null,
       motif: 'Réception bon de commande',
     })
+
     // Maj stock_actuel
     const { data: ing } = await supabase.from('ingredients').select('stock_actuel').eq('id', l.ingredient_id).single()
     if (ing) {
       const newStock = Number(ing.stock_actuel) + Number(l.quantite_recue)
       await supabase.from('ingredients').update({ stock_actuel: newStock }).eq('id', l.ingredient_id)
     }
+
+    // Module 11 : crée un lot_produit si un n° de lot a été saisi à la réception
+    const lotNumero = lotsParLigne.get(l.id as string)
+    if (lotNumero) {
+      const ingUnite = (l.ingredient as unknown as { unite?: string } | null)?.unite ?? null
+      await supabase.from('lots_produits').insert({
+        ingredient_id: l.ingredient_id,
+        lot_numero: lotNumero,
+        dlc: l.dlc_observee || null,
+        fournisseur_id: fournisseurId,
+        fournisseur_nom: fournisseurNom ?? null,
+        quantite: Number(l.quantite_recue),
+        unite: ingUnite,
+        bon_commande_id: bon_id,
+        date_reception: new Date().toISOString().slice(0, 10),
+        statut: 'en_stock',
+      })
+    }
   }
 
   revalidatePath('/admin/fournisseurs')
   revalidatePath('/admin/stock')
+  revalidatePath('/admin/hygiene')
   return { ok: true as const }
 }
 
