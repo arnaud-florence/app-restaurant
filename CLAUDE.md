@@ -87,7 +87,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 11 | Hygiène & sécurité (HACCP + températures + lots + checklists + nettoyage + NC + 3D) | ✅ | 0016, 0017 |
 | 12 | Allergènes (14 EU + override + QR salle + alerte cuisine + procédures urgence) | ✅ | 0018, 0019 |
 | 13 | RH (équipe + docs + formations + planning + pointage + congés + paie + registre légal) | ✅ | 0020, 0021 |
-| 14 | Finances & pilotage (P&L, trésorerie) | ⏳ | — |
+| 14 | Finances (P&L + charges + TVA + trésorerie + simulateurs + notes frais + CSV + rapport PDF) | ✅ | 0022, 0023 |
 | 15 | Gestion énergie | ⏳ | — |
 | 16 | Maintenance & équipements | ⏳ | — |
 | 17 | Obligations légales | ⏳ | — |
@@ -333,9 +333,9 @@ PORT=3000 node scripts/test-equipes.mjs          # Module 10
 PORT=3000 node scripts/test-hygiene.mjs          # Module 11
 PORT=3000 node scripts/test-allergenes.mjs       # Module 12
 PORT=3000 node scripts/test-rh.mjs               # Module 13
+PORT=3000 node scripts/test-finances.mjs         # Module 14
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
-# node scripts/test-finances.mjs                 # Module 14
 # node scripts/test-energie.mjs                  # Module 15
 # node scripts/test-maintenance.mjs              # Module 16
 # node scripts/test-legal.mjs                    # Module 17
