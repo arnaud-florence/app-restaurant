@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
+import { canAccess, type CustomPermissions } from '@/lib/permissions'
 
 type LinkItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> }
 type Group = { label: string; items: LinkItem[] }
@@ -86,18 +87,35 @@ const SHORTCUTS_OPS = [
   { href: '/bar',     label: 'Bar',     icon: Wine },
 ]
 
-export default function AdminNav({ profil }: { profil: { email: string; role: string } }) {
+type AdminNavProfil = {
+  email: string
+  role: string
+  poste: string | null
+  custom_permissions: CustomPermissions | null
+}
+
+export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
-  // Raccourcis bottom-nav mobile pour le gérant : 4 postes ops + bouton menu (5 zones tactiles).
-  // Les modules /admin/* restent accessibles via le bouton "Plus" qui ouvre la sidebar latérale.
-  const BOTTOM_NAV: Array<{ href: string; label: string; emoji: string }> = [
+  // Filtrage par permissions : un employé voit uniquement les modules auxquels il a accès.
+  // Le manager voit tout.
+  const isManager = profil.role === 'manager'
+  const peutVoir = (href: string) =>
+    isManager || canAccess(profil.poste, href, profil.custom_permissions)
+
+  const groupesFiltres = GROUPES
+    .map(g => ({ ...g, items: g.items.filter(it => peutVoir(it.href)) }))
+    .filter(g => g.items.length > 0)
+
+  // Raccourcis bottom-nav mobile : 4 postes ops + bouton menu (5 zones tactiles).
+  const BOTTOM_NAV_ALL: Array<{ href: string; label: string; emoji: string }> = [
     { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
     { href: '/bar',     label: 'Bar',     emoji: '🍺' },
     { href: '/cuisine', label: 'Cuisine', emoji: '👨‍🍳' },
     { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
   ]
+  const BOTTOM_NAV = BOTTOM_NAV_ALL.filter(it => peutVoir(it.href))
 
   return (
     <>
@@ -105,7 +123,7 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
       <header className="md:hidden sticky top-0 z-30 bg-white border-b flex items-center px-3 h-12">
         <Building2 className="h-5 w-5 text-emerald-600" />
         <div className="flex-1 text-center font-semibold truncate text-sm">
-          {GROUPES.flatMap(g => g.items).find(i => pathname === i.href || pathname?.startsWith(i.href + '/'))?.label ?? 'Admin'}
+          {groupesFiltres.flatMap(g => g.items).find(i => pathname === i.href || pathname?.startsWith(i.href + '/'))?.label ?? 'Admin'}
         </div>
         <div className="w-5" />
       </header>
@@ -164,7 +182,7 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4 text-sm">
-          {GROUPES.map(g => (
+          {groupesFiltres.map(g => (
             <div key={g.label}>
               <h3 className="px-2 mb-1 text-xs font-bold uppercase tracking-wider text-stone-400">{g.label}</h3>
               <ul className="space-y-0.5">
@@ -191,27 +209,29 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
             </div>
           ))}
 
-          <div>
-            <h3 className="px-2 mb-1 text-xs font-bold uppercase tracking-wider text-stone-400">Opérations</h3>
-            <ul className="space-y-0.5">
-              {SHORTCUTS_OPS.map(it => {
-                const Icon = it.icon
-                return (
-                  <li key={it.href}>
-                    <Link
-                      href={it.href}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{it.label}</span>
-                      <span className="ml-auto text-xs opacity-50">↗</span>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+          {SHORTCUTS_OPS.filter(it => peutVoir(it.href)).length > 0 && (
+            <div>
+              <h3 className="px-2 mb-1 text-xs font-bold uppercase tracking-wider text-stone-400">Opérations</h3>
+              <ul className="space-y-0.5">
+                {SHORTCUTS_OPS.filter(it => peutVoir(it.href)).map(it => {
+                  const Icon = it.icon
+                  return (
+                    <li key={it.href}>
+                      <Link
+                        href={it.href}
+                        onClick={() => setOpen(false)}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{it.label}</span>
+                        <span className="ml-auto text-xs opacity-50">↗</span>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
         </nav>
 
         {/* Footer profil + logout */}
@@ -222,7 +242,9 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
             </div>
             <div className="flex-1 min-w-0">
               <div className="truncate text-xs">{profil.email}</div>
-              <div className="text-xs text-stone-400">{profil.role}</div>
+              <div className="text-xs text-stone-400">
+                {profil.role === 'manager' ? 'Gérant' : (profil.poste ?? 'Employé')}
+              </div>
             </div>
           </div>
           <form action={logoutAction}>

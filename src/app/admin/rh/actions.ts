@@ -30,7 +30,15 @@ export async function creerEmploye(input: unknown): Promise<{ id: string }> {
     .insert({ ...p, actif: true })
     .select('id').single()
   if (error || !data) throw new Error(error?.message ?? 'Erreur')
+  // Auto-link : si un profil existe déjà avec cet email, on le rattache à l'employé.
+  if (p.email) {
+    await supabase.from('profils')
+      .update({ employe_id: data.id, poste: p.poste, updated_at: new Date().toISOString() })
+      .eq('email', p.email)
+      .is('employe_id', null)
+  }
   revalidatePath('/admin/rh')
+  revalidatePath('/admin/securite')
   return { id: data.id as string }
 }
 
@@ -42,7 +50,39 @@ export async function updateEmploye(input: unknown) {
   const supabase = await createClient()
   const { error } = await supabase.from('employes').update(rest).eq('id', id)
   if (error) throw new Error(error.message)
+  // Synchronise le poste sur le profil lié si l'email match.
+  await supabase.from('profils')
+    .update({ poste: rest.poste, updated_at: new Date().toISOString() })
+    .eq('employe_id', id)
   revalidatePath('/admin/rh')
+  revalidatePath('/admin/securite')
+  return { ok: true as const }
+}
+
+// ─── Permissions personnalisées par employé ───────────────────────
+const customPermissionsSchema = z.object({
+  employe_id: z.string().uuid(),
+  allowed:    z.array(z.string().min(1)).max(50).default([]),
+  denied:     z.array(z.string().min(1)).max(50).default([]),
+})
+
+/** Met à jour les overrides de permissions du profil lié à cet employé.
+ *  Si aucun profil n'est encore lié, on stocke quand même : à la 1ère
+ *  connexion, getProfile() liera l'employé via email match et le profil
+ *  héritera des bons droits.
+ */
+export async function setEmployePermissions(input: unknown) {
+  const p = customPermissionsSchema.parse(input)
+  const supabase = await createClient()
+  const overrides = (p.allowed.length === 0 && p.denied.length === 0)
+    ? null
+    : { allowed: p.allowed, denied: p.denied }
+  const { error } = await supabase.from('profils')
+    .update({ custom_permissions: overrides, updated_at: new Date().toISOString() })
+    .eq('employe_id', p.employe_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/rh')
+  revalidatePath('/admin/securite')
   return { ok: true as const }
 }
 

@@ -1,8 +1,9 @@
-// Module 28 — Helpers d'authentification + audit pour Server Components/Actions.
+// Module 28 — Helpers d'authentification + audit + permissions pour Server Components/Actions.
 
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { canAccess, getMainRoute, type CustomPermissions } from '@/lib/permissions'
 
 export type Profil = {
   id: string
@@ -10,45 +11,92 @@ export type Profil = {
   prenom: string | null
   nom: string | null
   role: 'manager' | 'employe'
+  poste: string | null                  // dénormalisé depuis employes.poste si lien actif
+  employe_id: string | null
+  custom_permissions: CustomPermissions | null
   totp_enabled: boolean
   derniere_connexion: string | null
   created_at: string
 }
 
-/** Renvoie le profil de l'utilisateur connecté, ou null. Crée la ligne si elle n'existe pas. */
+const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, created_at'
+
+/**
+ * Renvoie le profil de l'utilisateur connecté, ou null.
+ * Crée la ligne si elle n'existe pas, avec auto-link vers `employes` si email match.
+ * Le 1ᵉʳ user qui se logue devient manager (bootstrap).
+ */
 export async function getProfile(): Promise<Profil | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Lecture du profil
   const { data: existing } = await supabase
     .from('profils')
-    .select('id, email, prenom, nom, role, totp_enabled, derniere_connexion, created_at')
+    .select(COLS)
     .eq('id', user.id)
     .maybeSingle()
-  if (existing) return existing as Profil
 
-  // Bootstrap : si aucun profil manager n'existe, le 1er user qui se logue devient manager
+  // Cherche un employé qui match par email (utile pour auto-link)
+  const { data: employe } = await supabase
+    .from('employes')
+    .select('id, poste')
+    .eq('email', user.email ?? '')
+    .eq('actif', true)
+    .maybeSingle()
+
+  if (existing) {
+    const profil = existing as Profil
+    // Si le profil n'est pas encore lié à un employé mais qu'on en trouve un, on lie.
+    if (!profil.employe_id && employe) {
+      const { data: updated } = await supabase.from('profils')
+        .update({ employe_id: employe.id, poste: employe.poste, updated_at: new Date().toISOString() })
+        .eq('id', profil.id)
+        .select(COLS).single()
+      return (updated ?? profil) as Profil
+    }
+    return profil
+  }
+
+  // Bootstrap : si aucun profil manager n'existe, le 1ᵉʳ user qui se logue devient manager.
   const { count: nbManagers } = await supabase.from('profils')
     .select('id', { count: 'exact', head: true })
     .eq('role', 'manager')
-  const role: 'manager' | 'employe' = (nbManagers ?? 0) === 0 ? 'manager' : 'employe'
+  const isFirstUser = (nbManagers ?? 0) === 0
+
+  const role: 'manager' | 'employe' = isFirstUser ? 'manager' : 'employe'
+  const poste: string | null = isFirstUser ? 'manager' : (employe?.poste ?? null)
 
   const { data: created, error } = await supabase.from('profils').insert({
     id: user.id,
     email: user.email ?? '',
     role,
-  }).select('id, email, prenom, nom, role, totp_enabled, derniere_connexion, created_at').single()
+    poste,
+    employe_id: employe?.id ?? null,
+  }).select(COLS).single()
   if (error || !created) return null
   return created as Profil
 }
 
-/** Redirige vers /login si pas de profil ou rôle insuffisant. À appeler dans le layout/page admin. */
+/** Redirige vers /login si pas de profil ou rôle insuffisant (manager). À appeler depuis /admin/* layout. */
 export async function requireManager(): Promise<Profil> {
   const profil = await getProfile()
   if (!profil) redirect('/login')
-  if (profil.role !== 'manager') redirect('/login?error=role')
+  if (profil.role !== 'manager') redirect(getMainRoute(profil.poste))
+  return profil
+}
+
+/**
+ * Vérifie qu'un profil a accès à un chemin. Sinon redirige vers sa page principale.
+ * À utiliser depuis un layout ou page admin/* pour les modules nuancés (ex: /admin/finances
+ * accessible au manager mais pas au cuisinier).
+ */
+export async function requireAccess(path: string): Promise<Profil> {
+  const profil = await getProfile()
+  if (!profil) redirect('/login')
+  if (!canAccess(profil.poste, path, profil.custom_permissions)) {
+    redirect(getMainRoute(profil.poste))
+  }
   return profil
 }
 
@@ -82,6 +130,6 @@ export async function auditLog(input: {
       ip, user_agent,
     })
   } catch {
-    // Best-effort : on n'interrompt pas l'action sensible si le log échoue
+    // Best-effort
   }
 }
