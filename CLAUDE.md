@@ -100,7 +100,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 24 | Assistant IA gérant (chat Claude streaming + snapshot KPIs + alertes) | ✅ | 0041, 0042 |
 | 25 | Pilotage stratégique (10 KPIs + objectifs + plan d'action kanban + saisonnier 12 mois + PWA installable) | ✅ | 0043, 0044 |
 | 26 | Affichage salle (TV publique rotative + menu du jour + promos + QR appel serveur realtime) | ✅ | 0045, 0046 |
-| 27 | Formation des équipes | ⏳ | — |
+| 27 | Formation (guides step-by-step par poste + quiz QCM seuil 80% + suivi progression + fiche poste imprimable) | ✅ | 0047, 0048 |
 | 28 | Sécurité & accès (RBAC, 2FA, audit) | ⏳ | — |
 
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
@@ -317,6 +317,10 @@ fmtPct(n)   // 12,3 %
 
 - **Module 26 — QR appel serveur** : QR par table générés côté admin via lib `qrcode` (déjà installée Module 12, dynamic import client-side). URL pointée : `/table/[numero]/appel`. Anti-spam : 1 appel max par table toutes les 10 s. Le banner sur `/serveur` joue `playDing()` du Module 9A à chaque INSERT realtime — nécessite que le navigateur ait reçu une interaction utilisateur au moins une fois (politique audio).
 
+- **Module 27 — Formation** : `/formation` est publique, sélection employé persistée en localStorage (`formation_employe_id`). Anti-spam quiz : 1 tentative / 24 h par guide × employé (vérifié côté action serveur). Si un guide n'a aucune question, il est validé dès toutes ses étapes vues (statut → `reussi`). UNIQUE `(guide_id, employe_id)` sur `progressions_formation` : 1 ligne max par employé par guide — utiliser `resetProgression(guide_id, employe_id)` côté admin pour réinitialiser. Cascade delete : supprimer un guide supprime étapes + questions + progressions. Procédures d'urgence (incendie, allergie, etc.) sont gérées dans Module 12 — un lien depuis `/admin/formation` pointe vers `/admin/allergenes`.
+
+- **Pages /print en RSC** : ne JAMAIS utiliser `<button onClick={...}>` dans un Server Component — Next 14 RSC interdit les event handlers en pur RSC (erreur runtime "Event handlers cannot be passed to Client Component props"). Toujours extraire le bouton imprimer dans un fichier séparé `PrintButton.tsx` avec `'use client'` (pattern utilisé par Module 27).
+
 ## 9. Quick start
 
 ```sh
@@ -356,6 +360,7 @@ node scripts/test-assistant.mjs                  # Module 24 (data-only)
 PORT=3002 node scripts/test-assistant-e2e.mjs    # Module 24 (E2E streaming Claude — nécessite ANTHROPIC_API_KEY + crédit)
 PORT=3000 node scripts/test-pilotage.mjs         # Module 25
 PORT=3000 node scripts/test-affichage.mjs        # Module 26
+PORT=3000 node scripts/test-formation.mjs        # Module 27
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
