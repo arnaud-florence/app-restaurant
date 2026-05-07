@@ -360,7 +360,7 @@ function CorrelationsTab({ data }: { data: DataPrevisionnel }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                 <XAxis dataKey="x" name="Impact météo" unit="%" type="number" domain={[-30, 15]} fontSize={11} label={{ value: 'Impact météo théorique (%)', position: 'bottom', offset: 0, fontSize: 11 }} />
                 <YAxis dataKey="y" name="CA" type="number" fontSize={11} tickFormatter={(v) => `${v}€`} />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(v: number, n: string) => n === 'CA' ? `${v}€` : `${v}%`} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(v, n) => n === 'CA' ? `${v}€` : `${v}%`} />
                 <ReferenceLine y={data.regression.intercept} stroke="#ef4444" strokeDasharray="3 3" label={{ value: `Moyenne ${data.regression.intercept.toFixed(0)}€`, position: 'right', fontSize: 10, fill: '#ef4444' }} />
                 <Scatter name="Jours" data={points} fill="#10b981" />
               </ScatterChart>

@@ -81,11 +81,11 @@ export default function AppelsServeurBanner({ serveurId }: { serveurId: string |
               </div>
               <div className="flex gap-1">
                 <button
-                  onClick={() => startTransition(() => prendreEnChargeAppel(a.id, serveurId).catch(() => {}))}
+                  onClick={() => startTransition(() => { void prendreEnChargeAppel(a.id, serveurId).catch(() => {}) })}
                   className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 rounded text-sm font-semibold inline-flex items-center gap-1"
                 ><Check className="h-4 w-4" /> Pris</button>
                 <button
-                  onClick={() => startTransition(() => annulerAppel(a.id).catch(() => {}))}
+                  onClick={() => startTransition(() => { void annulerAppel(a.id).catch(() => {}) })}
                   className="px-2 py-1 bg-zinc-700 hover:bg-zinc-800 rounded text-sm"
                 ><X className="h-4 w-4" /></button>
               </div>

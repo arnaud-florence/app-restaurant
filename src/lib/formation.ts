@@ -89,7 +89,7 @@ export function calculerScoreQuiz(reponses: number[], questions: Question[]): { 
 }
 
 /** Définit le nouveau statut d'une progression après une tentative de quiz. */
-export function statutApresQuiz(score_pct: number, seuil: number): StatutFormation {
+export function statutApresQuiz(score_pct: number, seuil: number): 'reussi' | 'echoue' {
   return score_pct >= seuil ? 'reussi' : 'echoue'
 }
 

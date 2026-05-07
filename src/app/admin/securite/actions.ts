@@ -3,15 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { authenticator } from 'otplib'
+import { generateSecret, generateURI, verifySync } from 'otplib'
 import { auditLog, requireManager } from '@/lib/auth'
 
 // ─── 2FA ─────────────────────────────────────────────────────────────
 /** Génère un secret TOTP + 10 backup codes. Renvoie le secret + l'URL otpauth pour QR. */
 export async function preparer2FA(): Promise<{ secret: string; otpauth: string; backup_codes: string[] }> {
   const profil = await requireManager()
-  const secret = authenticator.generateSecret()
-  const otpauth = authenticator.keyuri(profil.email, 'App Restaurant', secret)
+  const secret = generateSecret()
+  const otpauth = generateURI({ issuer: 'App Restaurant', label: profil.email, secret })
   const backup_codes = Array.from({ length: 10 }, () =>
     Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
   )
@@ -29,7 +29,7 @@ export async function activer2FA(input: unknown) {
   const profil = await requireManager()
   const p = activer2FASchema.parse(input)
 
-  const valid = authenticator.check(p.code, p.secret)
+  const { valid } = verifySync({ secret: p.secret, token: p.code })
   if (!valid) throw new Error('Code TOTP invalide. Vérifiez l\'horloge de votre téléphone.')
 
   const supabase = await createClient()

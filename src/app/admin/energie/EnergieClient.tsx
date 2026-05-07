@@ -154,7 +154,7 @@ function DashboardTab({ data }: { data: DataEnergie }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                 <XAxis dataKey="mois" fontSize={11} />
                 <YAxis fontSize={11} tickFormatter={(v) => v + '€'} />
-                <Tooltip formatter={(v: number) => v + ' €'} />
+                <Tooltip formatter={(v) => Number(v) + ' €'} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="Électricité" fill={TYPE_ENERGIE_INFO.electricite.cls_solid} />
                 <Bar dataKey="Gaz" fill={TYPE_ENERGIE_INFO.gaz.cls_solid} />

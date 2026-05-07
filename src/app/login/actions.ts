@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { authenticator } from 'otplib'
+import { verifySync } from 'otplib'
 import { auditLog, getClientContext } from '@/lib/auth'
 
 const loginSchema = z.object({
@@ -43,7 +43,7 @@ export async function loginAction(input: unknown): Promise<{ ok: true; needs_2fa
       await supabase.auth.signOut()
       return { ok: true, needs_2fa: true }
     }
-    const valid = authenticator.check(p.data.totp, profil.totp_secret as string)
+    const { valid } = verifySync({ secret: profil.totp_secret as string, token: p.data.totp })
     if (!valid) {
       await supabase.auth.signOut()
       await supabase.from('connexions').insert({ profil_id: profil.id, email: p.data.email, succes: false, ip, user_agent })

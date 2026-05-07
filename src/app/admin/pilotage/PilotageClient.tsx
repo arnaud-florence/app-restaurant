@@ -245,10 +245,10 @@ export default function PilotageClient({
               <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
               <Tooltip
-                formatter={(value: number, name: string) =>
+                formatter={(value, name) =>
                   name === 'CA' ? [Number(value).toLocaleString('fr-FR') + ' €', 'CA']
-                  : name === 'Couverts' ? [value, 'Couverts']
-                  : [value, name]
+                  : name === 'Couverts' ? [String(value), 'Couverts']
+                  : [String(value), String(name)]
                 }
               />
               <Legend />

@@ -1,0 +1,10 @@
+.next
+node_modules
+.env.local
+.env
+supabase/.temp
+scripts/test-*.mjs
+scripts/test-*.js
+scripts/verify-supabase.mjs
+.claude
+*.log
