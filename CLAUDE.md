@@ -90,7 +90,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 14 | Finances (P&L + charges + TVA + trésorerie + simulateurs + notes frais + CSV + rapport PDF) | ✅ | 0022, 0023 |
 | 15 | Énergie (relevés élec/gaz/eau + comparaison N vs N-1 + alerte +20% + coût/plat + suggestions) | ✅ | 0024, 0025 |
 | 16 | Maintenance (équipements + planning préventif + interventions + contrôles obligatoires alerte 1 mois) | ✅ | 0026 |
-| 17 | Obligations légales | ⏳ | — |
+| 17 | Légal (obligations + 14 affichages obligatoires + accidents travail + registre sécurité imprimable) | ✅ | 0027, 0028 |
 | 18 | Gestion des déchets | ⏳ | — |
 | 19 | Gestion des groupes (TO) | ⏳ | — |
 | 20 | Relation client & fidélité | ⏳ | — |
@@ -336,9 +336,9 @@ PORT=3000 node scripts/test-rh.mjs               # Module 13
 PORT=3000 node scripts/test-finances.mjs         # Module 14
 PORT=3000 node scripts/test-energie.mjs          # Module 15
 PORT=3000 node scripts/test-maintenance.mjs      # Module 16
+PORT=3000 node scripts/test-legal.mjs            # Module 17
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
-# node scripts/test-legal.mjs                    # Module 17
 # node scripts/test-dechets.mjs                  # Module 18
 # node scripts/test-groupes.mjs                  # Module 19
 # node scripts/test-clients.mjs                  # Module 20
