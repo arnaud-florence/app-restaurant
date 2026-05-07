@@ -83,7 +83,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 8  | Fournisseurs + bons + factures + réception | ✅ | 0010, 0011 |
 | 9A | Écrans service temps réel + caisse + Z-report | ✅ | 0012, 0013 |
 | 9B | Tickets imprimables 80mm (bons + client) | ✅ | — |
-| 10 | Communication interne équipes | ⏳ | — |
+| 10 | Communication interne équipes (chat 5 canaux + affichage + CR + matériel) | ✅ | 0014, 0015 |
 | 11 | Hygiène & sécurité alimentaire (HACCP) | ⏳ | — |
 | 12 | Allergènes & traçabilité | ⏳ | — |
 | 13 | Ressources humaines | ⏳ | — |
@@ -329,9 +329,9 @@ node scripts/test-stock.mjs                      # Module 7
 node scripts/test-fournisseurs.mjs               # Module 8
 node scripts/test-service.mjs                    # Module 9A
 PORT=3000 node scripts/test-tickets.mjs          # Module 9B
+PORT=3000 node scripts/test-equipes.mjs          # Module 10
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
-# node scripts/test-equipes.mjs                  # Module 10
 # node scripts/test-hygiene.mjs                  # Module 11
 # node scripts/test-allergenes.mjs               # Module 12
 # node scripts/test-rh.mjs                       # Module 13
