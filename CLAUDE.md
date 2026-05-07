@@ -101,7 +101,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 25 | Pilotage stratégique (10 KPIs + objectifs + plan d'action kanban + saisonnier 12 mois + PWA installable) | ✅ | 0043, 0044 |
 | 26 | Affichage salle (TV publique rotative + menu du jour + promos + QR appel serveur realtime) | ✅ | 0045, 0046 |
 | 27 | Formation (guides step-by-step par poste + quiz QCM seuil 80% + suivi progression + fiche poste imprimable) | ✅ | 0047, 0048 |
-| 28 | Sécurité & accès (RBAC, 2FA, audit) | ⏳ | — |
+| 28 | Sécurité (Supabase Auth + RBAC manager/employe + 2FA TOTP + audit + connexions + sauvegarde JSON) | ✅ | 0049, 0050 |
 
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
 
@@ -321,6 +321,16 @@ fmtPct(n)   // 12,3 %
 
 - **Pages /print en RSC** : ne JAMAIS utiliser `<button onClick={...}>` dans un Server Component — Next 14 RSC interdit les event handlers en pur RSC (erreur runtime "Event handlers cannot be passed to Client Component props"). Toujours extraire le bouton imprimer dans un fichier séparé `PrintButton.tsx` avec `'use client'` (pattern utilisé par Module 27).
 
+- **Module 28 — Bootstrap manager** : la 1ʳᵉ personne qui s'inscrit via `/login` devient automatiquement manager (logique dans `getProfile()` : si 0 ligne avec role='manager' alors le nouveau profil est créé en role='manager', sinon en role='employe'). Pour ajouter un autre manager : laisser la personne s'inscrire (compte employé par défaut), puis la promouvoir dans `/admin/securite` onglet Profils.
+
+- **Module 28 — Confirmation email Supabase** : selon la config du projet Supabase (Console → Authentication → Email Auth), `signUp()` peut envoyer un email de confirmation obligatoire. Si oui, l'utilisateur ne peut pas se connecter avant d'avoir cliqué le lien. Pour faciliter le dev local, désactiver "Confirm email" dans la console Supabase.
+
+- **Module 28 — Middleware** : `src/middleware.ts` protège `/admin/*` (redirige vers `/login` si pas de session ou rôle ≠ manager). Les pages opérationnelles (`/caisse`, `/serveur`, `/cuisine`, `/bar`) et publiques (`/affichage/tv`, `/table/*`, `/formation`, `/login`) restent accessibles sans login. Le matcher exclut explicitement `/api/assistant/stream` (Module 24) parce que le SSE doit fonctionner côté client sans rotation de cookie.
+
+- **Module 28 — RLS toujours désactivée** : single-tenant + protection middleware = l'app utilise toujours l'anon key Supabase et RLS reste OFF sur toutes les tables. Les server actions n'ont pas besoin de `service_role` key. Si on bascule un jour en multi-tenant, il faudra réactiver RLS et écrire des policies par profil.
+
+- **Module 28 — 2FA TOTP** : `otplib` génère le secret base32 + URI otpauth, lib `qrcode` affiche le QR. Codes de secours stockés en clair dans `profils.backup_codes` (text[]) — ils ne sont pas encore consommés à l'usage côté login (TODO si besoin). Si l'horloge du téléphone dérive, le code peut être rejeté — `authenticator.check()` accepte ±1 step (30s) par défaut.
+
 ## 9. Quick start
 
 ```sh
@@ -361,6 +371,7 @@ PORT=3002 node scripts/test-assistant-e2e.mjs    # Module 24 (E2E streaming Clau
 PORT=3000 node scripts/test-pilotage.mjs         # Module 25
 PORT=3000 node scripts/test-affichage.mjs        # Module 26
 PORT=3000 node scripts/test-formation.mjs        # Module 27
+PORT=3000 node scripts/test-securite.mjs         # Module 28
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
