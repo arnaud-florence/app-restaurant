@@ -90,12 +90,13 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
-  // Raccourcis bottom-nav mobile (4 + bouton menu = 5 zones tactiles)
-  const BOTTOM_NAV: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-    { href: '/admin/pilotage',  label: 'KPIs',      icon: BarChart3 },
-    { href: '/admin/assistant', label: 'Assistant', icon: Sparkles },
-    { href: '/admin/securite',  label: 'Sécurité',  icon: ShieldCheck },
-    { href: '/caisse',          label: 'Caisse',    icon: Wallet },
+  // Raccourcis bottom-nav mobile pour le gérant : 4 postes ops + bouton menu (5 zones tactiles).
+  // Les modules /admin/* restent accessibles via le bouton "Plus" qui ouvre la sidebar latérale.
+  const BOTTOM_NAV: Array<{ href: string; label: string; emoji: string }> = [
+    { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
+    { href: '/bar',     label: 'Bar',     emoji: '🍺' },
+    { href: '/cuisine', label: 'Cuisine', emoji: '👨‍🍳' },
+    { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
   ]
 
   return (
@@ -121,17 +122,16 @@ export default function AdminNav({ profil }: { profil: { email: string; role: st
       >
         {BOTTOM_NAV.map(it => {
           const active = pathname === it.href || pathname?.startsWith(it.href + '/')
-          const Icon = it.icon
           return (
             <Link
               key={it.href}
               href={it.href}
               className={cn(
-                'flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5',
-                active ? 'text-emerald-700' : 'text-zinc-600',
+                'flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5 font-semibold',
+                active ? 'text-emerald-700 bg-emerald-50' : 'text-zinc-600',
               )}
             >
-              <Icon className="h-6 w-6" />
+              <span className="text-2xl leading-none">{it.emoji}</span>
               <span>{it.label}</span>
             </Link>
           )
