@@ -12,8 +12,9 @@ import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 
 type ColonneTag = 'CUISINE' | 'PIZZA'
+type Role = 'cuisinier' | 'pizzaiolo'
 
-export default function CuisineClient({ initial }: { initial: CommandeService[] }) {
+export default function CuisineClient({ initial, role = 'cuisinier' }: { initial: CommandeService[]; role?: Role }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
@@ -149,8 +150,12 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Service — Atelier</p>
-            <h1 className="text-2xl sm:text-3xl font-bold">👨‍🍳 Cuisine</h1>
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              {role === 'pizzaiolo' ? 'Service — Pizzeria' : 'Service — Atelier'}
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              {role === 'pizzaiolo' ? '🍕 Pizzaiolo' : '👨‍🍳 Cuisine'}
+            </h1>
           </div>
           <div className="flex items-center gap-3">
             <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
@@ -191,15 +196,17 @@ export default function CuisineClient({ initial }: { initial: CommandeService[] 
         />
       ))}
 
-      {/* 2 colonnes : CUISINE / PIZZA */}
-      <main className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-800">
-        <Colonne
-          tag="CUISINE"
-          icone="👨‍🍳"
-          articles={articlesParColonne.CUISINE}
-          now={now}
-          onTransition={transition}
-        />
+      {/* Colonnes : pizzaiolo voit uniquement PIZZA, cuisinier voit les 2 */}
+      <main className={cn('flex-1 grid gap-px bg-zinc-800', role === 'pizzaiolo' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2')}>
+        {role !== 'pizzaiolo' && (
+          <Colonne
+            tag="CUISINE"
+            icone="👨‍🍳"
+            articles={articlesParColonne.CUISINE}
+            now={now}
+            onTransition={transition}
+          />
+        )}
         <Colonne
           tag="PIZZA"
           icone="🍕"

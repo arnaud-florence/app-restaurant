@@ -13,6 +13,7 @@ import { creerCommande, changerStatutArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
 import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import AppelsServeurBanner from './AppelsServeurBanner'
+import OpsBottomNav from '@/components/OpsBottomNav'
 
 type Table = {
   id: string
@@ -241,7 +242,7 @@ export default function ServeurClient({
   const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-mobile-nav">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
@@ -344,6 +345,9 @@ export default function ServeurClient({
           onEnvoyer={envoyerCommande}
         />
       )}
+
+      {/* Bottom nav mobile */}
+      <OpsBottomNav role="serveur" />
 
       {/* Modal Encaissement */}
       {encaisserCmd && (

@@ -11,6 +11,7 @@ import {
   fermerSessionCaisse,
   type ResumeSession,
 } from '../actions'
+import OpsBottomNav from '@/components/OpsBottomNav'
 
 const METHODES_LABEL: Record<string, { label: string; emoji: string }> = {
   especes:      { label: 'Espèces',      emoji: '💵' },
@@ -64,7 +65,8 @@ export default function CaisseClient({
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-mobile-nav">
+      <OpsBottomNav role="caisse" />
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>
