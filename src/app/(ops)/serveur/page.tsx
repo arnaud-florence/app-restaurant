@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { listCommandesActives } from '../actions'
 import ServeurClient from './ServeurClient'
+import { getProfile } from '@/lib/auth'
 
 export const metadata = { title: 'Serveur — Service' }
 export const dynamic = 'force-dynamic'
@@ -51,12 +52,23 @@ export default async function ServeurPage() {
     poste: e.poste as string,
   }))
 
+  // Profil de l'utilisateur connecté (pour la nav admin contextuelle).
+  // Null si mode kiosk (tablette partagée sans login).
+  const profil = await getProfile()
+  const navProfil = profil ? {
+    email: profil.email,
+    role: profil.role,
+    poste: profil.poste,
+    custom_permissions: profil.custom_permissions,
+  } : null
+
   return (
     <ServeurClient
       initialCommandes={commandes}
       tables={tables}
       recettes={recettes}
       employes={employes}
+      navProfil={navProfil}
     />
   )
 }

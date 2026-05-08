@@ -11,7 +11,7 @@ import {
   fermerSessionCaisse,
   type ResumeSession,
 } from '../actions'
-import OpsBottomNav from '@/components/OpsBottomNav'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 const METHODES_LABEL: Record<string, { label: string; emoji: string }> = {
@@ -37,11 +37,12 @@ type SessionFermee = {
 }
 
 export default function CaisseClient({
-  initialResume, sessionsFermees, employes,
+  initialResume, sessionsFermees, employes, navProfil,
 }: {
   initialResume: ResumeSession | null
   sessionsFermees: SessionFermee[]
   employes: Employe[]
+  navProfil?: OpsBottomNavProfil
 }) {
   const router = useRouter()
   const [resume, setResume] = useState(initialResume)
@@ -67,7 +68,7 @@ export default function CaisseClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      <OpsBottomNav />
+      <OpsBottomNav profil={navProfil} />
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>

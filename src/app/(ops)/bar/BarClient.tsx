@@ -10,10 +10,10 @@ import {
 } from '@/lib/service'
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
-import OpsBottomNav from '@/components/OpsBottomNav'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
-export default function BarClient({ initial }: { initial: CommandeService[] }) {
+export default function BarClient({ initial, navProfil }: { initial: CommandeService[]; navProfil?: OpsBottomNavProfil }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
@@ -109,7 +109,7 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      <OpsBottomNav />
+      <OpsBottomNav profil={navProfil} />
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>

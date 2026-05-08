@@ -22,5 +22,10 @@ export default async function CuisinePage({ searchParams }: { searchParams: { ro
   else if (profil?.poste === 'second') widgetPoste = 'second'
   else if (profil?.poste === 'pizzaiolo') widgetPoste = 'pizzaiolo'
 
-  return <CuisineClient initial={commandes} role={role} widgetPoste={widgetPoste} />
+  const navProfil = profil ? {
+    email: profil.email, role: profil.role, poste: profil.poste,
+    custom_permissions: profil.custom_permissions,
+  } : null
+
+  return <CuisineClient initial={commandes} role={role} widgetPoste={widgetPoste} navProfil={navProfil} />
 }

@@ -13,7 +13,7 @@ import { creerCommande, changerStatutArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
 import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import AppelsServeurBanner from './AppelsServeurBanner'
-import OpsBottomNav from '@/components/OpsBottomNav'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 type Table = {
@@ -48,12 +48,13 @@ type LignePanier = {
 type Tab = 'plan' | 'a_servir' | 'a_encaisser'
 
 export default function ServeurClient({
-  initialCommandes, tables, recettes, employes,
+  initialCommandes, tables, recettes, employes, navProfil,
 }: {
   initialCommandes: CommandeService[]
   tables: Table[]
   recettes: Recette[]
   employes: Employe[]
+  navProfil?: OpsBottomNavProfil
 }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initialCommandes)
@@ -348,8 +349,8 @@ export default function ServeurClient({
         />
       )}
 
-      {/* Bottom nav mobile (espace opérationnel — 4 boutons uniformes) */}
-      <OpsBottomNav />
+      {/* Bottom nav mobile + drawer modules admin selon poste utilisateur */}
+      <OpsBottomNav profil={navProfil} />
 
       {/* Modal Encaissement */}
       {encaisserCmd && (

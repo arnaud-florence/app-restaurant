@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getResumeSession, listSessionsFermees } from '../actions'
 import CaisseClient from './CaisseClient'
+import { getProfile } from '@/lib/auth'
 
 export const metadata = { title: 'Caisse — Z-report' }
 export const dynamic = 'force-dynamic'
@@ -25,11 +26,18 @@ export default async function CaissePage() {
     poste: e.poste as string,
   }))
 
+  const profil = await getProfile()
+  const navProfil = profil ? {
+    email: profil.email, role: profil.role, poste: profil.poste,
+    custom_permissions: profil.custom_permissions,
+  } : null
+
   return (
     <CaisseClient
       initialResume={resume}
       sessionsFermees={sessionsFermees}
       employes={employes}
+      navProfil={navProfil}
     />
   )
 }
