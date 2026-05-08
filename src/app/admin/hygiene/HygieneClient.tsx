@@ -28,6 +28,9 @@ import {
 
 type Tab = 'quotidien' | 'haccp' | 'lots' | 'registres'
 
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import type { PosteWidget } from '@/lib/taches-du-jour'
+
 export default function HygieneClient(props: {
   employes: Employe[]
   ingredients: IngredientShort[]
@@ -40,6 +43,7 @@ export default function HygieneClient(props: {
   ncs: NonConformite[]
   interventions: Intervention3D[]
   plansNettoyage: PlanNettoyage[]
+  widgetPoste?: PosteWidget | null
 }) {
   const [tab, setTab] = useState<Tab>('quotidien')
   const [erreur, setErreur] = useState('')
@@ -85,7 +89,8 @@ export default function HygieneClient(props: {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="max-w-7xl mx-auto p-4 space-y-4">
+        {props.widgetPoste && <TachesDuJourWidget poste={props.widgetPoste} defaultOpen />}
         {tab === 'quotidien' && (
           <QuotidienTab
             employes={props.employes}

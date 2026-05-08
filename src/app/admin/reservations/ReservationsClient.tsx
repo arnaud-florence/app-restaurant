@@ -19,10 +19,11 @@ import {
   creerEvenement, updateEvenement, changerStatutEvenement, supprimerEvenement,
 } from './actions'
 import type { DataReservations } from './page'
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 type Tab = 'chambres' | 'tables' | 'evenements'
 
-export default function ReservationsClient({ data, readOnly = false }: { data: DataReservations; readOnly?: boolean }) {
+export default function ReservationsClient({ data, readOnly = false, showTachesDuJour = false }: { data: DataReservations; readOnly?: boolean; showTachesDuJour?: boolean }) {
   const [tab, setTab] = useState<Tab>('chambres')
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
@@ -58,7 +59,8 @@ export default function ReservationsClient({ data, readOnly = false }: { data: D
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="max-w-7xl mx-auto p-4 space-y-4">
+        {showTachesDuJour && <TachesDuJourWidget poste="receptionniste" defaultOpen />}
         {tab === 'chambres'   && <ChambresTab chambres={data.chambres} resas={data.resaChambres} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'tables'     && <TablesTab resas={data.resaTables} tables={data.tables} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'evenements' && <EvenementsTab evenements={data.evenements} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}

@@ -12,11 +12,18 @@ import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import type { PosteWidget } from '@/lib/taches-du-jour'
 
 type ColonneTag = 'CUISINE' | 'PIZZA'
 type Role = 'cuisinier' | 'pizzaiolo'
 
-export default function CuisineClient({ initial, role = 'cuisinier' }: { initial: CommandeService[]; role?: Role }) {
+export default function CuisineClient({
+  initial, role = 'cuisinier', widgetPoste,
+}: {
+  initial: CommandeService[]
+  role?: Role
+  widgetPoste?: PosteWidget
+}) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
@@ -201,9 +208,9 @@ export default function CuisineClient({ initial, role = 'cuisinier' }: { initial
         />
       ))}
 
-      {/* Widget tâches du jour (cuisinier ou pizzaiolo selon role) */}
+      {/* Widget tâches du jour : pizzaiolo si ?role= sinon poste utilisateur (second/cuisinier) */}
       <div className="px-3 pt-3 bg-zinc-900">
-        <TachesDuJourWidget poste={role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier'} theme="dark" />
+        <TachesDuJourWidget poste={widgetPoste ?? (role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier')} theme="dark" />
       </div>
 
       {/* Colonnes : pizzaiolo voit uniquement PIZZA, cuisinier voit les 2 */}

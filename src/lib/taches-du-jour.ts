@@ -4,7 +4,9 @@
 // les checklists d'un parser markdown).
 
 export type Moment = 'matin' | 'service' | 'fin'
-export type PosteWidget = 'gerant' | 'serveur' | 'cuisinier' | 'pizzaiolo' | 'barman' | 'caisse'
+export type PosteWidget =
+  | 'gerant' | 'serveur' | 'cuisinier' | 'pizzaiolo' | 'barman' | 'caisse'
+  | 'receptionniste' | 'second' | 'plonge'
 
 export type Tache = {
   id: string                    // identifiant stable (utilisé en localStorage)
@@ -16,12 +18,15 @@ export type Tache = {
 type Matrice = Record<PosteWidget, Record<Moment, Tache[]>>
 
 export const POSTE_INFO: Record<PosteWidget, { label: string; emoji: string }> = {
-  gerant:    { label: 'Gérant',    emoji: '🧑‍💼' },
-  serveur:   { label: 'Serveur',   emoji: '🍽️' },
-  cuisinier: { label: 'Cuisinier', emoji: '👨‍🍳' },
-  pizzaiolo: { label: 'Pizzaiolo', emoji: '🍕' },
-  barman:    { label: 'Barman',    emoji: '🍺' },
-  caisse:    { label: 'Caisse',    emoji: '💰' },
+  gerant:         { label: 'Gérant',         emoji: '🧑‍💼' },
+  serveur:        { label: 'Serveur',        emoji: '🍽️' },
+  cuisinier:      { label: 'Cuisinier',      emoji: '👨‍🍳' },
+  pizzaiolo:      { label: 'Pizzaiolo',      emoji: '🍕' },
+  barman:         { label: 'Barman',         emoji: '🍺' },
+  caisse:         { label: 'Caisse',         emoji: '💰' },
+  receptionniste: { label: 'Réceptionniste', emoji: '🛎️' },
+  second:         { label: 'Second',         emoji: '👨‍🍳' },
+  plonge:         { label: 'Plonge / Extra', emoji: '🧽' },
 }
 
 export const MOMENT_INFO: Record<Moment, { label: string; emoji: string }> = {
@@ -150,6 +155,65 @@ export const TACHES: Matrice = {
     fin: [
       { id: 'k-f-zreport', label: 'Z-report fin de session (vérifier écart théorique/réel)', obligatoire: true, module: '/caisse' },
       { id: 'k-f-fermeture', label: 'Fermer la session caisse', obligatoire: true, module: '/caisse' },
+    ],
+  },
+
+  receptionniste: {
+    matin: [
+      { id: 'r-m-pointage', label: 'Pointer arrivée', obligatoire: true },
+      { id: 'r-m-arrivees', label: 'Liste arrivées chambres du jour', module: '/admin/reservations' },
+      { id: 'r-m-tables', label: 'Liste résas tables midi + soir', module: '/admin/reservations' },
+      { id: 'r-m-events', label: 'Vérifier événements en cours / à venir', module: '/admin/reservations' },
+      { id: 'r-m-briefing', label: 'Poster briefing équipe (chambres + tables + events)', obligatoire: true, module: '/equipes' },
+    ],
+    service: [
+      { id: 'r-s-resas', label: 'Saisir réservations entrantes (téléphone, mail, walk-in)', obligatoire: true, module: '/admin/reservations' },
+      { id: 'r-s-acompte', label: 'Encaisser acomptes à réception', obligatoire: true, module: '/admin/reservations' },
+      { id: 'r-s-checkin', label: 'Check-in / check-out chambres', obligatoire: true, module: '/admin/reservations' },
+      { id: 'r-s-clients', label: 'Mettre à jour fiches clients (allergies, préférences)', module: '/admin/clients' },
+      { id: 'r-s-reclamations', label: 'Répondre aux réclamations <48h', module: '/admin/clients' },
+    ],
+    fin: [
+      { id: 'r-f-statuts', label: 'Vérifier statuts en suspens (no_show, check-out manqué)', obligatoire: true, module: '/admin/reservations' },
+      { id: 'r-f-briefing', label: 'Préparer briefing du lendemain', module: '/equipes' },
+      { id: 'r-f-pointage', label: 'Pointer sortie', obligatoire: true },
+    ],
+  },
+
+  second: {
+    matin: [
+      { id: 'sd-m-pointage', label: 'Pointer arrivée', obligatoire: true },
+      { id: 'sd-m-previsionnel', label: 'Lecture météo + prévisionnel CA', module: '/admin/previsionnel' },
+      { id: 'sd-m-temp', label: 'Vérifier que les relevés température sont saisis', obligatoire: true, module: '/admin/hygiene' },
+      { id: 'sd-m-briefing', label: 'Briefing équipe cuisine (canal Cuisine)', obligatoire: true, module: '/equipes' },
+      { id: 'sd-m-dlc', label: 'Identifier les lots à priorité (DLC critique)', module: '/admin/hygiene' },
+    ],
+    service: [
+      { id: 'sd-s-supervise', label: 'Superviser /cuisine, intervenir si besoin', module: '/cuisine' },
+      { id: 'sd-s-allergenes', label: 'Sécuriser les commandes allergènes (vérification)', module: '/admin/allergenes' },
+    ],
+    fin: [
+      { id: 'sd-f-validation', label: 'Valider la pesée déchets (cohérence)', module: '/admin/dechets' },
+      { id: 'sd-f-lots', label: 'Vérifier statuts lots à jour (consommé/jeté/en_stock)', module: '/admin/hygiene' },
+      { id: 'sd-f-journal', label: 'Saisir entrée journal cuisine si fait marquant', module: '/admin/journal' },
+      { id: 'sd-f-pointage', label: 'Pointer sortie', obligatoire: true },
+    ],
+  },
+
+  plonge: {
+    matin: [
+      { id: 'pl-m-pointage', label: 'Pointer arrivée', obligatoire: true },
+      { id: 'pl-m-equipe', label: 'Lire chat équipe (consignes)', module: '/equipes' },
+    ],
+    service: [
+      { id: 'pl-s-plonge', label: 'Plonge en continu (couverts, casseroles)', obligatoire: true },
+      { id: 'pl-s-rangement', label: 'Aide rangement et tri si besoin' },
+    ],
+    fin: [
+      { id: 'pl-f-checklist', label: 'Cocher checklist nettoyage cuisine (au fur et à mesure)', obligatoire: true, module: '/admin/hygiene' },
+      { id: 'pl-f-dechets', label: 'Pesée déchets (toutes catégories)', obligatoire: true, module: '/admin/dechets' },
+      { id: 'pl-f-poubelles', label: 'Sortir les poubelles aux containers extérieurs', obligatoire: true },
+      { id: 'pl-f-pointage', label: 'Pointer sortie', obligatoire: true },
     ],
   },
 }

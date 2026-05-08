@@ -126,6 +126,11 @@ export default async function ReservationsPage() {
 
   const profil = await getProfile()
   const readOnly = isReadOnly(profil?.poste, '/admin/reservations', profil?.custom_permissions)
+  const showTaches = profil?.poste === 'receptionniste'
 
-  return <ReservationsClient data={{ chambres, resaChambres, resaTables, evenements, tables }} readOnly={readOnly} />
+  return <ReservationsClient
+    data={{ chambres, resaChambres, resaTables, evenements, tables }}
+    readOnly={readOnly}
+    showTachesDuJour={showTaches}
+  />
 }

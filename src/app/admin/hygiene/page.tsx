@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import HygieneClient from './HygieneClient'
+import { getProfile } from '@/lib/auth'
+import type { PosteWidget } from '@/lib/taches-du-jour'
 import type {
   PlanHaccp, Lot, NonConformite, Intervention3D, PlanNettoyage,
   ReleveTemperature, ProcedureHygiene, ChecklistHygiene,
@@ -198,6 +200,22 @@ export default async function HygienePage() {
     created_at: p.created_at as string,
   }))
 
+  // Détecte le poste de l'utilisateur connecté pour afficher le bon widget
+  // Tâches du jour. Manager ne voit pas de widget ici (il a le sien sur
+  // /admin/pilotage). Les autres postes voient le leur s'ils en ont un
+  // dans la matrice des tâches qui couvre /admin/hygiene.
+  const profil = await getProfile()
+  let widgetPoste: PosteWidget | null = null
+  switch (profil?.poste) {
+    case 'plonge': case 'extra':         widgetPoste = 'plonge'; break
+    case 'cuisine': case 'cuisinier':    widgetPoste = 'cuisinier'; break
+    case 'pizzaiolo':                    widgetPoste = 'pizzaiolo'; break
+    case 'salle': case 'serveur':        widgetPoste = 'serveur'; break
+    case 'bar': case 'barman':           widgetPoste = 'barman'; break
+    case 'second':                       widgetPoste = 'second'; break
+    default:                             widgetPoste = null  // manager ou autre
+  }
+
   return (
     <HygieneClient
       employes={employes}
@@ -211,6 +229,7 @@ export default async function HygienePage() {
       ncs={ncs}
       interventions={interventions}
       plansNettoyage={plansNettoyage}
+      widgetPoste={widgetPoste}
     />
   )
 }
