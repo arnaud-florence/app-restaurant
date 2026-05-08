@@ -21,10 +21,11 @@ import { toggleRecetteActif, deleteRecette } from './actions'
 import RecetteFormModal from './RecetteFormModal'
 
 export default function RecettesClient({
-  initialRecettes, ingredients,
+  initialRecettes, ingredients, readOnly = false,
 }: {
   initialRecettes: RecetteWithIngredients[]
   ingredients: Ingredient[]
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -113,11 +114,13 @@ export default function RecettesClient({
                   <span className="sm:hidden">📊 Engineering</span>
                 </Button>
               </Link>
-              <Button size="lg" onClick={() => setCreating(true)}>
-                <span className="text-lg">+</span>
-                <span className="hidden sm:inline">Nouvelle recette</span>
-                <span className="sm:hidden">Ajouter</span>
-              </Button>
+              {!readOnly && (
+                <Button size="lg" onClick={() => setCreating(true)}>
+                  <span className="text-lg">+</span>
+                  <span className="hidden sm:inline">Nouvelle recette</span>
+                  <span className="sm:hidden">Ajouter</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -184,6 +187,7 @@ export default function RecettesClient({
                 key={recette.id}
                 recette={recette}
                 synth={s}
+                readOnly={readOnly}
                 onEdit={() => setEditing(recette)}
                 onToggle={() => onActiver(recette, !recette.actif)}
                 onDelete={() => setConfirmDelete(recette)}
@@ -256,10 +260,11 @@ function KPI({ label, value, tone, icon, pulse }: {
 
 // ─── Carte recette ───────────────────────────────────────────────────
 function RecetteCard({
-  recette: r, synth: s, onEdit, onToggle, onDelete,
+  recette: r, synth: s, readOnly = false, onEdit, onToggle, onDelete,
 }: {
   recette: RecetteWithIngredients
   synth: ReturnType<typeof synthese>
+  readOnly?: boolean
   onEdit: () => void
   onToggle: () => void
   onDelete: () => void
@@ -355,14 +360,16 @@ function RecetteCard({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-1 mt-auto pt-2">
-          <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
-          <Button size="sm" variant="ghost" onClick={onToggle} title={r.actif ? 'Désactiver' : 'Activer'}>
-            {r.actif ? '🚫' : '✓'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive" title="Supprimer">🗑</Button>
-        </div>
+        {/* Actions — masquées en lecture seule */}
+        {!readOnly && (
+          <div className="flex gap-1 mt-auto pt-2">
+            <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
+            <Button size="sm" variant="ghost" onClick={onToggle} title={r.actif ? 'Désactiver' : 'Activer'}>
+              {r.actif ? '🚫' : '✓'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive" title="Supprimer">🗑</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

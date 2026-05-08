@@ -1,12 +1,16 @@
 import BoissonsClient from './BoissonsClient'
 import { listBoissons } from './actions'
 import { createClient } from '@/lib/supabase/server'
+import { getProfile } from '@/lib/auth'
+import { isReadOnly } from '@/lib/permissions'
 
 export const metadata = { title: 'Carte des vins & boissons — Admin' }
 export const dynamic = 'force-dynamic'
 
 export default async function BoissonsPage() {
   const supabase = await createClient()
+  const profil = await getProfile()
+  const readOnly = isReadOnly(profil?.poste, '/admin/boissons', profil?.custom_permissions)
 
   const [boissons, recettesRes, accordsRes] = await Promise.all([
     listBoissons(),
@@ -40,6 +44,7 @@ export default async function BoissonsPage() {
       boissons={boissons}
       recettes={recettes}
       accordsParBoisson={accordsParBoisson}
+      readOnly={readOnly}
     />
   )
 }

@@ -4,6 +4,8 @@ import {
   type Chambre, type ResaChambre, type ResaTable, type Evenement,
   type StatutResa, type StatutResaTable, type StatutEvent, type TypeEvenement,
 } from '@/lib/reservations'
+import { getProfile } from '@/lib/auth'
+import { isReadOnly } from '@/lib/permissions'
 
 export const metadata = { title: 'Réservations & événementiel — Admin' }
 export const dynamic = 'force-dynamic'
@@ -122,5 +124,8 @@ export default async function ReservationsPage() {
     zone: (t.zone as string) ?? 'salle',
   }))
 
-  return <ReservationsClient data={{ chambres, resaChambres, resaTables, evenements, tables }} />
+  const profil = await getProfile()
+  const readOnly = isReadOnly(profil?.poste, '/admin/reservations', profil?.custom_permissions)
+
+  return <ReservationsClient data={{ chambres, resaChambres, resaTables, evenements, tables }} readOnly={readOnly} />
 }

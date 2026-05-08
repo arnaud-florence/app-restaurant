@@ -19,7 +19,7 @@ import HistoriquePrixModal from './HistoriquePrixModal'
 const fmtPrix = (n: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(n)
 
-export default function IngredientsClient({ initial }: { initial: Ingredient[] }) {
+export default function IngredientsClient({ initial, readOnly = false }: { initial: Ingredient[]; readOnly?: boolean }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filtreCat, setFiltreCat] = useState<string>('')
@@ -89,11 +89,13 @@ export default function IngredientsClient({ initial }: { initial: Ingredient[] }
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Catalogue produits</p>
               <h1 className="text-xl sm:text-2xl font-bold">🥬 Ingrédients</h1>
             </div>
-            <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
-              <span className="text-lg">+</span>
-              <span className="hidden sm:inline">Ajouter un ingrédient</span>
-              <span className="sm:hidden">Ajouter</span>
-            </Button>
+            {!readOnly && (
+              <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
+                <span className="text-lg">+</span>
+                <span className="hidden sm:inline">Ajouter un ingrédient</span>
+                <span className="sm:hidden">Ajouter</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -155,6 +157,7 @@ export default function IngredientsClient({ initial }: { initial: Ingredient[] }
                 <IngredientCard
                   key={i.id}
                   i={i}
+                  readOnly={readOnly}
                   onEdit={() => setEditing(i)}
                   onHistorique={() => setHistorique(i)}
                   onToggle={() => onActiver(i, !i.actif)}
@@ -183,6 +186,7 @@ export default function IngredientsClient({ initial }: { initial: Ingredient[] }
                         <IngredientRow
                           key={i.id}
                           i={i}
+                          readOnly={readOnly}
                           onEdit={() => setEditing(i)}
                           onHistorique={() => setHistorique(i)}
                           onToggle={() => onActiver(i, !i.actif)}
@@ -267,9 +271,10 @@ function KPI({ label, value, tone, icon, pulse }: {
 
 // ─── Mobile : carte ──────────────────────────────────────────────────
 function IngredientCard({
-  i, onEdit, onHistorique, onToggle, onDelete,
+  i, readOnly = false, onEdit, onHistorique, onToggle, onDelete,
 }: {
   i: Ingredient
+  readOnly?: boolean
   onEdit: () => void
   onHistorique: () => void
   onToggle: () => void
@@ -314,12 +319,16 @@ function IngredientCard({
         )}
 
         <div className="flex flex-wrap gap-1.5 pt-1">
-          <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
           <Button size="sm" variant="ghost" onClick={onHistorique}>📈 Prix</Button>
-          <Button size="sm" variant="ghost" onClick={onToggle}>
-            {i.actif ? '🚫' : '✓'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive">🗑</Button>
+          {!readOnly && (
+            <>
+              <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
+              <Button size="sm" variant="ghost" onClick={onToggle}>
+                {i.actif ? '🚫' : '✓'}
+              </Button>
+            </>
+          )}
+          {!readOnly && <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive">🗑</Button>}
         </div>
       </CardContent>
     </Card>
@@ -328,9 +337,10 @@ function IngredientCard({
 
 // ─── Desktop : ligne ─────────────────────────────────────────────────
 function IngredientRow({
-  i, onEdit, onHistorique, onToggle, onDelete,
+  i, readOnly = false, onEdit, onHistorique, onToggle, onDelete,
 }: {
   i: Ingredient
+  readOnly?: boolean
   onEdit: () => void
   onHistorique: () => void
   onToggle: () => void
@@ -365,11 +375,15 @@ function IngredientRow({
       <td className="py-3 px-4">
         <div className="flex justify-end gap-1">
           <Button size="sm" variant="ghost" onClick={onHistorique} title="Historique des prix">📈</Button>
-          <Button size="sm" variant="ghost" onClick={onEdit} title="Modifier">✏️</Button>
-          <Button size="sm" variant="ghost" onClick={onToggle} title={i.actif ? 'Désactiver' : 'Activer'}>
-            {i.actif ? '🚫' : '✓'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} title="Supprimer" className="text-destructive">🗑</Button>
+          {!readOnly && (
+            <>
+              <Button size="sm" variant="ghost" onClick={onEdit} title="Modifier">✏️</Button>
+              <Button size="sm" variant="ghost" onClick={onToggle} title={i.actif ? 'Désactiver' : 'Activer'}>
+                {i.actif ? '🚫' : '✓'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={onDelete} title="Supprimer" className="text-destructive">🗑</Button>
+            </>
+          )}
         </div>
       </td>
     </tr>

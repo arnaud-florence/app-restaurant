@@ -22,7 +22,7 @@ import type { DataReservations } from './page'
 
 type Tab = 'chambres' | 'tables' | 'evenements'
 
-export default function ReservationsClient({ data }: { data: DataReservations }) {
+export default function ReservationsClient({ data, readOnly = false }: { data: DataReservations; readOnly?: boolean }) {
   const [tab, setTab] = useState<Tab>('chambres')
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
@@ -59,9 +59,9 @@ export default function ReservationsClient({ data }: { data: DataReservations })
       </header>
 
       <main className="max-w-7xl mx-auto p-4">
-        {tab === 'chambres'   && <ChambresTab chambres={data.chambres} resas={data.resaChambres} onError={flashKo} onOk={flashOk} />}
-        {tab === 'tables'     && <TablesTab resas={data.resaTables} tables={data.tables} onError={flashKo} onOk={flashOk} />}
-        {tab === 'evenements' && <EvenementsTab evenements={data.evenements} onError={flashKo} onOk={flashOk} />}
+        {tab === 'chambres'   && <ChambresTab chambres={data.chambres} resas={data.resaChambres} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
+        {tab === 'tables'     && <TablesTab resas={data.resaTables} tables={data.tables} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
+        {tab === 'evenements' && <EvenementsTab evenements={data.evenements} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
       </main>
 
       {erreur && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30 cursor-pointer" onClick={() => setErreur('')}>⚠️ {erreur}</div>}
@@ -94,7 +94,7 @@ function KPI({ label, value, accent = 'zinc' }: { label: string; value: number; 
 }
 
 // ─── TAB 1 — Chambres ──────────────────────────────────────────────
-function ChambresTab({ chambres, resas, onError, onOk }: { chambres: Chambre[]; resas: ResaChambre[]; onError: (e: unknown) => void; onOk: (m: string) => void }) {
+function ChambresTab({ chambres, resas, readOnly = false, onError, onOk }: { chambres: Chambre[]; resas: ResaChambre[]; readOnly?: boolean; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const [refDate, setRefDate] = useState(new Date())
   const [showResa, setShowResa] = useState<{ chambre_id: string; date: string } | null>(null)
   const [openResa, setOpenResa] = useState<ResaChambre | null>(null)
@@ -141,6 +141,8 @@ function ChambresTab({ chambres, resas, onError, onOk }: { chambres: Chambre[]; 
                             title={`${occup.client_nom} · ${fmtDate(occup.date_arrivee)} → ${fmtDate(occup.date_depart)}`}>
                             {occup.client_nom.split(' ')[0].slice(0, 6)}
                           </button>
+                        ) : readOnly ? (
+                          <div className="w-full h-10" />
                         ) : (
                           <button onClick={() => setShowResa({ chambre_id: c.id, date: j.iso })}
                             className="w-full h-10 rounded border border-dashed border-zinc-200 hover:border-zinc-400 text-zinc-400 hover:text-zinc-700 text-xs">
@@ -283,7 +285,7 @@ function DetailResaChambreModal({ resa, chambre, onClose, onError, onOk }: {
 }
 
 // ─── TAB 2 — Tables/terrasse ───────────────────────────────────────
-function TablesTab({ resas, tables, onError, onOk }: { resas: ResaTable[]; tables: { id: string; numero: string; capacite: number; zone: string }[]; onError: (e: unknown) => void; onOk: (m: string) => void }) {
+function TablesTab({ resas, tables, readOnly = false, onError, onOk }: { resas: ResaTable[]; tables: { id: string; numero: string; capacite: number; zone: string }[]; readOnly?: boolean; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const [showForm, setShowForm] = useState(false)
   const [filtreDate, setFiltreDate] = useState(new Date().toISOString().slice(0, 10))
   const router = useRouter()
@@ -296,7 +298,7 @@ function TablesTab({ resas, tables, onError, onOk }: { resas: ResaTable[]; table
         <Field label="Date">
           <input type="date" value={filtreDate} onChange={e => setFiltreDate(e.target.value)} className="h-10 px-3 rounded-md border border-zinc-300" />
         </Field>
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réservation</button>
+        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réservation</button>}
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white">
@@ -327,7 +329,7 @@ function TablesTab({ resas, tables, onError, onOk }: { resas: ResaTable[]; table
                     {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'arrivee'); onOk('Arrivée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">↗ Arrivée</button>}
                     {r.statut === 'arrivee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'terminee'); onOk('Terminée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white font-bold">✓ Fini</button>}
                     {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'no_show'); onOk('No-show'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-red-100 text-red-900 border border-red-300 font-bold">✗ No-show</button>}
-                    <button onClick={async () => { if (!confirm('Supprimer ?')) return; try { await supprimerResaTable(r.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-6 px-2 text-zinc-400 hover:text-red-600">×</button>
+                    {!readOnly && <button onClick={async () => { if (!confirm('Supprimer ?')) return; try { await supprimerResaTable(r.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-6 px-2 text-zinc-400 hover:text-red-600">×</button>}
                   </div>
                 </li>
               )
@@ -410,7 +412,7 @@ function ResaTableModal({ date, tables, onClose, onError, onSuccess }: { date: s
 }
 
 // ─── TAB 3 — Événements ────────────────────────────────────────────
-function EvenementsTab({ evenements, onError, onOk }: { evenements: Evenement[]; onError: (e: unknown) => void; onOk: (m: string) => void }) {
+function EvenementsTab({ evenements, readOnly = false, onError, onOk }: { evenements: Evenement[]; readOnly?: boolean; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const [showForm, setShowForm] = useState<Evenement | true | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const router = useRouter()
@@ -418,7 +420,7 @@ function EvenementsTab({ evenements, onError, onOk }: { evenements: Evenement[];
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel événement</button>
+        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel événement</button>}
       </div>
 
       <div className="space-y-2">
@@ -458,7 +460,7 @@ function EvenementsTab({ evenements, onError, onOk }: { evenements: Evenement[];
                   {e.besoins_techniques && <p><b>Technique :</b> {e.besoins_techniques}</p>}
                   {e.notes && <p className="italic">Notes : {e.notes}</p>}
                   <div className="flex gap-2 flex-wrap pt-2">
-                    <button onClick={() => setShowForm(e)} className="text-xs h-9 px-3 rounded border border-zinc-300 bg-white hover:bg-zinc-100 font-bold">✏️ Modifier</button>
+                    {!readOnly && <button onClick={() => setShowForm(e)} className="text-xs h-9 px-3 rounded border border-zinc-300 bg-white hover:bg-zinc-100 font-bold">✏️ Modifier</button>}
                     <a href={`/admin/reservations/evenements/${e.id}/devis/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-blue-600 hover:bg-blue-500 text-white font-bold">📋 Devis</a>
                     {e.privatisation && <a href={`/admin/reservations/evenements/${e.id}/contrat/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-red-600 hover:bg-red-500 text-white font-bold">📜 Contrat</a>}
                     {e.statut === 'demande' && <button onClick={async () => { try { await changerStatutEvenement(e.id, 'confirmee'); onOk('Confirmé'); router.refresh() } catch (err) { onError(err) } }} className="text-xs h-9 px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}

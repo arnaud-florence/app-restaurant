@@ -20,6 +20,7 @@ export type Poste =
 
 export type Permissions = {
   allowed: string[]      // routes autorisées (préfixes). '*' = toutes.
+  readonly?: string[]    // routes accessibles en lecture seule (Add/Edit/Delete cachés)
   main: string           // page d'accueil par défaut du rôle
   label: string          // affichage UI
 }
@@ -52,13 +53,18 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/cuisine',
     allowed: [
       '/cuisine',
-      '/admin/recettes',                // lecture seule (v2)
-      '/admin/ingredients',             // lecture seule (v2)
-      '/admin/stock',                   // déduction tablette uniquement (v2)
+      '/admin/recettes',
+      '/admin/ingredients',
+      '/admin/stock',
       '/admin/hygiene',                 // checklists et températures
-      '/admin/allergenes',              // lecture seule (v2)
+      '/admin/allergenes',
       '/admin/dechets',
       ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/recettes',
+      '/admin/ingredients',
+      '/admin/allergenes',
     ],
   },
   cuisinier: { /* alias — populé après ce bloc */ } as unknown as Permissions,
@@ -68,13 +74,18 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/cuisine?role=pizzaiolo',
     allowed: [
       '/cuisine',                       // colonne pizza uniquement (v2 filtre contenu)
-      '/admin/recettes',                // pizza uniquement (v2)
-      '/admin/ingredients',             // pizza uniquement (v2)
-      '/admin/stock',                   // déduction pizza (v2)
-      '/admin/hygiene',                 // checklists pizza (v2)
-      '/admin/allergenes',              // pizza uniquement (v2)
+      '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
+      '/admin/ingredients',             // pizza uniquement (v2 filtre contenu)
+      '/admin/stock',                   // déduction pizza (v2 filtre contenu)
+      '/admin/hygiene',                 // checklists pizza (v2 filtre contenu)
+      '/admin/allergenes',              // pizza uniquement (v2 filtre contenu)
       '/admin/dechets',
       ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/recettes',
+      '/admin/ingredients',
+      '/admin/allergenes',
     ],
   },
 
@@ -85,12 +96,18 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     allowed: [
       '/serveur', '/caisse',
       '/admin/clients',
-      '/admin/allergenes',              // lecture seule (v2)
-      '/admin/boissons',                // lecture seule (v2)
-      '/admin/reservations',            // lecture seule (v2)
-      '/admin/evenements',              // lecture seule (v2)
+      '/admin/allergenes',
+      '/admin/boissons',
+      '/admin/reservations',
+      '/admin/evenements',
       '/admin/hygiene',                 // checklists salle
       ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/allergenes',
+      '/admin/boissons',
+      '/admin/reservations',
+      '/admin/evenements',
     ],
   },
 
@@ -120,8 +137,11 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
       '/admin/clients',
       '/admin/chambres',                // route legacy si existe, sinon dans reservations
       '/admin/groupes',
-      '/admin/allergenes',              // lecture seule (v2)
+      '/admin/allergenes',
       ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/allergenes',
     ],
   },
 
@@ -152,6 +172,8 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 export type CustomPermissions = {
   allowed?: string[]                    // routes accordées en plus de la matrice
   denied?: string[]                     // routes interdites en plus de la matrice
+  readonly?: string[]                   // routes forcées en lecture seule en plus de la matrice
+  writable?: string[]                   // routes où la lecture seule de la matrice est levée
 }
 
 /** Renvoie les permissions effectives (matrice + overrides). */
@@ -197,6 +219,30 @@ export function canAccess(
 /** Page d'accueil du rôle (pour le redirect post-login + accès non autorisé). */
 export function getMainRoute(poste: string | null | undefined): string {
   return getPermissions(poste).main
+}
+
+/**
+ * Indique si un chemin est en lecture seule pour ce poste.
+ * Le manager et les overrides "writable" lèvent la restriction.
+ * Les overrides "readonly" forcent la restriction même si la matrice ne le prévoit pas.
+ */
+export function isReadOnly(
+  poste: string | null | undefined,
+  path: string,
+  overrides?: CustomPermissions | null,
+): boolean {
+  // Manager (poste 'manager' OU '*' dans allowed) = jamais en lecture seule.
+  const perms = getPermissions(poste)
+  if (perms.allowed.includes('*')) return false
+
+  // Override writable lève la restriction même si matrice impose readonly.
+  if (overrides?.writable?.some(p => pathMatchPrefix(path, p))) return false
+
+  // Override readonly impose la restriction.
+  if (overrides?.readonly?.some(p => pathMatchPrefix(path, p))) return true
+
+  // Matrice
+  return (perms.readonly ?? []).some(p => pathMatchPrefix(path, p))
 }
 
 /** Liste des items de nav qu'un poste peut voir (pour filtrer AdminNav). */

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import AllergenesClient from './AllergenesClient'
 import { allergenesRecette, type Allergene, type ProcedureUrgence, type TypeProcedureUrgence } from '@/lib/allergenes'
+import { getProfile } from '@/lib/auth'
+import { isReadOnly } from '@/lib/permissions'
 
 export const metadata = { title: 'Allergènes & traçabilité — Admin' }
 export const dynamic = 'force-dynamic'
@@ -18,6 +20,8 @@ export type RecetteAllergenes = {
 
 export default async function AllergenesPage() {
   const supabase = await createClient()
+  const profil = await getProfile()
+  const readOnly = isReadOnly(profil?.poste, '/admin/allergenes', profil?.custom_permissions)
 
   const [recettesRes, procRes] = await Promise.all([
     supabase
@@ -72,5 +76,5 @@ export default async function AllergenesPage() {
     actif: Boolean(p.actif),
   }))
 
-  return <AllergenesClient recettes={recettes} procedures={procedures} />
+  return <AllergenesClient recettes={recettes} procedures={procedures} readOnly={readOnly} />
 }

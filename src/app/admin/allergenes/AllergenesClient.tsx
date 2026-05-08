@@ -17,10 +17,11 @@ import type { RecetteAllergenes } from './page'
 type Tab = 'catalogue' | 'procedures' | 'qr'
 
 export default function AllergenesClient({
-  recettes, procedures,
+  recettes, procedures, readOnly = false,
 }: {
   recettes: RecetteAllergenes[]
   procedures: ProcedureUrgence[]
+  readOnly?: boolean
 }) {
   const [tab, setTab] = useState<Tab>('catalogue')
   const [erreur, setErreur] = useState('')
@@ -57,8 +58,8 @@ export default function AllergenesClient({
       </header>
 
       <main className="max-w-7xl mx-auto p-4">
-        {tab === 'catalogue'  && <CatalogueTab recettes={recettes} onError={flashKo} onOk={flashOk} />}
-        {tab === 'procedures' && <ProceduresTab procedures={procedures} onError={flashKo} onOk={flashOk} />}
+        {tab === 'catalogue'  && <CatalogueTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
+        {tab === 'procedures' && <ProceduresTab procedures={procedures} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'qr'         && <QRTab />}
       </main>
 
@@ -83,9 +84,10 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 // ─── TAB 1 — Catalogue plats × allergènes ──────────────────────────
 function CatalogueTab({
-  recettes, onError, onOk,
+  recettes, readOnly = false, onError, onOk,
 }: {
   recettes: RecetteAllergenes[]
+  readOnly?: boolean
   onError: (e: unknown) => void
   onOk: (m: string) => void
 }) {
@@ -169,10 +171,12 @@ function CatalogueTab({
                     </p>
                   )}
                 </div>
-                <button onClick={() => setEditing(r)}
-                  className="shrink-0 text-xs h-8 px-3 rounded-md border border-zinc-300 hover:bg-zinc-50 font-bold">
-                  Override
-                </button>
+                {!readOnly && (
+                  <button onClick={() => setEditing(r)}
+                    className="shrink-0 text-xs h-8 px-3 rounded-md border border-zinc-300 hover:bg-zinc-50 font-bold">
+                    Override
+                  </button>
+                )}
               </article>
             ))}
           </div>
@@ -260,9 +264,10 @@ function OverrideModal({
 
 // ─── TAB 2 — Procédures d'urgence ──────────────────────────────────
 function ProceduresTab({
-  procedures, onError, onOk,
+  procedures, readOnly = false, onError, onOk,
 }: {
   procedures: ProcedureUrgence[]
+  readOnly?: boolean
   onError: (e: unknown) => void
   onOk: (m: string) => void
 }) {
@@ -275,7 +280,9 @@ function ProceduresTab({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-600">{procedures.length} procédure{procedures.length > 1 ? 's' : ''} active{procedures.length > 1 ? 's' : ''}</p>
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle procédure</button>
+        {!readOnly && (
+          <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle procédure</button>
+        )}
       </div>
 
       {procedures.length === 0 ? (
@@ -312,16 +319,18 @@ function ProceduresTab({
                         <b>Contacts d&apos;urgence :</b> {p.contacts}
                       </div>
                     )}
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={() => setEditing(p)}
-                        className="text-xs h-8 px-3 rounded border border-current font-bold">Modifier</button>
-                      <button onClick={async () => {
-                        if (!confirm(`Désactiver "${p.titre}" ?`)) return
-                        try { await supprimerProcedureUrgence(p.id); onOk('Désactivée'); router.refresh() }
-                        catch (e) { onError(e) }
-                      }}
-                        className="text-xs h-8 px-3 rounded text-current/70 hover:text-red-700">× Désactiver</button>
-                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => setEditing(p)}
+                          className="text-xs h-8 px-3 rounded border border-current font-bold">Modifier</button>
+                        <button onClick={async () => {
+                          if (!confirm(`Désactiver "${p.titre}" ?`)) return
+                          try { await supprimerProcedureUrgence(p.id); onOk('Désactivée'); router.refresh() }
+                          catch (e) { onError(e) }
+                        }}
+                          className="text-xs h-8 px-3 rounded text-current/70 hover:text-red-700">× Désactiver</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </article>

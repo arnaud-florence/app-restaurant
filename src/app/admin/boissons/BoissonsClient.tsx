@@ -20,11 +20,12 @@ import BoissonFormModal from './BoissonFormModal'
 type RecetteShort = { id: string; nom: string; categorie: string; tag_destination: string }
 
 export default function BoissonsClient({
-  boissons, recettes, accordsParBoisson,
+  boissons, recettes, accordsParBoisson, readOnly = false,
 }: {
   boissons: Boisson[]
   recettes: RecetteShort[]
   accordsParBoisson: Record<string, { recette_id: string; note: string | null }[]>
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
@@ -83,11 +84,13 @@ export default function BoissonsClient({
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Carte boissons</p>
             <h1 className="text-xl sm:text-2xl font-bold">🍷 Vins & boissons</h1>
           </div>
-          <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
-            <span className="text-lg">+</span>
-            <span className="hidden sm:inline">Nouvelle boisson</span>
-            <span className="sm:hidden">Ajouter</span>
-          </Button>
+          {!readOnly && (
+            <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
+              <span className="text-lg">+</span>
+              <span className="hidden sm:inline">Nouvelle boisson</span>
+              <span className="sm:hidden">Ajouter</span>
+            </Button>
+          )}
         </div>
       </header>
 
@@ -144,6 +147,7 @@ export default function BoissonsClient({
                 key={b.id}
                 b={b}
                 accordsCount={accordsParBoisson[b.id]?.length ?? 0}
+                readOnly={readOnly}
                 onEdit={() => setEditing(b)}
                 onToggle={() => onActiver(b, !b.actif)}
                 onDelete={() => setConfirmDelete(b)}
@@ -216,10 +220,11 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
 
 // ─── Card boisson ────────────────────────────────────────────────────
 function BoissonCard({
-  b, accordsCount, onEdit, onToggle, onDelete,
+  b, accordsCount, readOnly = false, onEdit, onToggle, onDelete,
 }: {
   b: Boisson
   accordsCount: number
+  readOnly?: boolean
   onEdit: () => void
   onToggle: () => void
   onDelete: () => void
@@ -292,14 +297,16 @@ function BoissonCard({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-1 pt-1">
-          <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
-          <Button size="sm" variant="ghost" onClick={onToggle} title={b.actif ? 'Désactiver' : 'Activer'}>
-            {b.actif ? '🚫' : '✓'}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive">🗑</Button>
-        </div>
+        {/* Actions — masquées en lecture seule */}
+        {!readOnly && (
+          <div className="flex gap-1 pt-1">
+            <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
+            <Button size="sm" variant="ghost" onClick={onToggle} title={b.actif ? 'Désactiver' : 'Activer'}>
+              {b.actif ? '🚫' : '✓'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive">🗑</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
