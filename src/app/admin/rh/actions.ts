@@ -64,9 +64,16 @@ const customPermissionsSchema = z.object({
   employe_id: z.string().uuid(),
   allowed:    z.array(z.string().min(1)).max(50).default([]),
   denied:     z.array(z.string().min(1)).max(50).default([]),
+  readonly:   z.array(z.string().min(1)).max(50).default([]),
+  writable:   z.array(z.string().min(1)).max(50).default([]),
 })
 
 /** Met à jour les overrides de permissions du profil lié à cet employé.
+ *  - allowed   : routes accordées en plus de la matrice du poste
+ *  - denied    : routes interdites (priorité sur tout)
+ *  - readonly  : force la route en lecture seule pour cet employé
+ *  - writable  : lève le readonly de la matrice pour cet employé
+ *
  *  Si aucun profil n'est encore lié, on stocke quand même : à la 1ère
  *  connexion, getProfile() liera l'employé via email match et le profil
  *  héritera des bons droits.
@@ -74,9 +81,14 @@ const customPermissionsSchema = z.object({
 export async function setEmployePermissions(input: unknown) {
   const p = customPermissionsSchema.parse(input)
   const supabase = await createClient()
-  const overrides = (p.allowed.length === 0 && p.denied.length === 0)
-    ? null
-    : { allowed: p.allowed, denied: p.denied }
+  const isEmpty = p.allowed.length === 0 && p.denied.length === 0
+                && p.readonly.length === 0 && p.writable.length === 0
+  const overrides = isEmpty ? null : {
+    allowed:  p.allowed.length  > 0 ? p.allowed  : undefined,
+    denied:   p.denied.length   > 0 ? p.denied   : undefined,
+    readonly: p.readonly.length > 0 ? p.readonly : undefined,
+    writable: p.writable.length > 0 ? p.writable : undefined,
+  }
   const { error } = await supabase.from('profils')
     .update({ custom_permissions: overrides, updated_at: new Date().toISOString() })
     .eq('employe_id', p.employe_id)
@@ -84,6 +96,31 @@ export async function setEmployePermissions(input: unknown) {
   revalidatePath('/admin/rh')
   revalidatePath('/admin/securite')
   return { ok: true as const }
+}
+
+/** Lit les overrides actuels du profil lié à cet employé. */
+export async function getEmployePermissions(employe_id: string): Promise<{
+  hasProfil: boolean
+  allowed: string[]
+  denied: string[]
+  readonly: string[]
+  writable: string[]
+}> {
+  if (!employe_id) throw new Error('employe_id manquant')
+  const supabase = await createClient()
+  const { data } = await supabase.from('profils')
+    .select('custom_permissions')
+    .eq('employe_id', employe_id)
+    .maybeSingle()
+  if (!data) return { hasProfil: false, allowed: [], denied: [], readonly: [], writable: [] }
+  const cp = (data.custom_permissions ?? {}) as { allowed?: string[]; denied?: string[]; readonly?: string[]; writable?: string[] }
+  return {
+    hasProfil: true,
+    allowed:  cp.allowed  ?? [],
+    denied:   cp.denied   ?? [],
+    readonly: cp.readonly ?? [],
+    writable: cp.writable ?? [],
+  }
 }
 
 export async function archiverEmploye(id: string, date_sortie: string) {

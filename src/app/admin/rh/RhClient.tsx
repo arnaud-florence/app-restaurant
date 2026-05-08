@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -20,7 +20,9 @@ import {
   creerShift, supprimerShift,
   pointerArrivee, pointerDepart,
   demanderConge, validerConge, refuserConge, ajusterSoldeConges,
+  setEmployePermissions, getEmployePermissions,
 } from './actions'
+import { canAccess, isReadOnly } from '@/lib/permissions'
 import type { DataRH } from './page'
 
 type Tab = 'equipe' | 'planning' | 'conges' | 'paie' | 'registre'
@@ -693,6 +695,14 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
       </div>
       <Field label="Date embauche"><input type="date" value={embauche} onChange={e => setEmbauche(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       <Field label="Notes internes"><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-md border border-zinc-300 resize-none text-sm" /></Field>
+
+      {/* Permissions personnalisées (visibles uniquement en édition d'un
+          employé existant — les overrides sont stockées sur le profil
+          Supabase Auth lié, pas sur l'employé). */}
+      {isEdit && employe && (
+        <PermissionsPanel employe_id={employe.id} poste={poste} onError={onError} onOk={onSuccess} />
+      )}
+
       <div className="flex gap-2 pt-2">
         <button onClick={onClose} disabled={isPending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
         {isEdit && employe?.actif && (
@@ -706,6 +716,208 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
         <button onClick={valider} disabled={isPending} className="flex-[2] min-h-[48px] rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 text-white font-bold">{isPending ? '…' : (isEdit ? '✓ Mettre à jour' : '+ Créer')}</button>
       </div>
     </Modal>
+  )
+}
+
+// ─── Permissions personnalisées par employé ───────────────────────────
+//
+// Dans l'édition d'un employé, ce panneau permet au gérant de surcharger
+// la matrice du poste : pour chaque module, choisir Hériter / Autorisé /
+// Lecture seule / Refusé. Les overrides sont stockés sur la table profils.
+//
+// Si aucun profil n'est encore lié à l'employé (employé n'a pas encore
+// activé son compte avec son email), les overrides ne sont pas écrits :
+// un message l'indique. À la 1ère connexion, getProfile() liera le profil
+// par email match et le gérant pourra alors définir les overrides.
+
+const ROUTES_PERMISSIONS: Array<{ groupe: string; items: Array<{ href: string; label: string }> }> = [
+  { groupe: 'Pilotage', items: [
+    { href: '/admin/pilotage',     label: 'Tableau de bord' },
+    { href: '/admin/assistant',    label: 'Assistant IA' },
+    { href: '/admin/journal',      label: 'Journal de bord' },
+    { href: '/admin/previsionnel', label: 'Prévisionnel' },
+  ]},
+  { groupe: 'Cuisine', items: [
+    { href: '/admin/recettes',     label: 'Recettes' },
+    { href: '/admin/ingredients',  label: 'Ingrédients' },
+    { href: '/admin/stock',        label: 'Stock' },
+    { href: '/admin/fournisseurs', label: 'Fournisseurs' },
+    { href: '/admin/allergenes',   label: 'Allergènes' },
+    { href: '/admin/boissons',     label: 'Boissons' },
+  ]},
+  { groupe: 'Service', items: [
+    { href: '/admin/affichage',    label: 'Affichage TV' },
+    { href: '/admin/reservations', label: 'Réservations' },
+    { href: '/admin/groupes',      label: 'Groupes' },
+    { href: '/admin/clients',      label: 'Clients/CRM' },
+  ]},
+  { groupe: 'Équipe', items: [
+    { href: '/admin/rh',           label: 'RH' },
+    { href: '/admin/formation',    label: 'Formation' },
+  ]},
+  { groupe: 'Conformité', items: [
+    { href: '/admin/hygiene',      label: 'Hygiène' },
+    { href: '/admin/legal',        label: 'Légal' },
+    { href: '/admin/maintenance',  label: 'Maintenance' },
+    { href: '/admin/dechets',      label: 'Déchets' },
+  ]},
+  { groupe: 'Finances', items: [
+    { href: '/admin/finances',     label: 'Finances' },
+    { href: '/admin/energie',      label: 'Énergie' },
+  ]},
+  { groupe: 'Système', items: [
+    { href: '/admin/setup',        label: 'Configuration' },
+    { href: '/admin/securite',     label: 'Sécurité' },
+  ]},
+]
+
+type RouteState = 'inherit' | 'allowed' | 'readonly' | 'denied'
+
+function PermissionsPanel({
+  employe_id, poste, onError, onOk,
+}: {
+  employe_id: string
+  poste: string
+  onError: (e: unknown) => void
+  onOk: (m: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [hasProfil, setHasProfil] = useState<boolean | null>(null)
+  const [overrides, setOverrides] = useState<Record<RouteState, string[]>>({
+    allowed: [], readonly: [], denied: [], inherit: [],
+  })
+  const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (!open) return
+    getEmployePermissions(employe_id)
+      .then(p => {
+        setHasProfil(p.hasProfil)
+        // 'allowed' = allowed ou writable (les deux donnent l'accès en écriture)
+        const allowedSet = new Set([...p.allowed, ...p.writable])
+        setOverrides({
+          allowed:  Array.from(allowedSet).filter(r => !p.readonly.includes(r) && !p.denied.includes(r)),
+          readonly: p.readonly.filter(r => !p.denied.includes(r)),
+          denied:   p.denied,
+          inherit:  [],
+        })
+      })
+      .catch(onError)
+  }, [open, employe_id, onError])
+
+  function getStateOf(route: string): RouteState {
+    if (overrides.denied.includes(route))   return 'denied'
+    if (overrides.readonly.includes(route)) return 'readonly'
+    if (overrides.allowed.includes(route))  return 'allowed'
+    return 'inherit'
+  }
+
+  function setStateOf(route: string, state: RouteState) {
+    setOverrides(prev => {
+      const strip = (arr: string[]) => arr.filter(r => r !== route)
+      const next = {
+        allowed:  strip(prev.allowed),
+        readonly: strip(prev.readonly),
+        denied:   strip(prev.denied),
+        inherit:  prev.inherit,
+      }
+      if (state === 'allowed')  next.allowed.push(route)
+      if (state === 'readonly') next.readonly.push(route)
+      if (state === 'denied')   next.denied.push(route)
+      return next
+    })
+  }
+
+  function save() {
+    startTransition(async () => {
+      try {
+        // Pour chaque route en 'allowed', on stocke dans allowed ET writable
+        // (allowed lève un denied potentiel de la matrice ; writable lève
+        // un readonly potentiel). Pour 'readonly', on stocke aussi dans
+        // allowed pour donner l'accès en plus du lecture seule.
+        const allowed:  string[] = [...overrides.allowed, ...overrides.readonly]
+        const writable: string[] = [...overrides.allowed]
+        const readonly: string[] = [...overrides.readonly]
+        const denied:   string[] = [...overrides.denied]
+        await setEmployePermissions({ employe_id, allowed, denied, readonly, writable })
+        onOk('Permissions personnalisées enregistrées')
+      } catch (e) { onError(e) }
+    })
+  }
+
+  function reset() {
+    if (!confirm('Réinitialiser tous les overrides (employé reprend les droits de son poste) ?')) return
+    setOverrides({ allowed: [], readonly: [], denied: [], inherit: [] })
+  }
+
+  return (
+    <div className="border-t border-zinc-200 pt-3 mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-sm font-bold text-zinc-700 hover:text-zinc-900"
+      >
+        <span>🔐 Accès personnalisés (avancé)</span>
+        <span className="text-xs">{open ? '▼' : '▶'}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {hasProfil === false && (
+            <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-900">
+              ⚠ Cet employé ne s'est pas encore connecté avec son email <strong>{/*...*/}</strong>.
+              Les overrides seront appliqués automatiquement à sa 1ère connexion.
+            </div>
+          )}
+          <p className="text-xs text-zinc-600">
+            Par défaut, l'employé hérite des accès de son poste <strong>{poste}</strong>. Modifie ici
+            module par module pour personnaliser.
+          </p>
+
+          <div className="max-h-64 overflow-y-auto border rounded-md">
+            {ROUTES_PERMISSIONS.map(g => (
+              <div key={g.groupe} className="border-b last:border-0">
+                <div className="px-2 py-1 bg-zinc-50 text-[10px] font-bold uppercase tracking-wider text-zinc-500">{g.groupe}</div>
+                {g.items.map(it => {
+                  const state = getStateOf(it.href)
+                  const matrixAccess  = canAccess(poste, it.href, null)
+                  const matrixReadonly = isReadOnly(poste, it.href, null)
+                  const inheritLabel = !matrixAccess
+                    ? '✗ Refusé (matrice)'
+                    : matrixReadonly
+                      ? '👁 Lecture seule (matrice)'
+                      : '✓ Autorisé (matrice)'
+                  return (
+                    <div key={it.href} className="flex items-center gap-2 px-2 py-1.5 text-xs border-t first:border-0 hover:bg-zinc-50">
+                      <span className="flex-1 font-medium truncate">{it.label}</span>
+                      <span className="text-[10px] text-zinc-500 hidden sm:inline">{inheritLabel}</span>
+                      <select
+                        value={state}
+                        onChange={e => setStateOf(it.href, e.target.value as RouteState)}
+                        className="text-xs h-8 px-2 rounded border border-zinc-300 bg-white"
+                      >
+                        <option value="inherit">Hériter</option>
+                        <option value="allowed">Autorisé</option>
+                        <option value="readonly">Lecture seule</option>
+                        <option value="denied">Refusé</option>
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <button type="button" onClick={reset} disabled={pending} className="text-xs h-9 px-3 rounded border border-zinc-300 hover:bg-zinc-50">
+              Réinitialiser
+            </button>
+            <button type="button" onClick={save} disabled={pending} className="flex-1 text-xs h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:bg-zinc-300">
+              {pending ? '…' : '💾 Enregistrer overrides'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
