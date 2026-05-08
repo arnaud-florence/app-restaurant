@@ -50,6 +50,9 @@ export default function FormationAdminClient({
           <Link href="/admin/allergenes" className="text-sm text-zinc-600 hover:text-emerald-700 inline-flex items-center gap-1 underline">
             🆘 Procédures urgence (Module 12)
           </Link>
+          <Link href="/admin/formation/docs">
+            <Button variant="outline" className="gap-2">📚 Manuels</Button>
+          </Link>
           <Link href="/formation" target="_blank">
             <Button variant="outline" className="gap-2"><ExternalLink className="h-4 w-4" /> Vue employé</Button>
           </Link>
