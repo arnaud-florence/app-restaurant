@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { requireWritable } from '@/lib/auth'
 import { type Boisson } from '@/lib/boissons'
 
 // ─── Validation ──────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export async function listAccordsExplicites(boisson_id: string): Promise<{ recet
 
 // ─── CRUD ────────────────────────────────────────────────────────────
 export async function createBoisson(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/boissons')
   const parsed = boissonSchema.parse(input)
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -126,6 +128,7 @@ export async function createBoisson(input: unknown): Promise<{ id: string }> {
 
 export async function updateBoisson(id: string, input: unknown) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/boissons')
   const parsed = boissonSchema.parse(input)
   const supabase = await createClient()
   const { error } = await supabase.from('boissons').update(toRow(parsed)).eq('id', id)
@@ -136,6 +139,7 @@ export async function updateBoisson(id: string, input: unknown) {
 
 export async function toggleBoissonActif(id: string, actif: boolean) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/boissons')
   const supabase = await createClient()
   const { error } = await supabase.from('boissons').update({ actif }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -145,6 +149,7 @@ export async function toggleBoissonActif(id: string, actif: boolean) {
 
 export async function deleteBoisson(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/boissons')
   const supabase = await createClient()
   const { error } = await supabase.from('boissons').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -154,6 +159,7 @@ export async function deleteBoisson(id: string) {
 
 // ─── Accords explicites ──────────────────────────────────────────────
 export async function ajouterAccord(boisson_id: string, recette_id: string, note?: string) {
+  await requireWritable('/admin/boissons')
   const supabase = await createClient()
   const { error } = await supabase
     .from('accords_mets_boissons')
@@ -164,6 +170,7 @@ export async function ajouterAccord(boisson_id: string, recette_id: string, note
 }
 
 export async function retirerAccord(boisson_id: string, recette_id: string) {
+  await requireWritable('/admin/boissons')
   const supabase = await createClient()
   const { error } = await supabase
     .from('accords_mets_boissons')

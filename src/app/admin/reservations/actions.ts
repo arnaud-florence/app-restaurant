@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { requireWritable } from '@/lib/auth'
 
 // ─── Chambres ──────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ const chambreSchema = z.object({
 })
 
 export async function creerChambre(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/reservations')
   const p = chambreSchema.parse(input)
   const supabase = await createClient()
   const { data, error } = await supabase.from('chambres').insert({ ...p, actif: true }).select('id').single()
@@ -27,6 +29,7 @@ export async function creerChambre(input: unknown): Promise<{ id: string }> {
 
 export async function archiverChambre(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('chambres').update({ actif: false }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -50,6 +53,7 @@ const resaChambreSchema = z.object({
 })
 
 export async function creerResaChambre(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/reservations')
   const p = resaChambreSchema.parse(input)
   if (new Date(p.date_depart) <= new Date(p.date_arrivee)) throw new Error('Date départ > date arrivée')
   const supabase = await createClient()
@@ -61,6 +65,7 @@ export async function creerResaChambre(input: unknown): Promise<{ id: string }> 
 
 export async function changerStatutResaChambre(id: string, statut: 'demande' | 'confirmee' | 'arrivee' | 'terminee' | 'annulee') {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('reservations_chambres').update({ statut }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -70,6 +75,7 @@ export async function changerStatutResaChambre(id: string, statut: 'demande' | '
 
 export async function ajusterAcompte(id: string, acompte: number) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('reservations_chambres').update({ acompte_verse: acompte }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -79,6 +85,7 @@ export async function ajusterAcompte(id: string, acompte: number) {
 
 export async function supprimerResaChambre(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('reservations_chambres').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -103,6 +110,7 @@ const resaTableSchema = z.object({
 })
 
 export async function creerResaTable(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/reservations')
   const p = resaTableSchema.parse(input)
   const supabase = await createClient()
   const { data, error } = await supabase.from('reservations_tables').insert({ ...p, statut: 'confirmee' }).select('id').single()
@@ -113,6 +121,7 @@ export async function creerResaTable(input: unknown): Promise<{ id: string }> {
 
 export async function changerStatutResaTable(id: string, statut: 'demande' | 'confirmee' | 'arrivee' | 'terminee' | 'no_show' | 'annulee') {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('reservations_tables').update({ statut }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -122,6 +131,7 @@ export async function changerStatutResaTable(id: string, statut: 'demande' | 'co
 
 export async function supprimerResaTable(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('reservations_tables').delete().eq('id', id)
   if (error) throw new Error(error.message)
@@ -153,6 +163,7 @@ const eventSchema = z.object({
 })
 
 export async function creerEvenement(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/reservations')
   const p = eventSchema.parse(input)
   const supabase = await createClient()
   const { data, error } = await supabase.from('evenements').insert({ ...p, statut: 'demande' }).select('id').single()
@@ -164,6 +175,7 @@ export async function creerEvenement(input: unknown): Promise<{ id: string }> {
 const updateEventSchema = eventSchema.extend({ id: z.string().uuid() })
 
 export async function updateEvenement(input: unknown) {
+  await requireWritable('/admin/reservations')
   const p = updateEventSchema.parse(input)
   const { id, ...rest } = p
   const supabase = await createClient()
@@ -175,6 +187,7 @@ export async function updateEvenement(input: unknown) {
 
 export async function changerStatutEvenement(id: string, statut: 'demande' | 'confirmee' | 'realise' | 'annulee') {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('evenements').update({ statut }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -184,6 +197,7 @@ export async function changerStatutEvenement(id: string, statut: 'demande' | 'co
 
 export async function supprimerEvenement(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/reservations')
   const supabase = await createClient()
   const { error } = await supabase.from('evenements').delete().eq('id', id)
   if (error) throw new Error(error.message)

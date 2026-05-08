@@ -3,7 +3,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { canAccess, getMainRoute, type CustomPermissions } from '@/lib/permissions'
+import { canAccess, getMainRoute, isReadOnly, type CustomPermissions } from '@/lib/permissions'
+
+/** Erreur d'autorisation lancée par les helpers server action. Le client la
+ *  reçoit comme un Error standard via Server Actions Next 14. */
+export class ForbiddenError extends Error {
+  constructor(public path: string, public reason: 'no_session' | 'no_access' | 'readonly') {
+    super(reason === 'no_session' ? 'Non connecté.'
+        : reason === 'readonly'   ? 'Accès en lecture seule sur cette page.'
+        : 'Accès refusé.')
+    this.name = 'ForbiddenError'
+  }
+}
 
 export type Profil = {
   id: string
@@ -96,6 +107,38 @@ export async function requireAccess(path: string): Promise<Profil> {
   if (!profil) redirect('/login')
   if (!canAccess(profil.poste, path, profil.custom_permissions)) {
     redirect(getMainRoute(profil.poste))
+  }
+  return profil
+}
+
+/**
+ * Variante pour Server Actions : throw une ForbiddenError au lieu de redirect.
+ * Utiliser au début d'une mutation server action sensible :
+ *
+ *     await requireAccessOrThrow('/admin/recettes')
+ *
+ * Le manager passe toujours. Audit log automatique sur refus.
+ */
+export async function requireAccessOrThrow(path: string): Promise<Profil> {
+  const profil = await getProfile()
+  if (!profil) throw new ForbiddenError(path, 'no_session')
+  if (!canAccess(profil.poste, path, profil.custom_permissions)) {
+    await auditLog({ action: 'access_denied', ressource_type: 'route', ressource_id: path, details: { poste: profil.poste } })
+    throw new ForbiddenError(path, 'no_access')
+  }
+  return profil
+}
+
+/**
+ * Vérifie que le profil a le DROIT D'ÉCRITURE sur cette route. Bloque les
+ * employés en lecture seule (cuisinier sur /admin/recettes par exemple).
+ * À appeler en TOUT DÉBUT de chaque server action de mutation.
+ */
+export async function requireWritable(path: string): Promise<Profil> {
+  const profil = await requireAccessOrThrow(path)
+  if (isReadOnly(profil.poste, path, profil.custom_permissions)) {
+    await auditLog({ action: 'write_denied_readonly', ressource_type: 'route', ressource_id: path, details: { poste: profil.poste } })
+    throw new ForbiddenError(path, 'readonly')
   }
   return profil
 }

@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { requireWritable } from '@/lib/auth'
+import { getPosteFilter } from '@/lib/permissions'
 import {
   type Recette, type RecetteIngredient, type RecetteWithIngredients,
   TAGS_DESTINATION, isNewId,
@@ -135,7 +137,13 @@ export async function listIngredientsForPicker(): Promise<Ingredient[]> {
 
 // ─── Création + ingrédients en une transaction logique ───────────────
 export async function createRecette(payload: unknown): Promise<{ id: string }> {
+  const profil = await requireWritable('/admin/recettes')
   const { recette, ingredients } = recetteFullSchema.parse(payload)
+  // Filtre contenu : un pizzaiolo ne peut créer que des recettes PIZZA, etc.
+  const filter = getPosteFilter(profil.poste)
+  if (filter.recetteTags && !filter.recetteTags.includes(recette.tag_destination)) {
+    throw new Error(`Vous ne pouvez créer que des recettes ${filter.recetteTags.join('/')}.`)
+  }
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -179,8 +187,22 @@ export async function createRecette(payload: unknown): Promise<{ id: string }> {
 // ─── Mise à jour avec diff sur les ingrédients ───────────────────────
 export async function updateRecette(id: string, payload: unknown) {
   if (!id) throw new Error('id manquant')
+  const profil = await requireWritable('/admin/recettes')
   const { recette, ingredients } = recetteFullSchema.parse(payload)
   const supabase = await createClient()
+  // Vérifie le filtre contenu : la recette existante ET la nouvelle doivent
+  // être dans les tags autorisés (anti-hijack : pizzaiolo ne peut éditer
+  // qu'une recette PIZZA, et ne peut pas la transformer en CUISINE).
+  const filter = getPosteFilter(profil.poste)
+  if (filter.recetteTags) {
+    const { data: existing } = await supabase.from('recettes').select('tag_destination').eq('id', id).maybeSingle()
+    if (!existing || !(filter.recetteTags as readonly string[]).includes(existing.tag_destination as string)) {
+      throw new Error('Cette recette n\'est pas dans votre périmètre.')
+    }
+    if (!filter.recetteTags.includes(recette.tag_destination)) {
+      throw new Error(`Vous ne pouvez pas changer le tag vers ${recette.tag_destination}.`)
+    }
+  }
 
   const { error: rErr } = await supabase
     .from('recettes')
@@ -244,7 +266,16 @@ export async function updateRecette(id: string, payload: unknown) {
 // ─── Toggle actif / inactif ──────────────────────────────────────────
 export async function toggleRecetteActif(id: string, actif: boolean) {
   if (!id) throw new Error('id manquant')
+  const profil = await requireWritable('/admin/recettes')
   const supabase = await createClient()
+  // Filtre contenu : ne peut toggle que les recettes de son périmètre
+  const filter = getPosteFilter(profil.poste)
+  if (filter.recetteTags) {
+    const { data: existing } = await supabase.from('recettes').select('tag_destination').eq('id', id).maybeSingle()
+    if (!existing || !(filter.recetteTags as readonly string[]).includes(existing.tag_destination as string)) {
+      throw new Error('Cette recette n\'est pas dans votre périmètre.')
+    }
+  }
   const { error } = await supabase.from('recettes').update({ actif }).eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/admin/recettes')
@@ -254,7 +285,16 @@ export async function toggleRecetteActif(id: string, actif: boolean) {
 // ─── Suppression définitive (cascade sur recette_ingredients) ────────
 export async function deleteRecette(id: string) {
   if (!id) throw new Error('id manquant')
+  const profil = await requireWritable('/admin/recettes')
   const supabase = await createClient()
+  // Filtre contenu : ne peut supprimer que les recettes de son périmètre
+  const filter = getPosteFilter(profil.poste)
+  if (filter.recetteTags) {
+    const { data: existing } = await supabase.from('recettes').select('tag_destination').eq('id', id).maybeSingle()
+    if (!existing || !(filter.recetteTags as readonly string[]).includes(existing.tag_destination as string)) {
+      throw new Error('Cette recette n\'est pas dans votre périmètre.')
+    }
+  }
   const { error } = await supabase.from('recettes').delete().eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/admin/recettes')

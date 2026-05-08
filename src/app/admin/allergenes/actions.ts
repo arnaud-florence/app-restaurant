@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { ALLERGENES_EU } from '@/lib/allergenes'
+import { requireWritable } from '@/lib/auth'
+import { getPosteFilter } from '@/lib/permissions'
 
 // ─── Recette : override allergènes complémentaires ────────────────
 
@@ -13,8 +15,17 @@ const setAllergenesSchema = z.object({
 })
 
 export async function setAllergenesComplementaires(input: unknown) {
+  const profil = await requireWritable('/admin/allergenes')
   const p = setAllergenesSchema.parse(input)
   const supabase = await createClient()
+  // Vérifie que la recette ciblée est dans le périmètre du poste
+  const filter = getPosteFilter(profil.poste)
+  if (filter.recetteTags) {
+    const { data: existing } = await supabase.from('recettes').select('tag_destination').eq('id', p.recette_id).maybeSingle()
+    if (!existing || !(filter.recetteTags as readonly string[]).includes(existing.tag_destination as string)) {
+      throw new Error('Cette recette n\'est pas dans votre périmètre.')
+    }
+  }
   const { error } = await supabase
     .from('recettes')
     .update({ allergenes_complementaires: p.allergenes_complementaires })
@@ -36,6 +47,7 @@ const procUrgSchema = z.object({
 })
 
 export async function creerProcedureUrgence(input: unknown): Promise<{ id: string }> {
+  await requireWritable('/admin/allergenes')
   const p = procUrgSchema.parse(input)
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -52,6 +64,7 @@ const updateProcUrgSchema = procUrgSchema.extend({
 })
 
 export async function updateProcedureUrgence(input: unknown) {
+  await requireWritable('/admin/allergenes')
   const p = updateProcUrgSchema.parse(input)
   const supabase = await createClient()
   const { id, ...rest } = p
@@ -66,6 +79,7 @@ export async function updateProcedureUrgence(input: unknown) {
 
 export async function supprimerProcedureUrgence(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/allergenes')
   const supabase = await createClient()
   const { error } = await supabase.from('procedures_urgence').update({ actif: false }).eq('id', id)
   if (error) throw new Error(error.message)

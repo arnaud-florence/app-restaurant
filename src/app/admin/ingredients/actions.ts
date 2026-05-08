@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { requireWritable } from '@/lib/auth'
 import { ALLERGENES_KEYS, type Ingredient, type HistoriquePrix } from './types'
 
 // ─── Validation Zod ──────────────────────────────────────────────────
@@ -94,6 +95,7 @@ export async function listIngredients(filterRecetteTags?: string[]): Promise<Ing
 
 // ─── Création ────────────────────────────────────────────────────────
 export async function createIngredient(input: unknown): Promise<Ingredient> {
+  await requireWritable('/admin/ingredients')
   const parsed = ingredientSchema.parse(input)
   const supabase = await createClient()
 
@@ -124,6 +126,7 @@ export async function createIngredient(input: unknown): Promise<Ingredient> {
 // ─── Mise à jour ─────────────────────────────────────────────────────
 export async function updateIngredient(id: string, input: unknown): Promise<Ingredient> {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/ingredients')
   const parsed = ingredientSchema.parse(input)
   const supabase = await createClient()
 
@@ -155,6 +158,7 @@ export async function updateIngredient(id: string, input: unknown): Promise<Ingr
 // ─── Activer / désactiver ────────────────────────────────────────────
 export async function toggleIngredientActif(id: string, actif: boolean) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/ingredients')
   const supabase = await createClient()
   const { error } = await supabase.from('ingredients').update({ actif }).eq('id', id)
   if (error) throw new Error(error.message)
@@ -165,6 +169,7 @@ export async function toggleIngredientActif(id: string, actif: boolean) {
 // ─── Suppression définitive ──────────────────────────────────────────
 export async function deleteIngredient(id: string) {
   if (!id) throw new Error('id manquant')
+  await requireWritable('/admin/ingredients')
   const supabase = await createClient()
   const { error } = await supabase.from('ingredients').delete().eq('id', id)
   if (error) {
