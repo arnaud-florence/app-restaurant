@@ -58,10 +58,12 @@ function mapRecette(r: Record<string, unknown>): Recette {
 }
 
 // ─── Liste avec ingrédients (fetch côté server component) ────────────
-export async function listRecettesAvecIngredients(): Promise<RecetteWithIngredients[]> {
+// filterTags : si fourni, filtre par tag_destination (utilisé par les
+// pages admin qui restreignent l'affichage selon le poste — ex pizzaiolo
+// ne voit que les recettes PIZZA).
+export async function listRecettesAvecIngredients(filterTags?: string[]): Promise<RecetteWithIngredients[]> {
   const supabase = await createClient()
-  // Jointure : recettes + recette_ingredients + ingredients
-  const { data, error } = await supabase
+  let query = supabase
     .from('recettes')
     .select(`
       *,
@@ -70,6 +72,10 @@ export async function listRecettesAvecIngredients(): Promise<RecetteWithIngredie
         ingredient:ingredients(id, nom, categorie, unite, prix_achat_ht, allergenes, actif)
       )
     `)
+  if (filterTags && filterTags.length > 0) {
+    query = query.in('tag_destination', filterTags)
+  }
+  const { data, error } = await query
     .order('actif', { ascending: false })
     .order('tag_destination')
     .order('nom')

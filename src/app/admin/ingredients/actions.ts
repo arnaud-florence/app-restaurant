@@ -69,13 +69,25 @@ function mapIngredient(r: IngredientRow): Ingredient {
 }
 
 // ─── Lecture (utilisée par la page server component) ─────────────────
-export async function listIngredients(): Promise<Ingredient[]> {
+export async function listIngredients(filterRecetteTags?: string[]): Promise<Ingredient[]> {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('ingredients')
-    .select('*')
-    .order('actif', { ascending: false })
-    .order('nom')
+
+  // Si filtre par tags : ne renvoyer que les ingrédients utilisés par les
+  // recettes dont tag_destination ∈ tags. Pizzaiolo ne voit que les
+  // ingrédients de pizzas, barman que ceux des recettes BAR (cocktails).
+  let allowedIds: string[] | null = null
+  if (filterRecetteTags && filterRecetteTags.length > 0) {
+    const { data: links } = await supabase
+      .from('recette_ingredients')
+      .select('ingredient_id, recette:recettes!inner(tag_destination)')
+      .in('recette.tag_destination', filterRecetteTags)
+    allowedIds = Array.from(new Set((links ?? []).map((l: { ingredient_id: string }) => l.ingredient_id)))
+    if (allowedIds.length === 0) return []
+  }
+
+  let query = supabase.from('ingredients').select('*')
+  if (allowedIds) query = query.in('id', allowedIds)
+  const { data, error } = await query.order('actif', { ascending: false }).order('nom')
   if (error) throw new Error(error.message)
   return (data ?? []).map(mapIngredient)
 }

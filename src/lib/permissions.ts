@@ -253,3 +253,31 @@ export function filterNavItems<T extends { href: string }>(
 ): T[] {
   return items.filter(it => canAccess(poste, it.href, overrides))
 }
+
+// ─── Filtres contenu par poste ────────────────────────────────────
+//
+// Certains postes voient uniquement une partie des données.
+// Ex : pizzaiolo → recettes / ingrédients / allergènes "pizza" uniquement.
+//
+// Les pages serveur appellent getPosteFilter() et filtrent leurs requêtes
+// Supabase. Si renvoie null, pas de filtre (manager + accès complet).
+
+export type PosteContentFilter = {
+  /** Tags de tag_destination autorisés sur les recettes (et ingrédients
+   *  utilisés par ces recettes). null = tous tags autorisés. */
+  recetteTags: Array<'CUISINE' | 'PIZZA' | 'BAR'> | null
+}
+
+export function getPosteFilter(poste: string | null | undefined): PosteContentFilter {
+  switch (poste) {
+    case 'pizzaiolo':
+      return { recetteTags: ['PIZZA'] }
+    case 'bar':
+    case 'barman':
+      return { recetteTags: ['BAR'] }
+    // Cuisinier / second / serveur : pas de filtre contenu (la matrice
+    // gère déjà l'accès + lecture seule). Manager : tout.
+    default:
+      return { recetteTags: null }
+  }
+}

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import AllergenesClient from './AllergenesClient'
 import { allergenesRecette, type Allergene, type ProcedureUrgence, type TypeProcedureUrgence } from '@/lib/allergenes'
 import { getProfile } from '@/lib/auth'
-import { isReadOnly } from '@/lib/permissions'
+import { isReadOnly, getPosteFilter } from '@/lib/permissions'
 
 export const metadata = { title: 'Allergènes & traçabilité — Admin' }
 export const dynamic = 'force-dynamic'
@@ -23,14 +23,19 @@ export default async function AllergenesPage() {
   const profil = await getProfile()
   const readOnly = isReadOnly(profil?.poste, '/admin/allergenes', profil?.custom_permissions)
 
+  const filter = getPosteFilter(profil?.poste)
+
+  let recettesQuery = supabase
+    .from('recettes')
+    .select(`id, nom, categorie, tag_destination, allergenes_complementaires,
+             recette_ingredients(ingredient:ingredients(nom, allergenes))`)
+    .eq('actif', true)
+  if (filter.recetteTags && filter.recetteTags.length > 0) {
+    recettesQuery = recettesQuery.in('tag_destination', filter.recetteTags)
+  }
+
   const [recettesRes, procRes] = await Promise.all([
-    supabase
-      .from('recettes')
-      .select(`id, nom, categorie, tag_destination, allergenes_complementaires,
-               recette_ingredients(ingredient:ingredients(nom, allergenes))`)
-      .eq('actif', true)
-      .order('categorie')
-      .order('nom'),
+    recettesQuery.order('categorie').order('nom'),
     supabase
       .from('procedures_urgence')
       .select('id, titre, type, etapes, contacts, ordre, actif')
