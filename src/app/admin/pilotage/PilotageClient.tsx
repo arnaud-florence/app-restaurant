@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   type Kpi, type KpiCode, type AnalyseMois, type Periode, type Statut, KPI_LABELS, formatValeur,
 } from '@/lib/pilotage'
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 import {
   upsertObjectif, supprimerObjectif,
   creerAction, updateAction, changerStatutAction, supprimerAction,
@@ -97,6 +98,8 @@ export default function PilotageClient({
           Vue 2 minutes — KPIs clés, objectifs, plan d'action, saisonnalité.
         </p>
       </div>
+
+      <TachesDuJourWidget poste="gerant" defaultOpen />
 
       {/* ─── 10 KPIs ─────────────────────────────────────────────── */}
       <section>

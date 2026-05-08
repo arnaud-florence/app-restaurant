@@ -14,6 +14,7 @@ import EncaissementModal from './EncaissementModal'
 import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import AppelsServeurBanner from './AppelsServeurBanner'
 import OpsBottomNav from '@/components/OpsBottomNav'
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 type Table = {
   id: string
@@ -294,6 +295,7 @@ export default function ServeurClient({
 
       {/* Contenu de l'onglet */}
       <main className="flex-1 p-4 space-y-4">
+        <TachesDuJourWidget poste="serveur" theme="dark" />
         {tab === 'plan' && (
           <PlanSalle
             zones={zones}

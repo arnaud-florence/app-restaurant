@@ -11,6 +11,7 @@ import {
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav from '@/components/OpsBottomNav'
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 export default function BarClient({ initial }: { initial: CommandeService[] }) {
   const router = useRouter()
@@ -149,6 +150,10 @@ export default function BarClient({ initial }: { initial: CommandeService[] }) {
           style={{ position: 'fixed', width: 0, height: 0, border: 0, opacity: 0, pointerEvents: 'none' }}
         />
       ))}
+
+      <div className="px-3 pt-3 bg-zinc-900">
+        <TachesDuJourWidget poste="barman" theme="dark" />
+      </div>
 
       <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {articles.length === 0 ? (

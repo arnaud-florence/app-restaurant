@@ -11,6 +11,7 @@ import {
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav from '@/components/OpsBottomNav'
+import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
 type ColonneTag = 'CUISINE' | 'PIZZA'
 type Role = 'cuisinier' | 'pizzaiolo'
@@ -199,6 +200,11 @@ export default function CuisineClient({ initial, role = 'cuisinier' }: { initial
           style={{ position: 'fixed', width: 0, height: 0, border: 0, opacity: 0, pointerEvents: 'none' }}
         />
       ))}
+
+      {/* Widget tâches du jour (cuisinier ou pizzaiolo selon role) */}
+      <div className="px-3 pt-3 bg-zinc-900">
+        <TachesDuJourWidget poste={role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier'} theme="dark" />
+      </div>
 
       {/* Colonnes : pizzaiolo voit uniquement PIZZA, cuisinier voit les 2 */}
       <main className={cn('flex-1 grid gap-px bg-zinc-800', role === 'pizzaiolo' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2')}>
