@@ -286,8 +286,15 @@ export async function setConsommationCommande(input: unknown): Promise<{ ok: tru
 }
 
 // ─── Encaissement : Multi-paiements + tips + libère table ────────────
+// ─── Helper pour client : récupère le ratio points→€ depuis la config ────
+export async function getRatioRemiseFidelite(): Promise<number> {
+  const { getConfigFidelite } = await import('@/lib/fidelite')
+  const c = await getConfigFidelite()
+  return c.points_par_euro_remise
+}
+
 const paiementSchema = z.object({
-  methode: z.enum(['especes','carte','ticket_resto','virement','autre']),
+  methode: z.enum(['especes','carte','ticket_resto','virement','autre','fidelite']),
   montant: z.number().min(0),
   pourboire: z.number().min(0).default(0),
   reference: z.string().max(100).optional().nullable(),
@@ -364,15 +371,42 @@ export async function encaisserCommande(input: unknown) {
       .eq('numero', cmd.numero_table)
   }
 
-  // 4. Crédit fidélité auto (si commande couplée à un client)
+  // 4. Fidélité — si paiement par points, on consomme + on crédite normalement
   // Best-effort : un échec ici ne bloque jamais l'encaissement.
-  let fidelite: { points: number; client_id: string } | null = null
+  let fidelite: { points: number; client_id: string; consommes?: number } | null = null
   try {
-    const { crediterPointsCommande } = await import('@/lib/fidelite')
+    const { crediterPointsCommande, consommerPointsFidelite, getConfigFidelite } = await import('@/lib/fidelite')
+
+    // 4a. Consommation : ligne de paiement 'fidelite' → mouvement utilisation
+    const ligneFid = p.paiements.find(x => x.methode === 'fidelite')
+    if (ligneFid && p.client_id) {
+      const config = await getConfigFidelite()
+      const pointsConsommes = Math.ceil(ligneFid.montant * config.points_par_euro_remise)
+      try {
+        await consommerPointsFidelite({
+          client_id: p.client_id,
+          points: pointsConsommes,
+          commande_id: p.commande_id,
+          employe_id: p.serveur_id ?? null,
+        })
+        fidelite = { points: 0, client_id: p.client_id, consommes: pointsConsommes }
+      } catch (e) {
+        // Solde insuffisant ou autre — log mais ne bloque pas
+        console.error('[fidelite] consommation échouée :', e)
+      }
+    }
+
+    // 4b. Crédit normal sur le total HT (gain) — toujours appliqué si client lié
     const r = await crediterPointsCommande(p.commande_id, p.serveur_id ?? null)
-    if (r) fidelite = { points: r.points, client_id: r.client_id }
+    if (r) {
+      fidelite = {
+        points: r.points,
+        client_id: r.client_id,
+        consommes: fidelite?.consommes,
+      }
+    }
   } catch (e) {
-    console.error('[fidelite] crédit échoué :', e)
+    console.error('[fidelite] erreur globale :', e)
   }
 
   revalidatePath('/cuisine')

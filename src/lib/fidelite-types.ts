@@ -28,16 +28,31 @@ export type ConfigFidelite = {
   points_par_euro: number              // ex: 1 = 1pt par € HT
   auto_credit_encaissement: boolean    // si true, crédit auto à l'encaissement
   points_inscription: number           // bonus à la création de la fiche client
+  points_par_euro_remise: number       // ex: 100 = 100pts pour 1€ de remise
 }
 
 export const CONFIG_FIDELITE_DEFAULT: ConfigFidelite = {
   points_par_euro: 1,
   auto_credit_encaissement: true,
   points_inscription: 10,
+  points_par_euro_remise: 100,
 }
 
 // Calcule les points gagnés sur un montant HT donné.
 export function pointsPourMontant(montantHt: number, ratio: number): number {
   if (montantHt <= 0) return 0
   return Math.floor(montantHt * ratio)
+}
+
+// Convertit des points en valeur € (selon le ratio de remise).
+// Ex : 250 pts avec ratio 100 → 2,50 €
+export function valeurEuroPoints(points: number, ratioRemise: number): number {
+  if (points <= 0 || ratioRemise <= 0) return 0
+  return Math.round((points / ratioRemise) * 100) / 100
+}
+
+// Inverse : combien de points correspondent à un montant € ?
+export function pointsPourMontantRemise(montantEur: number, ratioRemise: number): number {
+  if (montantEur <= 0 || ratioRemise <= 0) return 0
+  return Math.ceil(montantEur * ratioRemise)
 }

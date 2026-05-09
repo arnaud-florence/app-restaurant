@@ -1,13 +1,14 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix } from '@/lib/service'
 import { CONSOMMATION_INFO } from '@/lib/tva'
-import { encaisserCommande, setConsommationCommande } from '../actions'
+import { encaisserCommande, setConsommationCommande, getRatioRemiseFidelite } from '../actions'
 import { searchClients, creerClientRapide } from '@/app/admin/clients/actions'
 import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
+import { valeurEuroPoints, pointsPourMontantRemise } from '@/lib/fidelite-types'
 
 type ClientChoisi = {
   id: string
@@ -20,7 +21,7 @@ type ClientChoisi = {
   points_fidelite: number
 }
 
-type Methode = 'especes' | 'carte' | 'ticket_resto' | 'virement' | 'autre'
+type Methode = 'especes' | 'carte' | 'ticket_resto' | 'virement' | 'autre' | 'fidelite'
 type ModePaiement = 'simple' | 'mixte' | 'parts_egales' | 'personnalise'
 
 const METHODES: Array<{ key: Methode; label: string; emoji: string }> = [
@@ -91,6 +92,12 @@ export default function EncaissementModal({
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [pointsCredites, setPointsCredites] = useState<number | null>(null)
 
+  // Ratio de conversion points → € (chargé depuis config admin)
+  const [ratioRemise, setRatioRemise] = useState(100) // default fallback
+  useEffect(() => {
+    getRatioRemiseFidelite().then(r => { if (r > 0) setRatioRemise(r) }).catch(() => {})
+  }, [])
+
   // Mode création client rapide
   const [showCreate, setShowCreate] = useState(false)
   const [createPrenom, setCreatePrenom] = useState('')
@@ -118,6 +125,48 @@ export default function EncaissementModal({
   function annulerCreation() {
     setShowCreate(false)
     setCreateError('')
+  }
+
+  // ─── Utilisation des points fidélité ───
+  // Calcule le max utilisable : min(solde client, total restant à payer)
+  const totalDejaUtilise = paiements.filter(p => p.methode === 'fidelite').reduce((s, p) => s + Number(p.montant ?? 0), 0)
+  const restantApresAutres = totalTTC - paiements.filter(p => p.methode !== 'fidelite').reduce((s, p) => s + Number(p.montant ?? 0), 0)
+  const maxRemiseEur = client
+    ? Math.min(valeurEuroPoints(client.points_fidelite, ratioRemise), Math.max(0, restantApresAutres + totalDejaUtilise))
+    : 0
+
+  const [pointsAUtiliser, setPointsAUtiliser] = useState<number>(0)
+
+  function appliquerPointsFidelite() {
+    if (!client || pointsAUtiliser <= 0) return
+    const valeurEur = valeurEuroPoints(pointsAUtiliser, ratioRemise)
+    if (valeurEur <= 0) return
+    // Retire les anciennes lignes 'fidelite' puis ajoute la nouvelle
+    setPaiements(prev => [
+      ...prev.filter(p => p.methode !== 'fidelite'),
+      { key: 'fid' + Math.random().toString(36).slice(2, 6), methode: 'fidelite', montant: valeurEur, pourboire: 0, reference: `${pointsAUtiliser} pts` },
+    ])
+    // Recalcule la ligne de paiement principal pour combler le restant
+    const restant = Math.max(0, totalTTC - valeurEur)
+    setPaiements(prev => {
+      const fidLine = prev.find(p => p.methode === 'fidelite')
+      const autres = prev.filter(p => p.methode !== 'fidelite')
+      // Si une seule autre ligne, on ajuste son montant au restant
+      if (autres.length === 1) autres[0] = { ...autres[0], montant: restant }
+      return fidLine ? [...autres, fidLine] : autres
+    })
+    setPointsAUtiliser(0)
+  }
+
+  function retirerPointsFidelite() {
+    setPaiements(prev => {
+      const fidLines = prev.filter(p => p.methode === 'fidelite')
+      const autres = prev.filter(p => p.methode !== 'fidelite')
+      // Restaure le montant de la ligne principale au total
+      if (autres.length === 1) autres[0] = { ...autres[0], montant: totalTTC }
+      return autres
+    })
+    setPointsAUtiliser(0)
   }
 
   function validerCreation() {
@@ -339,7 +388,18 @@ export default function EncaissementModal({
 
         {/* Lignes de paiement */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-          {paiements.map((p, idx) => (
+          {paiements.map((p, idx) => p.methode === 'fidelite' ? (
+            // Ligne fidélité : read-only, gérée via le bloc dédié
+            <div key={p.key} className="rounded-md border border-violet-700/50 bg-violet-950/30 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-violet-300">⭐ Points fidélité</span>
+                  <p className="text-sm text-violet-100 mt-1">{p.reference} → -{fmtPrix(Number(p.montant))}</p>
+                </div>
+                <button onClick={retirerPointsFidelite} className="text-xs text-red-400 hover:text-red-300">× retirer</button>
+              </div>
+            </div>
+          ) : (
             <div key={p.key} className="rounded-md border border-zinc-800 bg-zinc-950 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
@@ -596,6 +656,72 @@ export default function EncaissementModal({
             )}
           </div>
 
+          {/* Utilisation des points fidélité */}
+          {client && client.points_fidelite > 0 && maxRemiseEur > 0 && (
+            <div className="rounded-md border border-violet-700/50 bg-violet-950/30 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs uppercase tracking-wider text-violet-300">⭐ Utiliser des points fidélité</p>
+                <span className="text-[11px] text-violet-300/80">
+                  Solde : {client.points_fidelite} pts ({fmtPrix(valeurEuroPoints(client.points_fidelite, ratioRemise))})
+                </span>
+              </div>
+              {totalDejaUtilise > 0 ? (
+                <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-violet-900/40 border border-violet-700/50">
+                  <div className="text-sm">
+                    <span className="font-bold text-violet-100">{pointsPourMontantRemise(totalDejaUtilise, ratioRemise)} pts</span>
+                    <span className="text-violet-300/80"> appliqués → </span>
+                    <span className="font-bold text-violet-100">-{fmtPrix(totalDejaUtilise)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={retirerPointsFidelite}
+                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                  >
+                    Retirer
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={Math.min(client.points_fidelite, pointsPourMontantRemise(maxRemiseEur, ratioRemise))}
+                      step={ratioRemise}  // pas par tranche d'1€
+                      value={pointsAUtiliser || ''}
+                      onChange={e => setPointsAUtiliser(Math.max(0, Number(e.target.value) || 0))}
+                      placeholder="Nombre de points"
+                      className="flex-1 h-10 px-2 rounded-md bg-zinc-950 border border-violet-700/40 text-zinc-100 text-sm outline-none focus:border-violet-500"
+                    />
+                    <span className="text-xs text-violet-300 whitespace-nowrap">
+                      = {fmtPrix(valeurEuroPoints(pointsAUtiliser, ratioRemise))}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPointsAUtiliser(Math.min(client.points_fidelite, pointsPourMontantRemise(maxRemiseEur, ratioRemise)))}
+                      className="flex-1 h-9 rounded-md bg-violet-900/40 hover:bg-violet-900/60 text-violet-200 text-xs font-medium border border-violet-700/40"
+                    >
+                      Tout utiliser ({fmtPrix(maxRemiseEur)} max)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={appliquerPointsFidelite}
+                      disabled={pointsAUtiliser <= 0}
+                      className="flex-1 h-9 rounded-md bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-xs font-bold"
+                    >
+                      ✓ Appliquer
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-violet-300/70 italic">
+                    {ratioRemise} pts = 1 €. La remise s&apos;applique au total à payer.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Serveur (pour suivi tips) */}
           <div>
             <label className="text-xs uppercase tracking-wider text-zinc-400 block mb-1">Serveur (suivi pourboires)</label>
@@ -636,6 +762,11 @@ export default function EncaissementModal({
           {/* Toast fidélité après validation */}
           {pointsCredites !== null && (
             <div className="rounded-md bg-emerald-900/50 border border-emerald-500 p-3 text-center">
+              {totalDejaUtilise > 0 && (
+                <p className="text-violet-200 text-sm mb-1">
+                  ⭐ -{pointsPourMontantRemise(totalDejaUtilise, ratioRemise)} pts utilisés ({fmtPrix(totalDejaUtilise)} de remise)
+                </p>
+              )}
               <p className="text-emerald-200 font-bold text-lg">⭐ +{pointsCredites} points crédités !</p>
               <p className="text-emerald-300/80 text-xs">Le solde du client est mis à jour.</p>
             </div>

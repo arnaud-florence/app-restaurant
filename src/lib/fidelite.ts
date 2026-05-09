@@ -19,6 +19,7 @@ export async function getConfigFidelite(): Promise<ConfigFidelite> {
       'fidelite.points_par_euro',
       'fidelite.auto_credit_encaissement',
       'fidelite.points_inscription',
+      'fidelite.points_par_euro_remise',
     ])
   const map = new Map((data ?? []).map(r => [r.cle as string, (r.valeur as string) ?? '']))
 
@@ -26,6 +27,7 @@ export async function getConfigFidelite(): Promise<ConfigFidelite> {
     points_par_euro: Number(map.get('fidelite.points_par_euro') ?? CONFIG_FIDELITE_DEFAULT.points_par_euro),
     auto_credit_encaissement: (map.get('fidelite.auto_credit_encaissement') ?? 'true').toLowerCase() === 'true',
     points_inscription: Number(map.get('fidelite.points_inscription') ?? CONFIG_FIDELITE_DEFAULT.points_inscription),
+    points_par_euro_remise: Number(map.get('fidelite.points_par_euro_remise') ?? CONFIG_FIDELITE_DEFAULT.points_par_euro_remise),
   }
 }
 
@@ -35,10 +37,60 @@ export async function setConfigFidelite(c: ConfigFidelite): Promise<void> {
     { cle: 'fidelite.points_par_euro',          valeur: String(c.points_par_euro) },
     { cle: 'fidelite.auto_credit_encaissement', valeur: c.auto_credit_encaissement ? 'true' : 'false' },
     { cle: 'fidelite.points_inscription',       valeur: String(c.points_inscription) },
+    { cle: 'fidelite.points_par_euro_remise',   valeur: String(c.points_par_euro_remise) },
   ]
   for (const r of rows) {
     await sb.from('parametres').upsert(r, { onConflict: 'cle' })
   }
+}
+
+/**
+ * Consomme des points fidélité d'un client (utilisation comme moyen de paiement).
+ * Crée un mouvement négatif et décrémente le solde. Idempotent par commande_id.
+ *
+ * Renvoie null si rien à faire, ou { points } sur succès.
+ * Throw si solde insuffisant.
+ */
+export async function consommerPointsFidelite(p: {
+  client_id: string
+  points: number          // positif (sera stocké en négatif)
+  commande_id: string
+  employe_id?: string | null
+}): Promise<{ points: number } | null> {
+  if (p.points <= 0) return null
+  const sb = await createClient()
+
+  // Idempotence : déjà une utilisation pour cette commande ?
+  const { count } = await sb.from('mouvements_points')
+    .select('id', { count: 'exact', head: true })
+    .eq('commande_id', p.commande_id)
+    .eq('type', 'utilisation')
+  if ((count ?? 0) > 0) return null
+
+  // Vérifie le solde
+  const { data: cli } = await sb.from('clients')
+    .select('points_fidelite, numero:id').eq('id', p.client_id).maybeSingle()
+  const solde = Number(cli?.points_fidelite ?? 0)
+  if (solde < p.points) {
+    throw new Error(`Solde insuffisant : ${solde} pts dispo, ${p.points} demandés.`)
+  }
+
+  // Mouvement utilisation (points négatifs)
+  await sb.from('mouvements_points').insert({
+    client_id: p.client_id,
+    type: 'utilisation',
+    points: -p.points,
+    motif: `Paiement fidélité commande`,
+    commande_id: p.commande_id,
+    employe_id: p.employe_id ?? null,
+  })
+
+  // Décrément solde
+  await sb.from('clients')
+    .update({ points_fidelite: Math.max(0, solde - p.points) })
+    .eq('id', p.client_id)
+
+  return { points: p.points }
 }
 
 /**

@@ -11,6 +11,7 @@ export default function ConfigFideliteForm({ config }: { config: ConfigFidelite 
   const [pts, setPts] = useState(config.points_par_euro)
   const [auto, setAuto] = useState(config.auto_credit_encaissement)
   const [inscr, setInscr] = useState(config.points_inscription)
+  const [ratioRemise, setRatioRemise] = useState(config.points_par_euro_remise)
   const [isPending, startTransition] = useTransition()
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
@@ -24,6 +25,7 @@ export default function ConfigFideliteForm({ config }: { config: ConfigFidelite 
           points_par_euro: Number(pts) || 0,
           auto_credit_encaissement: auto,
           points_inscription: Number(inscr) || 0,
+          points_par_euro_remise: Number(ratioRemise) || 100,
         })
         setMsg('✓ Configuration enregistrée.')
       } catch (e) {
@@ -33,7 +35,7 @@ export default function ConfigFideliteForm({ config }: { config: ConfigFidelite 
   }
 
   return (
-    <div className="grid md:grid-cols-3 gap-4">
+    <div className="grid md:grid-cols-4 gap-4">
       <div>
         <Label>Points par € HT</Label>
         <Input
@@ -79,7 +81,21 @@ export default function ConfigFideliteForm({ config }: { config: ConfigFidelite 
         </p>
       </div>
 
-      <div className="md:col-span-3 flex items-center gap-3">
+      <div>
+        <Label>Points pour 1 € de remise</Label>
+        <Input
+          type="number"
+          step="1"
+          min="1"
+          value={ratioRemise}
+          onChange={e => setRatioRemise(Number(e.target.value))}
+        />
+        <p className="text-[11px] text-zinc-500 mt-1">
+          Ex : 100 = 100 pts donnent 1 € de réduction à l&apos;encaissement.
+        </p>
+      </div>
+
+      <div className="md:col-span-4 flex items-center gap-3">
         <Button onClick={sauver} disabled={isPending}>
           {isPending ? 'Sauvegarde…' : 'Sauvegarder'}
         </Button>
