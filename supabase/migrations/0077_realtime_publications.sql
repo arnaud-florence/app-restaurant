@@ -1,31 +1,43 @@
 -- ============================================================
 -- Migration 0077 — Activation Realtime Supabase sur tables clés
 -- ============================================================
--- Permet à l'outil 2 (vitrine) de réagir en temps réel aux changements :
---   - recettes vendable_online toggled → masquage/affichage immédiat sur menu
---   - parametres modifié → horaires/contact mis à jour instantanément
---   - plats_du_jour ajouté/désactivé → hero du site mis à jour
---   - promotions activées → bannière apparait/disparait
---   - evenements créés → page événements rafraîchie
---   - ingredients stock épuisé → plats associés masqués
---
--- Pattern Supabase : ajouter les tables à la publication 'supabase_realtime'.
--- Les clients (outil 2 navigateur) peuvent ensuite s'abonner via :
---   supabase.channel('public-changes').on('postgres_changes', { ... })
+-- Idempotent : skip silencieusement si une table est déjà dans la publication.
 -- ============================================================
 
--- Tables exposées au Realtime public (lecture site)
-alter publication supabase_realtime add table recettes;
-alter publication supabase_realtime add table parametres;
-alter publication supabase_realtime add table plats_du_jour;
-alter publication supabase_realtime add table promotions;
-alter publication supabase_realtime add table evenements;
-alter publication supabase_realtime add table ingredients;
-alter publication supabase_realtime add table commandes;
-alter publication supabase_realtime add table commande_articles;
+do $$
+declare
+  t text;
+  tables_a_publier text[] := array[
+    'recettes',
+    'parametres',
+    'plats_du_jour',
+    'promotions',
+    'evenements',
+    'ingredients',
+    'commandes',
+    'commande_articles'
+  ];
+begin
+  foreach t in array tables_a_publier loop
+    -- Skip si déjà membre de la publication
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table %I', t);
+      raise notice '✓ % ajoutée au realtime', t;
+    else
+      raise notice '⏭ % déjà dans le realtime, skip', t;
+    end if;
+  end loop;
+end$$;
 
--- Diagnostic
+-- Diagnostic final
 select pubname, tablename
 from pg_publication_tables
 where pubname = 'supabase_realtime'
+  and tablename in (
+    'recettes','parametres','plats_du_jour','promotions',
+    'evenements','ingredients','commandes','commande_articles'
+  )
 order by tablename;
