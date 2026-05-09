@@ -677,7 +677,7 @@ function CatalogueModal({
       )}
 
       {/* 2 zones : catalogue + panier */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-0 pb-[110px] lg:pb-0">
         {/* Catalogue */}
         <div className="overflow-y-auto p-4">
           <div className="flex flex-wrap gap-1.5 mb-4">
@@ -718,8 +718,8 @@ function CatalogueModal({
           </div>
         </div>
 
-        {/* Panier */}
-        <div className="bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-800 flex flex-col">
+        {/* Panier — caché sur mobile (footer sticky en bas remplace), visible sur lg+ */}
+        <div className="hidden lg:flex bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col">
           <div className="px-4 py-2 border-b border-zinc-800">
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Panier</p>
             <p className="text-2xl font-bold tabular-nums">{fmtPrix(totalPanier)}</p>
@@ -794,6 +794,124 @@ function CatalogueModal({
           </div>
         </div>
       </div>
+
+      {/* MOBILE : footer fixe — toujours visible, panier ouvrable en overlay */}
+      <MobileCartFooter
+        panier={panier}
+        totalPanier={totalPanier}
+        onEnvoyer={onEnvoyer}
+        onModifierQte={onModifierQte}
+        onModifierCommentaire={onModifierCommentaire}
+        onToggleAllergene={onToggleAllergene}
+      />
     </div>
+  )
+}
+
+// Footer mobile sticky avec total + bouton envoyer + accès panier détaillé
+function MobileCartFooter({
+  panier, totalPanier, onEnvoyer, onModifierQte, onModifierCommentaire, onToggleAllergene,
+}: {
+  panier: LignePanier[]
+  totalPanier: number
+  onEnvoyer: () => void
+  onModifierQte: (id: string, delta: number) => void
+  onModifierCommentaire: (id: string, c: string) => void
+  onToggleAllergene: (id: string, a: Allergene) => void
+}) {
+  const [openSheet, setOpenSheet] = useState(false)
+  const nbArt = panier.reduce((s, p) => s + p.quantite, 0)
+
+  return (
+    <>
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950 border-t border-zinc-800 shadow-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-center gap-2 p-2">
+          <button
+            onClick={() => setOpenSheet(true)}
+            disabled={panier.length === 0}
+            className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            <div className="text-left min-w-0">
+              <p className="text-[10px] text-zinc-400 uppercase tracking-wider">{nbArt > 0 ? `${nbArt} article${nbArt > 1 ? 's' : ''}` : 'Panier vide'}</p>
+              <p className="font-bold tabular-nums text-base">{fmtPrix(totalPanier)}</p>
+            </div>
+            {panier.length > 0 && <span className="text-xs text-emerald-400 font-bold">Voir →</span>}
+          </button>
+          <button
+            onClick={onEnvoyer}
+            disabled={panier.length === 0}
+            className="flex-[2] min-h-[56px] rounded-md bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold uppercase tracking-wider text-sm"
+          >
+            📡 Envoyer
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom-sheet panier détaillé */}
+      {openSheet && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/80 flex items-end" onClick={() => setOpenSheet(false)}>
+          <div className="w-full max-h-[85vh] bg-zinc-950 rounded-t-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
+              <p className="text-sm font-bold uppercase tracking-wider text-zinc-300">Panier · {fmtPrix(totalPanier)}</p>
+              <button onClick={() => setOpenSheet(false)} className="text-zinc-400 hover:text-white text-2xl leading-none px-2">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {panier.length === 0 ? (
+                <p className="text-sm text-zinc-500 text-center py-8 italic">Aucun article — clique sur le catalogue.</p>
+              ) : panier.map(p => (
+                <div key={p.recette_id} className="rounded-md bg-zinc-900 border border-zinc-800 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-sm flex-1 min-w-0 truncate">{p.recette_nom}</p>
+                    <p className="text-emerald-400 font-bold tabular-nums shrink-0">{fmtPrix(p.quantite * p.prix_unitaire_ht)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <button onClick={() => onModifierQte(p.recette_id, -1)} className="min-h-[44px] min-w-[44px] rounded-md bg-zinc-800 font-bold">−</button>
+                    <span className="min-w-[2rem] text-center font-bold tabular-nums">{p.quantite}</span>
+                    <button onClick={() => onModifierQte(p.recette_id, 1)} className="min-h-[44px] min-w-[44px] rounded-md bg-zinc-800 font-bold">+</button>
+                  </div>
+                  <input
+                    type="text"
+                    value={p.commentaire}
+                    onChange={e => onModifierCommentaire(p.recette_id, e.target.value)}
+                    placeholder="Commentaire (cuisson, ajout…)"
+                    className="mt-1.5 w-full px-2 py-1 text-xs rounded bg-zinc-950 border border-zinc-800 text-zinc-100"
+                  />
+                  <details className="mt-1.5">
+                    <summary className={cn(
+                      'text-[10px] cursor-pointer px-2 py-1 rounded font-bold',
+                      p.allergenes_a_eviter.length > 0
+                        ? 'bg-red-900/40 text-red-300 border border-red-800'
+                        : 'text-zinc-400',
+                    )}>
+                      🚨 ALLERGIE — {p.allergenes_a_eviter.length === 0 ? 'aucune' : `${p.allergenes_a_eviter.length} à éviter`}
+                    </summary>
+                    <div className="flex flex-wrap gap-1 mt-1.5 p-1.5 bg-zinc-950 border border-zinc-800 rounded">
+                      {ALLERGENES_EU.map(a => {
+                        const sel = p.allergenes_a_eviter.includes(a)
+                        const info = ALLERGENE_INFO[a]
+                        return (
+                          <button key={a} onClick={() => onToggleAllergene(p.recette_id, a)}
+                            className={cn(
+                              'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                              sel
+                                ? 'bg-red-600 text-white border-red-400'
+                                : 'bg-zinc-900 text-zinc-500 border-zinc-700',
+                            )}>
+                            {info.emoji} {info.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

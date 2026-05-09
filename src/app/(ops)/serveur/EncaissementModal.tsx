@@ -474,8 +474,10 @@ export default function EncaissementModal({
           )}
         </div>
 
-        {/* Récap + serveur + valider */}
-        <div className="border-t border-zinc-800 p-5 space-y-3">
+        {/* Récap + serveur (scrollable) + valider (sticky bottom) */}
+        <div className="border-t border-zinc-800 flex flex-col flex-shrink-0 max-h-[55vh]">
+          {/* Zone scrollable : récap, client, fidélité, serveur, erreur */}
+          <div className="overflow-y-auto p-5 space-y-3 flex-1">
           {/* Récap */}
           <div className="rounded-md bg-zinc-950 border border-zinc-800 p-3 space-y-1 text-sm">
             <div className="flex justify-between">
@@ -786,8 +788,22 @@ export default function EncaissementModal({
             <p className="text-sm bg-red-900/30 border border-red-800 text-red-300 rounded-md px-3 py-2">⚠️ {erreur}</p>
           )}
 
-          {/* Boutons */}
-          <div className="flex gap-2">
+          {/* Toast fidélité après validation (dans la zone scrollable) */}
+          {pointsCredites !== null && (
+            <div className="rounded-md bg-emerald-900/50 border border-emerald-500 p-3 text-center">
+              {totalDejaUtilise > 0 && (
+                <p className="text-violet-200 text-sm mb-1">
+                  ⭐ -{pointsPourMontantRemise(totalDejaUtilise, ratioRemise)} pts utilisés ({fmtPrix(totalDejaUtilise)} de remise)
+                </p>
+              )}
+              <p className="text-emerald-200 font-bold text-lg">⭐ +{pointsCredites} points crédités !</p>
+              <p className="text-emerald-300/80 text-xs">Le solde du client est mis à jour.</p>
+            </div>
+          )}
+          </div>
+
+          {/* Boutons sticky bas — TOUJOURS visibles */}
+          <div className="flex gap-2 p-4 border-t border-zinc-800 bg-zinc-950 flex-shrink-0">
             <button
               onClick={onClose}
               disabled={isPending}
@@ -803,19 +819,6 @@ export default function EncaissementModal({
               {isPending ? 'Encaissement…' : `✓ Valider ${fmtPrix(totalTTC)}`}
             </button>
           </div>
-
-          {/* Toast fidélité après validation */}
-          {pointsCredites !== null && (
-            <div className="rounded-md bg-emerald-900/50 border border-emerald-500 p-3 text-center">
-              {totalDejaUtilise > 0 && (
-                <p className="text-violet-200 text-sm mb-1">
-                  ⭐ -{pointsPourMontantRemise(totalDejaUtilise, ratioRemise)} pts utilisés ({fmtPrix(totalDejaUtilise)} de remise)
-                </p>
-              )}
-              <p className="text-emerald-200 font-bold text-lg">⭐ +{pointsCredites} points crédités !</p>
-              <p className="text-emerald-300/80 text-xs">Le solde du client est mis à jour.</p>
-            </div>
-          )}
         </div>
       </div>
     </div>

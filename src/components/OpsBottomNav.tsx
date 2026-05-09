@@ -255,8 +255,9 @@ export default function OpsBottomNav({ profil = null }: { profil?: OpsBottomNavP
         )}
       </nav>
 
-      {/* Top-right floating bar (desktop) — accès rapide aux 4 ops + modules admin */}
-      <div className="hidden md:flex fixed top-4 right-4 z-30 items-center gap-1 bg-white/95 backdrop-blur border border-zinc-200 rounded-full shadow-lg p-1">
+      {/* Bottom-center floating bar (desktop) — accès rapide aux 5 ops + modules admin
+          Positionnée en bas pour ne pas masquer les boutons d'action en haut/droite des pages. */}
+      <div className="hidden md:flex fixed bottom-4 left-1/2 -translate-x-1/2 z-30 items-center gap-1 bg-white/95 backdrop-blur border border-zinc-200 rounded-full shadow-2xl p-1">
         {NAV.map(it => {
           const active = pathname === it.href || pathname?.startsWith(it.href + '/')
           return (
