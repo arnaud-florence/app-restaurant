@@ -55,6 +55,7 @@ const GROUPES: Group[] = [
     label: 'Clientèle', emoji: '👥',
     items: [
       { href: '/admin/reservations', label: 'Réservations', icon: Calendar },
+      { href: '/admin/chambres',     label: 'Chambres',     icon: Building2 },
       { href: '/admin/groupes',      label: 'Groupes',      icon: Users },
       { href: '/admin/clients',      label: 'Clients / CRM', icon: Users },
       { href: '/admin/clients/fidelite', label: 'Programme fidélité', icon: Star },
