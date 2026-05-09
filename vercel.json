@@ -28,5 +28,11 @@
     "src/app/api/assistant/stream/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/collecte-avis",
+      "schedule": "0 10 * * *"
+    }
+  ]
 }
