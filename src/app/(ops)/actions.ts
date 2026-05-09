@@ -417,6 +417,36 @@ export async function encaisserCommande(input: unknown) {
 }
 
 // ─── Annuler une commande ────────────────────────────────────────────
+// ─── Transition statut commande ONLINE ───────────────────────────────
+// Utilisée par /emporter pour avancer manuellement les statuts :
+//   en_attente → en_preparation → pret_pour_retrait → retire_par_client
+const statutOnlineSchema = z.object({
+  commande_id:     z.string().uuid(),
+  nouveau_statut:  z.enum(['en_preparation', 'pret_pour_retrait', 'retire_par_client']),
+})
+
+export async function marquerStatutCommandeOnline(input: unknown) {
+  const p = statutOnlineSchema.parse(input)
+  const supabase = await createClient()
+  const { data: cmd } = await supabase.from('commandes')
+    .select('source, statut')
+    .eq('id', p.commande_id).maybeSingle()
+  if (!cmd) throw new Error('Commande introuvable')
+  if (cmd.source !== 'ONLINE') throw new Error('Cette action est réservée aux commandes ONLINE')
+  if (cmd.statut === 'encaisse' || cmd.statut === 'annule') {
+    throw new Error('Commande terminée — modification impossible')
+  }
+  const { error } = await supabase.from('commandes')
+    .update({ statut: p.nouveau_statut })
+    .eq('id', p.commande_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/emporter')
+  revalidatePath('/cuisine')
+  revalidatePath('/pizza')
+  revalidatePath('/bar')
+  return { ok: true as const }
+}
+
 export async function annulerCommande(commande_id: string, motif: string) {
   if (!commande_id) throw new Error('commande_id manquant')
   const supabase = await createClient()
@@ -674,12 +704,12 @@ export async function listCommandesActives() {
   const { data, error } = await supabase
     .from('commandes')
     .select(`
-      id, numero, source, numero_table, statut, notes, created_at,
+      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait,
       montant_total_ttc, tva_total, consommation,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
-    .not('statut', 'in', '(encaisse,annule)')
+    .not('statut', 'in', '(encaisse,annule,retire_par_client)')
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).map(r => {
@@ -697,6 +727,7 @@ export async function listCommandesActives() {
       montant_total_ttc: Number(r.montant_total_ttc ?? 0),
       tva_total:         Number(r.tva_total ?? 0),
       consommation:      ((r.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
+      creneau_retrait:   (r.creneau_retrait as string) ?? null,
       articles: articles.map(a => ({
         id: a.id as string,
         commande_id: a.commande_id as string,

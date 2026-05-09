@@ -41,7 +41,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Second / Chef de cuisine',
     main: '/mon-espace',
     allowed: [
-      '/cuisine', '/pizza',
+      '/cuisine', '/pizza', '/emporter',
       '/admin/recettes', '/admin/recettes/engineering',
       '/admin/ingredients', '/admin/stock', '/admin/fournisseurs',
       '/admin/boissons', '/admin/hygiene', '/admin/allergenes',
@@ -76,6 +76,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/mon-espace',
     allowed: [
       '/pizza',                         // poste pizza dédié
+      '/emporter',                      // commandes ONLINE incluent les pizzas à emporter
       '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
       '/admin/ingredients',             // pizza uniquement (v2 filtre contenu)
       '/admin/stock',                   // déduction pizza (v2 filtre contenu)
@@ -118,7 +119,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Barman',
     main: '/mon-espace',
     allowed: [
-      '/bar', '/caisse',
+      '/bar', '/caisse', '/emporter',
       '/admin/boissons',
       '/admin/stock',                   // boissons uniquement (v2)
       '/admin/ingredients',             // boissons uniquement (v2)
