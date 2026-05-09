@@ -96,19 +96,27 @@ export default function BarClient({
     return () => { supabase.removeChannel(channel) }
   }, [router])
 
-  // ─── Filtrage : articles BAR uniquement, hors 'servi'
-  const articles = useMemo(() => {
-    const out: Array<{ commande: CommandeService; article: CommandeService['articles'][number] }> = []
+  // ─── Filtrage : 1 ticket par COMMANDE (regroupe tous les articles BAR
+  // d'une même table/comptoir pour éviter les oublis lors de la préparation)
+  const ticketsParCommande = useMemo(() => {
+    const out: Array<{
+      commande: CommandeService
+      articles: CommandeService['articles']
+    }> = []
     for (const c of commandes) {
-      for (const a of c.articles) {
-        if (a.tag_destination !== 'BAR') continue
-        if (a.statut === 'servi') continue
-        out.push({ commande: c, article: a })
-      }
+      const articlesBar = c.articles.filter(a => a.tag_destination === 'BAR' && a.statut !== 'servi')
+      if (articlesBar.length === 0) continue
+      out.push({ commande: c, articles: articlesBar })
     }
     out.sort((a, b) => new Date(a.commande.created_at).getTime() - new Date(b.commande.created_at).getTime())
     return out
   }, [commandes])
+
+  // Liste à plat pour les KPIs (compteurs, temps moyen)
+  const articles = useMemo(
+    () => ticketsParCommande.flatMap(t => t.articles.map(a => ({ commande: t.commande, article: a }))),
+    [ticketsParCommande]
+  )
 
   // Commandes comptoir à encaisser (source COMPTOIR, statut non encaissé/annulé)
   const commandesComptoir = useMemo(() => {
@@ -244,14 +252,20 @@ export default function BarClient({
       )}
 
       <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-32">
-        {articles.length === 0 ? (
+        {ticketsParCommande.length === 0 ? (
           <div className="col-span-full text-center text-zinc-500 py-16">
             <p className="text-6xl mb-3">🍷</p>
             <p className="text-base">Aucun ticket bar en attente.</p>
           </div>
         ) : (
-          articles.map(({ commande, article }) => (
-            <Ticket key={article.id} commande={commande} article={article} now={now} onTransition={transition} />
+          ticketsParCommande.map(({ commande, articles: arts }) => (
+            <TicketCommande
+              key={commande.id}
+              commande={commande}
+              articles={arts}
+              now={now}
+              onTransition={transition}
+            />
           ))
         )}
       </main>
@@ -304,49 +318,62 @@ export default function BarClient({
   )
 }
 
-function Ticket({
-  commande, article, now, onTransition,
+// Ticket regroupant TOUS les articles BAR d'une même commande
+// (table ou comptoir) — évite le risque d'oubli en éparpillant les lignes.
+function TicketCommande({
+  commande, articles, now, onTransition,
 }: {
   commande: CommandeService
-  article: CommandeService['articles'][number]
+  articles: CommandeService['articles']
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
 }) {
   const min = statutMinuteur(commande.created_at, now)
   const minSty = STATUT_MINUTEUR_STYLE[min]
   const sourceSty = SOURCE_LABEL[commande.source]
-  const statutSty = STATUT_ARTICLE_LABEL[article.statut]
 
-  const nextStatut: StatutArticle | null =
-    article.statut === 'en_attente' ? 'en_preparation' :
-    article.statut === 'en_preparation' ? 'pret' :
-    null
-
-  // Border-left épaisse selon la source pour repère visuel immédiat
   const sourceBorderL =
     commande.source === 'TABLE'    ? 'border-l-[6px] border-l-blue-500' :
     commande.source === 'COMPTOIR' ? 'border-l-[6px] border-l-violet-500' :
     'border-l-[6px] border-l-emerald-500'
 
-  // Couleur du header selon source (plus visible que juste un badge)
   const sourceHeaderBg =
     commande.source === 'TABLE'    ? 'bg-blue-950/50' :
     commande.source === 'COMPTOIR' ? 'bg-violet-950/50' :
     'bg-emerald-950/50'
 
+  // Statut global : si tout pret = pret, si en cours = en_preparation, sinon en_attente
+  const tousEnAttente   = articles.every(a => a.statut === 'en_attente')
+  const tousPret        = articles.every(a => a.statut === 'pret')
+  const tousEnPrep      = articles.every(a => a.statut === 'en_preparation' || a.statut === 'pret')
+
+  // Allergènes : agrégation pour visibilité globale
+  const allergenes = Array.from(new Set(articles.flatMap(a => a.allergenes_a_eviter)))
+
+  // Bouton groupé : action sur tous les articles non encore au statut cible
+  function avancerTous(cible: StatutArticle) {
+    const ids = articles
+      .filter(a => a.statut !== cible && a.statut !== 'servi')
+      .map(a => a.id)
+    for (const id of ids) onTransition(id, cible)
+  }
+
+  // Border globale selon avancement majoritaire
+  const borderClasse = tousPret
+    ? 'border-emerald-500/70'
+    : tousEnPrep ? 'border-amber-500/50'
+    : 'border-blue-500/50'
+
   return (
-    <div className={cn(
-      'rounded-lg border-2 bg-zinc-900 overflow-hidden',
-      sourceBorderL,
-      article.statut === 'en_attente'     ? 'border-blue-500/50' :
-      article.statut === 'en_preparation' ? 'border-amber-500/50' :
-      article.statut === 'pret'           ? 'border-emerald-500/70' :
-                                             'border-zinc-700'
-    )}>
+    <div className={cn('rounded-lg border-2 bg-zinc-900 overflow-hidden', sourceBorderL, borderClasse)}>
+      {/* Header : source + minuteur + impression */}
       <div className={cn('px-3 py-2 flex items-center justify-between gap-2', sourceHeaderBg)}>
         <div className="flex items-center gap-2 min-w-0">
           <span className={cn('text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded', sourceSty.bg, sourceSty.text)}>
             {sourceSty.emoji} {commande.source === 'TABLE' && commande.numero_table ? `T${commande.numero_table}` : sourceSty.label}
+          </span>
+          <span className="text-[11px] text-zinc-400 font-medium">
+            {articles.length} ligne{articles.length > 1 ? 's' : ''}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -363,45 +390,73 @@ function Ticket({
         </div>
       </div>
 
-      <div className="px-3 py-3">
-        {article.allergenes_a_eviter.length > 0 && (
-          <div className="mb-2 -mx-3 -mt-3 px-3 py-2 bg-red-600 text-white border-b-4 border-red-300 animate-pulse">
-            <p className="text-[10px] font-black uppercase tracking-wider opacity-90">🚨 ALLERGIE CLIENT</p>
-            <p className="text-sm font-bold mt-0.5">
-              ⛔ Éviter : {article.allergenes_a_eviter.map(a => {
-                const info = ALLERGENE_INFO[a as Allergene]
-                return info ? `${info.emoji} ${info.label}` : a
-              }).join(' · ')}
-            </p>
-          </div>
-        )}
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold tabular-nums">×{article.quantite}</span>
-          <p className="text-lg font-semibold leading-tight">{article.recette_nom}</p>
-        </div>
-        {article.commentaire && (
-          <p className="mt-2 text-sm text-amber-300 bg-amber-900/30 border border-amber-800 rounded px-2 py-1.5 italic">
-            ⚠ {article.commentaire}
+      {/* Allergènes globaux (banner rouge si présent) */}
+      {allergenes.length > 0 && (
+        <div className="px-3 py-2 bg-red-600 text-white border-b-4 border-red-300 animate-pulse">
+          <p className="text-[10px] font-black uppercase tracking-wider opacity-90">🚨 ALLERGIE CLIENT</p>
+          <p className="text-sm font-bold mt-0.5">
+            ⛔ Éviter : {allergenes.map(a => {
+              const info = ALLERGENE_INFO[a as Allergene]
+              return info ? `${info.emoji} ${info.label}` : a
+            }).join(' · ')}
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="px-3 pb-3 flex items-center gap-2">
-        <span className={cn('flex-1 text-center text-sm font-bold uppercase tracking-wider py-2 rounded-md', statutSty.bg, statutSty.text)}>
-          {statutSty.emoji} {statutSty.label}
-        </span>
-        {nextStatut && (
+      {/* Liste articles avec leur statut individuel */}
+      <ul className="divide-y divide-zinc-800">
+        {articles.map(a => {
+          const statutSty = STATUT_ARTICLE_LABEL[a.statut]
+          const nextStatut: StatutArticle | null =
+            a.statut === 'en_attente' ? 'en_preparation' :
+            a.statut === 'en_preparation' ? 'pret' :
+            null
+          return (
+            <li key={a.id} className="px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-baseline gap-2 min-w-0 flex-1">
+                  <span className="text-2xl font-bold tabular-nums text-zinc-100 flex-shrink-0">×{a.quantite}</span>
+                  <p className="text-base font-semibold leading-tight truncate">{a.recette_nom}</p>
+                </div>
+                <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0', statutSty.bg, statutSty.text)}>
+                  {statutSty.emoji}
+                </span>
+                {nextStatut && (
+                  <button
+                    onClick={() => onTransition(a.id, nextStatut)}
+                    className={cn(
+                      'min-h-[36px] px-3 rounded-md font-bold text-xs transition-colors active:scale-95 flex-shrink-0',
+                      a.statut === 'en_attente' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                    )}
+                  >
+                    {a.statut === 'en_attente' ? '🔥' : '✓'}
+                  </button>
+                )}
+              </div>
+              {a.commentaire && (
+                <p className="mt-1.5 text-xs text-amber-300 bg-amber-900/30 border border-amber-800 rounded px-2 py-1 italic">
+                  ⚠ {a.commentaire}
+                </p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Action groupée : avancer tous les articles d'un coup */}
+      {!tousPret && (
+        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-950/50">
           <button
-            onClick={() => onTransition(article.id, nextStatut)}
+            onClick={() => avancerTous(tousEnAttente ? 'en_preparation' : 'pret')}
             className={cn(
-              'min-h-[48px] px-4 py-2 rounded-md font-bold text-sm uppercase tracking-wider transition-colors active:scale-[0.97]',
-              article.statut === 'en_attente' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+              'w-full min-h-[44px] rounded-md font-bold text-sm uppercase tracking-wider transition-colors active:scale-[0.98]',
+              tousEnAttente ? 'bg-amber-500 hover:bg-amber-400 text-white' : 'bg-emerald-500 hover:bg-emerald-400 text-white'
             )}
           >
-            {article.statut === 'en_attente' ? '🔥 Prendre' : '✓ Prêt'}
+            {tousEnAttente ? '🔥 Prendre tout en préparation' : '✓ Marquer tout prêt'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
