@@ -57,6 +57,7 @@ const GROUPES: Group[] = [
       { href: '/admin/groupes',      label: 'Groupes',      icon: Users },
       { href: '/admin/clients',      label: 'Clients / CRM', icon: Users },
       { href: '/admin/clients/fidelite', label: 'Programme fidélité', icon: Star },
+      { href: '/admin/promotions',   label: 'Promotions',          icon: Sparkles },
       { href: '/admin/affichage',    label: 'Affichage TV', icon: Tv },
     ],
   },
