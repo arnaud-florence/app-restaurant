@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles, Plus, Trash2, ExternalLink, AlertTriangle } from 'lucide-react'
+import { Sparkles, Plus, Trash2, ExternalLink, AlertTriangle, ShoppingBag, Calendar } from 'lucide-react'
 import { creerPlatDuJour, modifierPlatDuJour, togglePlatDuJour, supprimerPlatDuJour } from './actions'
 import type { PlatDuJour, RecetteOnline } from './page'
 
@@ -66,7 +66,7 @@ export default function PlatsDuJourClient({
             Plats du jour
           </h1>
           <p className="text-sm text-zinc-500">
-            Sélection mise en avant en hero du site web (outil 2). {aujourdhui.length} actif{aujourdhui.length > 1 ? 's' : ''} aujourd&apos;hui.
+            Mis en avant en hero du site web. {aujourdhui.length} actif{aujourdhui.length > 1 ? 's' : ''} aujourd&apos;hui.
           </p>
         </div>
         <Button onClick={() => setCreating(true)} disabled={recettes.length === 0} className="gap-1.5">
@@ -75,17 +75,31 @@ export default function PlatsDuJourClient({
         </Button>
       </header>
 
-      {/* Pas de recette vendable_online → guide */}
+      {/* Card explicative — flow CTA selon vendable_online */}
+      <Card className="p-4 bg-emerald-50 border-emerald-200">
+        <p className="text-xs uppercase tracking-wider text-emerald-700 font-bold mb-2">💡 Comment ça marche sur le site</p>
+        <ul className="text-sm text-emerald-900 space-y-1.5">
+          <li className="flex items-start gap-2">
+            <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span><strong>Toujours visible :</strong> bouton « Réserver une table » → le client peut venir le déguster sur place</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <ShoppingBag className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span><strong>Si la recette est aussi 🌐 vendable en ligne :</strong> bouton supplémentaire « Commander en ligne » (click & collect)</span>
+          </li>
+        </ul>
+      </Card>
+
+      {/* Pas de recette active du tout → guide */}
       {recettes.length === 0 && (
         <Card className="p-5 bg-amber-50 border-amber-300">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-amber-900">Aucune recette vendable en ligne pour l&apos;instant</p>
+              <p className="font-bold text-amber-900">Aucune recette active</p>
               <p className="text-sm text-amber-800 mt-1">
-                Va dans <Link href="/admin/recettes" className="underline">/admin/recettes</Link>, ouvre une recette,
-                et active le toggle « 🌐 Vendable en ligne (site web) ».
-                Reviens ici ensuite pour la mettre en plat du jour.
+                Crée tes recettes dans <Link href="/admin/recettes" className="underline">/admin/recettes</Link>,
+                puis reviens ici pour les mettre en plat du jour.
               </p>
             </div>
           </div>
@@ -140,6 +154,21 @@ export default function PlatsDuJourClient({
                       {p.actif && passe && <Badge className="bg-zinc-100 text-zinc-600 border-zinc-300">passé</Badge>}
                       {p.actif && !futur && !passe && <Badge className="bg-emerald-500 text-white">actif</Badge>}
                     </div>
+                  </div>
+                  {/* CTA disponibles sur le site */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    <Badge className="bg-violet-100 text-violet-800 border-violet-300 gap-1 text-[10px]">
+                      <Calendar className="h-3 w-3" /> Réservation table
+                    </Badge>
+                    {p.recette_vendable_online ? (
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 text-[10px]">
+                        <ShoppingBag className="h-3 w-3" /> Commande en ligne
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-zinc-100 text-zinc-500 border-zinc-300 gap-1 text-[10px]">
+                        Sur place uniquement
+                      </Badge>
+                    )}
                   </div>
                   {p.description_speciale && (
                     <p className="text-xs italic text-zinc-600 mt-2 line-clamp-2">« {p.description_speciale} »</p>
@@ -252,7 +281,7 @@ function PlatModal({
 
         <div className="space-y-3">
           <div>
-            <label className="text-sm font-medium block mb-1">Recette (vendable en ligne)</label>
+            <label className="text-sm font-medium block mb-1">Recette à mettre en avant</label>
             <select
               value={recetteId}
               onChange={e => setRecetteId(e.target.value)}
@@ -260,15 +289,14 @@ function PlatModal({
             >
               {recettes.map(r => (
                 <option key={r.id} value={r.id}>
+                  {r.vendable_online ? '🌐 ' : '📍 '}
                   {r.nom} · {r.categorie} · {r.prix_vente_ht.toFixed(2)} €
                 </option>
               ))}
             </select>
-            {recettes.length === 0 && (
-              <p className="text-xs text-amber-700 mt-1">
-                Aucune recette online — coche le toggle dans /admin/recettes d&apos;abord.
-              </p>
-            )}
+            <p className="text-[11px] text-zinc-500 mt-1">
+              🌐 = aussi commandable en ligne · 📍 = sur place uniquement (toujours réservable via le site)
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -347,6 +375,7 @@ function PlatModal({
         <p className="text-[11px] text-zinc-500 italic mt-3 flex items-center gap-1">
           <ExternalLink className="h-3 w-3" />
           Ces plats apparaîtront en mise en avant sur le site web (outil 2 à venir).
+          Boutons CTA : Réserver une table (toujours) + Commander en ligne (si recette 🌐).
         </p>
       </Card>
     </div>
