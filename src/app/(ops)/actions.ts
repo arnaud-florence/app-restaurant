@@ -214,9 +214,34 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
       .eq('numero', p.numero_table)
   }
 
+  // ─── Hook ONLINE : notif interne managers + cuisine ─────────────
+  // Best-effort, jamais bloquant.
+  if (p.source === 'ONLINE') {
+    try {
+      const { data: destinataires } = await supabase.from('employes')
+        .select('id')
+        .in('poste', ['manager', 'cuisine', 'cuisinier', 'second', 'pizzaiolo', 'barman'])
+        .eq('actif', true)
+      if (destinataires && destinataires.length > 0) {
+        await supabase.from('notifications').insert(
+          destinataires.map(e => ({
+            destinataire_employe_id: e.id,
+            type: 'commande_online_recue',
+            titre: '📦 Nouvelle commande ONLINE',
+            message: `Commande #${cmd.numero ?? cmd.id.slice(-6)} reçue depuis le site web`,
+            url_action: '/emporter',
+          }))
+        )
+      }
+    } catch (e) {
+      console.error('[notif-online] erreur création notifs :', e)
+    }
+  }
+
   revalidatePath('/cuisine')
   revalidatePath('/bar')
   revalidatePath('/serveur')
+  revalidatePath('/emporter')
   return { id: cmd.id as string, numero: cmd.numero as string }
 }
 
@@ -429,7 +454,7 @@ export async function marquerStatutCommandeOnline(input: unknown) {
   const p = statutOnlineSchema.parse(input)
   const supabase = await createClient()
   const { data: cmd } = await supabase.from('commandes')
-    .select('source, statut')
+    .select('source, statut, numero, client_id, client_email, client_nom, creneau_retrait, montant_total_ttc')
     .eq('id', p.commande_id).maybeSingle()
   if (!cmd) throw new Error('Commande introuvable')
   if (cmd.source !== 'ONLINE') throw new Error('Cette action est réservée aux commandes ONLINE')
@@ -440,6 +465,46 @@ export async function marquerStatutCommandeOnline(input: unknown) {
     .update({ statut: p.nouveau_statut })
     .eq('id', p.commande_id)
   if (error) throw new Error(error.message)
+
+  // ─── Hook email client si commande prête à retirer ──────────────
+  // Best-effort, jamais bloquant.
+  if (p.nouveau_statut === 'pret_pour_retrait') {
+    try {
+      // Récupère email du client (lien client_id ou champ libre)
+      let email: string | null = (cmd.client_email as string) ?? null
+      let nom: string | null = (cmd.client_nom as string) ?? null
+      if (!email && cmd.client_id) {
+        const { data: cli } = await supabase.from('clients')
+          .select('email, prenom, nom').eq('id', cmd.client_id).maybeSingle()
+        if (cli) {
+          email = (cli.email as string) ?? null
+          nom = `${(cli.prenom as string) ?? ''} ${(cli.nom as string) ?? ''}`.trim() || null
+        }
+      }
+      if (email) {
+        const { sendEmail, emailLayout } = await import('@/lib/email')
+        const numero = (cmd.numero as string) ?? p.commande_id.slice(-6)
+        const heureRetrait = cmd.creneau_retrait
+          ? new Date(cmd.creneau_retrait as string).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          : null
+        const body = `
+          <p>Bonjour${nom ? ' ' + nom.split(' ')[0] : ''},</p>
+          <p><strong>Votre commande #${numero} est prête à retirer ! 🎁</strong></p>
+          ${heureRetrait ? `<p>Vous pouvez venir la chercher dès maintenant${heureRetrait ? ` (créneau prévu : ${heureRetrait})` : ''}.</p>` : '<p>Vous pouvez venir la chercher dès maintenant.</p>'}
+          <p>À très vite,<br><strong>L'équipe</strong></p>
+        `
+        // Best-effort en arrière-plan, on n'attend pas
+        sendEmail({
+          to: email,
+          subject: `🎁 Commande #${numero} prête à retirer`,
+          html: emailLayout({ titre: 'Commande prête !', bodyHtml: body }),
+        }).catch(e => console.error('[email] envoi prête échoué :', e))
+      }
+    } catch (e) {
+      console.error('[hook-pret-retrait] erreur :', e)
+    }
+  }
+
   revalidatePath('/emporter')
   revalidatePath('/cuisine')
   revalidatePath('/pizza')

@@ -9,6 +9,7 @@ export type NotificationType =
   | 'challenge_atteint'
   | 'formation_expire'
   | 'message_general'
+  | 'commande_online_recue'
 
 export const TYPE_INFO: Record<NotificationType, { emoji: string; cls: string }> = {
   nc_critique:           { emoji: '🚨', cls: 'bg-red-100 text-red-900 border-red-300' },
@@ -19,6 +20,7 @@ export const TYPE_INFO: Record<NotificationType, { emoji: string; cls: string }>
   challenge_atteint:     { emoji: '🏆', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
   formation_expire:      { emoji: '🎓', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
   message_general:       { emoji: '📨', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+  commande_online_recue: { emoji: '📦', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
 }
 
 export type Notification = {
