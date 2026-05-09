@@ -364,8 +364,38 @@ function TicketCommande({
     : tousEnPrep ? 'border-amber-500/50'
     : 'border-blue-500/50'
 
+  // Créneau retrait pour ONLINE (compte à rebours visible)
+  const isOnline = commande.source === 'ONLINE'
+  const creneauTime = commande.creneau_retrait ? new Date(commande.creneau_retrait).getTime() : null
+  const minutesRestantes = creneauTime ? Math.round((creneauTime - now) / 60000) : null
+  const urgenceCls = !isOnline || minutesRestantes === null ? null
+    : minutesRestantes < 0 ? 'bg-red-600 animate-pulse'
+    : minutesRestantes < 10 ? 'bg-amber-500'
+    : minutesRestantes < 20 ? 'bg-blue-500'
+    : 'bg-emerald-700'
+
   return (
     <div className={cn('rounded-lg border-2 bg-zinc-900 overflow-hidden', sourceBorderL, borderClasse)}>
+      {/* Bandeau ONLINE : créneau retrait + compte à rebours */}
+      {isOnline && creneauTime && (
+        <div className={cn('px-3 py-2 text-white flex items-center justify-between gap-2', urgenceCls)}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📦</span>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider opacity-90 leading-none">Retrait à</p>
+              <p className="text-base font-bold tabular-nums leading-tight">
+                {new Date(creneauTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+          {minutesRestantes !== null && (
+            <p className="text-xl font-bold tabular-nums">
+              {minutesRestantes < 0 ? `+${Math.abs(minutesRestantes)} min` : `${minutesRestantes} min`}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Header : source + minuteur + impression */}
       <div className={cn('px-3 py-2 flex items-center justify-between gap-2', sourceHeaderBg)}>
         <div className="flex items-center gap-2 min-w-0">

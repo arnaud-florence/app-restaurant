@@ -307,23 +307,57 @@ function Ticket({
     article.statut === 'en_preparation' ? 'pret' :
     null
 
+  // Border-left épaisse selon source (cohérent avec BarClient)
+  const sourceBorderL =
+    commande.source === 'TABLE'    ? 'border-l-[6px] border-l-blue-500' :
+    commande.source === 'COMPTOIR' ? 'border-l-[6px] border-l-violet-500' :
+    'border-l-[6px] border-l-emerald-500'
+
+  // Calcul du créneau retrait pour les ONLINE (compte à rebours visible)
+  const isOnline = commande.source === 'ONLINE'
+  const creneauTime = commande.creneau_retrait ? new Date(commande.creneau_retrait).getTime() : null
+  const minutesRestantes = creneauTime ? Math.round((creneauTime - now) / 60000) : null
+  const urgenceCls = !isOnline || minutesRestantes === null ? null
+    : minutesRestantes < 0 ? 'bg-red-600 animate-pulse'
+    : minutesRestantes < 10 ? 'bg-amber-500'
+    : minutesRestantes < 20 ? 'bg-blue-500'
+    : 'bg-emerald-700'
+
   return (
     <div className={cn(
       'rounded-lg border-2 bg-zinc-900 overflow-hidden',
+      sourceBorderL,
       article.statut === 'en_attente'     ? 'border-blue-500/50' :
       article.statut === 'en_preparation' ? 'border-amber-500/50' :
       article.statut === 'pret'           ? 'border-emerald-500/70' :
                                              'border-zinc-700'
     )}>
+      {/* Bandeau ONLINE : créneau retrait + compte à rebours visible */}
+      {isOnline && creneauTime && (
+        <div className={cn('px-3 py-2 text-white flex items-center justify-between gap-2', urgenceCls)}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📦</span>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider opacity-90 leading-none">Retrait à</p>
+              <p className="text-base font-bold tabular-nums leading-tight">
+                {new Date(creneauTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+          {minutesRestantes !== null && (
+            <p className="text-xl font-bold tabular-nums">
+              {minutesRestantes < 0 ? `+${Math.abs(minutesRestantes)} min` : `${minutesRestantes} min`}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Header ticket : source + table + minuteur */}
       <div className="px-3 py-2 flex items-center justify-between gap-2 bg-zinc-950">
         <div className="flex items-center gap-2 min-w-0">
           <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded', sourceSty.bg, sourceSty.text)}>
-            {sourceSty.emoji} {sourceSty.label}
+            {sourceSty.emoji} {commande.source === 'TABLE' && commande.numero_table ? `T${commande.numero_table}` : sourceSty.label}
           </span>
-          {commande.numero_table && (
-            <span className="text-sm font-bold text-zinc-100">T{commande.numero_table}</span>
-          )}
           <span className="text-[10px] text-zinc-500 truncate">{commande.numero}</span>
         </div>
         <div className="flex items-center gap-1.5">
