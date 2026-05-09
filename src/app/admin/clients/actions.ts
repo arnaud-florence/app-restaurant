@@ -49,6 +49,78 @@ export async function updateClient(input: unknown) {
 }
 
 /**
+ * Création express depuis la caisse (4 champs : prénom, nom, email, téléphone).
+ * Renvoie l'objet client complet pour qu'il puisse être directement utilisé par le picker.
+ * Idempotence : si email ou téléphone déjà présents → renvoie le client existant.
+ */
+const clientRapideSchema = z.object({
+  prenom:    z.string().trim().max(100).nullable(),
+  nom:       z.string().trim().min(1, 'Nom obligatoire').max(100),
+  email:     z.string().trim().max(160).nullable().transform(v => v && v.length > 0 ? v : null),
+  telephone: z.string().trim().max(30).nullable().transform(v => v && v.length > 0 ? v : null),
+})
+
+export async function creerClientRapide(input: unknown): Promise<{
+  id: string; prenom: string | null; nom: string;
+  email: string | null; telephone: string | null;
+  niveau_fidelite: string; nb_visites: number; points_fidelite: number;
+  deja_existant: boolean
+}> {
+  const p = clientRapideSchema.parse(input)
+  const supabase = await createClient()
+
+  // Idempotence : on évite les doublons sur email OU téléphone
+  if (p.email || p.telephone) {
+    let q = supabase.from('clients')
+      .select('id, prenom, nom, email, telephone, niveau_fidelite, nb_visites, points_fidelite')
+      .limit(1)
+    if (p.email) q = q.eq('email', p.email)
+    else if (p.telephone) q = q.eq('telephone', p.telephone)
+    const { data: existing } = await q
+    if (existing && existing.length > 0) {
+      const e = existing[0]
+      return {
+        id: e.id as string,
+        prenom: (e.prenom as string) ?? null,
+        nom: e.nom as string,
+        email: (e.email as string) ?? null,
+        telephone: (e.telephone as string) ?? null,
+        niveau_fidelite: (e.niveau_fidelite as string) ?? 'standard',
+        nb_visites: Number(e.nb_visites ?? 0),
+        points_fidelite: Number(e.points_fidelite ?? 0),
+        deja_existant: true,
+      }
+    }
+  }
+
+  const code = genererCodeParrainage(p.prenom ?? p.nom, p.nom)
+  const { data, error } = await supabase.from('clients').insert({
+    prenom:    p.prenom,
+    nom:       p.nom,
+    email:     p.email,
+    telephone: p.telephone,
+    code_parrainage: code,
+    points_fidelite: 0,
+    niveau_fidelite: 'standard',
+    opt_in_marketing: false,
+  }).select('id, prenom, nom, email, telephone, niveau_fidelite, nb_visites, points_fidelite').single()
+  if (error || !data) throw new Error(error?.message ?? 'Erreur création')
+
+  revalidatePath('/admin/clients')
+  return {
+    id: data.id as string,
+    prenom: (data.prenom as string) ?? null,
+    nom: data.nom as string,
+    email: (data.email as string) ?? null,
+    telephone: (data.telephone as string) ?? null,
+    niveau_fidelite: (data.niveau_fidelite as string) ?? 'standard',
+    nb_visites: Number(data.nb_visites ?? 0),
+    points_fidelite: Number(data.points_fidelite ?? 0),
+    deja_existant: false,
+  }
+}
+
+/**
  * Recherche rapide pour autocomplete (encaissement, réservation, etc.).
  * Match insensible à la casse sur prénom/nom/email/téléphone. Limite 8 résultats.
  */

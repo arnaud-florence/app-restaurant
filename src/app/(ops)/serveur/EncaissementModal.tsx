@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix } from '@/lib/service'
 import { CONSOMMATION_INFO } from '@/lib/tva'
 import { encaisserCommande, setConsommationCommande } from '../actions'
-import { searchClients } from '@/app/admin/clients/actions'
+import { searchClients, creerClientRapide } from '@/app/admin/clients/actions'
 import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
 
 type ClientChoisi = {
@@ -90,6 +90,62 @@ export default function EncaissementModal({
   const [searchPending, startSearchTransition] = useTransition()
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [pointsCredites, setPointsCredites] = useState<number | null>(null)
+
+  // Mode création client rapide
+  const [showCreate, setShowCreate] = useState(false)
+  const [createPrenom, setCreatePrenom] = useState('')
+  const [createNom, setCreateNom] = useState('')
+  const [createEmail, setCreateEmail] = useState('')
+  const [createTel, setCreateTel] = useState('')
+  const [createPending, startCreateTransition] = useTransition()
+  const [createError, setCreateError] = useState('')
+
+  function ouvrirCreationClient() {
+    // Pré-remplit le nom depuis la query si plausible
+    const q = searchQuery.trim()
+    if (q) {
+      const parts = q.split(/\s+/)
+      if (parts.length >= 2) { setCreatePrenom(parts[0]); setCreateNom(parts.slice(1).join(' ')) }
+      else { setCreateNom(q) }
+    } else {
+      setCreatePrenom(''); setCreateNom('')
+    }
+    setCreateEmail(''); setCreateTel(''); setCreateError('')
+    setShowCreate(true)
+    setShowSearchResults(false)
+  }
+
+  function annulerCreation() {
+    setShowCreate(false)
+    setCreateError('')
+  }
+
+  function validerCreation() {
+    if (!createNom.trim()) { setCreateError('Nom obligatoire'); return }
+    setCreateError('')
+    startCreateTransition(async () => {
+      try {
+        const c = await creerClientRapide({
+          prenom: createPrenom.trim() || null,
+          nom: createNom.trim(),
+          email: createEmail.trim() || null,
+          telephone: createTel.trim() || null,
+        })
+        setClient({
+          id: c.id, prenom: c.prenom, nom: c.nom,
+          email: c.email, telephone: c.telephone,
+          niveau_fidelite: c.niveau_fidelite,
+          nb_visites: c.nb_visites,
+          points_fidelite: c.points_fidelite,
+        })
+        setShowCreate(false)
+        setSearchQuery('')
+        setSearchResults([])
+      } catch (e) {
+        setCreateError(e instanceof Error ? e.message : 'Erreur')
+      }
+    })
+  }
 
   function rechercherClient(q: string) {
     setSearchQuery(q)
@@ -390,7 +446,19 @@ export default function EncaissementModal({
 
           {/* Client fidélité */}
           <div>
-            <label className="text-xs uppercase tracking-wider text-zinc-400 block mb-1">Client (fidélité — optionnel)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs uppercase tracking-wider text-zinc-400">Client (fidélité — optionnel)</label>
+              {!client && !showCreate && (
+                <button
+                  type="button"
+                  onClick={ouvrirCreationClient}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 underline"
+                >
+                  + Nouveau
+                </button>
+              )}
+            </div>
+
             {client ? (
               <div className="flex items-center justify-between gap-2 p-2 rounded-md border border-emerald-700/50 bg-emerald-950/40">
                 <div className="min-w-0 text-sm">
@@ -416,6 +484,64 @@ export default function EncaissementModal({
                   Retirer
                 </button>
               </div>
+            ) : showCreate ? (
+              <div className="rounded-md border border-emerald-700/50 bg-zinc-950 p-3 space-y-2">
+                <p className="text-[11px] text-emerald-300 mb-1">Nouveau client (visite + fidélité)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={createPrenom}
+                    onChange={e => setCreatePrenom(e.target.value)}
+                    placeholder="Prénom"
+                    className="h-10 px-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    value={createNom}
+                    onChange={e => setCreateNom(e.target.value)}
+                    placeholder="Nom *"
+                    className="h-10 px-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <input
+                  type="email"
+                  value={createEmail}
+                  onChange={e => setCreateEmail(e.target.value)}
+                  placeholder="Email (optionnel)"
+                  className="w-full h-10 px-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm outline-none focus:border-emerald-500"
+                />
+                <input
+                  type="tel"
+                  value={createTel}
+                  onChange={e => setCreateTel(e.target.value)}
+                  placeholder="Téléphone (optionnel)"
+                  className="w-full h-10 px-2 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-100 text-sm outline-none focus:border-emerald-500"
+                />
+                {createError && (
+                  <p className="text-xs text-red-400">⚠️ {createError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={annulerCreation}
+                    disabled={createPending}
+                    className="flex-1 h-10 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={validerCreation}
+                    disabled={createPending || !createNom.trim()}
+                    className="flex-[2] h-10 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white text-sm font-bold"
+                  >
+                    {createPending ? 'Création…' : '✓ Créer & associer'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-500 italic">
+                  Email/téléphone évite les doublons. Sans, doublon possible.
+                </p>
+              </div>
             ) : (
               <div className="relative">
                 <input
@@ -426,10 +552,19 @@ export default function EncaissementModal({
                   className="w-full h-12 px-3 rounded-md bg-zinc-950 border border-zinc-700 text-zinc-100 outline-none focus:border-emerald-500"
                 />
                 {showSearchResults && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-700 rounded-md shadow-xl z-50 max-h-64 overflow-y-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-700 rounded-md shadow-xl z-50 max-h-72 overflow-y-auto">
                     {searchPending && <p className="text-xs text-zinc-400 p-3">Recherche…</p>}
                     {!searchPending && searchResults.length === 0 && (
-                      <p className="text-xs text-zinc-500 p-3">Aucun client trouvé pour « {searchQuery} »</p>
+                      <div className="p-3 space-y-2">
+                        <p className="text-xs text-zinc-500">Aucun client trouvé pour « {searchQuery} »</p>
+                        <button
+                          type="button"
+                          onClick={ouvrirCreationClient}
+                          className="w-full text-sm bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-md px-3 py-2"
+                        >
+                          + Créer ce client
+                        </button>
+                      </div>
                     )}
                     {!searchPending && searchResults.map(c => {
                       const k = (c.niveau_fidelite as NiveauFidelite) ?? 'standard'
