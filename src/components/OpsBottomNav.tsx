@@ -254,17 +254,36 @@ export default function OpsBottomNav({ profil = null }: { profil?: OpsBottomNavP
         )}
       </nav>
 
-      {/* Top-right floating button (desktop) — accès rapide modules admin */}
-      {profil && (
-        <button
-          onClick={() => setOpen(true)}
-          className="hidden md:flex fixed top-4 right-4 z-30 items-center gap-2 px-3 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium shadow-lg"
-          aria-label="Mes modules admin"
-        >
-          <Menu className="h-4 w-4" />
-          <span>Modules</span>
-        </button>
-      )}
+      {/* Top-right floating bar (desktop) — accès rapide aux 4 ops + modules admin */}
+      <div className="hidden md:flex fixed top-4 right-4 z-30 items-center gap-1 bg-white/95 backdrop-blur border border-zinc-200 rounded-full shadow-lg p-1">
+        {NAV.map(it => {
+          const active = pathname === it.href || pathname?.startsWith(it.href + '/')
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                active ? 'bg-emerald-600 text-white' : 'text-zinc-700 hover:bg-zinc-100',
+              )}
+              title={it.label}
+            >
+              <span>{it.emoji}</span>
+              <span>{it.label}</span>
+            </Link>
+          )
+        })}
+        {profil && (
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-800"
+            aria-label="Mes modules admin"
+          >
+            <Menu className="h-4 w-4" />
+            <span>Modules</span>
+          </button>
+        )}
+      </div>
     </>
   )
 }
