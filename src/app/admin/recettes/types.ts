@@ -30,6 +30,8 @@ export type Recette = {
   contient_alcool: boolean
   actif: boolean
   photo_url: string | null
+  vendable_online: boolean        // Phase 0 : recette proposée sur le site web ?
+  image_url: string | null        // Phase 0 : photo HD pour la vitrine (différente de photo_url interne)
   created_at: string
   updated_at: string
 }
@@ -68,6 +70,8 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     contient_alcool: false,
     actif: true,
     photo_url: '',
+    vendable_online: false,
+    image_url: '',
   }
 }
 

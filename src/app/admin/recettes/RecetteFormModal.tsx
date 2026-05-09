@@ -41,6 +41,8 @@ const formSchema = z.object({
   contient_alcool: z.boolean(),
   photo_url: z.string().max(2000),
   actif: z.boolean(),
+  vendable_online: z.boolean(),
+  image_url: z.string().max(2000),
 })
 type FormData = z.infer<typeof formSchema>
 
@@ -75,8 +77,10 @@ export default function RecetteFormModal({
         contient_alcool: recette.contient_alcool ?? false,
         photo_url: recette.photo_url ?? '',
         actif: recette.actif,
+        vendable_online: recette.vendable_online ?? false,
+        image_url: recette.image_url ?? '',
       }
-    : { ...defaultRecette(), description: '', photo_url: '', contient_alcool: false } as FormData
+    : { ...defaultRecette(), description: '', photo_url: '', contient_alcool: false, vendable_online: false, image_url: '' } as FormData
 
   const {
     register, handleSubmit, control, watch, setValue, setError,
@@ -419,6 +423,37 @@ export default function RecetteFormModal({
                     </div>
                   )}
                 />
+              </section>
+
+              {/* Vente en ligne (Phase 0 — préparation site web) */}
+              <section className="space-y-3">
+                <p className="text-xs uppercase tracking-wider text-emerald-700 font-bold">🌐 Vente en ligne</p>
+                <Controller
+                  control={control}
+                  name="vendable_online"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between rounded-md border-2 border-emerald-200 bg-emerald-50 p-3">
+                      <div className="min-w-0">
+                        <Label htmlFor="r-online" className="text-base cursor-pointer">Vendable en ligne (site web)</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Si activé : la recette apparaîtra sur la carte du site web et sera commandable en click & collect.
+                        </p>
+                      </div>
+                      <Switch id="r-online" checked={field.value} onCheckedChange={field.onChange} />
+                    </div>
+                  )}
+                />
+                <Field label="Photo HD pour le site (URL publique)" error={errors.image_url?.message}>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    {...register('image_url')}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Recommandé : 1200×800px, JPG/WebP. Cloudinary, Imgur, ou ton CDN. Différente de la photo interne (photo_url).
+                  </p>
+                </Field>
               </section>
 
               {rootError && (

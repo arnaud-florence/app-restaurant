@@ -24,6 +24,9 @@ const recetteSchema = z.object({
   contient_alcool: z.boolean().default(false),
   photo_url: z.string().max(2000).optional().nullable(),
   actif: z.boolean().default(true),
+  // Phase 0 : exposition site web
+  vendable_online: z.boolean().default(false),
+  image_url: z.string().max(2000).optional().nullable(),
 })
 
 const ingredientLigneSchema = z.object({
@@ -56,6 +59,8 @@ function mapRecette(r: Record<string, unknown>): Recette {
     contient_alcool: !!r.contient_alcool,
     actif: r.actif as boolean,
     photo_url: (r.photo_url as string) ?? null,
+    vendable_online: !!r.vendable_online,
+    image_url: (r.image_url as string) ?? null,
     created_at: r.created_at as string,
     updated_at: r.updated_at as string,
   }
@@ -162,6 +167,8 @@ export async function createRecette(payload: unknown): Promise<{ id: string }> {
       contient_alcool: recette.contient_alcool,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
+      vendable_online: recette.vendable_online,
+      image_url: recette.image_url || null,
     })
     .select('id')
     .single()
@@ -221,6 +228,8 @@ export async function updateRecette(id: string, payload: unknown) {
       contient_alcool: recette.contient_alcool,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
+      vendable_online: recette.vendable_online,
+      image_url: recette.image_url || null,
     })
     .eq('id', id)
   if (rErr) throw new Error(rErr.message)

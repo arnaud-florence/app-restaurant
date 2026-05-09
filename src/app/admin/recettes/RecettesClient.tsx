@@ -34,6 +34,7 @@ export default function RecettesClient({
   const [filtreTag, setFiltreTag] = useState<TagDestination | ''>('')
   const [filtreFC, setFiltreFC] = useState<'tous' | 'vert' | 'orange' | 'rouge' | 'alerte'>('tous')
   const [filtreStatut, setFiltreStatut] = useState<'actifs' | 'inactifs' | 'tous'>('actifs')
+  const [filtreOnline, setFiltreOnline] = useState<'tous' | 'online' | 'offline'>('tous')
 
   const [editing, setEditing]   = useState<RecetteWithIngredients | null>(null)
   const [creating, setCreating] = useState(false)
@@ -56,13 +57,15 @@ export default function RecettesClient({
     return enriched.filter(({ recette: r, s }) => {
       if (filtreStatut === 'actifs'   && !r.actif) return false
       if (filtreStatut === 'inactifs' &&  r.actif) return false
+      if (filtreOnline === 'online'  && !r.vendable_online) return false
+      if (filtreOnline === 'offline' &&  r.vendable_online) return false
       if (filtreTag && r.tag_destination !== filtreTag) return false
       if (filtreFC === 'alerte' && !s.alerte) return false
       if (filtreFC !== 'tous' && filtreFC !== 'alerte' && s.statut !== filtreFC) return false
       if (q && !(r.nom.toLowerCase().includes(q) || r.categorie.toLowerCase().includes(q))) return false
       return true
     })
-  }, [enriched, search, filtreTag, filtreFC, filtreStatut])
+  }, [enriched, search, filtreTag, filtreFC, filtreStatut, filtreOnline])
 
   const stats = useMemo(() => {
     const actifs = enriched.filter(e => e.recette.actif)
@@ -168,6 +171,11 @@ export default function RecettesClient({
               <option value="actifs">Actives uniquement</option>
               <option value="tous">Toutes (actives + inactives)</option>
               <option value="inactifs">Inactives uniquement</option>
+            </Select>
+            <Select value={filtreOnline} onChange={e => setFiltreOnline(e.target.value as typeof filtreOnline)} className="md:w-44">
+              <option value="tous">🌐 Vente en ligne : tous</option>
+              <option value="online">🌐 En ligne uniquement</option>
+              <option value="offline">🚫 Pas en ligne</option>
             </Select>
           </CardContent>
         </Card>
@@ -304,6 +312,11 @@ function RecetteCard({
         <Badge className={cn('absolute top-2 left-2 border', tag.cls)}>
           {tag.emoji} {tag.label}
         </Badge>
+        {r.vendable_online && (
+          <Badge className="absolute bottom-2 left-2 bg-emerald-500 text-white border-0">
+            🌐 En ligne
+          </Badge>
+        )}
         {s.alerte && (
           <Badge className="absolute top-2 right-2 bg-red-600 text-white border-0 animate-pulse">
             🚨 Alerte food cost
