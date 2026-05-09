@@ -9,7 +9,7 @@ import { NIVEAU_INFO, type NiveauFidelite, calculerNiveau } from '@/lib/clients'
 import { TYPE_MOUVEMENT_INFO, type TypeMouvementPoints } from '@/lib/fidelite-types'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Star, TrendingUp, History, Award } from 'lucide-react'
+import { Star, TrendingUp, History, Award, Gift, Lock } from 'lucide-react'
 import FooterLegal from '@/components/FooterLegal'
 
 export const dynamic = 'force-dynamic'
@@ -90,6 +90,61 @@ export default async function ClientFidelitePage({ params }: { params: { id: str
             <div className="flex items-center gap-2">
               <Award className="h-5 w-5 text-violet-600" />
               <p className="font-semibold text-violet-900">Niveau maximum atteint — merci de votre fidélité !</p>
+            </div>
+          </Card>
+        )}
+
+        {/* Récompenses débloquées (niveau actuel) */}
+        <Card className="p-4 bg-white">
+          <div className="flex items-center gap-2 mb-3">
+            <Gift className="h-4 w-4 text-emerald-600" />
+            <h2 className="font-semibold">Mes avantages actuels</h2>
+            <Badge variant="outline" className={infoActuel.cls + ' text-[10px]'}>
+              Niveau {infoActuel.label}
+            </Badge>
+          </div>
+          <ul className="space-y-1.5">
+            {infoActuel.recompenses.map((r, i) => (
+              <li key={i} className="text-sm flex items-start gap-2">
+                <span className="text-emerald-600 font-bold">✓</span>
+                <span>{r}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        {/* Récompenses à débloquer (paliers suivants) */}
+        {idx < ordre.length - 1 && (
+          <Card className="p-4 bg-zinc-50 border-zinc-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Lock className="h-4 w-4 text-zinc-500" />
+              <h2 className="font-semibold text-zinc-700">À débloquer</h2>
+            </div>
+            <div className="space-y-3">
+              {ordre.slice(idx + 1).map(palierKey => {
+                const info = NIVEAU_INFO[palierKey]
+                const visites_restantes = Math.max(0, info.min_visites - Number(client.nb_visites ?? 0))
+                return (
+                  <div key={palierKey} className="border border-zinc-200 rounded-md p-3 bg-white">
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                      <Badge variant="outline" className={info.cls}>
+                        {info.emoji} {info.label}
+                      </Badge>
+                      <span className="text-[11px] text-zinc-500">
+                        à {visites_restantes} visite{visites_restantes > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <ul className="space-y-1">
+                      {info.recompenses.map((r, i) => (
+                        <li key={i} className="text-xs flex items-start gap-2 text-zinc-600">
+                          <span className="text-zinc-400">○</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })}
             </div>
           </Card>
         )}

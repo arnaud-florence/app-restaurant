@@ -29,12 +29,48 @@ export type Client = {
 
 export type NiveauFidelite = 'standard' | 'bronze' | 'argent' | 'or' | 'platine'
 
-export const NIVEAU_INFO: Record<NiveauFidelite, { label: string; emoji: string; cls: string; min_visites: number }> = {
-  standard: { label: 'Standard', emoji: '👤', cls: 'bg-zinc-100   text-zinc-700   border-zinc-300',     min_visites: 0  },
-  bronze:   { label: 'Bronze',   emoji: '🥉', cls: 'bg-amber-100  text-amber-900  border-amber-300',    min_visites: 5  },
-  argent:   { label: 'Argent',   emoji: '🥈', cls: 'bg-stone-100  text-stone-900  border-stone-300',    min_visites: 15 },
-  or:       { label: 'Or',       emoji: '🥇', cls: 'bg-yellow-100 text-yellow-900 border-yellow-300',   min_visites: 30 },
-  platine:  { label: 'Platine',  emoji: '💎', cls: 'bg-violet-100 text-violet-900 border-violet-300',   min_visites: 60 },
+export const NIVEAU_INFO: Record<NiveauFidelite, {
+  label: string
+  emoji: string
+  cls: string
+  min_visites: number
+  recompenses: string[]
+}> = {
+  standard: {
+    label: 'Standard', emoji: '👤',
+    cls: 'bg-zinc-100   text-zinc-700   border-zinc-300',
+    min_visites: 0,
+    recompenses: ['Cumul des points fidélité à chaque visite'],
+  },
+  bronze:   {
+    label: 'Bronze',   emoji: '🥉',
+    cls: 'bg-amber-100  text-amber-900  border-amber-300',
+    min_visites: 5,
+    recompenses: ['-5 % sur l\'addition'],
+  },
+  argent:   {
+    label: 'Argent',   emoji: '🥈',
+    cls: 'bg-stone-100  text-stone-900  border-stone-300',
+    min_visites: 15,
+    recompenses: ['-5 % sur l\'addition', 'Café ou thé offert à chaque visite'],
+  },
+  or:       {
+    label: 'Or',       emoji: '🥇',
+    cls: 'bg-yellow-100 text-yellow-900 border-yellow-300',
+    min_visites: 30,
+    recompenses: ['-10 % sur l\'addition', 'Dessert offert à chaque visite', 'Réservation prioritaire'],
+  },
+  platine:  {
+    label: 'Platine',  emoji: '💎',
+    cls: 'bg-violet-100 text-violet-900 border-violet-300',
+    min_visites: 60,
+    recompenses: [
+      '-15 % sur l\'addition',
+      'Apéritif maison offert',
+      'Invitation aux soirées privées',
+      'Cadeau d\'anniversaire personnalisé',
+    ],
+  },
 }
 
 export function calculerNiveau(nb_visites: number): NiveauFidelite {

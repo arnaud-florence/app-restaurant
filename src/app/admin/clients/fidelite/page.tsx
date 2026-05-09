@@ -7,7 +7,8 @@ import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
 import { TYPE_MOUVEMENT_INFO, type TypeMouvementPoints } from '@/lib/fidelite-types'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Star, TrendingUp, Settings, History } from 'lucide-react'
+import { Star, TrendingUp, Settings, History, Gift, Users } from 'lucide-react'
+import TableClientsFideliteClient from './TableClientsFideliteClient'
 import Link from 'next/link'
 import ConfigFideliteForm from './ConfigFideliteForm'
 
@@ -17,7 +18,7 @@ export const metadata = { title: 'Fidélité — Admin' }
 export default async function FidelitePage() {
   const sb = await createClient()
 
-  const [topPointsRes, topCaRes, mouvementsRes, config] = await Promise.all([
+  const [topPointsRes, topCaRes, mouvementsRes, allClientsRes, config] = await Promise.all([
     sb.from('clients')
       .select('id, prenom, nom, points_fidelite, niveau_fidelite, nb_visites, total_depense')
       .order('points_fidelite', { ascending: false })
@@ -30,6 +31,10 @@ export default async function FidelitePage() {
       .select('id, type, points, motif, created_at, client:clients!client_id(prenom, nom)')
       .order('created_at', { ascending: false })
       .limit(20),
+    sb.from('clients')
+      .select('id, prenom, nom, points_fidelite, niveau_fidelite, nb_visites, total_depense, derniere_visite, email, telephone')
+      .order('points_fidelite', { ascending: false })
+      .limit(500),
     getConfigFidelite(),
   ])
 
@@ -49,6 +54,26 @@ export default async function FidelitePage() {
     client: { prenom?: string | null; nom?: string | null } | null
   }
   const mouvements = (mouvementsRes.data ?? []) as MvtRow[]
+
+  type ClientRecap = {
+    id: string; prenom: string | null; nom: string;
+    points_fidelite: number; niveau_fidelite: string;
+    nb_visites: number; total_depense: number;
+    derniere_visite: string | null;
+    email: string | null; telephone: string | null;
+  }
+  const allClients: ClientRecap[] = (allClientsRes.data ?? []).map(r => ({
+    id: r.id as string,
+    prenom: (r.prenom as string) ?? null,
+    nom: r.nom as string,
+    points_fidelite: Number(r.points_fidelite ?? 0),
+    niveau_fidelite: (r.niveau_fidelite as string) ?? 'standard',
+    nb_visites: Number(r.nb_visites ?? 0),
+    total_depense: Number(r.total_depense ?? 0),
+    derniere_visite: (r.derniere_visite as string) ?? null,
+    email: (r.email as string) ?? null,
+    telephone: (r.telephone as string) ?? null,
+  }))
 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6">
@@ -77,6 +102,48 @@ export default async function FidelitePage() {
           Configuration
         </h2>
         <ConfigFideliteForm config={config} />
+      </Card>
+
+      {/* Programme de récompenses */}
+      <Card className="p-5">
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+          <Gift className="h-5 w-5 text-emerald-600" />
+          Programme de récompenses
+        </h2>
+        <p className="text-xs text-zinc-500 mb-4">
+          Avantages débloqués par chaque palier. Les récompenses sont visibles par le client sur sa page personnelle.
+        </p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-3">
+          {(['standard','bronze','argent','or','platine'] as const).map(k => {
+            const ni = NIVEAU_INFO[k]
+            return (
+              <div key={k} className={`rounded-md border p-3 ${ni.cls}`}>
+                <p className="font-bold text-base mb-1">{ni.emoji} {ni.label}</p>
+                <p className="text-[11px] opacity-70 mb-2">À partir de {ni.min_visites} visite{ni.min_visites > 1 ? 's' : ''}</p>
+                <ul className="space-y-1 text-xs">
+                  {ni.recompenses.map((r, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="font-bold">·</span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-[11px] text-zinc-500 italic mt-3">
+          💡 Pour modifier ces récompenses, édite <code>src/lib/clients.ts</code> → <code>NIVEAU_INFO</code>.
+        </p>
+      </Card>
+
+      {/* Tableau récap tous les clients */}
+      <Card className="p-5">
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+          <Users className="h-5 w-5 text-zinc-600" />
+          Tous les clients ({allClients.length})
+        </h2>
+        <TableClientsFideliteClient clients={allClients} />
       </Card>
 
       {/* Tops */}
