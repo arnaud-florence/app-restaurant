@@ -41,7 +41,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Second / Chef de cuisine',
     main: '/mon-espace',
     allowed: [
-      '/cuisine',
+      '/cuisine', '/pizza',
       '/admin/recettes', '/admin/recettes/engineering',
       '/admin/ingredients', '/admin/stock', '/admin/fournisseurs',
       '/admin/boissons', '/admin/hygiene', '/admin/allergenes',
@@ -75,7 +75,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Pizzaiolo',
     main: '/mon-espace',
     allowed: [
-      '/cuisine',                       // colonne pizza uniquement (v2 filtre contenu)
+      '/pizza',                         // poste pizza dédié
       '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
       '/admin/ingredients',             // pizza uniquement (v2 filtre contenu)
       '/admin/stock',                   // déduction pizza (v2 filtre contenu)

@@ -18,6 +18,7 @@ import { logoutAction } from '@/app/login/actions'
 const NAV: Array<{ href: string; label: string; emoji: string }> = [
   { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
   { href: '/cuisine', label: 'Cuisine', emoji: '👨‍🍳' },
+  { href: '/pizza',   label: 'Pizza',   emoji: '🍕' },
   { href: '/bar',     label: 'Bar',     emoji: '🍺' },
   { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
 ]

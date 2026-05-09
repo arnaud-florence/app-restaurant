@@ -109,7 +109,7 @@ export const TACHES: Matrice = {
       { id: 'p-m-checklist', label: 'Checklist hygiène cuisine (banc + four)', obligatoire: true, module: '/admin/hygiene' },
     ],
     service: [
-      { id: 'p-s-cmd', label: 'Marquer chaque pizza "en préparation" puis "prêt"', obligatoire: true, module: '/cuisine?role=pizzaiolo' },
+      { id: 'p-s-cmd', label: 'Marquer chaque pizza "en préparation" puis "prêt"', obligatoire: true, module: '/pizza' },
       { id: 'p-s-allergenes', label: 'Allergène GLUTEN signalé : pâte sans gluten + outils séparés', obligatoire: true, module: '/admin/allergenes' },
       { id: 'p-s-pate', label: 'Préparer la pâte du lendemain (saisir comme nouveau lot)', module: '/admin/hygiene' },
     ],

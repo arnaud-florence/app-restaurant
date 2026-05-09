@@ -56,7 +56,7 @@ const POSTE_TO_ACTION: Record<string, { href: string; label: string; emoji: stri
   second:         { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   cuisine:        { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   cuisinier:      { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
-  pizzaiolo:      { href: '/cuisine?role=pizzaiolo', label: 'Service pizza',  emoji: '🍕' },
+  pizzaiolo:      { href: '/pizza',               label: 'Service pizza',      emoji: '🍕' },
   serveur:        { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
   salle:          { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
   bar:            { href: '/bar',                label: 'Service bar',        emoji: '🍷' },

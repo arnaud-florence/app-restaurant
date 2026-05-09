@@ -36,17 +36,21 @@ export default function CuisineClient({
   const [autoPrint, setAutoPrint] = useState(false)
   const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
 
-  // Persistance auto-print en localStorage
+  // Persistance auto-print en localStorage (clé séparée par poste)
+  const autoPrintKey = role === 'pizzaiolo' ? 'pizza_auto_print' : 'cuisine_auto_print'
   useEffect(() => {
-    try { setAutoPrint(localStorage.getItem('cuisine_auto_print') === '1') } catch { /* ignore */ }
-  }, [])
+    try { setAutoPrint(localStorage.getItem(autoPrintKey) === '1') } catch { /* ignore */ }
+  }, [autoPrintKey])
   function toggleAutoPrint() {
     setAutoPrint(v => {
       const nv = !v
-      try { localStorage.setItem('cuisine_auto_print', nv ? '1' : '0') } catch { /* ignore */ }
+      try { localStorage.setItem(autoPrintKey, nv ? '1' : '0') } catch { /* ignore */ }
       return nv
     })
   }
+
+  // Tag affiché par ce poste (CUISINE pour cuisinier, PIZZA pour pizzaiolo)
+  const monTag: ColonneTag = role === 'pizzaiolo' ? 'PIZZA' : 'CUISINE'
 
   // Tick minuteur (1 seconde)
   useEffect(() => {
@@ -63,21 +67,20 @@ export default function CuisineClient({
     for (const c of initial) {
       if (!previousIdsRef.current.has(c.id)) nouvelles.push(c)
     }
-    if (nouvelles.length > 0 && audioReadyRef.current) playDing()
-    if (nouvelles.length > 0 && autoPrint) {
+    // Ne déclenche son/impression que si la commande a quelque chose POUR CE POSTE
+    const nouvellesPourMoi = nouvelles.filter(c =>
+      c.articles.some(a => a.tag_destination === monTag)
+    )
+    if (nouvellesPourMoi.length > 0 && audioReadyRef.current) playDing()
+    if (nouvellesPourMoi.length > 0 && autoPrint) {
       const jobs: Array<{ key: string; src: string }> = []
-      for (const c of nouvelles) {
-        const dests = new Set(c.articles
-          .filter(a => a.tag_destination === 'CUISINE' || a.tag_destination === 'PIZZA')
-          .map(a => a.tag_destination))
-        for (const d of dests) {
-          jobs.push({ key: `${c.id}-${d}-${Date.now()}`, src: `/print/bons/${c.id}?dest=${d}&auto=1` })
-        }
+      for (const c of nouvellesPourMoi) {
+        jobs.push({ key: `${c.id}-${monTag}-${Date.now()}`, src: `/print/bons/${c.id}?dest=${monTag}&auto=1` })
       }
       if (jobs.length > 0) setPrintJobs(prev => [...prev, ...jobs])
     }
     previousIdsRef.current = newIds
-  }, [initial, autoPrint])
+  }, [initial, autoPrint, monTag])
 
   // Cleanup des iframes auto-print après 8s
   useEffect(() => {
@@ -120,24 +123,21 @@ export default function CuisineClient({
     return out
   }, [commandes])
 
-  // Compteurs en haut
+  // Compteurs en haut — restreints à la colonne du rôle
   const nbEnAttente = useMemo(() => {
     let n = 0
     for (const c of commandes) for (const a of c.articles) {
-      if ((a.tag_destination === 'CUISINE' || a.tag_destination === 'PIZZA') && a.statut === 'en_attente') n++
+      if (a.tag_destination === monTag && a.statut === 'en_attente') n++
     }
     return n
-  }, [commandes])
+  }, [commandes, monTag])
 
   const tempsMoyen = useMemo(() => {
-    const articles = [
-      ...articlesParColonne.CUISINE,
-      ...articlesParColonne.PIZZA,
-    ]
+    const articles = articlesParColonne[monTag]
     if (articles.length === 0) return 0
     const total = articles.reduce((s, x) => s + (now - new Date(x.commande.created_at).getTime()) / 60000, 0)
     return total / articles.length
-  }, [articlesParColonne, now])
+  }, [articlesParColonne, monTag, now])
 
   function transition(article_id: string, nouveau: StatutArticle) {
     // Optimistic update
@@ -158,9 +158,9 @@ export default function CuisineClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      {/* Bottom nav mobile (espace opérationnel — masqué pour le pizzaiolo
-          qui a une vue concentrée sur sa colonne uniquement). */}
-      {role !== 'pizzaiolo' && <OpsBottomNav profil={navProfil} />}
+      {/* Bottom nav mobile (espace opérationnel — affichée aussi pour pizzaiolo
+          maintenant que la pizza est un poste séparé avec sa propre route). */}
+      <OpsBottomNav profil={navProfil} />
       {/* Header sombre */}
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
@@ -221,9 +221,17 @@ export default function CuisineClient({
         />
       </div>
 
-      {/* Colonnes : pizzaiolo voit uniquement PIZZA, cuisinier voit les 2 */}
-      <main className={cn('flex-1 grid gap-px bg-zinc-800', role === 'pizzaiolo' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2')}>
-        {role !== 'pizzaiolo' && (
+      {/* Cuisine et Pizza sont 2 postes séparés : on n'affiche QUE la colonne du rôle */}
+      <main className="flex-1 grid grid-cols-1 gap-px bg-zinc-800">
+        {role === 'pizzaiolo' ? (
+          <Colonne
+            tag="PIZZA"
+            icone="🍕"
+            articles={articlesParColonne.PIZZA}
+            now={now}
+            onTransition={transition}
+          />
+        ) : (
           <Colonne
             tag="CUISINE"
             icone="👨‍🍳"
@@ -232,13 +240,6 @@ export default function CuisineClient({
             onTransition={transition}
           />
         )}
-        <Colonne
-          tag="PIZZA"
-          icone="🍕"
-          articles={articlesParColonne.PIZZA}
-          now={now}
-          onTransition={transition}
-        />
       </main>
     </div>
   )
