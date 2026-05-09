@@ -6,14 +6,15 @@ import { createClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/auth'
 
 const schema = z.object({
-  nom:          z.string().trim().min(1).max(100),
-  numero:       z.string().trim().min(1).max(20),
-  capacite:     z.coerce.number().int().min(1).max(20),
-  prix_nuit_ht: z.coerce.number().min(0).max(10000),
-  description:  z.string().max(1000).nullable().optional(),
-  equipements:  z.array(z.string()).default([]),
-  photos:       z.array(z.string()).default([]),
-  actif:        z.boolean().default(true),
+  nom:            z.string().trim().min(1).max(100),
+  numero:         z.string().trim().min(1).max(20),
+  capacite:       z.coerce.number().int().min(1).max(20),
+  prix_nuit_ht:   z.coerce.number().min(0).max(10000),
+  description:    z.string().max(1000).nullable().optional(),
+  equipements:    z.array(z.string()).default([]),
+  photos:         z.array(z.string()).default([]),
+  video_360_url:  z.string().max(500).nullable().optional(),
+  actif:          z.boolean().default(true),
 })
 
 export async function creerChambre(input: unknown) {
@@ -24,6 +25,7 @@ export async function creerChambre(input: unknown) {
     nom: p.nom, numero: p.numero, capacite: p.capacite,
     prix_nuit_ht: p.prix_nuit_ht, description: p.description || null,
     equipements: p.equipements, photos: p.photos.filter(p => p.trim()),
+    video_360_url: p.video_360_url || null,
     actif: p.actif,
   }).select('id').single()
   if (error || !data) {
@@ -44,6 +46,7 @@ export async function modifierChambre(input: unknown) {
     nom: p.nom, numero: p.numero, capacite: p.capacite,
     prix_nuit_ht: p.prix_nuit_ht, description: p.description || null,
     equipements: p.equipements, photos: p.photos.filter(p => p.trim()),
+    video_360_url: p.video_360_url || null,
     actif: p.actif,
   }).eq('id', p.id)
   if (error) throw new Error(error.message)

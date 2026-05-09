@@ -13,6 +13,7 @@ export type Chambre = {
   description: string | null
   equipements: string[]
   photos: string[]
+  video_360_url: string | null
   actif: boolean
 }
 
@@ -28,6 +29,7 @@ export default async function ChambresAdminPage() {
     description: (c.description as string) ?? null,
     equipements: (c.equipements as string[]) ?? [],
     photos: (c.photos as string[]) ?? [],
+    video_360_url: (c.video_360_url as string) ?? null,
     actif: c.actif as boolean,
   }))
   return <ChambresAdminClient chambres={chambres} />

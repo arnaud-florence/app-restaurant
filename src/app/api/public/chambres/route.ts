@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
   const sb = await createClient()
   const { data, error } = await sb.from('chambres')
-    .select('id, nom, numero, capacite, prix_nuit_ht, description, equipements, photos')
+    .select('id, nom, numero, capacite, prix_nuit_ht, description, equipements, photos, video_360_url')
     .eq('actif', true)
     .order('numero')
 
@@ -28,16 +28,18 @@ export async function GET(req: Request) {
     capacite: number | string; prix_nuit_ht: number | string;
     description: string | null;
     equipements: string[] | null; photos: string[] | null;
+    video_360_url: string | null;
   }
   const items = ((data ?? []) as Row[]).map(c => ({
     id: c.id,
     nom: c.nom,
     numero: c.numero,
     capacite: Number(c.capacite ?? 2),
-    prix_nuit_ttc: Math.round(Number(c.prix_nuit_ht) * 1.10 * 100) / 100,  // TVA hôtellerie 10%
+    prix_nuit_ttc: Math.round(Number(c.prix_nuit_ht) * 1.10 * 100) / 100,
     description: c.description,
     equipements: c.equipements ?? [],
     photos: c.photos ?? [],
+    video_360_url: c.video_360_url,
   }))
 
   return Response.json({ items, count: items.length }, {

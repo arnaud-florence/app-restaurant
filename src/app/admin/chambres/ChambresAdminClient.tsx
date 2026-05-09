@@ -146,6 +146,7 @@ function ChambreModal({ chambre, onClose, onSaved }: { chambre: Chambre | null; 
   const [description, setDescription] = useState(chambre?.description ?? '')
   const [equipements, setEquipements] = useState<string[]>(chambre?.equipements ?? [])
   const [photos, setPhotos] = useState<string[]>(chambre?.photos ?? [''])
+  const [video360, setVideo360] = useState(chambre?.video_360_url ?? '')
   const [actif, setActif] = useState(chambre?.actif ?? true)
   const [erreur, setErreur] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -162,7 +163,9 @@ function ChambreModal({ chambre, onClose, onSaved }: { chambre: Chambre | null; 
         const payload = {
           nom: nom.trim(), numero: numero.trim(), capacite, prix_nuit_ht: prix,
           description: description.trim() || null, equipements,
-          photos: photos.filter(p => p.trim()), actif,
+          photos: photos.filter(p => p.trim()),
+          video_360_url: video360.trim() || null,
+          actif,
         }
         if (isEdit) await modifierChambre({ ...payload, id: chambre!.id })
         else await creerChambre(payload)
@@ -220,6 +223,14 @@ function ChambreModal({ chambre, onClose, onSaved }: { chambre: Chambre | null; 
           <Textarea rows={3} value={photos.join('\n')} onChange={e => setPhotos(e.target.value.split('\n'))}
             placeholder="https://images.unsplash.com/..." />
           <p className="text-[11px] text-zinc-500 mt-0.5">Recommandé : 1200×800px. Première photo = image principale.</p>
+        </div>
+
+        <div>
+          <label className="text-sm font-bold block mb-1">URL vidéo 360° (optionnel)</label>
+          <Input value={video360} onChange={e => setVideo360(e.target.value)} placeholder="https://www.youtube.com/watch?v=XXXX" />
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            Visite virtuelle YouTube/Vimeo. Coller l&apos;URL complète, on génère l&apos;embed auto.
+          </p>
         </div>
 
         <label className="flex items-center gap-2 text-sm cursor-pointer rounded-md border p-2">
