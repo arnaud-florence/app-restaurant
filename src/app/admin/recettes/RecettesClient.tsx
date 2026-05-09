@@ -19,7 +19,7 @@ import {
 } from './types'
 import { toggleRecetteActif, deleteRecette } from './actions'
 import RecetteFormModal from './RecetteFormModal'
-import { installerCatalogueDemarrage } from '../setup/seed-actions'
+import { installerCatalogueDemarrage, seedCatalogueOnline } from '../setup/seed-actions'
 import { Loader2, Sparkles } from 'lucide-react'
 
 export default function RecettesClient({
@@ -122,6 +122,7 @@ export default function RecettesClient({
               {!readOnly && (
                 <>
                   <PackDemarrageButton />
+                  <SeedOnlineButton />
                   <Button size="lg" onClick={() => setCreating(true)}>
                     <span className="text-lg">+</span>
                     <span className="hidden sm:inline">Nouvelle recette</span>
@@ -489,6 +490,92 @@ function PackDemarrageButton() {
               <summary className="cursor-pointer text-zinc-600">Voir le détail ({result.details.length} lignes)</summary>
               <ul className="mt-2 space-y-0.5 text-[11px] font-mono text-zinc-700 max-h-48 overflow-y-auto">
                 {result.details.map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+            </details>
+            <Button onClick={() => setResult(null)} className="w-full mt-3">Fermer</Button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── Bouton « Activer site web » ─────────────────────────────
+// Active vendable_online sur toutes les recettes SNACKING/PIZZA/BAR existantes
+// + crée 16 recettes starter (5 snacking, 5 pizzas, 6 bar) avec photos
+// + ajoute photo placeholder sur toutes les recettes online sans image.
+function SeedOnlineButton() {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [result, setResult] = useState<{ activees: number; creees: number; photos: number; total: number; details: string[] } | null>(null)
+
+  function lancer() {
+    if (!confirm(
+      'Activer le catalogue ONLINE pour le site web ?\n\n' +
+      'Cela va :\n' +
+      '• Activer « vendable_online » sur toutes tes recettes SNACKING/PIZZA/BAR existantes\n' +
+      '• Créer 16 recettes starter manquantes (5 snacking + 5 pizzas + 6 bar) avec photos\n' +
+      '• Ajouter une photo placeholder sur les recettes online sans image\n\n' +
+      'Idempotent : ne crée pas de doublons.'
+    )) return
+    startTransition(async () => {
+      try {
+        const r = await seedCatalogueOnline()
+        setResult({ activees: r.activees, creees: r.creees, photos: r.photos_ajoutees, total: r.total_online, details: r.details })
+        router.refresh()
+      } catch (e) {
+        alert(e instanceof Error ? e.message : 'Erreur')
+      }
+    })
+  }
+
+  return (
+    <>
+      <Button
+        size="lg"
+        variant="outline"
+        onClick={lancer}
+        disabled={pending}
+        className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1"
+        title="Active toutes les recettes pour le site web + crée des plats si manquants"
+      >
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🌐</span>}
+        <span className="hidden sm:inline">Activer site web</span>
+        <span className="sm:hidden">Site web</span>
+      </Button>
+
+      {result && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setResult(null)}>
+          <div className="bg-white rounded-lg max-w-md w-full p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <span className="text-2xl">🌐</span>
+              Catalogue site web activé
+            </h3>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="rounded-md bg-blue-50 p-2 text-center">
+                <p className="text-2xl font-bold text-blue-700">{result.total}</p>
+                <p className="text-[10px] uppercase tracking-wider">Recettes online</p>
+              </div>
+              <div className="rounded-md bg-emerald-50 p-2 text-center">
+                <p className="text-2xl font-bold text-emerald-700">+{result.creees}</p>
+                <p className="text-[10px] uppercase tracking-wider">Créées</p>
+              </div>
+              <div className="rounded-md bg-amber-50 p-2 text-center">
+                <p className="text-2xl font-bold text-amber-700">{result.activees}</p>
+                <p className="text-[10px] uppercase tracking-wider">Activées</p>
+              </div>
+              <div className="rounded-md bg-pink-50 p-2 text-center">
+                <p className="text-2xl font-bold text-pink-700">{result.photos}</p>
+                <p className="text-[10px] uppercase tracking-wider">Photos ajoutées</p>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-600 mb-2">
+              ✓ Va vérifier sur <a href="https://site-restaurant-beta.vercel.app/menu" target="_blank" rel="noopener" className="text-blue-600 underline">le site /menu</a> (hard reload Ctrl+Shift+R).
+            </p>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-zinc-500 hover:text-zinc-700">Détails ({result.details.length})</summary>
+              <ul className="mt-2 space-y-0.5 max-h-48 overflow-y-auto">
+                {result.details.map((d, i) => <li key={i} className="text-[11px] text-zinc-600">{d}</li>)}
               </ul>
             </details>
             <Button onClick={() => setResult(null)} className="w-full mt-3">Fermer</Button>
