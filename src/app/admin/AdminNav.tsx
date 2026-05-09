@@ -42,6 +42,7 @@ const GROUPES: Group[] = [
     label: 'Opérations', emoji: '🍽️',
     items: [
       { href: '/admin/recettes',     label: 'Recettes',     icon: ChefHat },
+      { href: '/admin/plats-du-jour', label: 'Plats du jour', icon: Sparkles },
       { href: '/admin/ingredients',  label: 'Ingrédients',  icon: Store },
       { href: '/admin/stock',        label: 'Stock',        icon: Truck },
       { href: '/admin/fournisseurs', label: 'Fournisseurs', icon: Truck },
