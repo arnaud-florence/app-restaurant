@@ -519,32 +519,77 @@ export default function EncaissementModal({
               )}
             </div>
 
-            {client ? (
-              <div className="flex items-center justify-between gap-2 p-2 rounded-md border border-emerald-700/50 bg-emerald-950/40">
-                <div className="min-w-0 text-sm">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-emerald-100 truncate">
-                      {client.prenom ? client.prenom + ' ' : ''}{client.nom}
-                    </span>
-                    {(() => {
-                      const k = (client.niveau_fidelite as NiveauFidelite) ?? 'standard'
-                      const ni = NIVEAU_INFO[k] ?? NIVEAU_INFO.standard
-                      return <span className="text-xs px-1.5 py-0.5 rounded border border-emerald-700/60 bg-emerald-900/40 text-emerald-200">{ni.emoji} {ni.label}</span>
-                    })()}
+            {client ? (() => {
+              const ordre: NiveauFidelite[] = ['standard', 'bronze', 'argent', 'or', 'platine']
+              const k = (client.niveau_fidelite as NiveauFidelite) ?? 'standard'
+              const ni = NIVEAU_INFO[k] ?? NIVEAU_INFO.standard
+              const idx = ordre.indexOf(k)
+              const prochainKey = idx >= 0 && idx < ordre.length - 1 ? ordre[idx + 1] : null
+              const prochain = prochainKey ? NIVEAU_INFO[prochainKey] : null
+              const visitesRestantes = prochain ? Math.max(0, prochain.min_visites - client.nb_visites) : 0
+              return (
+                <div className="rounded-md border border-emerald-700/50 bg-emerald-950/40 p-3 space-y-2">
+                  {/* Header : nom + niveau + bouton retirer */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-emerald-100 truncate">
+                          {client.prenom ? client.prenom + ' ' : ''}{client.nom}
+                        </span>
+                        <span className="text-xs px-1.5 py-0.5 rounded border border-emerald-700/60 bg-emerald-900/40 text-emerald-200">
+                          {ni.emoji} {ni.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-300/80 mt-0.5">
+                        {client.points_fidelite} pts · {client.nb_visites} visite{client.nb_visites > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setClient(null)}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1 flex-shrink-0"
+                    >
+                      Retirer
+                    </button>
                   </div>
-                  <p className="text-[11px] text-emerald-300/80">
-                    {client.points_fidelite} pts · {client.nb_visites} visites
-                  </p>
+
+                  {/* Récompenses débloquées */}
+                  <div className="border-t border-emerald-800/50 pt-2">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-300/70 mb-1">
+                      🎁 Avantages actifs (à appliquer si demandé)
+                    </p>
+                    <ul className="space-y-0.5">
+                      {ni.recompenses.map((r, i) => (
+                        <li key={i} className="text-[11px] text-emerald-100 flex items-start gap-1.5">
+                          <span className="text-emerald-400 font-bold">✓</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Prochain palier */}
+                  {prochain && (
+                    <div className="border-t border-emerald-800/50 pt-2">
+                      <p className="text-[11px] text-emerald-300/80">
+                        🎯 Prochain palier :{' '}
+                        <span className="font-bold text-emerald-100">{prochain.emoji} {prochain.label}</span>
+                        {visitesRestantes > 0 ? (
+                          <span> dans <span className="font-bold">{visitesRestantes} visite{visitesRestantes > 1 ? 's' : ''}</span></span>
+                        ) : (
+                          <span className="font-bold text-amber-300"> — atteint après cet encaissement !</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                  {!prochain && (
+                    <div className="border-t border-emerald-800/50 pt-2">
+                      <p className="text-[11px] text-violet-300 font-medium">💎 Niveau maximum — fidélité top !</p>
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setClient(null)}
-                  className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
-                >
-                  Retirer
-                </button>
-              </div>
-            ) : showCreate ? (
+              )
+            })() : showCreate ? (
               <div className="rounded-md border border-emerald-700/50 bg-zinc-950 p-3 space-y-2">
                 <p className="text-[11px] text-emerald-300 mb-1">Nouveau client (visite + fidélité)</p>
                 <div className="grid grid-cols-2 gap-2">
