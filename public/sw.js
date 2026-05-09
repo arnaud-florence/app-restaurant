@@ -1,21 +1,111 @@
-// Service worker — PWA installable + Push notifications.
+// Service worker — PWA installable + Push notifications + cache offline.
 //
-// Push : reçoit les events depuis le serveur (Web Push), affiche une notif
-// native. Tap sur la notif → ouvre l'URL associée dans l'app.
+// Stratégies :
+//  - Assets statiques (_next/static/*, /icons/*, fonts) : cache-first (rapide, immuables)
+//  - Pages HTML : network-first avec fallback offline.html (toujours frais si online)
+//  - API/POST/Supabase : pas de cache, network only (fail si offline → géré côté UI)
 
-self.addEventListener('install', () => {
-  self.skipWaiting()
+const CACHE_VERSION = 'v2-2026-05-09'
+const STATIC_CACHE  = `static-${CACHE_VERSION}`
+const PAGES_CACHE   = `pages-${CACHE_VERSION}`
+const OFFLINE_URL   = '/offline.html'
+
+// Pages à pré-cacher pour qu'elles soient dispo offline dès la 1ère install
+const PRECACHE_URLS = [
+  OFFLINE_URL,
+  '/icon-192.png',
+  '/icon-512.png',
+]
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(STATIC_CACHE)
+      // Pre-cache best-effort : ne bloque pas l'install si une URL échoue
+      await Promise.allSettled(PRECACHE_URLS.map(u => cache.add(u)))
+      await self.skipWaiting()
+    })()
+  )
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    (async () => {
+      // Nettoie les anciens caches d'autres versions
+      const keys = await caches.keys()
+      await Promise.all(
+        keys
+          .filter(k => k !== STATIC_CACHE && k !== PAGES_CACHE)
+          .map(k => caches.delete(k))
+      )
+      await self.clients.claim()
+    })()
+  )
 })
 
+// ─── Stratégies de fetch ──────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
-  // Stratégie network-first transparente — le SW existe surtout pour rendre
-  // la PWA installable et pour gérer les push notifications.
-  event.respondWith(fetch(event.request).catch(() => new Response('Offline', { status: 503 })))
+  const req = event.request
+
+  // Seules les requêtes GET sont éligibles au cache
+  if (req.method !== 'GET') return
+
+  const url = new URL(req.url)
+
+  // Skip cross-origin (Supabase, fonts CDN, analytics…) → laisse passer en network
+  if (url.origin !== self.location.origin) return
+
+  // 1. Assets statiques Next.js : cache-first (immuables, hash dans l'URL)
+  if (url.pathname.startsWith('/_next/static/') ||
+      url.pathname.startsWith('/icon-')         ||
+      url.pathname.endsWith('.woff2')           ||
+      url.pathname.endsWith('.woff')            ||
+      url.pathname.endsWith('.ttf')             ||
+      url.pathname.endsWith('.svg')) {
+    event.respondWith(cacheFirst(req, STATIC_CACHE))
+    return
+  }
+
+  // 2. Pages HTML (navigations) : network-first avec fallback offline
+  if (req.mode === 'navigate' || req.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(networkFirstHtml(req))
+    return
+  }
+
+  // 3. Reste (API, JSON, etc.) : pas de cache, laisse le browser gérer
 })
+
+async function cacheFirst(req, cacheName) {
+  const cache = await caches.open(cacheName)
+  const hit = await cache.match(req)
+  if (hit) return hit
+  try {
+    const res = await fetch(req)
+    if (res.ok) cache.put(req, res.clone())
+    return res
+  } catch {
+    return new Response('Offline asset', { status: 503 })
+  }
+}
+
+async function networkFirstHtml(req) {
+  try {
+    const res = await fetch(req)
+    // Cache la dernière version réussie de chaque page navigée
+    if (res.ok) {
+      const cache = await caches.open(PAGES_CACHE)
+      cache.put(req, res.clone())
+    }
+    return res
+  } catch {
+    // Hors ligne : sert la dernière version cachée si dispo, sinon la page offline
+    const cache = await caches.open(PAGES_CACHE)
+    const hit = await cache.match(req)
+    if (hit) return hit
+    const offline = await caches.match(OFFLINE_URL)
+    return offline ?? new Response('Hors-ligne', { status: 503 })
+  }
+}
 
 // ─── Push notifications ──────────────────────────────────────────
 self.addEventListener('push', (event) => {
@@ -46,7 +136,6 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    // Si une fenêtre de l'app est déjà ouverte, on la focus + navigate
     for (const client of all) {
       if ('focus' in client) {
         try { await client.focus() } catch { /* ignore */ }
@@ -56,7 +145,6 @@ self.addEventListener('notificationclick', (event) => {
         return
       }
     }
-    // Sinon ouvre une nouvelle fenêtre
     if (self.clients.openWindow) await self.clients.openWindow(url)
   })())
 })

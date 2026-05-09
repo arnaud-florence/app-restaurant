@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hors-ligne — App Restaurant</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #fafaf9 0%, #fef3c7 100%);
+      color: #1c1917;
+    }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 480px; width: 100%;
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 16px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { color: #57534e; line-height: 1.5; margin: 8px 0; }
+    .status {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 999px;
+      background: #fef2f2; color: #991b1b;
+      font-size: 13px; font-weight: 600; margin: 12px 0;
+    }
+    .status::before {
+      content: ''; width: 8px; height: 8px;
+      background: #dc2626; border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    button {
+      display: inline-block;
+      margin-top: 16px;
+      background: #059669;
+      color: white;
+      border: 0;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #047857; }
+    .tips {
+      margin-top: 24px;
+      padding: 16px;
+      background: #fef3c7;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .tips strong { color: #92400e; }
+    .tips ul { margin: 8px 0 0; padding-left: 20px; }
+    .tips li { margin: 4px 0; font-size: 13px; color: #78350f; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Connexion perdue</h1>
+    <div class="status">Hors-ligne</div>
+    <p>L'app a besoin d'internet pour fonctionner pleinement (commandes, encaissement, synchro temps réel).</p>
+
+    <button onclick="location.reload()">🔄 Réessayer</button>
+
+    <div class="tips">
+      <strong>⚠️ Que faire en attendant :</strong>
+      <ul>
+        <li>Note les commandes sur papier</li>
+        <li>Vérifie le routeur / la 4G du tel</li>
+        <li>Dès que la connexion revient, l'app reprend automatiquement</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Auto-retry quand la connexion revient
+    window.addEventListener('online', () => location.reload())
+  </script>
+</body>
+</html>

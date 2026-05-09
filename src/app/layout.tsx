@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import ContextualHelp from "@/components/ContextualHelp";
 import GlobalSearch from "@/components/GlobalSearch";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -51,6 +52,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <OfflineIndicator />
         {children}
         <GlobalSearch />
         <ContextualHelp />
