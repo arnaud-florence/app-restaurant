@@ -2,7 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 import PilotageClient from './PilotageClient'
+import TachesEquipeCard from './TachesEquipeCard'
+import PerformanceCard from './PerformanceCard'
+import BandeauSetupIncomplet from './BandeauSetupIncomplet'
 import { calculerKPIs, calculerSaisonnier, periodeMoisCourant } from '@/lib/pilotage'
+import { getProfile } from '@/lib/auth'
 
 export const metadata = { title: 'Pilotage stratégique — Admin' }
 export const dynamic = 'force-dynamic'
@@ -20,6 +24,18 @@ export default async function PilotagePage() {
     supabase.from('employes').select('id, prenom, nom').eq('actif', true).order('prenom'),
   ])
 
+  // Persistance widget tâches du jour pour le manager (gérant lui-même)
+  const profil = await getProfile()
+  const employeId = profil?.employe_id ?? null
+  let initialDone: string[] = []
+  if (employeId) {
+    const { data } = await supabase.from('taches_completees')
+      .select('tache_id')
+      .eq('employe_id', employeId)
+      .eq('date', new Date().toISOString().slice(0, 10))
+    initialDone = (data ?? []).map(r => r.tache_id as string)
+  }
+
   return (
     <PilotageClient
       kpis={kpis}
@@ -28,6 +44,9 @@ export default async function PilotagePage() {
       actions={(actionsRes.data ?? []) as unknown as ActionRow[]}
       employes={employesRes.data ?? []}
       periode={periode}
+      widgetEmployeId={employeId}
+      widgetInitialDone={initialDone}
+      tachesEquipeCard={<><BandeauSetupIncomplet /><TachesEquipeCard /><PerformanceCard /></>}
     />
   )
 }

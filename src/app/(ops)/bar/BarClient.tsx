@@ -13,7 +13,14 @@ import { changerStatutArticle } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 
-export default function BarClient({ initial, navProfil }: { initial: CommandeService[]; navProfil?: OpsBottomNavProfil }) {
+export default function BarClient({
+  initial, navProfil, widgetEmployeId = null, widgetInitialDone = [],
+}: {
+  initial: CommandeService[]
+  navProfil?: OpsBottomNavProfil
+  widgetEmployeId?: string | null
+  widgetInitialDone?: string[]
+}) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
@@ -152,7 +159,7 @@ export default function BarClient({ initial, navProfil }: { initial: CommandeSer
       ))}
 
       <div className="px-3 pt-3 bg-zinc-900">
-        <TachesDuJourWidget poste="barman" theme="dark" />
+        <TachesDuJourWidget poste="barman" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
       </div>
 
       <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

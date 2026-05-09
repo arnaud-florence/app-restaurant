@@ -48,6 +48,37 @@ export async function updateClient(input: unknown) {
   return { ok: true as const }
 }
 
+/**
+ * Recherche rapide pour autocomplete (encaissement, réservation, etc.).
+ * Match insensible à la casse sur prénom/nom/email/téléphone. Limite 8 résultats.
+ */
+export async function searchClients(query: string): Promise<Array<{
+  id: string; prenom: string | null; nom: string;
+  email: string | null; telephone: string | null;
+  niveau_fidelite: string; nb_visites: number; points_fidelite: number;
+}>> {
+  const q = query.trim()
+  if (q.length < 2) return []
+  const supabase = await createClient()
+  // Escape % et _ pour éviter wildcard injection
+  const safe = q.replace(/[%_]/g, ch => '\\' + ch)
+  const { data } = await supabase.from('clients')
+    .select('id, prenom, nom, email, telephone, niveau_fidelite, nb_visites, points_fidelite')
+    .or(`nom.ilike.%${safe}%,prenom.ilike.%${safe}%,email.ilike.%${safe}%,telephone.ilike.%${safe}%`)
+    .order('nb_visites', { ascending: false })
+    .limit(8)
+  return (data ?? []).map(r => ({
+    id: r.id as string,
+    prenom: (r.prenom as string) ?? null,
+    nom: r.nom as string,
+    email: (r.email as string) ?? null,
+    telephone: (r.telephone as string) ?? null,
+    niveau_fidelite: (r.niveau_fidelite as string) ?? 'standard',
+    nb_visites: Number(r.nb_visites ?? 0),
+    points_fidelite: Number(r.points_fidelite ?? 0),
+  }))
+}
+
 export async function supprimerClient(id: string) {
   if (!id) throw new Error('id manquant')
   const supabase = await createClient()

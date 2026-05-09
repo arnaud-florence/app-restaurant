@@ -2,25 +2,35 @@
 
 // Module 28 — Navigation latérale admin avec sidebar groupée + mobile hamburger.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Menu, X, LogOut, BarChart3, ChefHat, Wine, ShieldCheck, Users, Wallet,
   Calendar, Building2, Truck, Sparkles, Settings, Tv, GraduationCap,
   AlertTriangle, FileText, Trash2, Zap, NotebookPen, CloudSun, Wrench,
-  Store, BookOpen,
+  Store, BookOpen, Trophy, Calculator, ChevronDown, ChevronRight, Home, Star,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
+import NotificationsBell from '@/components/NotificationsBell'
 
 type LinkItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> }
-type Group = { label: string; items: LinkItem[] }
+type Group = { label: string; emoji: string; items: LinkItem[] }
 
+// 7 groupes consolidés (vs 9 avant).
+// "Mon profil" = toujours expanded (1 seul item).
+// Les autres groupes : collapsibles, l'état est sauvé en localStorage.
 const GROUPES: Group[] = [
   {
-    label: 'Pilotage',
+    label: 'Mon profil', emoji: '🏠',
+    items: [
+      { href: '/mon-espace',         label: 'Mon espace',      icon: Home },
+    ],
+  },
+  {
+    label: 'Pilotage', emoji: '📊',
     items: [
       { href: '/admin/pilotage',     label: 'Tableau de bord', icon: BarChart3 },
       { href: '/admin/assistant',    label: 'Assistant IA',    icon: Sparkles },
@@ -29,56 +39,57 @@ const GROUPES: Group[] = [
     ],
   },
   {
-    label: 'Cuisine',
+    label: 'Opérations', emoji: '🍽️',
     items: [
       { href: '/admin/recettes',     label: 'Recettes',     icon: ChefHat },
       { href: '/admin/ingredients',  label: 'Ingrédients',  icon: Store },
       { href: '/admin/stock',        label: 'Stock',        icon: Truck },
       { href: '/admin/fournisseurs', label: 'Fournisseurs', icon: Truck },
-      { href: '/admin/allergenes',   label: 'Allergènes',   icon: AlertTriangle },
       { href: '/admin/boissons',     label: 'Boissons',     icon: Wine },
+      { href: '/admin/allergenes',   label: 'Allergènes',   icon: AlertTriangle },
     ],
   },
   {
-    label: 'Service',
+    label: 'Clientèle', emoji: '👥',
     items: [
-      { href: '/admin/affichage',    label: 'Affichage TV', icon: Tv },
       { href: '/admin/reservations', label: 'Réservations', icon: Calendar },
       { href: '/admin/groupes',      label: 'Groupes',      icon: Users },
-      { href: '/admin/clients',      label: 'Clients/CRM',  icon: Users },
+      { href: '/admin/clients',      label: 'Clients / CRM', icon: Users },
+      { href: '/admin/clients/fidelite', label: 'Programme fidélité', icon: Star },
+      { href: '/admin/affichage',    label: 'Affichage TV', icon: Tv },
     ],
   },
   {
-    label: 'Équipe',
+    label: 'Gestion équipe & finances', emoji: '💼',
     items: [
-      { href: '/admin/rh',         label: 'Ressources humaines', icon: Users },
-      { href: '/admin/formation',  label: 'Formation',           icon: GraduationCap },
+      { href: '/admin/rh',           label: 'Ressources humaines', icon: Users },
+      { href: '/formation',          label: 'Mes manuels',         icon: BookOpen },
+      { href: '/admin/formation',    label: 'Gérer guides',        icon: GraduationCap },
+      { href: '/admin/challenges',   label: 'Challenges',          icon: Trophy },
+      { href: '/admin/economie',     label: 'Centre économique',   icon: Calculator },
+      { href: '/admin/finances',     label: 'Finances / TVA',      icon: Wallet },
+      { href: '/admin/energie',      label: 'Énergie',             icon: Zap },
     ],
   },
   {
-    label: 'Conformité',
+    label: 'Conformité', emoji: '🛡️',
     items: [
-      { href: '/admin/hygiene',     label: 'Hygiène / HACCP', icon: ShieldCheck },
-      { href: '/admin/legal',       label: 'Légal',           icon: FileText },
-      { href: '/admin/maintenance', label: 'Maintenance',     icon: Wrench },
-      { href: '/admin/dechets',     label: 'Déchets',         icon: Trash2 },
+      { href: '/admin/hygiene',      label: 'Hygiène / HACCP',     icon: ShieldCheck },
+      { href: '/admin/dechets',      label: 'Déchets (AGEC)',      icon: Trash2 },
+      { href: '/admin/legal',        label: 'Légal',               icon: FileText },
+      { href: '/admin/maintenance',  label: 'Maintenance',         icon: Wrench },
     ],
   },
   {
-    label: 'Finances',
+    label: 'Système', emoji: '⚙️',
     items: [
-      { href: '/admin/finances', label: 'P&L / TVA / trésorerie', icon: Wallet },
-      { href: '/admin/energie',  label: 'Énergie',                icon: Zap },
-    ],
-  },
-  {
-    label: 'Système',
-    items: [
-      { href: '/admin/setup',    label: 'Configuration', icon: Settings },
-      { href: '/admin/securite', label: 'Sécurité',      icon: ShieldCheck },
+      { href: '/admin/setup',        label: 'Configuration',       icon: Settings },
+      { href: '/admin/securite',     label: 'Sécurité',            icon: ShieldCheck },
     ],
   },
 ]
+
+const STORAGE_KEY = 'admin_nav_collapsed'
 
 const SHORTCUTS_OPS = [
   { href: '/caisse',  label: 'Caisse',  icon: Wallet },
@@ -97,6 +108,7 @@ type AdminNavProfil = {
 export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   // Filtrage par permissions : un employé voit uniquement les modules auxquels il a accès.
   // Le manager voit tout.
@@ -108,6 +120,34 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
     .map(g => ({ ...g, items: g.items.filter(it => peutVoir(it.href)) }))
     .filter(g => g.items.length > 0)
 
+  // Hydrate les groupes collapsed depuis localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) setCollapsed(new Set(JSON.parse(raw)))
+    } catch { /* ignore */ }
+  }, [])
+
+  function toggleGroup(label: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...next])) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  // Le groupe contenant l'URL actuelle est toujours expanded
+  function isGroupCollapsed(g: Group) {
+    if (g.items.length <= 1) return false                    // Mon profil = jamais collapsed
+    const containsActive = g.items.some(it =>
+      pathname === it.href || pathname?.startsWith(it.href + '/'),
+    )
+    if (containsActive) return false
+    return collapsed.has(g.label)
+  }
+
   // Raccourcis bottom-nav mobile : 4 postes ops + bouton menu (5 zones tactiles).
   const BOTTOM_NAV_ALL: Array<{ href: string; label: string; emoji: string }> = [
     { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
@@ -118,14 +158,13 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
   const BOTTOM_NAV = BOTTOM_NAV_ALL.filter(it => peutVoir(it.href))
 
   return (
-    <>
-      {/* Top bar mobile (titre courant + logo) */}
+    <>      {/* Top bar mobile (titre courant + logo) */}
       <header className="md:hidden sticky top-0 z-30 bg-white border-b flex items-center px-3 h-12">
         <Building2 className="h-5 w-5 text-emerald-600" />
         <div className="flex-1 text-center font-semibold truncate text-sm">
           {groupesFiltres.flatMap(g => g.items).find(i => pathname === i.href || pathname?.startsWith(i.href + '/'))?.label ?? 'Admin'}
         </div>
-        <div className="w-5" />
+        <NotificationsBell />
       </header>
 
       {/* Overlay mobile */}
@@ -181,33 +220,78 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4 text-sm">
-          {groupesFiltres.map(g => (
-            <div key={g.label}>
-              <h3 className="px-2 mb-1 text-xs font-bold uppercase tracking-wider text-stone-400">{g.label}</h3>
-              <ul className="space-y-0.5">
-                {g.items.map(it => {
-                  const active = pathname === it.href || pathname?.startsWith(it.href + '/')
-                  const Icon = it.icon
-                  return (
-                    <li key={it.href}>
-                      <Link
-                        href={it.href}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          'flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
-                          active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white',
-                        )}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{it.label}</span>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ))}
+        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-2 text-sm">
+          {groupesFiltres.map(g => {
+            const isCol = isGroupCollapsed(g)
+            const isSingle = g.items.length === 1
+            return (
+              <div key={g.label}>
+                {isSingle ? (
+                  // Pas de header collapsible pour les groupes à 1 item
+                  <ul className="space-y-0.5">
+                    {g.items.map(it => {
+                      const active = pathname === it.href || pathname?.startsWith(it.href + '/')
+                      const Icon = it.icon
+                      return (
+                        <li key={it.href}>
+                          <Link
+                            href={it.href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'flex items-center gap-2 rounded-md px-2 py-2 transition-colors',
+                              active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white',
+                            )}
+                          >
+                            <span className="text-base">{g.emoji}</span>
+                            <Icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate font-medium">{it.label}</span>
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(g.label)}
+                      className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 rounded-md"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-sm">{g.emoji}</span>
+                        {g.label}
+                        <span className="text-stone-500">({g.items.length})</span>
+                      </span>
+                      {isCol ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+                    {!isCol && (
+                      <ul className="space-y-0.5 mt-0.5 ml-1">
+                        {g.items.map(it => {
+                          const active = pathname === it.href || pathname?.startsWith(it.href + '/')
+                          const Icon = it.icon
+                          return (
+                            <li key={it.href}>
+                              <Link
+                                href={it.href}
+                                onClick={() => setOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
+                                  active ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-stone-800 hover:text-white',
+                                )}
+                              >
+                                <Icon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{it.label}</span>
+                              </Link>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          })}
 
           {SHORTCUTS_OPS.filter(it => peutVoir(it.href)).length > 0 && (
             <div>

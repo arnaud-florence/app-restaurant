@@ -6,7 +6,8 @@
 // l'utilisateur connecté. En mode kiosk (sans profil), seul les 4 boutons
 // ops sont affichés.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import PushNotifSwitch from '@/components/PushNotifSwitch'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, LogOut, Building2 } from 'lucide-react'
@@ -53,11 +54,18 @@ const ADMIN_MODULES: Array<{ groupe: string; items: Array<{ href: string; label:
     ],
   },
   {
+    groupe: 'Mon profil',
+    items: [
+      { href: '/mon-espace',       label: 'Mon espace',    emoji: '🏠' },
+    ],
+  },
+  {
     groupe: 'Équipe',
     items: [
-      { href: '/admin/rh',         label: 'RH',        emoji: '👥' },
-      { href: '/admin/formation',  label: 'Formation', emoji: '🎓' },
-      { href: '/equipes',          label: 'Chat équipe', emoji: '💬' },
+      { href: '/admin/rh',         label: 'RH',           emoji: '👥' },
+      { href: '/formation',        label: 'Mes manuels',  emoji: '📖' },
+      { href: '/admin/formation',  label: 'Gérer guides', emoji: '🎓' },
+      { href: '/equipes',          label: 'Chat équipe',  emoji: '💬' },
     ],
   },
   {
@@ -67,6 +75,13 @@ const ADMIN_MODULES: Array<{ groupe: string; items: Array<{ href: string; label:
       { href: '/admin/legal',       label: 'Légal',       emoji: '📑' },
       { href: '/admin/maintenance', label: 'Maintenance', emoji: '🔧' },
       { href: '/admin/dechets',     label: 'Déchets',     emoji: '🗑️' },
+    ],
+  },
+  {
+    groupe: 'Performance',
+    items: [
+      { href: '/admin/challenges', label: 'Challenges', emoji: '🏆' },
+      { href: '/admin/economie',   label: 'Économie',   emoji: '🧮' },
     ],
   },
   {
@@ -96,6 +111,14 @@ export default function OpsBottomNav({ profil = null }: { profil?: OpsBottomNavP
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
+  // Ferme le drawer sur Échap
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
   // Manager = tout autorisé. Sinon on filtre via la matrice.
   const isManager = profil?.role === 'manager'
   const peutVoir = (href: string) =>
@@ -108,9 +131,13 @@ export default function OpsBottomNav({ profil = null }: { profil?: OpsBottomNavP
 
   return (
     <>
-      {/* Drawer modules admin (slide-up depuis le bas, mobile-first) */}
+      {/* Backdrop : couvre TOUT l'écran (mobile + desktop) pour fermer au clic-outside */}
       {open && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-40" onClick={() => setOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/40 z-40"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
       )}
       {profil && (
         <aside className={cn(
@@ -174,6 +201,11 @@ export default function OpsBottomNav({ profil = null }: { profil?: OpsBottomNavP
               ))}
             </nav>
           )}
+
+          {/* Notifications PWA */}
+          <div className="px-3 pt-2">
+            <PushNotifSwitch />
+          </div>
 
           {/* Footer logout */}
           <div className="sticky bottom-0 bg-white border-t p-3">

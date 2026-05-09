@@ -9,16 +9,18 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { type Guide, type Question, type Progression, POSTE_INFO, peutRetenter } from '@/lib/formation'
 import { soumettreQuiz } from '../../actions'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 
 type Resultat = { score_pct: number; bonnes: number; total: number; statut: 'reussi' | 'echoue'; seuil: number }
 
 export default function QuizClient({
-  guide, questions, progression, employe,
+  guide, questions, progression, employe, navProfil = null,
 }: {
   guide: Guide
   questions: Question[]
   progression: Progression | null
   employe: { id: string; prenom: string; nom: string }
+  navProfil?: OpsBottomNavProfil
 }) {
   const [reponses, setReponses] = useState<(number | null)[]>(new Array(questions.length).fill(null))
   const [pending, startTransition] = useTransition()
@@ -32,9 +34,15 @@ export default function QuizClient({
     if (!tousRepondu) return
     startTransition(async () => {
       try {
+        // Quiz adaptatif : on envoie les réponses associées aux question_ids
+        // tirées (et non l'ordre). Le serveur tolère un sous-ensemble.
+        const reponses_par_question = questions.map((q, i) => ({
+          question_id: q.id,
+          reponse_idx: (reponses[i] as number) ?? 0,
+        }))
         const r = await soumettreQuiz({
           guide_id: guide.id, employe_id: employe.id,
-          reponses: reponses as number[],
+          reponses_par_question,
         })
         setResultat(r)
       } catch (e) {
@@ -108,7 +116,8 @@ export default function QuizClient({
 
   // ─── Vue passage du quiz ────────────────────────────────────
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 pb-mobile-nav">
+      <OpsBottomNav profil={navProfil} />
       <header className="bg-white border-b">
         <div className="max-w-3xl mx-auto p-3 flex items-center gap-3">
           <Link href={`/formation/${guide.id}?emp=${employe.id}`} className="text-zinc-600 hover:text-emerald-700"><ArrowLeft className="h-5 w-5" /></Link>

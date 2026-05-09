@@ -14,7 +14,7 @@ import {
   fmtPrix, fmtHeures, fmtDate, heuresEntre, ratioMasseSalariale, statutMasseSalariale, heuresSup,
 } from '@/lib/rh'
 import {
-  creerEmploye, updateEmploye, archiverEmploye,
+  creerEmploye, updateEmploye, archiverEmploye, inviterEmploye,
   creerDocument, supprimerDocument,
   creerFormation, supprimerFormation,
   creerShift, supprimerShift,
@@ -158,7 +158,25 @@ function EquipeTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
                     {!e.actif && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">Archivé</span>}
                   </div>
                 </div>
-                <button onClick={() => setShowForm(e)} className="text-xs h-7 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️</button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {e.actif && e.email && (
+                    <InviterButton
+                      employe_id={e.id}
+                      email={e.email}
+                      prenom={e.prenom}
+                      onError={onError}
+                      onSuccess={onOk}
+                    />
+                  )}
+                  {e.actif && (
+                    <Link
+                      href={`/admin/rh/contrat/${e.id}?type=${e.type_contrat ?? 'CDI'}`}
+                      className="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-300 hover:bg-zinc-50 font-bold"
+                      title="Générer contrat de travail"
+                    >📄</Link>
+                  )}
+                  <button onClick={() => setShowForm(e)} className="text-xs h-7 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold" title="Modifier">✏️</button>
+                </div>
               </header>
               <div className="px-3 py-2 text-xs text-zinc-600 space-y-0.5">
                 {e.email && <p>📧 {e.email}</p>}
@@ -1156,5 +1174,39 @@ function ModalActions({ onClose, onValider, pending, validLabel }: { onClose: ()
         {pending ? '…' : validLabel}
       </button>
     </div>
+  )
+}
+
+// ─── Bouton Inviter par email Magic Link ──────────────────────
+function InviterButton({
+  employe_id, email, prenom, onError, onSuccess,
+}: {
+  employe_id: string
+  email: string
+  prenom: string
+  onError: (e: unknown) => void
+  onSuccess: (msg: string) => void
+}) {
+  const [pending, startTransition] = useTransition()
+  function inviter() {
+    if (!confirm(`Envoyer un email d'invitation à ${prenom} (${email}) ?\n\nL'employé recevra un lien pour se connecter directement à l'application.`)) return
+    startTransition(async () => {
+      try {
+        const r = await inviterEmploye({ employe_id })
+        onSuccess(r.action === 'invited' ? `📧 Invitation envoyée à ${r.email}` : `🔄 Magic link réenvoyé à ${r.email}`)
+      } catch (e) {
+        onError(e)
+      }
+    })
+  }
+  return (
+    <button
+      onClick={inviter}
+      disabled={pending}
+      className="text-xs h-7 px-2 rounded border border-emerald-300 hover:bg-emerald-50 text-emerald-700 font-bold disabled:opacity-50"
+      title={`Inviter ${prenom} par email`}
+    >
+      {pending ? '…' : '📧'}
+    </button>
   )
 }

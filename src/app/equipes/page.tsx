@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import EquipesClient from './EquipesClient'
+import { getProfile } from '@/lib/auth'
+import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import type {
   Canal, Employe, Message, InfoAffichage, CompteRendu, Materiel,
   Priorite, TypeMateriel, EtatMateriel,
@@ -104,6 +106,12 @@ export default async function EquipesPage() {
     }
   })
 
+  const profil = await getProfile()
+  const navProfil: OpsBottomNavProfil = profil ? {
+    email: profil.email, role: profil.role, poste: profil.poste,
+    custom_permissions: profil.custom_permissions,
+  } : null
+
   return (
     <EquipesClient
       employes={employes}
@@ -111,6 +119,7 @@ export default async function EquipesPage() {
       initialInfos={infos}
       initialCRs={crs}
       initialMateriels={mats}
+      navProfil={navProfil}
     />
   )
 }

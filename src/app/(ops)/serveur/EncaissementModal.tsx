@@ -1,9 +1,24 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix } from '@/lib/service'
-import { encaisserCommande } from '../actions'
+import { CONSOMMATION_INFO } from '@/lib/tva'
+import { encaisserCommande, setConsommationCommande } from '../actions'
+import { searchClients } from '@/app/admin/clients/actions'
+import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
+
+type ClientChoisi = {
+  id: string
+  prenom: string | null
+  nom: string
+  email: string | null
+  telephone: string | null
+  niveau_fidelite: string
+  nb_visites: number
+  points_fidelite: number
+}
 
 type Methode = 'especes' | 'carte' | 'ticket_resto' | 'virement' | 'autre'
 type ModePaiement = 'simple' | 'mixte' | 'parts_egales' | 'personnalise'
@@ -32,13 +47,32 @@ export default function EncaissementModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const total = useMemo(
+  const router = useRouter()
+  const totalHT = useMemo(
     () => commande.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0),
     [commande.articles]
   )
-  // TVA mixte simplifiée : on suppose 10% sur tout pour le TTC
-  // (le calcul réel sera affiné quand la TVA par tag arrivera)
-  const totalTTC = useMemo(() => total * 1.10, [total])
+  // Total TTC = montant calculé serveur (TVA réelle multi-taux). Fallback 1.10 si pas encore migré.
+  const totalTTC = Number(commande.montant_total_ttc ?? totalHT * 1.10)
+  const tvaTotal = Number(commande.tva_total ?? totalTTC - totalHT)
+  const consommation = commande.consommation ?? 'sur_place'
+
+  const [conso, setConso] = useState<'sur_place' | 'emporter'>(consommation)
+  const [pendingConso, setPendingConso] = useState(false)
+
+  async function basculerConso(c: 'sur_place' | 'emporter') {
+    if (c === conso) return
+    setPendingConso(true)
+    try {
+      await setConsommationCommande({ commande_id: commande.id, consommation: c })
+      setConso(c)
+      router.refresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Erreur')
+    } finally {
+      setPendingConso(false)
+    }
+  }
 
   const [mode, setMode] = useState<ModePaiement>('simple')
   const [serveurChoisi, setServeurChoisi] = useState(serveurId)
@@ -48,6 +82,30 @@ export default function EncaissementModal({
   const [parts, setParts] = useState(2)
   const [erreur, setErreur] = useState('')
   const [isPending, startTransition] = useTransition()
+
+  // ─── Sélection client (fidélité) ───
+  const [client, setClient] = useState<ClientChoisi | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ClientChoisi[]>([])
+  const [searchPending, startSearchTransition] = useTransition()
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [pointsCredites, setPointsCredites] = useState<number | null>(null)
+
+  function rechercherClient(q: string) {
+    setSearchQuery(q)
+    if (q.trim().length < 2) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+    setShowSearchResults(true)
+    startSearchTransition(async () => {
+      try {
+        const r = await searchClients(q)
+        setSearchResults(r)
+      } catch { setSearchResults([]) }
+    })
+  }
 
   const totalPaye = paiements.reduce((s, p) => s + (Number(p.montant) || 0), 0)
   const totalTips = paiements.reduce((s, p) => s + (Number(p.pourboire) || 0), 0)
@@ -120,9 +178,10 @@ export default function EncaissementModal({
     setErreur('')
     startTransition(async () => {
       try {
-        await encaisserCommande({
+        const r = await encaisserCommande({
           commande_id: commande.id,
           serveur_id: serveurChoisi || null,
+          client_id: client?.id ?? null,
           paiements: paiements.map(p => ({
             methode: p.methode,
             montant: Number(p.montant),
@@ -130,7 +189,13 @@ export default function EncaissementModal({
             reference: p.reference || null,
           })),
         })
-        onSuccess()
+        // Affiche bref retour fidélité avant fermeture
+        if (r?.fidelite && r.fidelite.points > 0) {
+          setPointsCredites(r.fidelite.points)
+          setTimeout(onSuccess, 1500)
+        } else {
+          onSuccess()
+        }
       } catch (e) { setErreur(e instanceof Error ? e.message : 'Erreur') }
     })
   }
@@ -152,6 +217,43 @@ export default function EncaissementModal({
             <p className="text-sm text-zinc-400 mt-0.5">{commande.articles.length} article{commande.articles.length > 1 ? 's' : ''} · Total à encaisser : <b className="text-zinc-100">{fmtPrix(totalTTC)}</b></p>
           </div>
           <button onClick={onClose} className="min-h-[44px] min-w-[44px] rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400">×</button>
+        </div>
+
+        {/* Toggle Sur place / À emporter (recalcule TVA) */}
+        <div className="px-5 py-3 border-b border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs text-zinc-400">
+            <span className="uppercase tracking-wider font-bold">Mode consommation</span>
+            <span className="block text-[10px] text-zinc-500">Recalcule la TVA · alcool toujours à 20%</span>
+          </div>
+          <div className="flex gap-1">
+            {(['sur_place', 'emporter'] as const).map(c => {
+              const info = CONSOMMATION_INFO[c]
+              const active = conso === c
+              return (
+                <button
+                  key={c}
+                  onClick={() => basculerConso(c)}
+                  disabled={pendingConso}
+                  className={cn(
+                    'px-3 py-2 rounded-md text-xs font-bold border transition-colors min-h-[40px]',
+                    active
+                      ? 'bg-emerald-500 text-white border-emerald-400'
+                      : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700',
+                    pendingConso && 'opacity-50',
+                  )}
+                >
+                  {info.emoji} {info.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Récap TVA mini */}
+        <div className="px-5 py-2 border-b border-zinc-800 grid grid-cols-3 gap-2 text-xs text-zinc-400">
+          <div><span className="text-zinc-500">HT </span><span className="text-zinc-200 font-bold tabular-nums">{fmtPrix(totalHT)}</span></div>
+          <div><span className="text-zinc-500">TVA </span><span className="text-zinc-200 font-bold tabular-nums">{fmtPrix(tvaTotal)}</span></div>
+          <div className="text-right"><span className="text-zinc-500">TTC </span><span className="text-emerald-400 font-bold tabular-nums">{fmtPrix(totalTTC)}</span></div>
         </div>
 
         {/* Sélection mode */}
@@ -286,6 +388,79 @@ export default function EncaissementModal({
             )}
           </div>
 
+          {/* Client fidélité */}
+          <div>
+            <label className="text-xs uppercase tracking-wider text-zinc-400 block mb-1">Client (fidélité — optionnel)</label>
+            {client ? (
+              <div className="flex items-center justify-between gap-2 p-2 rounded-md border border-emerald-700/50 bg-emerald-950/40">
+                <div className="min-w-0 text-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-emerald-100 truncate">
+                      {client.prenom ? client.prenom + ' ' : ''}{client.nom}
+                    </span>
+                    {(() => {
+                      const k = (client.niveau_fidelite as NiveauFidelite) ?? 'standard'
+                      const ni = NIVEAU_INFO[k] ?? NIVEAU_INFO.standard
+                      return <span className="text-xs px-1.5 py-0.5 rounded border border-emerald-700/60 bg-emerald-900/40 text-emerald-200">{ni.emoji} {ni.label}</span>
+                    })()}
+                  </div>
+                  <p className="text-[11px] text-emerald-300/80">
+                    {client.points_fidelite} pts · {client.nb_visites} visites
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClient(null)}
+                  className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                >
+                  Retirer
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => rechercherClient(e.target.value)}
+                  placeholder="Nom, prénom, email, téléphone…"
+                  className="w-full h-12 px-3 rounded-md bg-zinc-950 border border-zinc-700 text-zinc-100 outline-none focus:border-emerald-500"
+                />
+                {showSearchResults && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-zinc-700 rounded-md shadow-xl z-50 max-h-64 overflow-y-auto">
+                    {searchPending && <p className="text-xs text-zinc-400 p-3">Recherche…</p>}
+                    {!searchPending && searchResults.length === 0 && (
+                      <p className="text-xs text-zinc-500 p-3">Aucun client trouvé pour « {searchQuery} »</p>
+                    )}
+                    {!searchPending && searchResults.map(c => {
+                      const k = (c.niveau_fidelite as NiveauFidelite) ?? 'standard'
+                      const ni = NIVEAU_INFO[k] ?? NIVEAU_INFO.standard
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => { setClient(c); setSearchQuery(''); setShowSearchResults(false) }}
+                          className="w-full text-left p-2 hover:bg-zinc-800 border-b border-zinc-800 last:border-0"
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="font-medium text-zinc-100">
+                              {c.prenom ? c.prenom + ' ' : ''}{c.nom}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-300">
+                              {ni.emoji} {ni.label}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500">
+                            {c.points_fidelite} pts · {c.nb_visites} visites
+                          </p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Serveur (pour suivi tips) */}
           <div>
             <label className="text-xs uppercase tracking-wider text-zinc-400 block mb-1">Serveur (suivi pourboires)</label>
@@ -322,6 +497,14 @@ export default function EncaissementModal({
               {isPending ? 'Encaissement…' : `✓ Valider ${fmtPrix(totalTTC)}`}
             </button>
           </div>
+
+          {/* Toast fidélité après validation */}
+          {pointsCredites !== null && (
+            <div className="rounded-md bg-emerald-900/50 border border-emerald-500 p-3 text-center">
+              <p className="text-emerald-200 font-bold text-lg">⭐ +{pointsCredites} points crédités !</p>
+              <p className="text-emerald-300/80 text-xs">Le solde du client est mis à jour.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

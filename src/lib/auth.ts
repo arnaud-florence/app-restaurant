@@ -28,9 +28,10 @@ export type Profil = {
   totp_enabled: boolean
   derniere_connexion: string | null
   created_at: string
+  onboarding_completed_at: string | null
 }
 
-const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, created_at'
+const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, created_at, onboarding_completed_at'
 
 /**
  * Renvoie le profil de l'utilisateur connecté, ou null.

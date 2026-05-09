@@ -20,17 +20,19 @@ import {
   creerCompteRendu, supprimerCompteRendu,
   creerMateriel, attribuerMateriel, restituerMateriel, changerEtatMateriel,
 } from './actions'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 
 type Tab = 'messages' | 'affichage' | 'cr' | 'materiel'
 
 export default function EquipesClient({
-  employes, initialMessages, initialInfos, initialCRs, initialMateriels,
+  employes, initialMessages, initialInfos, initialCRs, initialMateriels, navProfil = null,
 }: {
   employes: Employe[]
   initialMessages: Message[]
   initialInfos: InfoAffichage[]
   initialCRs: CompteRendu[]
   initialMateriels: Materiel[]
+  navProfil?: OpsBottomNavProfil
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('messages')
@@ -93,7 +95,8 @@ export default function EquipesClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 pb-mobile-nav">
+      <OpsBottomNav profil={navProfil} />
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white border-b border-zinc-200">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">

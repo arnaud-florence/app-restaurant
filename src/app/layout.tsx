@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
+import ContextualHelp from "@/components/ContextualHelp";
+import GlobalSearch from "@/components/GlobalSearch";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -50,11 +52,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <GlobalSearch />
+        <ContextualHelp />
         <Script id="register-sw" strategy="afterInteractive">
           {`if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-              navigator.serviceWorker.register('/sw.js').catch(() => {});
-            });
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+              .then(reg => console.log('[SW] registered', reg.scope))
+              .catch(err => console.warn('[SW] register error', err));
           }`}
         </Script>
       </body>

@@ -1,19 +1,27 @@
 // Module 27 — Formation : types, helpers progression, scoring quiz.
 
 export type Poste =
-  | 'cuisine' | 'pizzaiolo' | 'bar' | 'salle'
-  | 'serveur' | 'manager'   | 'plonge' | 'autre' | 'tous'
+  | 'cuisine' | 'cuisinier' | 'pizzaiolo' | 'bar' | 'barman' | 'salle'
+  | 'serveur' | 'manager'   | 'gerant'    | 'plonge' | 'extra'
+  | 'second'  | 'receptionniste'
+  | 'autre'   | 'tous'
 
 export const POSTE_INFO: Record<Poste, { label: string; emoji: string; cls: string }> = {
-  cuisine:    { label: 'Cuisine',    emoji: '👨‍🍳', cls: 'bg-amber-100   text-amber-900   border-amber-300' },
-  pizzaiolo:  { label: 'Pizzaiolo',  emoji: '🍕',   cls: 'bg-red-100     text-red-900     border-red-300' },
-  bar:        { label: 'Bar',        emoji: '🍷',   cls: 'bg-violet-100  text-violet-900  border-violet-300' },
-  salle:      { label: 'Salle',      emoji: '🪑',   cls: 'bg-blue-100    text-blue-900    border-blue-300' },
-  serveur:    { label: 'Serveur',    emoji: '🛎️',   cls: 'bg-blue-100    text-blue-900    border-blue-300' },
-  manager:    { label: 'Manager',    emoji: '🧑‍💼', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  plonge:     { label: 'Plonge',     emoji: '🧽',   cls: 'bg-cyan-100    text-cyan-900    border-cyan-300' },
-  autre:      { label: 'Autre',      emoji: '•',    cls: 'bg-zinc-100    text-zinc-700    border-zinc-300' },
-  tous:       { label: 'Tous postes', emoji: '👥',  cls: 'bg-stone-100   text-stone-800   border-stone-300' },
+  manager:        { label: 'Manager',         emoji: '🧑‍💼', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  gerant:         { label: 'Gérant',          emoji: '🧑‍💼', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  second:         { label: 'Second',          emoji: '👨‍🍳', cls: 'bg-orange-100  text-orange-900  border-orange-300' },
+  cuisine:        { label: 'Cuisine',         emoji: '👨‍🍳', cls: 'bg-amber-100   text-amber-900   border-amber-300' },
+  cuisinier:      { label: 'Cuisinier',       emoji: '👨‍🍳', cls: 'bg-amber-100   text-amber-900   border-amber-300' },
+  pizzaiolo:      { label: 'Pizzaiolo',       emoji: '🍕',    cls: 'bg-red-100     text-red-900     border-red-300' },
+  bar:            { label: 'Bar',             emoji: '🍷',    cls: 'bg-violet-100  text-violet-900  border-violet-300' },
+  barman:         { label: 'Barman',          emoji: '🍷',    cls: 'bg-violet-100  text-violet-900  border-violet-300' },
+  salle:          { label: 'Salle',           emoji: '🪑',    cls: 'bg-blue-100    text-blue-900    border-blue-300' },
+  serveur:        { label: 'Serveur',         emoji: '🛎️',    cls: 'bg-blue-100    text-blue-900    border-blue-300' },
+  receptionniste: { label: 'Réceptionniste',  emoji: '📞',    cls: 'bg-pink-100    text-pink-900    border-pink-300' },
+  plonge:         { label: 'Plonge',          emoji: '🧽',    cls: 'bg-cyan-100    text-cyan-900    border-cyan-300' },
+  extra:          { label: 'Extra',           emoji: '🆘',    cls: 'bg-cyan-100    text-cyan-900    border-cyan-300' },
+  autre:          { label: 'Autre',           emoji: '•',     cls: 'bg-zinc-100    text-zinc-700    border-zinc-300' },
+  tous:           { label: 'Tous postes',     emoji: '👥',    cls: 'bg-stone-100   text-stone-800   border-stone-300' },
 }
 
 export type StatutFormation = 'non_commence' | 'en_cours' | 'quiz_a_passer' | 'reussi' | 'echoue'
@@ -99,4 +107,31 @@ export function peutRetenter(progression: Progression | null): { ok: boolean; ra
   const ageH = (Date.now() - new Date(progression.derniere_tentative_le).getTime()) / 3_600_000
   if (ageH >= 24) return { ok: true }
   return { ok: false, raison: 'limite 24h', prochaine_tentative_dans_h: Math.ceil(24 - ageH) }
+}
+
+/** Postes considérés "compatibles" entre l'employé et un guide.
+ *  Permet à un cuisinier de voir un guide marqué 'cuisine' (alias) et inversement. */
+const POSTE_ALIAS: Record<string, string[]> = {
+  cuisine:        ['cuisine', 'cuisinier'],
+  cuisinier:      ['cuisine', 'cuisinier'],
+  pizzaiolo:      ['pizzaiolo'],
+  bar:            ['bar', 'barman'],
+  barman:         ['bar', 'barman'],
+  serveur:        ['serveur', 'salle'],
+  salle:          ['serveur', 'salle'],
+  receptionniste: ['receptionniste'],
+  manager:        ['manager', 'gerant'],
+  gerant:         ['manager', 'gerant'],
+  second:         ['second'],
+  plonge:         ['plonge', 'extra'],
+  extra:          ['plonge', 'extra'],
+  autre:          ['autre'],
+}
+
+/** L'employé (poste) a-t-il droit de voir le guide (guidePoste) ? */
+export function guideAccessibleAuPoste(posteEmploye: string | null | undefined, posteGuide: string): boolean {
+  if (posteGuide === 'tous') return true
+  if (!posteEmploye) return false
+  const aliases = POSTE_ALIAS[posteEmploye] ?? [posteEmploye]
+  return aliases.includes(posteGuide)
 }

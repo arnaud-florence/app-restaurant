@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import FinancesClient from './FinancesClient'
+import CardTvaMensuel from './CardTvaMensuel'
 import { chargerCRMois } from './actions'
 import {
   type ChargeFixe, type NoteDeFrais, type CategorieCharge, type FrequenceCharge, type StatutNDF,
@@ -101,18 +102,31 @@ export default async function FinancesPage() {
   })
 
   return (
-    <FinancesClient
-      cr={crData.cr}
-      tva={crData.tva}
-      moisLibelle={crData.libelle}
-      moisIso={moisIso}
-      charges={charges}
-      notes={notes}
-      employes={employes}
-      tresorSolde={tresorSolde}
-      tresorDate={tresorDate}
-      caJourMoyen={caJourMoyen}
-      projection={projection}
-    />
+    <>
+      <FinancesClient
+        cr={crData.cr}
+        tva={crData.tva}
+        moisLibelle={crData.libelle}
+        moisIso={moisIso}
+        charges={charges}
+        notes={notes}
+        employes={employes}
+        tresorSolde={tresorSolde}
+        tresorDate={tresorDate}
+        caJourMoyen={caJourMoyen}
+        projection={projection}
+      />
+      <div className="max-w-7xl mx-auto px-4 pb-6 space-y-4">
+        <CardTvaMensuel moisIso={moisIso} />
+        <div className="flex gap-2 flex-wrap">
+          <a href={`/admin/finances/pourboires?mois=${moisIso}`} className="inline-flex items-center gap-2 rounded-md border bg-white hover:bg-zinc-50 px-4 py-3 text-sm font-medium">
+            💸 Pourboires : répartition mensuelle
+          </a>
+          <a href={`/admin/finances/bilan-mensuel?mois=${moisIso}`} className="inline-flex items-center gap-2 rounded-md border bg-white hover:bg-zinc-50 px-4 py-3 text-sm font-medium">
+            📑 Bilan PDF mensuel
+          </a>
+        </div>
+      </div>
+    </>
   )
 }

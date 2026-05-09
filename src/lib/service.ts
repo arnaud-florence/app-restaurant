@@ -19,6 +19,10 @@ export type CommandeService = {
   serveur_nom?: string | null
   created_at: string
   articles: ArticleService[]
+  // TVA / consommation (Module TVA multi-taux)
+  montant_total_ttc?: number
+  tva_total?: number
+  consommation?: 'sur_place' | 'emporter'
 }
 
 export type ArticleService = {

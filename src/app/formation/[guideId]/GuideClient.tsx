@@ -1,24 +1,29 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Check, ArrowLeft, Award } from 'lucide-react'
+import { marked } from 'marked'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { type Guide, type Etape, type Progression, POSTE_INFO, STATUT_INFO } from '@/lib/formation'
 import { marquerEtapeVue } from '../actions'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+
+marked.setOptions({ gfm: true, breaks: false })
 
 export default function GuideClient({
-  guide, etapes, progression, employe, nbQuestions,
+  guide, etapes, progression, employe, nbQuestions, navProfil = null,
 }: {
   guide: Guide
   etapes: Etape[]
   progression: Progression | null
   employe: { id: string; prenom: string; nom: string }
   nbQuestions: number
+  navProfil?: OpsBottomNavProfil
 }) {
   const router = useRouter()
   const [idx, setIdx] = useState(0)
@@ -28,6 +33,10 @@ export default function GuideClient({
   const etape = etapes[idx]
   const total = etapes.length
   const toutesVues = etapes.every(e => vues.has(e.id))
+  const etapeHtml = useMemo(
+    () => (etape ? (marked.parse(etape.contenu) as string) : ''),
+    [etape],
+  )
 
   function valider(e: Etape, allerSuivant: boolean) {
     if (vues.has(e.id)) {
@@ -58,7 +67,8 @@ export default function GuideClient({
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 pb-mobile-nav">
+      <OpsBottomNav profil={navProfil} />
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto p-3 flex items-center gap-3">
@@ -89,9 +99,18 @@ export default function GuideClient({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={etape.image_url} alt={etape.titre} className="rounded-md max-h-80 object-contain mb-4" />
           )}
-          <div className="prose prose-zinc max-w-none whitespace-pre-wrap text-zinc-800">
-            {etape.contenu}
-          </div>
+          <div
+            className="prose prose-zinc prose-emerald max-w-none text-zinc-800
+                       prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+                       prose-h3:text-base prose-h3:mt-4 prose-h3:mb-1.5 prose-h3:font-bold
+                       prose-table:text-sm prose-th:bg-zinc-50 prose-th:font-bold prose-th:text-left
+                       prose-td:border prose-td:px-3 prose-td:py-2 prose-th:border prose-th:px-3 prose-th:py-2
+                       prose-blockquote:border-emerald-500 prose-blockquote:bg-emerald-50/40 prose-blockquote:px-4 prose-blockquote:py-2 prose-blockquote:not-italic
+                       prose-code:bg-zinc-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-zinc-800 prose-code:before:content-none prose-code:after:content-none
+                       prose-li:my-0.5
+                       prose-a:text-emerald-700"
+            dangerouslySetInnerHTML={{ __html: etapeHtml }}
+          />
           {etape.video_url && (
             <div className="mt-4">
               <a href={etape.video_url} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline text-sm">🎥 Vidéo associée</a>

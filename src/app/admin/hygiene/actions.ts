@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { creerNotification } from '@/lib/notifications'
 import { TYPE_EQUIPEMENT_LABEL, type TypeEquipement } from './types'
 
 // ─── Relevés température ───────────────────────────────────────────
@@ -226,6 +227,32 @@ export async function creerNonConformite(input: unknown): Promise<{ id: string }
     .insert({ ...p, statut: 'ouverte' })
     .select('id').single()
   if (error || !data) throw new Error(error?.message ?? 'Erreur')
+
+  // Notif manager si NC critique
+  if (p.gravite === 'critique') {
+    const typesLabels: Record<string, string> = {
+      temperature: 'Température', hygiene: 'Hygiène', produit: 'Produit',
+      equipement: 'Équipement', procedure: 'Procédure', autre: 'Autre',
+    }
+    await creerNotification({
+      destinataire_employe_id: null,    // managers
+      type: 'nc_critique',
+      titre: `🚨 NC critique : ${typesLabels[p.type] ?? p.type}`,
+      message: p.description.slice(0, 200) + (p.description.length > 200 ? '…' : ''),
+      url_action: '/admin/hygiene',
+    })
+    // Si responsable assigné : notif lui aussi
+    if (p.responsable_id) {
+      await creerNotification({
+        destinataire_employe_id: p.responsable_id,
+        type: 'nc_critique',
+        titre: 'NC critique à traiter',
+        message: `Une non-conformité critique te concerne : ${p.description.slice(0, 150)}`,
+        url_action: '/admin/hygiene',
+      })
+    }
+  }
+
   revalidatePath('/admin/hygiene')
   return { id: data.id as string }
 }

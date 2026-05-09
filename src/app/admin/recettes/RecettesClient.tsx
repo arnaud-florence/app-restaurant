@@ -19,6 +19,8 @@ import {
 } from './types'
 import { toggleRecetteActif, deleteRecette } from './actions'
 import RecetteFormModal from './RecetteFormModal'
+import { installerCatalogueDemarrage } from '../setup/seed-actions'
+import { Loader2, Sparkles } from 'lucide-react'
 
 export default function RecettesClient({
   initialRecettes, ingredients, readOnly = false,
@@ -115,11 +117,14 @@ export default function RecettesClient({
                 </Button>
               </Link>
               {!readOnly && (
-                <Button size="lg" onClick={() => setCreating(true)}>
-                  <span className="text-lg">+</span>
-                  <span className="hidden sm:inline">Nouvelle recette</span>
-                  <span className="sm:hidden">Ajouter</span>
-                </Button>
+                <>
+                  <PackDemarrageButton />
+                  <Button size="lg" onClick={() => setCreating(true)}>
+                    <span className="text-lg">+</span>
+                    <span className="hidden sm:inline">Nouvelle recette</span>
+                    <span className="sm:hidden">Ajouter</span>
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -402,5 +407,81 @@ function ConfirmDialog({
         </div>
       </div>
     </div>
+  )
+}
+
+// Bouton « Pack démarrage » : installe 5 fournisseurs + 50 ingrédients + 20 recettes en 1 click.
+function PackDemarrageButton() {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [result, setResult] = useState<{ f: number; i: number; r: number; details: string[] } | null>(null)
+
+  function lancer() {
+    if (!confirm(
+      'Installer le pack démarrage ?\n\n' +
+      'Cela créera :\n' +
+      '• 5 fournisseurs typiques (Metro, Pomona, Sysco...)\n' +
+      '• 50 ingrédients de base avec prix d\'achat\n' +
+      '• 20 recettes prêtes à l\'emploi (pizzas, burgers, salades, plats, desserts, boissons)\n\n' +
+      'Idempotent : ne crée pas de doublons.'
+    )) return
+    startTransition(async () => {
+      try {
+        const r = await installerCatalogueDemarrage()
+        setResult({ f: r.fournisseurs.crees, i: r.ingredients.crees, r: r.recettes.crees, details: r.details })
+        router.refresh()
+      } catch (e) {
+        alert(e instanceof Error ? e.message : 'Erreur')
+      }
+    })
+  }
+
+  return (
+    <>
+      <Button
+        size="lg"
+        variant="outline"
+        onClick={lancer}
+        disabled={pending}
+        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
+        title="Installer 20 recettes + 50 ingrédients + 5 fournisseurs"
+      >
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        <span className="hidden sm:inline">Pack démarrage</span>
+        <span className="sm:hidden">Pack</span>
+      </Button>
+
+      {result && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setResult(null)}>
+          <div className="bg-white rounded-lg max-w-md w-full p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-emerald-600" />
+              Pack démarrage installé
+            </h3>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="rounded-md bg-emerald-50 p-2 text-center">
+                <p className="text-2xl font-bold text-emerald-700">{result.f}</p>
+                <p className="text-[10px] text-zinc-500 uppercase">Fournisseurs</p>
+              </div>
+              <div className="rounded-md bg-emerald-50 p-2 text-center">
+                <p className="text-2xl font-bold text-emerald-700">{result.i}</p>
+                <p className="text-[10px] text-zinc-500 uppercase">Ingrédients</p>
+              </div>
+              <div className="rounded-md bg-emerald-50 p-2 text-center">
+                <p className="text-2xl font-bold text-emerald-700">{result.r}</p>
+                <p className="text-[10px] text-zinc-500 uppercase">Recettes</p>
+              </div>
+            </div>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-zinc-600">Voir le détail ({result.details.length} lignes)</summary>
+              <ul className="mt-2 space-y-0.5 text-[11px] font-mono text-zinc-700 max-h-48 overflow-y-auto">
+                {result.details.map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+            </details>
+            <Button onClick={() => setResult(null)} className="w-full mt-3">Fermer</Button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

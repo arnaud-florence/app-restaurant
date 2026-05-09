@@ -1,62 +1,86 @@
-// Module 28 v2 — Middleware avec contrôle d'accès par rôle.
+// Module 28 v2 — Middleware avec contrôle d'accès par rôle + onboarding.
 //
-// /admin/* :
-//   - non connecté → /login?next=…
-//   - connecté manager → toujours OK
-//   - connecté employe → check matrice permissions (poste). Si pas le droit,
-//     redirect vers la main route de son poste (ex cuisinier qui tape /admin/finances
-//     est renvoyé sur /cuisine).
-//
-// Pages ops (/serveur, /cuisine, /bar, /caisse) restent accessibles sans login (mode kiosk).
+// Règles :
+// 1. /admin/* :
+//    - non connecté → /login?next=…
+//    - connecté manager → OK
+//    - connecté employé NON onboardé → /formation/onboarding
+//    - connecté employé onboardé → check matrice permissions
+// 2. Pages ops (/serveur, /cuisine, /bar, /caisse) + /equipes :
+//    - kiosk (non connecté) → OK (mode tablette partagée)
+//    - connecté manager → OK
+//    - connecté employé NON onboardé → /formation/onboarding
+//    - connecté employé onboardé → OK
+// 3. /formation/* + /login + / + public kiosk : toujours OK
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { canAccess, getMainRoute, type CustomPermissions } from '@/lib/permissions'
 
+const OPS_PATHS = ['/serveur', '/cuisine', '/bar', '/caisse', '/equipes']
+function isOpsPath(path: string) {
+  return OPS_PATHS.some(p => path === p || path.startsWith(p + '/'))
+}
+
 export async function middleware(request: NextRequest) {
   const { response, user, supabase } = await updateSession(request)
   const path = request.nextUrl.pathname
 
-  if (path.startsWith('/admin')) {
-    if (!user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('next', path)
-      return NextResponse.redirect(url)
-    }
+  const isAdmin = path.startsWith('/admin')
+  const isOps   = isOpsPath(path)
 
-    // Lit le profil (role + poste + overrides)
-    const { data: profil } = await supabase
-      .from('profils')
-      .select('role, poste, custom_permissions')
-      .eq('id', user.id)
-      .maybeSingle()
+  // Rien à check sur les autres paths (login, formation, public…)
+  if (!isAdmin && !isOps) return response
 
-    // Manager = passe-droit
-    if (profil?.role === 'manager') return response
-
-    // Employé : check matrice
-    const overrides = (profil?.custom_permissions ?? null) as CustomPermissions | null
-    if (canAccess(profil?.poste, path, overrides)) {
-      return response
-    }
-
-    // Pas le droit → redirect vers la main route du poste (ex: cuisinier sur /admin/finances → /cuisine)
+  // Admin + non connecté → login
+  if (isAdmin && !user) {
     const url = request.nextUrl.clone()
-    const main = getMainRoute(profil?.poste)
-    // Évite la boucle de redirection si la main route elle-même n'existe pas (cas edge 'autre')
-    if (main.startsWith(path) || path === main) {
-      url.pathname = '/login'
-      url.searchParams.set('error', 'role')
-    } else {
-      const [pathname, search] = main.split('?')
-      url.pathname = pathname
-      url.search = search ? '?' + search : ''
-    }
+    url.pathname = '/login'
+    url.searchParams.set('next', path)
     return NextResponse.redirect(url)
   }
 
-  return response
+  // Ops sans session : kiosk, pass-through
+  if (isOps && !user) return response
+
+  // À ce point : user connecté, sur admin OR ops.
+  // Lit le profil (role + poste + overrides + onboarding).
+  const { data: profil } = await supabase
+    .from('profils')
+    .select('role, poste, custom_permissions, onboarding_completed_at')
+    .eq('id', user!.id)
+    .maybeSingle()
+
+  // Manager = toujours OK
+  if (profil?.role === 'manager') return response
+
+  // Employé NON onboardé → /formation/onboarding (sauf si déjà sur le wizard)
+  if (profil && !profil.onboarding_completed_at) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/formation/onboarding'
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
+
+  // Sur ops : pas de check matrice (un cuisinier peut aller sur /caisse en mode kiosk)
+  if (isOps) return response
+
+  // Sur admin : check matrice
+  const overrides = (profil?.custom_permissions ?? null) as CustomPermissions | null
+  if (canAccess(profil?.poste, path, overrides)) return response
+
+  // Pas le droit → redirect vers la main route du poste
+  const url = request.nextUrl.clone()
+  const main = getMainRoute(profil?.poste)
+  if (main.startsWith(path) || path === main) {
+    url.pathname = '/login'
+    url.searchParams.set('error', 'role')
+  } else {
+    const [pathname, search] = main.split('?')
+    url.pathname = pathname
+    url.search = search ? '?' + search : ''
+  }
+  return NextResponse.redirect(url)
 }
 
 export const config = {

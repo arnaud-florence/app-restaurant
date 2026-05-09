@@ -27,6 +27,7 @@ export type Recette = {
   nb_portions: number
   prix_vente_ht: number
   tva: number
+  contient_alcool: boolean
   actif: boolean
   photo_url: string | null
   created_at: string
@@ -64,6 +65,7 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     nb_portions: 1,
     prix_vente_ht: 0,
     tva: 10,
+    contient_alcool: false,
     actif: true,
     photo_url: '',
   }

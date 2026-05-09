@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { type StatutArticle, type StatutCommande, type SourceCommande } from '@/lib/service'
+import { sendPushToPostes } from '@/lib/push'
+import { tauxTvaArticle, calculerLigneTva, agregerVentilation, type Consommation } from '@/lib/tva'
 
 // ─── Articles : transitions de statut ────────────────────────────────
 const transitionArticleSchema = z.object({
@@ -78,6 +80,31 @@ export async function changerStatutArticle(input: unknown) {
     }
   }
 
+  // 3. Push notif : article passe à 'pret' → ping tous les serveurs/salle
+  if (p.nouveau_statut === 'pret') {
+    try {
+      const { data: art } = await supabase
+        .from('commande_articles')
+        .select('recette_nom, quantite, commande:commandes(numero_table, source)')
+        .eq('id', p.article_id)
+        .maybeSingle()
+      if (art) {
+        type CmdRow = { numero_table?: string | null; source?: string | null }
+        const cmd = (art.commande ?? null) as CmdRow | null
+        const tableTxt = cmd?.numero_table ? `T${cmd.numero_table}` : (cmd?.source === 'COMPTOIR' ? 'Comptoir' : '')
+        const qty = (art.quantite as number) ?? 1
+        const nom = (art.recette_nom as string) ?? 'plat'
+        const body = tableTxt ? `${tableTxt} · ×${qty} ${nom}` : `×${qty} ${nom}`
+        await sendPushToPostes(['serveur', 'salle'], {
+          title: '🍽 Plat prêt',
+          body,
+          tag: `art-${p.article_id}`,
+          url:  '/serveur',
+        })
+      }
+    } catch { /* best-effort */ }
+  }
+
   revalidatePath('/cuisine')
   revalidatePath('/bar')
   revalidatePath('/serveur')
@@ -99,6 +126,7 @@ const creerCommandeSchema = z.object({
   numero_table: z.string().max(20).optional().nullable(),
   serveur_id: z.string().uuid().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  consommation: z.enum(['sur_place','emporter']).default('sur_place'),
   articles: z.array(articleInputSchema).min(1, 'Au moins un article'),
 })
 
@@ -114,8 +142,26 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     .eq('date_session', new Date().toISOString().slice(0, 10))
     .maybeSingle()
 
-  const total = p.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
-  const total_ttc = total * 1.10  // approximation 10% — réelle TVA mixte calculée à l'encaissement
+  // Récupère contient_alcool pour chaque recette de la commande
+  const recetteIds = Array.from(new Set(p.articles.map(a => a.recette_id)))
+  const { data: recettes } = await supabase.from('recettes')
+    .select('id, contient_alcool')
+    .in('id', recetteIds)
+  const alcoolMap = new Map<string, boolean>()
+  for (const r of (recettes ?? [])) alcoolMap.set(r.id as string, !!r.contient_alcool)
+
+  // Calcule TVA par article + agrège
+  const consommation: Consommation = p.consommation
+  const lignesTva = p.articles.map(a => {
+    const alcool = alcoolMap.get(a.recette_id) ?? false
+    const taux   = tauxTvaArticle(alcool, consommation)
+    const calc   = calculerLigneTva(a.quantite, a.prix_unitaire_ht, taux)
+    return { ...a, tva_taux: taux, tva_eur: calc.tva_eur, ttc: calc.ttc, prix_unitaire_ttc: calc.prix_unitaire_ttc, ht: calc.ht }
+  })
+  const total_ht  = lignesTva.reduce((s, l) => s + l.ht, 0)
+  const total_ttc = lignesTva.reduce((s, l) => s + l.ttc, 0)
+  const tva_total = lignesTva.reduce((s, l) => s + l.tva_eur, 0)
+  const ventilation = agregerVentilation(lignesTva.map(l => ({ tva_taux: l.tva_taux, tva_eur: l.tva_eur })))
 
   // Génère un numéro lisible (TKT-YYMMDD-XXXX)
   const today = new Date()
@@ -128,8 +174,11 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     source: p.source,
     numero_table: p.numero_table || null,
     statut: 'en_attente',
-    montant_total_ht: total,
-    montant_total_ttc: total_ttc,
+    montant_total_ht: Math.round(total_ht * 100) / 100,
+    montant_total_ttc: Math.round(total_ttc * 100) / 100,
+    tva_total: Math.round(tva_total * 100) / 100,
+    ventilation_tva: ventilation,
+    consommation,
     notes: p.notes || null,
     serveur_id: p.serveur_id || null,
     session_caisse_id: session?.id ?? null,
@@ -138,11 +187,14 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
 
   // Articles
   const { error: aErr } = await supabase.from('commande_articles').insert(
-    p.articles.map(a => ({
+    lignesTva.map(a => ({
       commande_id: cmd.id,
       recette_id: a.recette_id,
       quantite: a.quantite,
       prix_unitaire_ht: a.prix_unitaire_ht,
+      prix_unitaire_ttc: a.prix_unitaire_ttc,
+      tva_taux: a.tva_taux,
+      tva_eur:  a.tva_eur,
       tag_destination: a.tag_destination,
       commentaire: a.commentaire || null,
       allergenes_a_eviter: a.allergenes_a_eviter ?? [],
@@ -168,6 +220,71 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
   return { id: cmd.id as string, numero: cmd.numero as string }
 }
 
+// ─── Toggle sur_place / emporter (recalcule TVA) ────────────────────
+const setConsoSchema = z.object({
+  commande_id: z.string().uuid(),
+  consommation: z.enum(['sur_place', 'emporter']),
+})
+
+export async function setConsommationCommande(input: unknown): Promise<{ ok: true }> {
+  const p = setConsoSchema.parse(input)
+  const supabase = await createClient()
+
+  // Récupère articles + recettes pour recalculer
+  const { data: arts } = await supabase.from('commande_articles')
+    .select('id, recette_id, quantite, prix_unitaire_ht')
+    .eq('commande_id', p.commande_id)
+  if (!arts || arts.length === 0) throw new Error('Commande introuvable ou vide')
+
+  const recetteIds = Array.from(new Set(arts.map(a => a.recette_id as string)))
+  const { data: recettes } = await supabase.from('recettes')
+    .select('id, contient_alcool')
+    .in('id', recetteIds)
+  const alcoolMap = new Map<string, boolean>()
+  for (const r of (recettes ?? [])) alcoolMap.set(r.id as string, !!r.contient_alcool)
+
+  // Recalcule chaque ligne + agrège
+  let total_ht = 0, total_ttc = 0, tva_total = 0
+  const updates: Array<{ id: string; tva_taux: number; tva_eur: number; prix_unitaire_ttc: number }> = []
+  for (const a of arts) {
+    const alcool = alcoolMap.get(a.recette_id as string) ?? false
+    const taux   = tauxTvaArticle(alcool, p.consommation)
+    const calc   = calculerLigneTva(Number(a.quantite ?? 0), Number(a.prix_unitaire_ht ?? 0), taux)
+    updates.push({
+      id: a.id as string,
+      tva_taux: taux,
+      tva_eur: calc.tva_eur,
+      prix_unitaire_ttc: calc.prix_unitaire_ttc,
+    })
+    total_ht  += calc.ht
+    total_ttc += calc.ttc
+    tva_total += calc.tva_eur
+  }
+
+  const ventilation = agregerVentilation(updates.map(u => ({ tva_taux: u.tva_taux, tva_eur: u.tva_eur })))
+
+  // Update articles
+  for (const u of updates) {
+    await supabase.from('commande_articles').update({
+      tva_taux: u.tva_taux, tva_eur: u.tva_eur, prix_unitaire_ttc: u.prix_unitaire_ttc,
+    }).eq('id', u.id)
+  }
+  // Update commande
+  const { error } = await supabase.from('commandes').update({
+    consommation:      p.consommation,
+    montant_total_ht:  Math.round(total_ht * 100) / 100,
+    montant_total_ttc: Math.round(total_ttc * 100) / 100,
+    tva_total:         Math.round(tva_total * 100) / 100,
+    ventilation_tva:   ventilation,
+  }).eq('id', p.commande_id)
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/serveur')
+  revalidatePath('/caisse')
+  revalidatePath('/cuisine')
+  return { ok: true as const }
+}
+
 // ─── Encaissement : Multi-paiements + tips + libère table ────────────
 const paiementSchema = z.object({
   methode: z.enum(['especes','carte','ticket_resto','virement','autre']),
@@ -179,6 +296,7 @@ const paiementSchema = z.object({
 const encaisserSchema = z.object({
   commande_id: z.string().uuid(),
   serveur_id: z.string().uuid().optional().nullable(),
+  client_id: z.string().uuid().optional().nullable(),  // pour crédit fidélité
   paiements: z.array(paiementSchema).min(1),
 })
 
@@ -225,10 +343,16 @@ export async function encaisserCommande(input: unknown) {
   )
   if (pErr) throw new Error(`Erreur paiements : ${pErr.message}`)
 
-  // 2. Marque commande encaisse + tip total
+  // 2. Marque commande encaisse + tip total + lien client (si fourni)
+  const updateCmd: Record<string, unknown> = {
+    statut: 'encaisse',
+    mode_paiement: p.paiements.map(x => x.methode).join('+'),
+    pourboire_total: totalTips,
+  }
+  if (p.client_id) updateCmd.client_id = p.client_id
   const { error: uErr } = await supabase
     .from('commandes')
-    .update({ statut: 'encaisse', mode_paiement: p.paiements.map(x => x.methode).join('+'), pourboire_total: totalTips })
+    .update(updateCmd)
     .eq('id', p.commande_id)
   if (uErr) throw new Error(`Erreur maj commande : ${uErr.message}`)
 
@@ -240,11 +364,22 @@ export async function encaisserCommande(input: unknown) {
       .eq('numero', cmd.numero_table)
   }
 
+  // 4. Crédit fidélité auto (si commande couplée à un client)
+  // Best-effort : un échec ici ne bloque jamais l'encaissement.
+  let fidelite: { points: number; client_id: string } | null = null
+  try {
+    const { crediterPointsCommande } = await import('@/lib/fidelite')
+    const r = await crediterPointsCommande(p.commande_id, p.serveur_id ?? null)
+    if (r) fidelite = { points: r.points, client_id: r.client_id }
+  } catch (e) {
+    console.error('[fidelite] crédit échoué :', e)
+  }
+
   revalidatePath('/cuisine')
   revalidatePath('/bar')
   revalidatePath('/serveur')
   revalidatePath('/admin')
-  return { ok: true as const }
+  return { ok: true as const, fidelite }
 }
 
 // ─── Annuler une commande ────────────────────────────────────────────
@@ -506,6 +641,7 @@ export async function listCommandesActives() {
     .from('commandes')
     .select(`
       id, numero, source, numero_table, statut, notes, created_at,
+      montant_total_ttc, tva_total, consommation,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
@@ -524,6 +660,9 @@ export async function listCommandesActives() {
       notes: (r.notes as string) ?? null,
       created_at: r.created_at as string,
       serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
+      montant_total_ttc: Number(r.montant_total_ttc ?? 0),
+      tva_total:         Number(r.tva_total ?? 0),
+      consommation:      ((r.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
       articles: articles.map(a => ({
         id: a.id as string,
         commande_id: a.commande_id as string,

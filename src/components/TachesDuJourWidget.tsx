@@ -1,35 +1,47 @@
 'use client'
 
-// Widget « Tâches du jour » — affiche la checklist des tâches obligatoires
-// et recommandées du poste, groupées par moment de la journée.
-// Persistance : localStorage par poste + date du jour. Reset auto à minuit.
+// Widget « Tâches du jour » — affiche la checklist du poste, groupée par moment.
+// Persistance :
+//   - employeId fourni  → DB via server actions cocherTache/decocherTache
+//                         (multi-device, sert au dashboard manager)
+//   - employeId absent  → localStorage (kiosk mode tablette partagée)
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, ListTodo, Check, ExternalLink } from 'lucide-react'
+import { ChevronDown, ChevronUp, ListTodo, Check, ExternalLink, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   type PosteWidget, type Moment, type Tache,
   TACHES, POSTE_INFO, MOMENT_INFO,
   momentActuel, clefLocalStorage, getTaches,
 } from '@/lib/taches-du-jour'
+import { cocherTache, decocherTache } from '@/lib/taches-actions'
 
 export default function TachesDuJourWidget({
   poste,
   defaultOpen = false,
   theme = 'light',
+  employeId = null,
+  initialDone = [],
 }: {
   poste: PosteWidget
   defaultOpen?: boolean
   theme?: 'light' | 'dark'
+  /** Si fourni, persistance via DB (recommandé pour les employés connectés). */
+  employeId?: string | null
+  /** Tâches déjà cochées en DB pour la journée (à hydrater). */
+  initialDone?: string[]
 }) {
-  const [done, setDone] = useState<Set<string>>(new Set())
+  const persistDb = !!employeId
+  const [done, setDone] = useState<Set<string>>(() => new Set(initialDone))
   const [open, setOpen] = useState(defaultOpen)
   const [expandedMoment, setExpandedMoment] = useState<Moment>(momentActuel())
-  const [hydrated, setHydrated] = useState(false)
+  const [hydrated, setHydrated] = useState(persistDb)  // déjà hydraté côté DB
+  const [pending, startTransition] = useTransition()
 
-  // Hydrate depuis localStorage
+  // Hydrate depuis localStorage si on est en mode kiosk
   useEffect(() => {
+    if (persistDb) return
     try {
       const raw = localStorage.getItem(clefLocalStorage(poste))
       if (raw) {
@@ -38,22 +50,64 @@ export default function TachesDuJourWidget({
       }
     } catch { /* ignore */ }
     setHydrated(true)
-  }, [poste])
+  }, [poste, persistDb])
 
-  // Sauvegarde à chaque changement
+  // Sauvegarde localStorage à chaque changement (mode kiosk uniquement)
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || persistDb) return
     try {
       localStorage.setItem(clefLocalStorage(poste), JSON.stringify([...done]))
     } catch { /* ignore */ }
-  }, [done, hydrated, poste])
+  }, [done, hydrated, poste, persistDb])
+
+  /** Cherche le tâche dans la matrice pour ses metadata (moment + obligatoire). */
+  function findTache(id: string): { moment: Moment; obligatoire: boolean } | null {
+    for (const m of ['matin', 'service', 'fin'] as Moment[]) {
+      const t = TACHES[poste]?.[m]?.find(x => x.id === id)
+      if (t) return { moment: m, obligatoire: !!t.obligatoire }
+    }
+    return null
+  }
 
   function toggle(id: string) {
+    const wasDone = done.has(id)
+
+    // Optimistic update (UI snappy)
     setDone(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (wasDone) next.delete(id)
+      else         next.add(id)
       return next
+    })
+
+    if (!persistDb || !employeId) return
+
+    const meta = findTache(id)
+    if (!meta) return
+
+    startTransition(async () => {
+      try {
+        if (wasDone) {
+          await decocherTache({ employe_id: employeId, tache_id: id })
+        } else {
+          await cocherTache({
+            employe_id:  employeId,
+            tache_id:    id,
+            poste,
+            moment:      meta.moment,
+            obligatoire: meta.obligatoire,
+          })
+        }
+      } catch (e) {
+        // Rollback en cas d'erreur
+        setDone(prev => {
+          const next = new Set(prev)
+          if (wasDone) next.add(id)
+          else         next.delete(id)
+          return next
+        })
+        alert(e instanceof Error ? e.message : 'Erreur — réessaie.')
+      }
     })
   }
 

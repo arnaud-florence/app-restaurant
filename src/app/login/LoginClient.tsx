@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { loginAction, signupAction } from './actions'
+import FooterLegal from '@/components/FooterLegal'
 
 export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: string; error: string | null; nbManagers: number }) {
   const router = useRouter()
@@ -41,7 +42,8 @@ export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: s
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-100 to-emerald-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-stone-100 to-emerald-50 flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-6">
         <div className="text-center mb-6">
           <Lock className="h-10 w-10 mx-auto text-emerald-600 mb-2" />
@@ -105,6 +107,8 @@ export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: s
           )}
         </div>
       </Card>
+      </div>
+      <FooterLegal />
     </div>
   )
 }

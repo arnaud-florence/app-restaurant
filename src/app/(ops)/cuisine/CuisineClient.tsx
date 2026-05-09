@@ -18,12 +18,14 @@ type ColonneTag = 'CUISINE' | 'PIZZA'
 type Role = 'cuisinier' | 'pizzaiolo'
 
 export default function CuisineClient({
-  initial, role = 'cuisinier', widgetPoste, navProfil,
+  initial, role = 'cuisinier', widgetPoste, navProfil, widgetEmployeId = null, widgetInitialDone = [],
 }: {
   initial: CommandeService[]
   role?: Role
   widgetPoste?: PosteWidget
   navProfil?: OpsBottomNavProfil
+  widgetEmployeId?: string | null
+  widgetInitialDone?: string[]
 }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
@@ -211,7 +213,12 @@ export default function CuisineClient({
 
       {/* Widget tâches du jour : pizzaiolo si ?role= sinon poste utilisateur (second/cuisinier) */}
       <div className="px-3 pt-3 bg-zinc-900">
-        <TachesDuJourWidget poste={widgetPoste ?? (role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier')} theme="dark" />
+        <TachesDuJourWidget
+          poste={widgetPoste ?? (role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier')}
+          theme="dark"
+          employeId={widgetEmployeId}
+          initialDone={widgetInitialDone}
+        />
       </div>
 
       {/* Colonnes : pizzaiolo voit uniquement PIZZA, cuisinier voit les 2 */}

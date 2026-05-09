@@ -3,6 +3,21 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { requireManager } from '@/lib/auth'
+import { cloturerMoisPerf } from '@/lib/challenges-cloture'
+
+/** Clôture les résultats d'un mois donné dans challenges_resultats. */
+export async function cloturerMoisAction(input: { mois: string }) {
+  await requireManager()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.mois)) throw new Error('Format mois invalide')
+  const m = new Date(input.mois)
+  const debut = new Date(m.getFullYear(), m.getMonth(), 1).toISOString().slice(0, 10)
+  const fin   = new Date(m.getFullYear(), m.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const r = await cloturerMoisPerf({ debut, fin })
+  revalidatePath('/admin/pilotage')
+  revalidatePath('/mon-espace')
+  return r
+}
 
 const KPI_ENUM = z.enum([
   'ca','marge_brute','food_cost_pct','ratio_masse_sal',

@@ -14,10 +14,6 @@ const METHODES_LABEL: Record<string, string> = {
   autre:        'AUTRE',
 }
 
-// TVA flat 10% : aligné avec creerCommande (montant_total_ttc = ht * 1.10)
-// et EncaissementModal. Quand TVA par tag arrivera, recalculer ici.
-const TVA_TAUX = 0.10
-
 export default function TicketClientPrintClient({
   data, auto,
 }: {
@@ -32,8 +28,15 @@ export default function TicketClientPrintClient({
 
   const { commande, articles, paiements, etablissement } = data
   const totalHT  = commande.montant_total_ht
-  const totalTVA = totalHT * TVA_TAUX
+  const totalTVA = commande.tva_total
   const totalTTC = commande.montant_total_ttc || (totalHT + totalTVA)
+  const ventilation = commande.ventilation_tva ?? {}
+  // Détaille HT par taux pour la ligne TVA
+  const htParTaux: Record<string, number> = {}
+  for (const a of articles) {
+    const k = String(a.tva_taux)
+    htParTaux[k] = (htParTaux[k] ?? 0) + a.quantite * a.prix_unitaire_ht
+  }
   const totalPaye  = paiements.reduce((s, p) => s + p.montant, 0)
   const totalTips  = paiements.reduce((s, p) => s + p.pourboire, 0)
   const isEncaisse = commande.statut === 'encaisse' || paiements.length > 0
@@ -126,14 +129,36 @@ export default function TicketClientPrintClient({
 
           {/* Totaux */}
           <div className="space-y-0.5 text-[11px]">
+            <div className="flex justify-between text-[10px] text-zinc-600">
+              <span>Mode</span>
+              <span>{commande.consommation === 'sur_place' ? '🍽 Sur place' : '🥡 À emporter'}</span>
+            </div>
             <div className="flex justify-between">
               <span>Total HT</span>
               <span className="tabular-nums">{fmtPrix(totalHT)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>TVA {(TVA_TAUX * 100).toFixed(0)} %</span>
-              <span className="tabular-nums">{fmtPrix(totalTVA)}</span>
-            </div>
+
+            {/* Ventilation TVA par taux */}
+            {Object.keys(ventilation).length > 0 ? (
+              <>
+                {Object.entries(ventilation).sort((a, b) => Number(a[0]) - Number(b[0])).map(([taux, montant]) => (
+                  <div key={taux} className="flex justify-between text-[10px]">
+                    <span>TVA {Number(taux).toFixed(taux === '5.5' ? 1 : 0)}% (HT {fmtPrix(htParTaux[taux] ?? 0)})</span>
+                    <span className="tabular-nums">{fmtPrix(Number(montant))}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-bold">
+                  <span>Total TVA</span>
+                  <span className="tabular-nums">{fmtPrix(totalTVA)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between">
+                <span>TVA</span>
+                <span className="tabular-nums">{fmtPrix(totalTVA)}</span>
+              </div>
+            )}
+
             <div className="flex justify-between text-base font-black border-t border-zinc-900 pt-1 mt-0.5">
               <span>TOTAL TTC</span>
               <span className="tabular-nums">{fmtPrix(totalTTC)}</span>
@@ -181,6 +206,19 @@ export default function TicketClientPrintClient({
           )}
 
           <div className="border-t-2 border-dashed border-zinc-900 my-1.5" />
+
+          {/* Bandeau fidélité (si commande couplée à un client) */}
+          {commande.client_id && commande.points_credites !== null && commande.points_credites > 0 && (
+            <div className="text-center text-[10px] border border-zinc-900 rounded p-2 mb-1.5">
+              <p className="font-bold">⭐ +{commande.points_credites} points fidélité crédités</p>
+              <p className="text-[9px] text-zinc-700">
+                Consultez votre solde et historique :
+              </p>
+              <p className="text-[9px] font-mono break-all mt-0.5">
+                /client/{commande.client_id}
+              </p>
+            </div>
+          )}
 
           {/* Pied */}
           <footer className="text-center text-[10px] space-y-0.5">

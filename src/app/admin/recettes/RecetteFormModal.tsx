@@ -38,6 +38,7 @@ const formSchema = z.object({
   nb_portions: z.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.number().min(0).max(99999),
   tva: z.number().min(0).max(100),
+  contient_alcool: z.boolean(),
   photo_url: z.string().max(2000),
   actif: z.boolean(),
 })
@@ -71,10 +72,11 @@ export default function RecetteFormModal({
         nb_portions: recette.nb_portions,
         prix_vente_ht: recette.prix_vente_ht,
         tva: recette.tva,
+        contient_alcool: recette.contient_alcool ?? false,
         photo_url: recette.photo_url ?? '',
         actif: recette.actif,
       }
-    : { ...defaultRecette(), description: '', photo_url: '' } as FormData
+    : { ...defaultRecette(), description: '', photo_url: '', contient_alcool: false } as FormData
 
   const {
     register, handleSubmit, control, watch, setValue, setError,
@@ -364,8 +366,18 @@ export default function RecetteFormModal({
                       <option value={20}>20% — boissons alcoolisées</option>
                       <option value={0}>0%</option>
                     </Select>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Indicatif. La TVA réelle est calculée auto à la commande
+                      (10% sur place / 5,5% emporter / 20% si alcool).
+                    </p>
                   </Field>
                 </div>
+                {/* Flag contient alcool — détermine si TVA fixée à 20% */}
+                <label className="flex items-center gap-2 text-sm cursor-pointer rounded-md border bg-amber-50/50 border-amber-200 px-3 py-2">
+                  <input type="checkbox" {...register('contient_alcool')} className="h-4 w-4" />
+                  <span className="font-medium">🍷 Cette recette contient de l&apos;alcool</span>
+                  <span className="text-[11px] text-zinc-600 ml-auto">→ TVA forcée à 20% peu importe la consommation</span>
+                </label>
                 {/* Prix suggérés */}
                 {synth.cout_portion > 0 && (
                   <div className="grid grid-cols-3 gap-2">

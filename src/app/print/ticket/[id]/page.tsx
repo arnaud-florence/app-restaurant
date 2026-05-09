@@ -22,10 +22,10 @@ export default async function TicketPage({
     supabase
       .from('commandes')
       .select(`
-        id, numero, source, numero_table, statut, notes, created_at,
-        montant_total_ht, montant_total_ttc, pourboire_total,
+        id, numero, source, numero_table, statut, notes, created_at, client_id,
+        montant_total_ht, montant_total_ttc, tva_total, ventilation_tva, consommation, pourboire_total,
         serveur:employes!serveur_id(prenom, nom),
-        commande_articles(id, quantite, prix_unitaire_ht, recette:recettes(nom))
+        commande_articles(id, quantite, prix_unitaire_ht, prix_unitaire_ttc, tva_taux, tva_eur, recette:recettes(nom))
       `)
       .eq('id', id)
       .maybeSingle(),
@@ -59,11 +59,25 @@ export default async function TicketPage({
   const etablissement: Record<string, string> = {}
   for (const p of paramsRes.data ?? []) etablissement[p.cle as string] = (p.valeur as string) ?? ''
 
+  // Si commande couplée à un client : récupère les points crédités pour cette commande
+  let pointsCredites: number | null = null
+  if (cmd.client_id) {
+    const { data: mvt } = await supabase.from('mouvements_points')
+      .select('points')
+      .eq('commande_id', id)
+      .eq('type', 'gain')
+      .maybeSingle()
+    if (mvt) pointsCredites = Number(mvt.points)
+  }
+
   const serv = cmd.serveur as { prenom?: string; nom?: string } | null
   type ArticleRow = {
     id: string
     quantite: number | null
     prix_unitaire_ht: number | null
+    prix_unitaire_ttc?: number | null
+    tva_taux?: number | null
+    tva_eur?: number | null
     recette?: { nom?: string } | null
   }
   const articles = ((cmd.commande_articles ?? []) as ArticleRow[]).map(a => ({
@@ -71,6 +85,9 @@ export default async function TicketPage({
     recette_nom: a.recette?.nom ?? '— recette supprimée —',
     quantite: Number(a.quantite ?? 1),
     prix_unitaire_ht: Number(a.prix_unitaire_ht ?? 0),
+    prix_unitaire_ttc: Number(a.prix_unitaire_ttc ?? 0),
+    tva_taux: Number(a.tva_taux ?? 10),
+    tva_eur: Number(a.tva_eur ?? 0),
   }))
 
   const data: TicketData = {
@@ -84,8 +101,13 @@ export default async function TicketPage({
       created_at: cmd.created_at as string,
       montant_total_ht: Number(cmd.montant_total_ht ?? 0),
       montant_total_ttc: Number(cmd.montant_total_ttc ?? 0),
+      tva_total: Number(cmd.tva_total ?? 0),
+      ventilation_tva: (cmd.ventilation_tva as Record<string, number>) ?? {},
+      consommation: ((cmd.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
       pourboire_total: Number(cmd.pourboire_total ?? 0),
       serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
+      client_id: (cmd.client_id as string) ?? null,
+      points_credites: pointsCredites,
     },
     articles,
     paiements: (paiementsRes.data ?? []).map(p => ({

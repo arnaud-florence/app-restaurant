@@ -21,6 +21,7 @@ const recetteSchema = z.object({
   nb_portions: z.coerce.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.coerce.number().min(0).max(99999),
   tva: z.coerce.number().min(0).max(100),
+  contient_alcool: z.boolean().default(false),
   photo_url: z.string().max(2000).optional().nullable(),
   actif: z.boolean().default(true),
 })
@@ -52,6 +53,7 @@ function mapRecette(r: Record<string, unknown>): Recette {
     nb_portions: Number(r.nb_portions ?? 1),
     prix_vente_ht: Number(r.prix_vente_ht ?? 0),
     tva: Number(r.tva ?? 10),
+    contient_alcool: !!r.contient_alcool,
     actif: r.actif as boolean,
     photo_url: (r.photo_url as string) ?? null,
     created_at: r.created_at as string,
@@ -157,6 +159,7 @@ export async function createRecette(payload: unknown): Promise<{ id: string }> {
       nb_portions: recette.nb_portions,
       prix_vente_ht: recette.prix_vente_ht,
       tva: recette.tva,
+      contient_alcool: recette.contient_alcool,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
     })
@@ -215,6 +218,7 @@ export async function updateRecette(id: string, payload: unknown) {
       nb_portions: recette.nb_portions,
       prix_vente_ht: recette.prix_vente_ht,
       tva: recette.tva,
+      contient_alcool: recette.contient_alcool,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
     })

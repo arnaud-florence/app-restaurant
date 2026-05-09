@@ -25,8 +25,10 @@ export type Permissions = {
   label: string          // affichage UI
 }
 
-// Routes communes à tous les employés actifs (briefing/info)
-const COMMUN_EMPLOYE = ['/equipes', '/admin/formation', '/login', '/']
+// Routes communes à tous les employés actifs (briefing/info).
+// /mon-espace : tableau de bord personnel = landing par défaut après login.
+// /formation : lecture seule des manuels + quiz (admin UI = /admin/formation, manager-only).
+const COMMUN_EMPLOYE = ['/mon-espace', '/equipes', '/formation', '/login', '/']
 
 export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
   manager: {
@@ -37,7 +39,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   second: {
     label: 'Second / Chef de cuisine',
-    main: '/cuisine',
+    main: '/mon-espace',
     allowed: [
       '/cuisine',
       '/admin/recettes', '/admin/recettes/engineering',
@@ -50,7 +52,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   cuisine: {  // = cuisinier (poste legacy)
     label: 'Cuisinier',
-    main: '/cuisine',
+    main: '/mon-espace',
     allowed: [
       '/cuisine',
       '/admin/recettes',
@@ -71,7 +73,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   pizzaiolo: {
     label: 'Pizzaiolo',
-    main: '/cuisine?role=pizzaiolo',
+    main: '/mon-espace',
     allowed: [
       '/cuisine',                       // colonne pizza uniquement (v2 filtre contenu)
       '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
@@ -92,7 +94,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
   salle: { /* alias serveur */ } as unknown as Permissions,
   serveur: {
     label: 'Serveur',
-    main: '/serveur',
+    main: '/mon-espace',
     allowed: [
       '/serveur', '/caisse',
       '/admin/clients',
@@ -114,7 +116,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
   bar: { /* alias barman */ } as unknown as Permissions,
   barman: {
     label: 'Barman',
-    main: '/bar',
+    main: '/mon-espace',
     allowed: [
       '/bar', '/caisse',
       '/admin/boissons',
@@ -130,7 +132,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   receptionniste: {
     label: 'Réceptionniste',
-    main: '/admin/reservations',
+    main: '/mon-espace',
     allowed: [
       '/admin/reservations',
       '/admin/evenements',
@@ -147,7 +149,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   plonge: {
     label: 'Plongeur',
-    main: '/admin/hygiene',
+    main: '/mon-espace',
     allowed: [
       '/admin/hygiene',                 // checklists nettoyage uniquement (v2)
       '/admin/dechets',
@@ -158,7 +160,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   autre: {
     label: 'Autre',
-    main: '/login',
+    main: '/mon-espace',
     allowed: [...COMMUN_EMPLOYE],
   },
 }

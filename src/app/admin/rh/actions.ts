@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { requireManager } from '@/lib/auth'
 import { joursConge } from '@/lib/rh'
+import { creerNotification } from '@/lib/notifications'
 
 // ─── Employés ──────────────────────────────────────────────────────
 
@@ -341,16 +344,45 @@ export async function validerConge(conge_id: string) {
 
   const { error } = await supabase.from('conges').update({ statut: 'valide' }).eq('id', conge_id)
   if (error) throw new Error(error.message)
+
+  // Notif employé
+  await creerNotification({
+    destinataire_employe_id: c.employe_id as string,
+    type: 'conge_validee',
+    titre: '✅ Congé validé',
+    message: `Ta demande de ${c.type} du ${c.date_debut} au ${c.date_fin} a été validée par le manager.`,
+    url_action: '/mon-espace',
+  })
+
   revalidatePath('/admin/rh')
+  revalidatePath('/mon-espace')
   return { ok: true as const }
 }
 
 export async function refuserConge(conge_id: string) {
   if (!conge_id) throw new Error('conge_id manquant')
   const supabase = await createClient()
+
+  const { data: c } = await supabase.from('conges')
+    .select('employe_id, date_debut, date_fin, type')
+    .eq('id', conge_id).maybeSingle()
+
   const { error } = await supabase.from('conges').update({ statut: 'refuse' }).eq('id', conge_id)
   if (error) throw new Error(error.message)
+
+  // Notif employé
+  if (c?.employe_id) {
+    await creerNotification({
+      destinataire_employe_id: c.employe_id as string,
+      type: 'conge_refusee',
+      titre: '❌ Congé refusé',
+      message: `Ta demande de ${c.type} du ${c.date_debut} au ${c.date_fin} a été refusée. Échange avec le manager.`,
+      url_action: '/mon-espace',
+    })
+  }
+
   revalidatePath('/admin/rh')
+  revalidatePath('/mon-espace')
   return { ok: true as const }
 }
 
@@ -362,4 +394,71 @@ export async function ajusterSoldeConges(employe_id: string, nouveau_solde: numb
   if (error) throw new Error(error.message)
   revalidatePath('/admin/rh')
   return { ok: true as const }
+}
+
+// ─── Invitation employé par email Magic Link ─────────────────────
+//
+// Workflow :
+//  1. Manager crée l'employé dans /admin/rh avec son email
+//  2. Click sur « Inviter par email » → cette action :
+//     - Vérifie l'employé + son email
+//     - Vérifie qu'il n'existe pas déjà un user Supabase avec cet email
+//     - Si non → admin.inviteUserByEmail (envoie email + crée user)
+//     - Si oui → re-envoie un magic link via admin.generateLink
+//  3. Employé clique sur le lien → arrive sur l'app, profil auto-link via getProfile()
+//  4. Onboarding wizard si pas encore fait
+//
+// Sécurité : nécessite SUPABASE_SERVICE_ROLE_KEY (server-only).
+//            Action protégée par requireManager().
+export async function inviterEmploye(input: { employe_id: string }): Promise<{
+  ok: true
+  email: string
+  action: 'invited' | 'link_resent'
+}> {
+  await requireManager()
+  if (!input.employe_id) throw new Error('employe_id manquant')
+
+  // 1. Récupère l'employé
+  const supabase = await createClient()
+  const { data: emp, error: errE } = await supabase.from('employes')
+    .select('id, prenom, nom, email, actif')
+    .eq('id', input.employe_id)
+    .maybeSingle()
+  if (errE)        throw new Error(errE.message)
+  if (!emp)        throw new Error('Employé introuvable')
+  if (!emp.actif)  throw new Error('Employé archivé — réactive-le d\'abord')
+  const email = (emp.email as string | null)?.trim()
+  if (!email)      throw new Error('Cet employé n\'a pas d\'email — ajoute-le sur sa fiche')
+
+  // 2. Tente d'inviter via Admin API
+  const admin = createAdminClient()
+  const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://app-restaurant-livid.vercel.app'}/`
+
+  const { error: errInvite } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
+    data: {
+      prenom: emp.prenom,
+      nom:    emp.nom,
+    },
+  })
+  if (!errInvite) {
+    revalidatePath('/admin/rh')
+    return { ok: true as const, email, action: 'invited' }
+  }
+
+  // 3. Si user existe déjà → on génère un magic link à la place
+  const msg = (errInvite.message ?? '').toLowerCase()
+  const exists = msg.includes('already registered') || msg.includes('user already') || msg.includes('exists')
+  if (exists) {
+    const { error: errLink } = await admin.auth.admin.generateLink({
+      type:  'magiclink',
+      email,
+      options: { redirectTo },
+    })
+    if (errLink) throw new Error(errLink.message)
+    revalidatePath('/admin/rh')
+    return { ok: true as const, email, action: 'link_resent' }
+  }
+
+  throw new Error(errInvite.message || 'Erreur d\'invitation')
 }

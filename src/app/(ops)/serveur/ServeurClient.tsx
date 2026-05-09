@@ -48,13 +48,15 @@ type LignePanier = {
 type Tab = 'plan' | 'a_servir' | 'a_encaisser'
 
 export default function ServeurClient({
-  initialCommandes, tables, recettes, employes, navProfil,
+  initialCommandes, tables, recettes, employes, navProfil, widgetEmployeId = null, widgetInitialDone = [],
 }: {
   initialCommandes: CommandeService[]
   tables: Table[]
   recettes: Recette[]
   employes: Employe[]
   navProfil?: OpsBottomNavProfil
+  widgetEmployeId?: string | null
+  widgetInitialDone?: string[]
 }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initialCommandes)
@@ -296,7 +298,7 @@ export default function ServeurClient({
 
       {/* Contenu de l'onglet */}
       <main className="flex-1 p-4 space-y-4">
-        <TachesDuJourWidget poste="serveur" theme="dark" />
+        <TachesDuJourWidget poste="serveur" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
         {tab === 'plan' && (
           <PlanSalle
             zones={zones}

@@ -58,6 +58,7 @@ const PRIORITE_BG: Record<ActionRow['priorite'], string> = {
 
 export default function PilotageClient({
   kpis, saisonnier, objectifs, actions, employes, periode,
+  widgetEmployeId = null, widgetInitialDone = [], tachesEquipeCard = null,
 }: {
   kpis: Kpi[]
   saisonnier: AnalyseMois[]
@@ -65,6 +66,10 @@ export default function PilotageClient({
   actions: ActionRow[]
   employes: { id: string; prenom: string; nom: string }[]
   periode: Periode
+  widgetEmployeId?: string | null
+  widgetInitialDone?: string[]
+  /** Carte serveur « Checklists d'équipe — aujourd'hui ». */
+  tachesEquipeCard?: React.ReactNode
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -99,7 +104,9 @@ export default function PilotageClient({
         </p>
       </div>
 
-      <TachesDuJourWidget poste="gerant" defaultOpen />
+      <TachesDuJourWidget poste="gerant" defaultOpen employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+
+      {tachesEquipeCard}
 
       {/* ─── 10 KPIs ─────────────────────────────────────────────── */}
       <section>

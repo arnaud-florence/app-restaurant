@@ -6,37 +6,49 @@ import { GraduationCap, Clock, BookOpen, Award, ChevronRight } from 'lucide-reac
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { type Guide, type Progression, POSTE_INFO, STATUT_INFO, pctEtapesVues } from '@/lib/formation'
+import { type Guide, type Progression, POSTE_INFO, STATUT_INFO, pctEtapesVues, guideAccessibleAuPoste } from '@/lib/formation'
+import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 
 const STORAGE_KEY = 'formation_employe_id'
 
 export default function FormationListClient({
   guides, employes, progressions, nbEtapesParGuide, nbQuestionsParGuide,
+  lockedEmployeId = null, isManager = false, navProfil = null,
 }: {
   guides: Guide[]
   employes: Array<{ id: string; prenom: string; nom: string; poste: string }>
   progressions: Progression[]
   nbEtapesParGuide: Record<string, number>
   nbQuestionsParGuide: Record<string, number>
+  /** Employé verrouillé (ex: utilisateur connecté non-manager). Si défini, le dropdown est caché. */
+  lockedEmployeId?: string | null
+  /** Manager → voit tous les employés et tous les guides (kiosk-like sans contrainte). */
+  isManager?: boolean
+  /** Profil pour le drawer de navigation (Plus / Modules). */
+  navProfil?: OpsBottomNavProfil
 }) {
-  const [employeId, setEmployeId] = useState<string>('')
+  const [employeId, setEmployeId] = useState<string>(lockedEmployeId ?? '')
 
-  // Persistence du choix d'employé en localStorage (pratique sur poste partagé)
+  // Persistence du choix d'employé en localStorage (mode kiosk uniquement)
   useEffect(() => {
+    if (lockedEmployeId) { setEmployeId(lockedEmployeId); return }
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) setEmployeId(saved)
-  }, [])
+  }, [lockedEmployeId])
   useEffect(() => {
-    if (employeId) localStorage.setItem(STORAGE_KEY, employeId)
-  }, [employeId])
+    if (!lockedEmployeId && employeId) localStorage.setItem(STORAGE_KEY, employeId)
+  }, [employeId, lockedEmployeId])
 
   const employe = useMemo(() => employes.find(e => e.id === employeId), [employes, employeId])
 
-  // Filtre des guides par poste de l'employé (+ "tous")
+  // Filtrage des guides par poste de l'employé (+ "tous"). Désactivé si manager.
+  // Utilise guideAccessibleAuPoste (POSTE_ALIAS) pour gérer cuisine↔cuisinier,
+  // bar↔barman, salle↔serveur, etc.
   const guidesAffiches = useMemo(() => {
+    if (isManager) return guides
     if (!employe) return guides
-    return guides.filter(g => g.poste === 'tous' || g.poste === employe.poste)
-  }, [guides, employe])
+    return guides.filter(g => guideAccessibleAuPoste(employe.poste, g.poste))
+  }, [guides, employe, isManager])
 
   // Map progressions par guide pour cet employé
   const progParGuide = useMemo(() => {
@@ -48,7 +60,8 @@ export default function FormationListClient({
   }, [progressions, employeId])
 
   return (
-    <div className="min-h-screen bg-stone-50 p-4 md:p-8">
+    <div className="min-h-screen bg-stone-50 p-4 md:p-8 pb-mobile-nav">
+      <OpsBottomNav profil={navProfil} />
       <div className="max-w-4xl mx-auto space-y-6">
         <header>
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -57,20 +70,33 @@ export default function FormationListClient({
           <p className="text-zinc-600">Guides interactifs et quiz de validation par poste.</p>
         </header>
 
-        {/* Sélection employé */}
-        <Card className="p-4">
-          <label className="text-sm font-medium block mb-2">Qui êtes-vous ?</label>
-          <select
-            value={employeId}
-            onChange={e => setEmployeId(e.target.value)}
-            className="w-full text-base rounded-md border px-3 py-2"
-          >
-            <option value="">— Sélectionner —</option>
-            {employes.map(e => (
-              <option key={e.id} value={e.id}>{e.prenom} {e.nom} · {e.poste}</option>
-            ))}
-          </select>
-        </Card>
+        {/* Sélection employé : caché si verrouillé sur un employé connecté */}
+        {lockedEmployeId ? (
+          employe && (
+            <Card className="p-4 bg-emerald-50 border-emerald-200">
+              <p className="text-sm text-emerald-900">
+                <span className="font-medium">Connecté en tant que :</span>{' '}
+                {employe.prenom} {employe.nom} <span className="text-emerald-700">· {employe.poste}</span>
+              </p>
+            </Card>
+          )
+        ) : (
+          <Card className="p-4">
+            <label className="text-sm font-medium block mb-2">
+              {isManager ? 'Sélectionner un employé (vue manager)' : 'Qui êtes-vous ?'}
+            </label>
+            <select
+              value={employeId}
+              onChange={e => setEmployeId(e.target.value)}
+              className="w-full text-base rounded-md border px-3 py-2"
+            >
+              <option value="">— Sélectionner —</option>
+              {employes.map(e => (
+                <option key={e.id} value={e.id}>{e.prenom} {e.nom} · {e.poste}</option>
+              ))}
+            </select>
+          </Card>
+        )}
 
         {/* Liste guides */}
         {guidesAffiches.length === 0 ? (

@@ -1,4 +1,5 @@
 import StockClient from './StockClient'
+import AlertesStockCard from './AlertesStockCard'
 import { listMouvements } from './actions'
 import { listIngredients } from '../ingredients/actions'
 
@@ -10,5 +11,12 @@ export default async function StockPage() {
     listIngredients(),
     listMouvements(200),
   ])
-  return <StockClient ingredients={ingredients} mouvements={mouvements} />
+  return (
+    <>
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <AlertesStockCard />
+      </div>
+      <StockClient ingredients={ingredients} mouvements={mouvements} />
+    </>
+  )
 }

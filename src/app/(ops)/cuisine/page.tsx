@@ -1,6 +1,7 @@
 import CuisineClient from './CuisineClient'
 import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 import type { PosteWidget } from '@/lib/taches-du-jour'
 
 export const metadata = { title: 'Cuisine — Service' }
@@ -27,5 +28,26 @@ export default async function CuisinePage({ searchParams }: { searchParams: { ro
     custom_permissions: profil.custom_permissions,
   } : null
 
-  return <CuisineClient initial={commandes} role={role} widgetPoste={widgetPoste} navProfil={navProfil} />
+  // Tâches déjà cochées aujourd'hui pour l'employé connecté (DB persist)
+  const employeId = profil?.employe_id ?? null
+  let initialDone: string[] = []
+  if (employeId) {
+    const supabase = await createClient()
+    const { data } = await supabase.from('taches_completees')
+      .select('tache_id')
+      .eq('employe_id', employeId)
+      .eq('date', new Date().toISOString().slice(0, 10))
+    initialDone = (data ?? []).map(r => r.tache_id as string)
+  }
+
+  return (
+    <CuisineClient
+      initial={commandes}
+      role={role}
+      widgetPoste={widgetPoste}
+      navProfil={navProfil}
+      widgetEmployeId={employeId}
+      widgetInitialDone={initialDone}
+    />
+  )
 }

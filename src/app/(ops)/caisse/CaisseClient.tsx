@@ -37,12 +37,14 @@ type SessionFermee = {
 }
 
 export default function CaisseClient({
-  initialResume, sessionsFermees, employes, navProfil,
+  initialResume, sessionsFermees, employes, navProfil, widgetEmployeId = null, widgetInitialDone = [],
 }: {
   initialResume: ResumeSession | null
   sessionsFermees: SessionFermee[]
   employes: Employe[]
   navProfil?: OpsBottomNavProfil
+  widgetEmployeId?: string | null
+  widgetInitialDone?: string[]
 }) {
   const router = useRouter()
   const [resume, setResume] = useState(initialResume)
@@ -82,7 +84,7 @@ export default function CaisseClient({
       </header>
 
       <main className="flex-1 p-4 space-y-6">
-        <TachesDuJourWidget poste="caisse" theme="dark" />
+        <TachesDuJourWidget poste="caisse" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
         {!resume ? (
           <OuvertureForm
             employes={employes}
