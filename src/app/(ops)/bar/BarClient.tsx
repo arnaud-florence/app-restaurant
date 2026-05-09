@@ -12,11 +12,26 @@ import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import ComptoirOrderModal from './ComptoirOrderModal'
+import EncaissementModal from '../serveur/EncaissementModal'
+import { fmtPrix } from '@/lib/service'
+
+type Recette = {
+  id: string; nom: string; categorie: string;
+  tag_destination: 'CUISINE' | 'PIZZA' | 'BAR'
+  prix_vente_ht: number
+}
+
+type Employe = { id: string; prenom: string; nom: string; poste: string }
 
 export default function BarClient({
-  initial, navProfil, widgetEmployeId = null, widgetInitialDone = [],
+  initial, recettes = [], employes = [], barmanId = null,
+  navProfil, widgetEmployeId = null, widgetInitialDone = [],
 }: {
   initial: CommandeService[]
+  recettes?: Recette[]
+  employes?: Employe[]
+  barmanId?: string | null
   navProfil?: OpsBottomNavProfil
   widgetEmployeId?: string | null
   widgetInitialDone?: string[]
@@ -24,6 +39,8 @@ export default function BarClient({
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
+  const [showComptoir, setShowComptoir] = useState(false)
+  const [encaissementCmd, setEncaissementCmd] = useState<CommandeService | null>(null)
   const [, startTransition] = useTransition()
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
@@ -93,6 +110,13 @@ export default function BarClient({
     return out
   }, [commandes])
 
+  // Commandes comptoir à encaisser (source COMPTOIR, statut non encaissé/annulé)
+  const commandesComptoir = useMemo(() => {
+    return commandes
+      .filter(c => c.source === 'COMPTOIR' && c.statut !== 'encaisse' && c.statut !== 'annule')
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [commandes])
+
   const nbEnAttente = articles.filter(x => x.article.statut === 'en_attente').length
   const tempsMoyen = articles.length > 0
     ? articles.reduce((s, x) => s + (now - new Date(x.commande.created_at).getTime()) / 60000, 0) / articles.length
@@ -143,6 +167,14 @@ export default function BarClient({
             >
               🖨 Auto-impression : {autoPrint ? 'ON' : 'OFF'}
             </button>
+            {recettes.length > 0 && (
+              <button
+                onClick={() => setShowComptoir(true)}
+                className="text-sm px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold border border-emerald-400"
+              >
+                + Nouvelle commande
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -162,6 +194,38 @@ export default function BarClient({
         <TachesDuJourWidget poste="barman" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
       </div>
 
+      {/* Section commandes comptoir à encaisser */}
+      {commandesComptoir.length > 0 && (
+        <section className="px-3 pt-3 bg-zinc-900">
+          <div className="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-3">
+            <p className="text-xs uppercase tracking-wider text-emerald-300 mb-2">
+              💰 Comptoir — {commandesComptoir.length} commande{commandesComptoir.length > 1 ? 's' : ''} à encaisser
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {commandesComptoir.map(c => {
+                const totalArticles = c.articles.reduce((s, a) => s + (a.quantite ?? 1), 0)
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setEncaissementCmd(c)}
+                    className="text-left p-3 rounded-md bg-zinc-900 border border-zinc-700 hover:border-emerald-500 transition-colors active:scale-[0.98]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-zinc-400">#{c.numero ?? c.id.slice(0, 6)}</p>
+                      <p className="text-xs text-zinc-500">{totalArticles} art.</p>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums mt-1">
+                      {fmtPrix(Number(c.montant_total_ttc ?? 0))}
+                    </p>
+                    <p className="text-[11px] text-emerald-400 mt-1 font-medium">→ Encaisser</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {articles.length === 0 ? (
           <div className="col-span-full text-center text-zinc-500 py-16">
@@ -174,6 +238,33 @@ export default function BarClient({
           ))
         )}
       </main>
+
+      {/* Modal saisie commande comptoir */}
+      {showComptoir && (
+        <ComptoirOrderModal
+          recettes={recettes}
+          barmanId={barmanId}
+          onClose={() => setShowComptoir(false)}
+          onSuccess={() => {
+            setShowComptoir(false)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {/* Modal encaissement */}
+      {encaissementCmd && (
+        <EncaissementModal
+          commande={encaissementCmd}
+          serveurId={barmanId ?? ''}
+          employes={employes}
+          onClose={() => setEncaissementCmd(null)}
+          onSuccess={() => {
+            setEncaissementCmd(null)
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
