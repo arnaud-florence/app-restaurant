@@ -11,7 +11,7 @@ export type RecetteAllergenes = {
   id: string
   nom: string
   categorie: string
-  tag_destination: 'CUISINE' | 'PIZZA' | 'BAR'
+  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   allergenes_calcules: Allergene[]      // depuis ingrédients
   allergenes_complementaires: Allergene[]  // override manuel
   allergenes_finaux: Allergene[]        // union des deux
@@ -62,7 +62,7 @@ export default async function AllergenesPage() {
       id: r.id,
       nom: r.nom,
       categorie: r.categorie,
-      tag_destination: r.tag_destination as 'CUISINE' | 'PIZZA' | 'BAR',
+      tag_destination: r.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
       allergenes_calcules: calc,
       allergenes_complementaires: compl.filter(a => !calc.includes(a)),
       allergenes_finaux: fin,

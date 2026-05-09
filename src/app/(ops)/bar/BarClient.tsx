@@ -18,7 +18,7 @@ import { fmtPrix } from '@/lib/service'
 
 type Recette = {
   id: string; nom: string; categorie: string;
-  tag_destination: 'CUISINE' | 'PIZZA' | 'BAR'
+  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   prix_vente_ht: number
 }
 

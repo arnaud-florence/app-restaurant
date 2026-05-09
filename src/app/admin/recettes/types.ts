@@ -1,12 +1,13 @@
 // Types Module 4 — Recettes & food cost.
 
-export const TAGS_DESTINATION = ['CUISINE', 'PIZZA', 'BAR'] as const
+export const TAGS_DESTINATION = ['CUISINE', 'SNACKING', 'PIZZA', 'BAR'] as const
 export type TagDestination = typeof TAGS_DESTINATION[number]
 
 export const TAG_STYLE: Record<TagDestination, { label: string; emoji: string; cls: string }> = {
-  CUISINE: { label: 'Cuisine', emoji: '👨‍🍳', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
-  PIZZA:   { label: 'Pizza',   emoji: '🍕', cls: 'bg-red-100 text-red-800 border-red-300' },
-  BAR:     { label: 'Bar',     emoji: '🍷', cls: 'bg-violet-100 text-violet-800 border-violet-300' },
+  CUISINE:  { label: 'Cuisine',  emoji: '👨‍🍳', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  SNACKING: { label: 'Snacking', emoji: '🥪', cls: 'bg-orange-100 text-orange-800 border-orange-300' },
+  PIZZA:    { label: 'Pizza',    emoji: '🍕', cls: 'bg-red-100 text-red-800 border-red-300' },
+  BAR:      { label: 'Bar',      emoji: '🍷', cls: 'bg-violet-100 text-violet-800 border-violet-300' },
 }
 
 export const CATEGORIES_RECETTE_DEFAUT = [

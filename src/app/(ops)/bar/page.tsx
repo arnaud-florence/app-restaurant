@@ -29,7 +29,7 @@ export default async function BarPage() {
     id: r.id as string,
     nom: r.nom as string,
     categorie: r.categorie as string,
-    tag_destination: r.tag_destination as 'CUISINE' | 'PIZZA' | 'BAR',
+    tag_destination: r.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
     prix_vente_ht: Number(r.prix_vente_ht ?? 0),
   }))
   const employes = (employesRes.data ?? []).map(e => ({

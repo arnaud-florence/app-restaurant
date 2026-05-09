@@ -116,7 +116,7 @@ const articleInputSchema = z.object({
   recette_id: z.string().uuid(),
   quantite: z.number().int().min(1),
   prix_unitaire_ht: z.number().min(0),
-  tag_destination: z.enum(['CUISINE','PIZZA','BAR']),
+  tag_destination: z.enum(['CUISINE','SNACKING','PIZZA','BAR']),
   commentaire: z.string().max(500).optional().nullable(),
   allergenes_a_eviter: z.array(z.string()).optional(),  // Module 12
 })

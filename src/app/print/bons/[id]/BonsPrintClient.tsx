@@ -7,9 +7,10 @@ import type { TagDestination } from '@/lib/service'
 import type { BonsPrintData } from './types'
 
 const DEST_INFO: Record<TagDestination, { label: string; emoji: string }> = {
-  CUISINE: { label: 'CUISINE', emoji: '👨‍🍳' },
-  PIZZA:   { label: 'PIZZA',   emoji: '🍕' },
-  BAR:     { label: 'BAR',     emoji: '🍷' },
+  CUISINE:  { label: 'CUISINE',  emoji: '👨‍🍳' },
+  SNACKING: { label: 'SNACKING', emoji: '🥪' },
+  PIZZA:    { label: 'PIZZA',    emoji: '🍕' },
+  BAR:      { label: 'BAR',      emoji: '🍷' },
 }
 
 const ORDRE: TagDestination[] = ['CUISINE', 'PIZZA', 'BAR']

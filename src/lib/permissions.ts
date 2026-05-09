@@ -267,7 +267,7 @@ export function filterNavItems<T extends { href: string }>(
 export type PosteContentFilter = {
   /** Tags de tag_destination autorisés sur les recettes (et ingrédients
    *  utilisés par ces recettes). null = tous tags autorisés. */
-  recetteTags: Array<'CUISINE' | 'PIZZA' | 'BAR'> | null
+  recetteTags: Array<'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'> | null
 }
 
 export function getPosteFilter(poste: string | null | undefined): PosteContentFilter {

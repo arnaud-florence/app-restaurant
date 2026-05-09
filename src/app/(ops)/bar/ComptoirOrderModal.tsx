@@ -11,7 +11,7 @@ import { fmtPrix } from '@/lib/service'
 
 type Recette = {
   id: string; nom: string; categorie: string;
-  tag_destination: 'CUISINE' | 'PIZZA' | 'BAR'
+  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   prix_vente_ht: number
 }
 
@@ -19,7 +19,7 @@ type LignePanier = {
   recette_id: string
   recette_nom: string
   prix_unitaire_ht: number
-  tag_destination: 'CUISINE' | 'PIZZA' | 'BAR'
+  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   quantite: number
   commentaire: string
 }

@@ -4,7 +4,7 @@
 // ─── Types métier ────────────────────────────────────────────────────
 export type StatutCommande = 'en_attente' | 'en_preparation' | 'pret' | 'servi' | 'encaisse' | 'annule'
 export type StatutArticle  = 'en_attente' | 'en_preparation' | 'pret' | 'servi'
-export type TagDestination = 'CUISINE' | 'PIZZA' | 'BAR'
+export type TagDestination = 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
 export type SourceCommande = 'ONLINE' | 'TABLE' | 'COMPTOIR'
 export type StatutTable    = 'libre' | 'occupee' | 'reservee' | 'a_encaisser'
 
@@ -56,9 +56,10 @@ export const STATUT_COMMANDE_LABEL: Record<StatutCommande, { label: string; emoj
 }
 
 export const TAG_DEST_LABEL: Record<TagDestination, { label: string; emoji: string; cls: string }> = {
-  CUISINE: { label: 'Cuisine', emoji: '👨‍🍳', cls: 'bg-amber-100 text-amber-800' },
-  PIZZA:   { label: 'Pizza',   emoji: '🍕', cls: 'bg-red-100 text-red-800' },
-  BAR:     { label: 'Bar',     emoji: '🍷', cls: 'bg-violet-100 text-violet-800' },
+  CUISINE:  { label: 'Cuisine',  emoji: '👨‍🍳', cls: 'bg-amber-100 text-amber-800' },
+  SNACKING: { label: 'Snacking', emoji: '🥪', cls: 'bg-orange-100 text-orange-800' },
+  PIZZA:    { label: 'Pizza',    emoji: '🍕', cls: 'bg-red-100 text-red-800' },
+  BAR:      { label: 'Bar',      emoji: '🍷', cls: 'bg-violet-100 text-violet-800' },
 }
 
 export const SOURCE_LABEL: Record<SourceCommande, { label: string; emoji: string; bg: string; text: string }> = {
