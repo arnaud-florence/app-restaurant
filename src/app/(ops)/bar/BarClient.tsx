@@ -165,16 +165,8 @@ export default function BarClient({
               )}
               title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
             >
-              🖨 Auto-impression : {autoPrint ? 'ON' : 'OFF'}
+              🖨 Auto : {autoPrint ? 'ON' : 'OFF'}
             </button>
-            {recettes.length > 0 && (
-              <button
-                onClick={() => setShowComptoir(true)}
-                className="text-sm px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold border border-emerald-400"
-              >
-                + Nouvelle commande
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -194,30 +186,34 @@ export default function BarClient({
         <TachesDuJourWidget poste="barman" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
       </div>
 
-      {/* Section commandes comptoir à encaisser */}
+      {/* Section commandes comptoir à encaisser (violet = COMPTOIR) */}
       {commandesComptoir.length > 0 && (
         <section className="px-3 pt-3 bg-zinc-900">
-          <div className="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-3">
-            <p className="text-xs uppercase tracking-wider text-emerald-300 mb-2">
-              💰 Comptoir — {commandesComptoir.length} commande{commandesComptoir.length > 1 ? 's' : ''} à encaisser
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="rounded-lg border-2 border-violet-500/60 bg-violet-950/30 p-3">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <p className="text-sm uppercase tracking-wider font-bold text-violet-200 flex items-center gap-2">
+                <span className="text-lg">🛒</span>
+                Comptoir — {commandesComptoir.length} à encaisser
+              </p>
+              <p className="text-[11px] text-violet-400">Clic sur une note pour ouvrir l&apos;encaissement</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
               {commandesComptoir.map(c => {
                 const totalArticles = c.articles.reduce((s, a) => s + (a.quantite ?? 1), 0)
                 return (
                   <button
                     key={c.id}
                     onClick={() => setEncaissementCmd(c)}
-                    className="text-left p-3 rounded-md bg-zinc-900 border border-zinc-700 hover:border-emerald-500 transition-colors active:scale-[0.98]"
+                    className="text-left p-3 rounded-md bg-zinc-900 border-2 border-violet-700/40 hover:border-violet-400 transition-colors active:scale-[0.97]"
                   >
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-zinc-400">#{c.numero ?? c.id.slice(0, 6)}</p>
-                      <p className="text-xs text-zinc-500">{totalArticles} art.</p>
+                      <p className="text-[10px] text-violet-300 font-bold">#{(c.numero ?? c.id).slice(-4)}</p>
+                      <p className="text-[10px] text-zinc-500">{totalArticles} art.</p>
                     </div>
-                    <p className="text-2xl font-bold tabular-nums mt-1">
+                    <p className="text-xl sm:text-2xl font-bold tabular-nums mt-1 text-violet-100">
                       {fmtPrix(Number(c.montant_total_ttc ?? 0))}
                     </p>
-                    <p className="text-[11px] text-emerald-400 mt-1 font-medium">→ Encaisser</p>
+                    <p className="text-[10px] text-emerald-400 mt-1 font-bold">→ ENCAISSER</p>
                   </button>
                 )
               })}
@@ -226,7 +222,28 @@ export default function BarClient({
         </section>
       )}
 
-      <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Légende couleurs sources (didactique) */}
+      {articles.length > 0 && (
+        <div className="px-3 pt-3 bg-zinc-900">
+          <div className="flex items-center gap-3 text-[11px] text-zinc-400 flex-wrap">
+            <span className="font-bold uppercase">À préparer</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded bg-blue-500"></span>
+              <span>Tables (serveurs)</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded bg-violet-500"></span>
+              <span>Comptoir (bar)</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded bg-emerald-500"></span>
+              <span>Online</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-32">
         {articles.length === 0 ? (
           <div className="col-span-full text-center text-zinc-500 py-16">
             <p className="text-6xl mb-3">🍷</p>
@@ -238,6 +255,24 @@ export default function BarClient({
           ))
         )}
       </main>
+
+      {/* FAB : nouvelle commande comptoir — visible sur tous écrans */}
+      {recettes.length > 0 && (
+        <button
+          onClick={() => setShowComptoir(true)}
+          className={cn(
+            'fixed right-4 z-30 inline-flex items-center gap-2 rounded-full',
+            'bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-2xl',
+            'transition-all active:scale-95 px-5 py-3 text-sm',
+            // Mobile : au-dessus de la bottom nav. Desktop : un peu plus haut pour respirer.
+            'bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] md:bottom-6',
+          )}
+          aria-label="Nouvelle commande comptoir"
+        >
+          <span className="text-lg leading-none">+</span>
+          <span>Nouvelle commande</span>
+        </button>
+      )}
 
       {/* Modal saisie commande comptoir */}
       {showComptoir && (
@@ -287,20 +322,32 @@ function Ticket({
     article.statut === 'en_preparation' ? 'pret' :
     null
 
+  // Border-left épaisse selon la source pour repère visuel immédiat
+  const sourceBorderL =
+    commande.source === 'TABLE'    ? 'border-l-[6px] border-l-blue-500' :
+    commande.source === 'COMPTOIR' ? 'border-l-[6px] border-l-violet-500' :
+    'border-l-[6px] border-l-emerald-500'
+
+  // Couleur du header selon source (plus visible que juste un badge)
+  const sourceHeaderBg =
+    commande.source === 'TABLE'    ? 'bg-blue-950/50' :
+    commande.source === 'COMPTOIR' ? 'bg-violet-950/50' :
+    'bg-emerald-950/50'
+
   return (
     <div className={cn(
       'rounded-lg border-2 bg-zinc-900 overflow-hidden',
+      sourceBorderL,
       article.statut === 'en_attente'     ? 'border-blue-500/50' :
       article.statut === 'en_preparation' ? 'border-amber-500/50' :
       article.statut === 'pret'           ? 'border-emerald-500/70' :
                                              'border-zinc-700'
     )}>
-      <div className="px-3 py-2 flex items-center justify-between gap-2 bg-zinc-950">
+      <div className={cn('px-3 py-2 flex items-center justify-between gap-2', sourceHeaderBg)}>
         <div className="flex items-center gap-2 min-w-0">
-          <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded', sourceSty.bg, sourceSty.text)}>
-            {sourceSty.emoji} {sourceSty.label}
+          <span className={cn('text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded', sourceSty.bg, sourceSty.text)}>
+            {sourceSty.emoji} {commande.source === 'TABLE' && commande.numero_table ? `T${commande.numero_table}` : sourceSty.label}
           </span>
-          {commande.numero_table && <span className="text-sm font-bold">T{commande.numero_table}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <a
