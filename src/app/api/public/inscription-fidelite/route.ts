@@ -109,6 +109,21 @@ export async function POST(req: Request) {
     })
   }
 
+  // Email de bienvenue (best-effort)
+  try {
+    const { sendEmail, emailBienvenueFidelite } = await import('@/lib/email')
+    const tpl = emailBienvenueFidelite({
+      prenom: p.prenom,
+      nom: p.nom,
+      points: cli.points_fidelite,
+      niveau: cli.niveau_fidelite,
+      code_parrainage: cli.code_parrainage,
+    })
+    await sendEmail({ to: p.email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+  } catch (e) {
+    console.error('[email-bienvenue] :', e)
+  }
+
   return Response.json({
     id: cli.id,
     points: cli.points_fidelite,

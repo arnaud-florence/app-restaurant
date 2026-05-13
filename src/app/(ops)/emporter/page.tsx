@@ -13,7 +13,41 @@ export const dynamic = 'force-dynamic'
 
 export default async function EmporterPage() {
   const supabase = await createClient()
-  const commandes = await listCommandesActives()
+
+  // Recettes pour le bouton "Nouvelle commande" sur Snack :
+  //   - SNACKING / PIZZA / BAR (cœur du poste snack rapide)
+  //   - + desserts (catégorie commençant par "dessert", insensible à la casse)
+  // Les plats CUISINE principaux sont exclus (pas pertinent ici).
+  const [commandes, recettesRes, employesRes] = await Promise.all([
+    listCommandesActives(),
+    supabase
+      .from('recettes')
+      .select('id, nom, categorie, tag_destination, prix_vente_ht')
+      .eq('actif', true)
+      .or('tag_destination.in.(SNACKING,PIZZA,BAR),categorie.ilike.dessert%')
+      .order('categorie')
+      .order('nom'),
+    // Pour EncaissementModal (besoin de la liste pour tip / part / etc.)
+    supabase
+      .from('employes')
+      .select('id, prenom, nom, poste')
+      .eq('actif', true)
+      .order('prenom'),
+  ])
+
+  const recettes = (recettesRes.data ?? []).map(r => ({
+    id: r.id as string,
+    nom: r.nom as string,
+    categorie: r.categorie as string,
+    tag_destination: r.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
+    prix_vente_ht: Number(r.prix_vente_ht ?? 0),
+  }))
+  const employes = (employesRes.data ?? []).map(e => ({
+    id: e.id as string,
+    prenom: e.prenom as string,
+    nom: e.nom as string,
+    poste: e.poste as string,
+  }))
 
   const profil = await getProfile()
   const navProfil = profil ? {
@@ -34,6 +68,9 @@ export default async function EmporterPage() {
   return (
     <EmporterClient
       initial={commandes}
+      recettes={recettes}
+      employes={employes}
+      operateurId={employeId}
       navProfil={navProfil}
       widgetEmployeId={employeId}
       widgetInitialDone={initialDone}

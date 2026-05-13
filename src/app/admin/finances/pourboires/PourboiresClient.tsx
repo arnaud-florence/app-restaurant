@@ -191,7 +191,7 @@ export default function PourboiresClient(p: Props) {
         <Card className="p-5">
           <h2 className="font-bold mb-3">Répartition par employé</h2>
           <div className="overflow-x-auto -mx-2">
-            <table className="w-full text-sm">
+            <table className="responsive-table w-full text-sm">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="text-left px-3 py-2">Employé</th>

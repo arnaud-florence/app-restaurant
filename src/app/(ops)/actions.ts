@@ -127,6 +127,18 @@ const creerCommandeSchema = z.object({
   serveur_id: z.string().uuid().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   consommation: z.enum(['sur_place','emporter']).default('sur_place'),
+  // Créneau retrait global (legacy/ONLINE site web) — si null : « dès que possible ».
+  // Si `creneaux_par_tag` est fourni avec des entrées, `creneau_retrait` global est
+  // recalculé = max(values) côté serveur (et le param d'entrée est ignoré).
+  creneau_retrait: z.string().datetime().optional().nullable(),
+  // Créneaux séparés par zone : { "SNACKING": "iso", "PIZZA": "iso", … }
+  // Utilisé quand un panier mixe plusieurs tags avec plannings distincts.
+  // NB : `partialRecord` (Zod v4) au lieu de `record` — sinon Zod exige TOUTES
+  // les clés de l'enum présentes, ce qui casse les commandes mono-tag.
+  creneaux_par_tag: z.partialRecord(
+    z.enum(['CUISINE','SNACKING','PIZZA','BAR']),
+    z.string().datetime(),
+  ).optional().nullable(),
   articles: z.array(articleInputSchema).min(1, 'Au moins un article'),
 })
 
@@ -163,6 +175,77 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
   const tva_total = lignesTva.reduce((s, l) => s + l.tva_eur, 0)
   const ventilation = agregerVentilation(lignesTva.map(l => ({ tva_taux: l.tva_taux, tva_eur: l.tva_eur })))
 
+  // ─── Anti-race par tag : vérifie chaque créneau distinct n'est pas déjà pris ───
+  // On consolide creneau_retrait (legacy) + creneaux_par_tag dans une map à vérifier.
+  // 1 commande max par slot, par tag (= par planning).
+  const creneauxAVerifier: Array<{ tag: 'CUISINE'|'SNACKING'|'PIZZA'|'BAR'; iso: string }> = []
+  if (p.creneaux_par_tag) {
+    for (const [tag, iso] of Object.entries(p.creneaux_par_tag)) {
+      if (iso) creneauxAVerifier.push({ tag: tag as 'CUISINE'|'SNACKING'|'PIZZA'|'BAR', iso })
+    }
+  }
+  // Legacy : si creneau_retrait fourni sans creneaux_par_tag, on déduit le tag de l'article majoritaire.
+  // (Ce chemin reste utilisé par /api/public/commande pour le site web ONLINE.)
+  if (p.creneau_retrait && creneauxAVerifier.length === 0) {
+    const tagsPanier = p.articles.map(a => a.tag_destination)
+    const tagPrincipal = (tagsPanier.find(t => t === 'SNACKING' || t === 'PIZZA') ?? 'SNACKING') as 'CUISINE'|'SNACKING'|'PIZZA'|'BAR'
+    creneauxAVerifier.push({ tag: tagPrincipal, iso: p.creneau_retrait })
+  }
+
+  for (const { tag, iso } of creneauxAVerifier) {
+    const slotStart = new Date(iso)
+    const jourSemaine = slotStart.getDay()
+    const { data: cfg } = await supabase.from('capacite_cuisine_par_creneau')
+      .select('duree_creneau_min')
+      .eq('jour_semaine', jourSemaine)
+      .eq('tag_destination', tag)
+      .eq('actif', true)
+      .limit(1)
+      .maybeSingle()
+    const dureeMin = Number(cfg?.duree_creneau_min ?? 15)
+    const slotEnd = new Date(slotStart.getTime() + dureeMin * 60_000)
+    // 2 cas à compter :
+    //   (a) commandes avec creneaux_par_tag[tag] qui tombent dans le slot
+    //   (b) commandes legacy (creneaux_par_tag vide / sans ce tag) dont le
+    //       creneau_retrait global tombe dans le slot — uniquement pour le tag
+    //       « principal » (=SNACKING) car le legacy ne distingue pas les zones.
+    const jsonPath = `creneaux_par_tag->>${tag}` as unknown as 'id'  // contourne le typing strict
+    const { count: dejaPrisesJsonb } = await supabase.from('commandes')
+      .select('*', { count: 'exact', head: true })
+      .in('source', ['ONLINE', 'COMPTOIR'])
+      .not('statut', 'in', '(annule)')
+      .gte(jsonPath, slotStart.toISOString())
+      .lt(jsonPath, slotEnd.toISOString())
+
+    let dejaPrisesLegacy = 0
+    if (tag === 'SNACKING') {
+      const { count } = await supabase.from('commandes')
+        .select('*', { count: 'exact', head: true })
+        .in('source', ['ONLINE', 'COMPTOIR'])
+        .not('statut', 'in', '(annule)')
+        .is(jsonPath, null)
+        .gte('creneau_retrait', slotStart.toISOString())
+        .lt('creneau_retrait', slotEnd.toISOString())
+      dejaPrisesLegacy = count ?? 0
+    }
+
+    if ((dejaPrisesJsonb ?? 0) + dejaPrisesLegacy >= 1) {
+      throw new Error(`Ce créneau ${tag.toLowerCase()} vient d'être réservé. Choisis un autre horaire.`)
+    }
+  }
+
+  // Calcule creneau_retrait global = max des creneaux_par_tag (= moment où tout est prêt)
+  let creneauRetraitFinal: string | null = p.creneau_retrait ?? null
+  let creneauxParTagFinal: Record<string, string> = {}
+  if (p.creneaux_par_tag && Object.keys(p.creneaux_par_tag).length > 0) {
+    creneauxParTagFinal = Object.fromEntries(
+      Object.entries(p.creneaux_par_tag).filter(([, iso]) => !!iso),
+    ) as Record<string, string>
+    const maxIso = Object.values(creneauxParTagFinal)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+    if (maxIso) creneauRetraitFinal = maxIso
+  }
+
   // Génère un numéro lisible (TKT-YYMMDD-XXXX)
   const today = new Date()
   const yymmdd = `${String(today.getFullYear()).slice(2)}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
@@ -182,6 +265,8 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     notes: p.notes || null,
     serveur_id: p.serveur_id || null,
     session_caisse_id: session?.id ?? null,
+    creneau_retrait: creneauRetraitFinal,
+    creneaux_par_tag: creneauxParTagFinal,
   }).select('id, numero').single()
   if (error || !cmd) throw new Error(error?.message ?? 'Erreur création commande')
 
@@ -512,6 +597,144 @@ export async function marquerStatutCommandeOnline(input: unknown) {
   return { ok: true as const }
 }
 
+// Avance une commande COMPTOIR (typiquement prise depuis /emporter snack ou /bar)
+// dans le flow : en_attente → en_preparation → pret → servi.
+// Source ONLINE → utiliser marquerStatutCommandeOnline à la place.
+const statutComptoirSchema = z.object({
+  commande_id:    z.string().uuid(),
+  nouveau_statut: z.enum(['en_preparation', 'pret', 'servi']),
+})
+
+export async function avancerCommandeComptoir(input: unknown) {
+  const p = statutComptoirSchema.parse(input)
+  const supabase = await createClient()
+  const { data: cmd } = await supabase.from('commandes')
+    .select('source, statut').eq('id', p.commande_id).maybeSingle()
+  if (!cmd) throw new Error('Commande introuvable')
+  if (cmd.source === 'ONLINE') throw new Error('Utilisez marquerStatutCommandeOnline pour ONLINE')
+  if (cmd.statut === 'encaisse' || cmd.statut === 'annule') {
+    throw new Error('Commande terminée — modification impossible')
+  }
+  const { error } = await supabase.from('commandes')
+    .update({ statut: p.nouveau_statut })
+    .eq('id', p.commande_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/emporter')
+  revalidatePath('/bar')
+  revalidatePath('/caisse')
+  return { ok: true as const }
+}
+
+// Construit un ISO UTC qui, affiché en Europe/Paris, donne HH:MM le jour `dateStr`.
+// Indispensable côté Vercel (serveur en UTC) : sinon on stocke 14:30 UTC = 16:30 Paris.
+function parisIsoFor(dateStr: string, hh: number, mm: number): string {
+  const naive = new Date(`${dateStr}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`)
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = fmt.formatToParts(naive)
+  const parisH = Number(parts.find(p => p.type === 'hour')?.value ?? '0')
+  const parisM = Number(parts.find(p => p.type === 'minute')?.value ?? '0')
+  const diffMin = (parisH * 60 + parisM) - (hh * 60 + mm)
+  return new Date(naive.getTime() - diffMin * 60_000).toISOString()
+}
+
+// Liste les créneaux retrait dispo pour un tag (SNACKING/PIZZA/BAR) à une date donnée.
+// Logique identique à /api/public/creneaux-retrait mais sans rate-limit (usage interne).
+// Compte ONLINE + COMPTOIR pour ne pas saturer la cuisine.
+//
+// Utilise le client serveur classique (anon key) : la RLS est désactivée sur
+// toutes les tables en single-tenant, donc pas besoin du service role.
+export async function listerCreneauxDisponibles(
+  tag: 'SNACKING' | 'PIZZA' | 'BAR',
+  dateStr?: string,
+): Promise<Array<{ heure: string; iso: string; disponible: boolean; count: number; max: number }>> {
+  const date = dateStr ?? new Date().toISOString().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return []
+
+  const supabase = await createClient()
+  // Utilise la date locale française (Europe/Paris) pour calculer le jour de la semaine,
+  // pas l'UTC. Sinon à 23h FR un lundi (=21h UTC), getDay() de UTC peut renvoyer dimanche.
+  const jourSemaine = new Date(date + 'T12:00:00').getDay()
+
+  const { data: configs, error: errCfg } = await supabase.from('capacite_cuisine_par_creneau')
+    .select('heure_debut, heure_fin, duree_creneau_min, max_commandes')
+    .eq('jour_semaine', jourSemaine)
+    .eq('tag_destination', tag)
+    .eq('actif', true)
+
+  // Logs serveur pour debug (visibles dans les logs Vercel — Settings > Logs)
+  console.log(`[creneaux] tag=${tag} date=${date} jour_semaine=${jourSemaine} → ${configs?.length ?? 0} configs`,
+    errCfg ? { error: errCfg.message } : '')
+
+  if (!configs || configs.length === 0) return []
+
+  const dayStart = new Date(date + 'T00:00:00').toISOString()
+  const dayEnd = new Date(date + 'T23:59:59').toISOString()
+  // On charge à la fois creneau_retrait (legacy) et creneaux_par_tag (multi-zones).
+  // Une commande peut occuper le slot du tag concerné via :
+  //   - creneaux_par_tag[tag] (multi-zones, depuis migration 0081)
+  //   - creneau_retrait global + creneaux_par_tag vide (legacy, comptait pour SNACKING uniquement)
+  const { data: cmds } = await supabase.from('commandes')
+    .select('creneau_retrait, creneaux_par_tag')
+    .in('source', ['ONLINE', 'COMPTOIR'])
+    .not('statut', 'in', '(annule)')
+    .gte('creneau_retrait', dayStart)
+    .lte('creneau_retrait', dayEnd)
+
+  const slots: Array<{ heure: string; iso: string; disponible: boolean; count: number; max: number }> = []
+  const now = new Date()
+
+  for (const cfg of configs) {
+    const debut = (cfg.heure_debut as string).slice(0, 5)
+    const fin = (cfg.heure_fin as string).slice(0, 5)
+    const duree = Number(cfg.duree_creneau_min ?? 15)
+    const max = Number(cfg.max_commandes ?? 5)
+    const [hd, md] = debut.split(':').map(Number)
+    const [hf, mf] = fin.split(':').map(Number)
+    let curMin = hd * 60 + md
+    const endMin = hf * 60 + mf
+
+    while (curMin < endMin) {
+      const h = Math.floor(curMin / 60)
+      const m = curMin % 60
+      const heureStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+      // Construit slotStart en HEURE FRANÇAISE (pas UTC du serveur Vercel)
+      const slotIso = parisIsoFor(date, h, m)
+      const slotStartMs = new Date(slotIso).getTime()
+      const slotEndMs = slotStartMs + duree * 60_000
+      // Skip si déjà passé (marge 5 min)
+      if (slotStartMs < now.getTime() + 5 * 60_000) {
+        curMin += duree
+        continue
+      }
+      const count = (cmds ?? []).filter(c => {
+        // Priorité au champ multi-zones (creneaux_par_tag[tag])
+        const parTag = (c.creneaux_par_tag as Record<string, string> | null) ?? {}
+        if (parTag[tag]) {
+          const t = new Date(parTag[tag]).getTime()
+          return t >= slotStartMs && t < slotEndMs
+        }
+        // Sinon, fallback legacy : creneau_retrait global compte uniquement pour SNACKING
+        // (le tag historiquement implicite avant la migration multi-créneaux).
+        if (tag === 'SNACKING' && c.creneau_retrait && Object.keys(parTag).length === 0) {
+          const t = new Date(c.creneau_retrait as string).getTime()
+          return t >= slotStartMs && t < slotEndMs
+        }
+        return false
+      }).length
+      // Règle métier : 1 commande max par créneau, peu importe le max configuré.
+      // Évite que plusieurs commandes (online + comptoir) atterrissent sur le même slot.
+      slots.push({ heure: heureStr, iso: slotIso, disponible: count === 0, count, max })
+      curMin += duree
+    }
+  }
+  return slots
+}
+
 export async function annulerCommande(commande_id: string, motif: string) {
   if (!commande_id) throw new Error('commande_id manquant')
   const supabase = await createClient()
@@ -769,7 +992,7 @@ export async function listCommandesActives() {
   const { data, error } = await supabase
     .from('commandes')
     .select(`
-      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait,
+      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
       montant_total_ttc, tva_total, consommation,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
@@ -793,6 +1016,7 @@ export async function listCommandesActives() {
       tva_total:         Number(r.tva_total ?? 0),
       consommation:      ((r.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
       creneau_retrait:   (r.creneau_retrait as string) ?? null,
+      creneaux_par_tag:  (r.creneaux_par_tag as Partial<Record<'CUISINE'|'SNACKING'|'PIZZA'|'BAR', string>> | null) ?? {},
       articles: articles.map(a => ({
         id: a.id as string,
         commande_id: a.commande_id as string,
@@ -800,7 +1024,7 @@ export async function listCommandesActives() {
         recette_nom: a.recette?.nom ?? '— recette supprimée —',
         quantite: Number(a.quantite ?? 1),
         prix_unitaire_ht: Number(a.prix_unitaire_ht ?? 0),
-        tag_destination: a.tag_destination as 'CUISINE' | 'PIZZA' | 'BAR',
+        tag_destination: a.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
         commentaire: (a.commentaire as string) ?? null,
         allergenes_a_eviter: (a.allergenes_a_eviter as string[] | undefined) ?? [],
         statut: a.statut as StatutArticle,

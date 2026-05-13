@@ -141,7 +141,7 @@ function DashboardTab({ data }: { data: DataDechets }) {
         {data.agg_an.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune pesée enregistrée.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="responsive-table w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Type</th>
@@ -200,7 +200,7 @@ function PeseesTab({ pesees, employes, onError, onOk }: { pesees: Pesee[]; emplo
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune pesée.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="responsive-table w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Date</th>

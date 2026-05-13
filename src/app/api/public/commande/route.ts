@@ -161,6 +161,39 @@ export async function POST(req: Request) {
     }
   }
 
+  // ─── Anti-race : vérifie que le créneau choisi n'est pas déjà pris ───
+  // Le cache CDN peut faire afficher un slot dispo pendant max 30s alors qu'il
+  // vient d'être réservé. On revérifie au dernier moment, juste avant l'INSERT.
+  // Règle : 1 commande max par créneau (cohérent avec listerCreneauxDisponibles).
+  if (p.creneau_retrait) {
+    const slotStart = new Date(p.creneau_retrait)
+    // Détermine la durée du créneau via la config (par défaut 15 min si introuvable)
+    const jourSemaine = slotStart.getDay()
+    const { data: cfg } = await sb.from('capacite_cuisine_par_creneau')
+      .select('duree_creneau_min')
+      .eq('jour_semaine', jourSemaine)
+      .eq('tag_destination', 'SNACKING')  // TODO : adapter si pizza/bar online
+      .eq('actif', true)
+      .limit(1)
+      .maybeSingle()
+    const dureeMin = Number(cfg?.duree_creneau_min ?? 15)
+    const slotEnd = new Date(slotStart.getTime() + dureeMin * 60_000)
+
+    const { count: dejaPrises } = await sb.from('commandes')
+      .select('*', { count: 'exact', head: true })
+      .in('source', ['ONLINE', 'COMPTOIR'])
+      .not('statut', 'in', '(annule)')
+      .gte('creneau_retrait', slotStart.toISOString())
+      .lt('creneau_retrait', slotEnd.toISOString())
+
+    if ((dejaPrises ?? 0) >= 1) {
+      return Response.json(
+        { error: 'Ce créneau vient d\'être réservé. Choisis un autre horaire.' },
+        { status: 409, headers: cors },
+      )
+    }
+  }
+
   // Génère un numéro de commande lisible
   const numero = `WEB-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`
 
@@ -200,7 +233,7 @@ export async function POST(req: Request) {
     return Response.json({ error: `Articles : ${aErr.message}` }, { status: 500, headers: cors })
   }
 
-  // Hook notif interne (best-effort) — réutilise le pattern existant
+  // Hook notif interne (best-effort)
   try {
     const { data: destinataires } = await sb.from('employes')
       .select('id')
@@ -219,6 +252,31 @@ export async function POST(req: Request) {
     }
   } catch (e) {
     console.error('[notif-online-public] erreur :', e)
+  }
+
+  // Email confirmation client (best-effort)
+  if (p.client_email) {
+    try {
+      const { sendEmail, emailConfirmationCommande } = await import('@/lib/email')
+      const articlesPourEmail = articlesEnrichis.map(a => {
+        const recette = recetteMap.get(a.recette_id)
+        return {
+          nom: recette?.nom ?? 'Article',
+          quantite: a.quantite,
+          prix_total: Math.round(a.prix_unitaire_ttc * a.quantite * 100) / 100,
+        }
+      })
+      const tpl = emailConfirmationCommande({
+        numero: cmd.numero,
+        total: Number(cmd.montant_total_ttc),
+        creneau_iso: p.creneau_retrait,
+        client_nom: p.client_nom ?? '',
+        articles: articlesPourEmail,
+      })
+      await sendEmail({ to: p.client_email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+    } catch (e) {
+      console.error('[email-commande] erreur :', e)
+    }
   }
 
   return Response.json({

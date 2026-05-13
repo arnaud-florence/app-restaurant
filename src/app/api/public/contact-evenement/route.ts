@@ -87,5 +87,38 @@ export async function POST(req: Request) {
     }
   } catch (e) { console.error('[notif-evt] :', e) }
 
+  // Email notif gérant + accusé réception client (best-effort)
+  try {
+    const { sendEmail, emailNotifGerantEvenement, emailLayout } = await import('@/lib/email')
+    const dest = process.env.EMAIL_GERANT
+    if (dest) {
+      const tplGerant = emailNotifGerantEvenement({
+        type: p.type_evenement,
+        date_evenement: p.date_souhaitee,
+        nb_personnes: p.nombre_personnes,
+        client_nom: `${p.prenom ?? ''} ${p.nom}`.trim(),
+        client_email: p.email,
+        client_telephone: p.telephone,
+        message: p.besoins,
+      })
+      await sendEmail({ to: dest, subject: tplGerant.subject, html: tplGerant.html, text: tplGerant.text, reply_to: p.email })
+    }
+    // Accusé réception au client
+    if (p.email) {
+      const html = emailLayout({
+        titre: 'Demande bien reçue',
+        bodyHtml: `
+          <p>Bonjour ${p.prenom ?? p.nom},</p>
+          <p>Nous avons bien reçu votre demande pour <strong>${p.type_evenement}</strong>.</p>
+          <p>Notre équipe vous recontacte sous <strong>48h</strong> avec une proposition adaptée à vos besoins et votre budget.</p>
+          <p style="color:#78716c;font-size:13px;">Pour toute question urgente : <a href="mailto:contact@lerelaisdessaveurs.fr" style="color:#C0392B;">contact@lerelaisdessaveurs.fr</a></p>
+        `,
+      })
+      await sendEmail({ to: p.email, subject: 'Votre demande de privatisation — Le Relais des Saveurs', html, text: 'Demande reçue, nous vous recontactons sous 48h.' })
+    }
+  } catch (e) {
+    console.error('[email-evt] :', e)
+  }
+
   return Response.json({ id: data.id, statut: 'demande' }, { headers: cors })
 }

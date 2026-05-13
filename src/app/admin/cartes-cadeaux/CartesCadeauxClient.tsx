@@ -140,7 +140,7 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
         </Card>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="responsive-table w-full text-sm">
             <thead className="text-xs text-zinc-500 uppercase border-b border-zinc-200">
               <tr>
                 <th className="text-left py-2">Code</th>

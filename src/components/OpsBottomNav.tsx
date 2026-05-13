@@ -20,7 +20,7 @@ const NAV: Array<{ href: string; label: string; emoji: string }> = [
   { href: '/cuisine',  label: 'Cuisine',  emoji: '👨‍🍳' },
   { href: '/pizza',    label: 'Pizza',    emoji: '🍕' },
   { href: '/bar',      label: 'Bar',      emoji: '🍺' },
-  { href: '/emporter', label: 'Emporter', emoji: '📦' },
+  { href: '/emporter', label: 'Snack',    emoji: '🥪' },
   { href: '/caisse',   label: 'Caisse',   emoji: '💰' },
 ]
 

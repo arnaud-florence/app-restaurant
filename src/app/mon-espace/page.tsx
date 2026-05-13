@@ -437,21 +437,14 @@ export default async function MonEspacePage() {
           </div>
         </Card>
 
-        {/* KPIs principaux */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* KPIs principaux — KPI Tâches retiré (cf demande user : gérer les tâches dans les écrans ops uniquement) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <KpiCard
             icon={<CalendarDays className="h-4 w-4" />}
             label="Heures cette semaine"
             value={`${heuresSemaine.toFixed(1)} h`}
             sublabel={`mois : ${heuresMois.toFixed(0)} h`}
             cls={heuresSemaine >= heuresContrat ? 'text-emerald-600' : 'text-zinc-700'}
-          />
-          <KpiCard
-            icon={<ListTodo className="h-4 w-4" />}
-            label="Tâches du jour"
-            value={`${tachesAujourd.length}/${totalAujourd}`}
-            sublabel={obligTotalAujourd > 0 ? `⚠ ${obligFaitAujourd}/${obligTotalAujourd} oblig.` : '—'}
-            cls={totalAujourd > 0 && tachesAujourd.length === totalAujourd ? 'text-emerald-600' : 'text-zinc-700'}
           />
           <KpiCard
             icon={<GraduationCap className="h-4 w-4" />}
@@ -503,17 +496,6 @@ export default async function MonEspacePage() {
                 <p className="text-[10px] uppercase font-bold text-zinc-500">{d.jour}</p>
                 <p className="text-[10px] text-zinc-400">{d.iso.slice(8)}</p>
                 <p className="text-sm font-bold mt-1">{d.heures > 0 ? `${d.heures.toFixed(1)}h` : '—'}</p>
-                <div className="mt-1 h-1 bg-zinc-200 rounded-full overflow-hidden">
-                  <div
-                    className={cn('h-full transition-all',
-                      d.tachesPct >= 80 ? 'bg-emerald-500' :
-                      d.tachesPct >= 40 ? 'bg-amber-500' :
-                      d.tachesPct > 0   ? 'bg-zinc-400' : 'bg-zinc-200',
-                    )}
-                    style={{ width: `${d.tachesPct}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-zinc-500 mt-0.5">{d.tachesFait}/{d.tachesTotal || '—'}</p>
               </div>
             ))}
           </div>

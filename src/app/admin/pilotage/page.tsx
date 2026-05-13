@@ -5,6 +5,7 @@ import PilotageClient from './PilotageClient'
 import TachesEquipeCard from './TachesEquipeCard'
 import PerformanceCard from './PerformanceCard'
 import BandeauSetupIncomplet from './BandeauSetupIncomplet'
+import AgentsAuTravail from '@/components/AgentsAuTravail'
 import { calculerKPIs, calculerSaisonnier, periodeMoisCourant } from '@/lib/pilotage'
 import { getProfile } from '@/lib/auth'
 
@@ -15,26 +16,28 @@ export default async function PilotagePage() {
   const supabase = await createClient()
   const periode = periodeMoisCourant()
 
-  const [kpis, saisonnier, objectifsRes, actionsRes, employesRes] = await Promise.all([
+  // Récupère le profil EN PARALLÈLE des autres requêtes (au lieu de séquentiellement après)
+  // pour pouvoir batcher tachesCompletees aussi.
+  const profilPromise = getProfile()
+  const employeIdHint = (await profilPromise)?.employe_id ?? null
+
+  const [kpis, saisonnier, objectifsRes, actionsRes, employesRes, tachesCompleteesRes] = await Promise.all([
     calculerKPIs(supabase),
     calculerSaisonnier(supabase),
     supabase.from('objectifs').select('*').order('annee', { ascending: false }).order('mois', { ascending: false, nullsFirst: false }),
     supabase.from('actions_strategiques').select('*, responsable:employes!responsable_id(prenom, nom)')
       .order('priorite', { ascending: true }).order('echeance', { ascending: true, nullsFirst: false }),
     supabase.from('employes').select('id, prenom, nom').eq('actif', true).order('prenom'),
+    employeIdHint
+      ? supabase.from('taches_completees')
+          .select('tache_id')
+          .eq('employe_id', employeIdHint)
+          .eq('date', new Date().toISOString().slice(0, 10))
+      : Promise.resolve({ data: [] }),
   ])
 
-  // Persistance widget tâches du jour pour le manager (gérant lui-même)
-  const profil = await getProfile()
-  const employeId = profil?.employe_id ?? null
-  let initialDone: string[] = []
-  if (employeId) {
-    const { data } = await supabase.from('taches_completees')
-      .select('tache_id')
-      .eq('employe_id', employeId)
-      .eq('date', new Date().toISOString().slice(0, 10))
-    initialDone = (data ?? []).map(r => r.tache_id as string)
-  }
+  const employeId = employeIdHint
+  const initialDone = (tachesCompleteesRes.data ?? []).map(r => (r as { tache_id: string }).tache_id)
 
   return (
     <PilotageClient
@@ -46,6 +49,7 @@ export default async function PilotagePage() {
       periode={periode}
       widgetEmployeId={employeId}
       widgetInitialDone={initialDone}
+      agentsBlock={<AgentsAuTravail />}
       tachesEquipeCard={<><BandeauSetupIncomplet /><TachesEquipeCard /><PerformanceCard /></>}
     />
   )

@@ -23,8 +23,12 @@ export type CommandeService = {
   montant_total_ttc?: number
   tva_total?: number
   consommation?: 'sur_place' | 'emporter'
-  // ONLINE — créneau de retrait choisi par le client
+  // ONLINE — créneau de retrait choisi par le client (= max des creneaux_par_tag)
   creneau_retrait?: string | null
+  // COMPTOIR/ONLINE — créneau distinct par zone si panier mixte (snack/pizza/bar/cuisine).
+  // Ex : { "SNACKING": "...T14:30:00Z", "PIZZA": "...T14:45:00Z" }.
+  // `creneau_retrait` global = max de ces valeurs (= moment où tout est prêt).
+  creneaux_par_tag?: Partial<Record<TagDestination, string>>
 }
 
 export type ArticleService = {

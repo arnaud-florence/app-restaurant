@@ -5,24 +5,40 @@
 // avec couleur d'urgence si <10 min. Sonnerie distincte à l'arrivée.
 // Actions : Prendre en prep → Prêt → Retiré par client.
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { type CommandeService, fmtPrix, playDing } from '@/lib/service'
+import { type CommandeService, fmtPrix, playDing, STATUT_ARTICLE_LABEL } from '@/lib/service'
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
-import { marquerStatutCommandeOnline } from '../actions'
+import { marquerStatutCommandeOnline, avancerCommandeComptoir } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import TachesSequentielles from '@/components/TachesSequentielles'
+import ComptoirOrderModal from '../bar/ComptoirOrderModal'
+import EncaissementModal from '../serveur/EncaissementModal'
+
+type Recette = {
+  id: string; nom: string; categorie: string;
+  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
+  prix_vente_ht: number
+}
+
+type Employe = { id: string; prenom: string; nom: string; poste: string }
 
 export default function EmporterClient({
-  initial, navProfil, widgetEmployeId = null, widgetInitialDone = [],
+  initial, recettes = [], employes = [], operateurId = null, navProfil, widgetEmployeId = null, widgetInitialDone = [],
 }: {
   initial: CommandeService[]
+  recettes?: Recette[]
+  employes?: Employe[]
+  operateurId?: string | null
   navProfil?: OpsBottomNavProfil
   widgetEmployeId?: string | null
   widgetInitialDone?: string[]
 }) {
+  const [showComptoir, setShowComptoir] = useState(false)
+  const [encaisserCmd, setEncaisserCmd] = useState<CommandeService | null>(null)
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
@@ -90,6 +106,22 @@ export default function EmporterClient({
     return () => { supabase.removeChannel(channel) }
   }, [router])
 
+  // Filets de sécurité contre les WebSockets dormants (PWA mobile en arrière-plan,
+  // OS qui suspend les sockets, etc.) :
+  //   1. Quand l'onglet/PWA redevient actif → router.refresh()
+  //   2. Poll toutes les 20s comme fallback si le realtime ne déclenche pas
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') router.refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') router.refresh()
+    }, 20_000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(poll)
+    }
+  }, [router])
+
   // Filtre commandes ONLINE non terminées (encaisse/annule/retire_par_client filtrés en amont)
   const commandesOnline = useMemo(() => {
     return commandes
@@ -102,8 +134,65 @@ export default function EmporterClient({
       })
   }, [commandes])
 
+  // Commandes COMPTOIR (prises depuis le bouton + nouvelle commande sur cette page)
+  // — qui contiennent au moins un article SNACKING/PIZZA/BAR. Statut < encaisse.
+  const commandesComptoirSnack = useMemo(() => {
+    return commandes
+      .filter(c => c.source === 'COMPTOIR')
+      .filter(c => c.statut !== 'encaisse' && c.statut !== 'annule')
+      .filter(c => c.articles.some(a =>
+        a.tag_destination === 'SNACKING' || a.tag_destination === 'PIZZA' || a.tag_destination === 'BAR'
+      ))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }, [commandes])
+
+  // Vue agenda : groupe les commandes par créneau (heure de retrait).
+  // Tri chrono ; "sans créneau" en bas.
+  const commandesParCreneau = useMemo(() => {
+    const map = new Map<string, { label: string; iso: string | null; commandes: typeof commandesComptoirSnack }>()
+    const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    const aujourdhui = new Date()
+    for (const c of commandesComptoirSnack) {
+      const key = c.creneau_retrait ?? '__sans__'
+      let label: string
+      if (c.creneau_retrait) {
+        const cr = new Date(c.creneau_retrait)
+        const sameDay = cr.toDateString() === aujourdhui.toDateString()
+        const heure = cr.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        label = sameDay ? heure : `${JOURS[cr.getDay()]} ${cr.getDate()}/${cr.getMonth() + 1} · ${heure}`
+      } else {
+        label = 'Sans créneau (à servir au plus vite)'
+      }
+      if (!map.has(key)) map.set(key, { label, iso: c.creneau_retrait ?? null, commandes: [] })
+      map.get(key)!.commandes.push(c)
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      if (!a.iso) return 1
+      if (!b.iso) return -1
+      return new Date(a.iso).getTime() - new Date(b.iso).getTime()
+    })
+  }, [commandesComptoirSnack])
+
   const nbEnAttente = commandesOnline.filter(c => c.statut === 'en_attente').length
   const nbPretRetrait = commandesOnline.filter(c => c.statut === 'pret_pour_retrait').length
+
+  // Callbacks stables pour le modal Comptoir → évite re-render à chaque tick d'horloge.
+  // Le state `now` ticke chaque seconde pour les compteurs des cartes ONLINE,
+  // mais le modal n'a pas besoin d'être re-render à chaque tick.
+  const fermerComptoir = useCallback(() => setShowComptoir(false), [])
+  const comptoirOk = useCallback(() => {
+    setShowComptoir(false)
+    router.refresh()
+  }, [router])
+
+  function avancerComptoir(commande_id: string, nouveau: 'en_preparation' | 'pret' | 'servi') {
+    // Optimistic update
+    setCommandes(prev => prev.map(c => c.id === commande_id ? { ...c, statut: nouveau } : c))
+    startTransition(async () => {
+      try { await avancerCommandeComptoir({ commande_id, nouveau_statut: nouveau }) }
+      catch { router.refresh() }
+    })
+  }
 
   function avancer(commande_id: string, nouveau: 'en_preparation' | 'pret_pour_retrait' | 'retire_par_client') {
     // Optimistic update
@@ -130,8 +219,8 @@ export default function EmporterClient({
       <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service — Emporter</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">📦 Commandes ONLINE</h1>
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Service — Snack & Emporter</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">🥪 Snack</h1>
           </div>
           <div className="flex items-center gap-3">
             <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
@@ -163,28 +252,299 @@ export default function EmporterClient({
       ))}
 
       <div className="px-3 pt-3">
-        <TachesDuJourWidget poste="cuisinier" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+        <TachesSequentielles poste="caisse_snacking" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
       </div>
 
-      <main className="flex-1 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-32">
-        {commandesOnline.length === 0 ? (
-          <div className="col-span-full text-center text-zinc-500 py-16">
-            <p className="text-6xl mb-3">📦</p>
-            <p className="text-base">Aucune commande ONLINE en cours.</p>
-            <p className="text-xs mt-2">Les commandes du site web apparaîtront ici en temps réel.</p>
+      <main className="flex-1 p-3 space-y-6 pb-32">
+        {/* ─── Section 1 : Commandes ONLINE (site web) ─── */}
+        <section>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-2 px-1">
+            🌐 ONLINE — site web ({commandesOnline.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {commandesOnline.length === 0 ? (
+              <div className="col-span-full text-center text-zinc-500 py-8 border border-dashed border-zinc-800 rounded-md">
+                <p className="text-3xl mb-1">📭</p>
+                <p className="text-sm">Aucune commande online en cours.</p>
+              </div>
+            ) : (
+              commandesOnline.map(c => (
+                <CommandeOnlineCard
+                  key={c.id}
+                  commande={c}
+                  now={now}
+                  onAvancer={avancer}
+                />
+              ))
+            )}
           </div>
-        ) : (
-          commandesOnline.map(c => (
-            <CommandeOnlineCard
-              key={c.id}
-              commande={c}
-              now={now}
-              onAvancer={avancer}
-            />
-          ))
-        )}
+        </section>
+
+        {/* ─── Section 2 : Commandes COMPTOIR snack (vue agenda par créneau) ─── */}
+        <section>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-amber-400 mb-2 px-1">
+            🛒 SNACK COMPTOIR — agenda ({commandesComptoirSnack.length})
+          </h2>
+          {commandesComptoirSnack.length === 0 ? (
+            <div className="text-center text-zinc-500 py-8 border border-dashed border-zinc-800 rounded-md">
+              <p className="text-3xl mb-1">🛒</p>
+              <p className="text-sm">Aucune commande snack en cours.</p>
+              <p className="text-xs mt-1">Clique sur « + Nouvelle commande » pour en créer une.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {commandesParCreneau.map(group => (
+                <div key={group.label} className="rounded-lg border border-zinc-800 bg-zinc-950/50">
+                  <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60 rounded-t-lg">
+                    <p className="text-sm font-bold text-amber-300 tabular-nums">
+                      🕒 {group.label}
+                    </p>
+                    <span className="text-[11px] text-zinc-500">
+                      {group.commandes.length} cmd{group.commandes.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {group.commandes.map(c => (
+                      <CommandeComptoirCard
+                        key={c.id}
+                        commande={c}
+                        onAvancer={avancerComptoir}
+                        onEncaisser={() => setEncaisserCmd(c)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
+
+      {/* FAB : nouvelle commande snack/pizza/bar — visible si recettes chargées */}
+      {recettes.length > 0 && (
+        <button
+          onClick={() => setShowComptoir(true)}
+          className={cn(
+            'fixed right-4 z-30 inline-flex items-center gap-2 rounded-full',
+            'bg-emerald-500 hover:bg-emerald-400 text-white font-bold shadow-2xl',
+            'transition-all active:scale-95 px-5 py-3 text-sm',
+            'bottom-[calc(64px+env(safe-area-inset-bottom)+16px)] md:bottom-6',
+          )}
+          aria-label="Nouvelle commande snack"
+        >
+          <span className="text-lg leading-none">+</span>
+          <span>Nouvelle commande</span>
+        </button>
+      )}
+
+      {/* Modal saisie commande snacking/pizza/bar */}
+      {showComptoir && (
+        <ComptoirSnackModalMemo
+          recettes={recettes}
+          barmanId={operateurId}
+          onClose={fermerComptoir}
+          onSuccess={comptoirOk}
+        />
+      )}
+
+      {/* Modal d'encaissement (réutilisé depuis /serveur) */}
+      {encaisserCmd && (
+        <EncaissementModal
+          commande={encaisserCmd}
+          serveurId={operateurId ?? ''}
+          employes={employes}
+          onClose={() => setEncaisserCmd(null)}
+          onSuccess={() => {
+            setEncaisserCmd(null)
+            router.refresh()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// ─── Card commande COMPTOIR snack ────────────────────────────
+function CommandeComptoirCard({
+  commande, onAvancer, onEncaisser,
+}: {
+  commande: CommandeService
+  onAvancer: (commande_id: string, nouveau: 'en_preparation' | 'pret' | 'servi') => void
+  onEncaisser: () => void
+}) {
+  const heureCreation = new Date(commande.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const total = commande.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+
+  // ─── Affichage créneaux : un par zone si multi (snack 14:30 · pizza 14:45), sinon créneau unique
+  const ICONE_TAG: Record<string, string> = { SNACKING: '🥪', PIZZA: '🍕', BAR: '🍷', CUISINE: '👨‍🍳' }
+  const aujourdhui = new Date()
+  const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+  function formatHeure(iso: string) {
+    const cr = new Date(iso)
+    const sameDay = cr.toDateString() === aujourdhui.toDateString()
+    const heure = cr.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    return { heure, sameDay, prefix: sameDay ? '' : `${JOURS[cr.getDay()]} ${cr.getDate()}/${cr.getMonth() + 1} · ` }
+  }
+
+  // Construit l'affichage par tag distinct si creneaux_par_tag présent et non vide
+  const creneauxParTag = commande.creneaux_par_tag ?? {}
+  const tagsAvecCreneau = Object.entries(creneauxParTag).filter(([, iso]) => !!iso)
+
+  // Détection urgence : on prend le créneau le plus proche (= min) pour déclencher l'alerte
+  const tousLesIso: string[] = tagsAvecCreneau.length > 0
+    ? tagsAvecCreneau.map(([, iso]) => iso as string)
+    : (commande.creneau_retrait ? [commande.creneau_retrait] : [])
+  const isoLePlusProche = tousLesIso.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0]
+  const creneauUrgent = isoLePlusProche
+    ? ((new Date(isoLePlusProche).getTime() - aujourdhui.getTime()) / 60_000) < 15
+    : false
+
+  // Label : multi ou mono
+  let creneauNode: ReactNode = <span>🚀 Sans créneau</span>
+  if (tagsAvecCreneau.length >= 2) {
+    creneauNode = (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        {tagsAvecCreneau
+          .sort(([, a], [, b]) => new Date(a as string).getTime() - new Date(b as string).getTime())
+          .map(([tag, iso]) => {
+            const f = formatHeure(iso as string)
+            return (
+              <span key={tag} className="inline-flex items-center gap-1">
+                <span>{ICONE_TAG[tag] ?? '🕒'}</span>
+                <span className="tabular-nums">{f.prefix}{f.heure}</span>
+              </span>
+            )
+          })}
+      </span>
+    )
+  } else if (tagsAvecCreneau.length === 1) {
+    const [tag, iso] = tagsAvecCreneau[0]
+    const f = formatHeure(iso as string)
+    creneauNode = <span>{ICONE_TAG[tag] ?? '🕒'} {f.prefix}{f.heure}</span>
+  } else if (commande.creneau_retrait) {
+    // Legacy : pas de breakdown par tag mais un créneau global
+    const f = formatHeure(commande.creneau_retrait)
+    creneauNode = <span>🕒 {f.prefix}{f.heure}</span>
+  }
+
+  // Statut commande → label & action suivante
+  const statutInfo: Record<string, { label: string; cls: string; nextLabel: string | null; nextStatut: 'en_preparation' | 'pret' | 'servi' | null }> = {
+    en_attente:     { label: '🆕 NOUVELLE',     cls: 'bg-blue-500 text-white',    nextLabel: '🔥 Préparer',  nextStatut: 'en_preparation' },
+    en_preparation: { label: '🔥 EN PRÉP',      cls: 'bg-amber-500 text-white',   nextLabel: '✓ Marquer prêt', nextStatut: 'pret' },
+    pret:           { label: '✓ PRÊT',           cls: 'bg-emerald-500 text-white', nextLabel: '🍽 Donné au client', nextStatut: 'servi' },
+    servi:          { label: '🍽 DONNÉ',         cls: 'bg-zinc-500 text-white',    nextLabel: null,              nextStatut: null },
+  }
+  const s = statutInfo[commande.statut] ?? { label: commande.statut, cls: 'bg-zinc-700 text-white', nextLabel: null, nextStatut: null }
+
+  return (
+    <article className={cn(
+      'rounded-lg border p-3 flex flex-col gap-2 transition-colors',
+      creneauUrgent ? 'border-red-500 bg-red-950/40' : 'border-zinc-700 bg-zinc-900',
+    )}>
+      <header className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs text-zinc-500">#{commande.numero} · créée {heureCreation}</p>
+          <p className="text-base font-bold text-white">🛒 Comptoir</p>
+        </div>
+        <span className={cn('text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider', s.cls)}>
+          {s.label}
+        </span>
+      </header>
+
+      {/* Bandeau créneau(x) retrait — multi-zones si distinct, mono sinon */}
+      <div className={cn(
+        'flex items-center justify-between gap-2 px-2 py-1 rounded text-sm font-bold',
+        creneauUrgent
+          ? 'bg-red-600 text-white animate-pulse'
+          : (commande.creneau_retrait || tagsAvecCreneau.length > 0)
+            ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-700'
+            : 'bg-zinc-800 text-zinc-400 border border-zinc-700',
+      )}>
+        {creneauNode}
+        {creneauUrgent && <span className="text-[10px] uppercase">⚠ Urgent</span>}
+      </div>
+
+      {(() => {
+        // Split poste SNACK vs autres (pizza/bar/cuisine) — coordination livraison.
+        const articlesSnack = commande.articles.filter(a => a.tag_destination === 'SNACKING')
+        const autresArticles = commande.articles.filter(a => a.tag_destination !== 'SNACKING')
+        const aDuSnack = articlesSnack.length > 0
+        const tousLesAutresPrets = autresArticles.length > 0
+          && autresArticles.every(a => a.statut === 'pret' || a.statut === 'servi')
+        return (
+          <>
+            {/* MON POSTE — articles SNACK : ce que prépare le snack-man, en gros, encadré */}
+            {aDuSnack && (
+              <div className="rounded-md bg-emerald-950/40 border-2 border-emerald-700/50 p-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold mb-1.5">
+                  🥪 Mon poste — Snack
+                </p>
+                <ul className="space-y-1.5">
+                  {articlesSnack.map(a => (
+                    <li key={a.id} className="flex items-center justify-between gap-2 text-white">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-3xl font-black tabular-nums text-emerald-400 shrink-0 leading-none">×{a.quantite}</span>
+                        <span className="text-lg font-bold leading-tight">{a.recette_nom}</span>
+                      </div>
+                      <span className="text-[11px] text-zinc-500 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* AUTRES — pizza/bar/cuisine : info pour le snack-man, en petit, encart sobre */}
+            {autresArticles.length > 0 && (
+              <div className="rounded border border-zinc-800 bg-zinc-950 px-2 py-1.5">
+                <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
+                  📦 Autres postes {tousLesAutresPrets && <span className="text-emerald-400">· tout est prêt</span>}
+                </p>
+                <ul className="space-y-0.5">
+                  {autresArticles.map(a => {
+                    const tagInfo = ICONE_TAG[a.tag_destination] ?? '·'
+                    const aSty = STATUT_ARTICLE_LABEL[a.statut]
+                    return (
+                      <li key={a.id} className="flex items-center justify-between text-[11px] gap-2">
+                        <span className="truncate text-zinc-400">
+                          <span className="opacity-70">{tagInfo}</span> <b className="tabular-nums">×{a.quantite}</b> {a.recette_nom}
+                        </span>
+                        <span className={cn('text-[9px] px-1 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
+                          {aSty.emoji}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </>
+        )
+      })()}
+
+      <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
+        <span className="text-xs text-zinc-400">Total</span>
+        <span className="text-lg font-bold text-white tabular-nums">{fmtPrix(total)}</span>
+      </div>
+
+      <div className="flex gap-2 mt-1">
+        {s.nextLabel && s.nextStatut && (
+          <button
+            onClick={() => onAvancer(commande.id, s.nextStatut!)}
+            className="flex-1 min-h-[44px] rounded-md bg-amber-500 hover:bg-amber-400 text-white font-bold text-sm transition-colors active:scale-95"
+          >
+            {s.nextLabel}
+          </button>
+        )}
+        {(commande.statut === 'pret' || commande.statut === 'servi') && (
+          <button
+            onClick={onEncaisser}
+            className="flex-1 min-h-[44px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors active:scale-95"
+          >
+            💰 Encaisser
+          </button>
+        )}
+      </div>
+    </article>
   )
 }
 
@@ -345,6 +705,21 @@ function CommandeOnlineCard({
     </div>
   )
 }
+
+// Wrapper memoïsé pour ComptoirOrderModal — empêche re-render à chaque tick d'horloge
+// du parent (qui ticke chaque seconde pour les compteurs ONLINE).
+// withCreneaux est une référence stable car définie au niveau module.
+// Sur /emporter (poste snack), on accepte les 3 plannings → le modal affichera un
+// sélecteur de créneau pour chaque tag réellement présent dans le panier.
+const SNACK_CRENEAUX = { tagsAvecPlanning: ['SNACKING', 'PIZZA', 'BAR'] as Array<'SNACKING' | 'PIZZA' | 'BAR'> }
+const ComptoirSnackModalMemo = memo(function ComptoirSnackModalMemo(props: {
+  recettes: Recette[]
+  barmanId: string | null
+  onClose: () => void
+  onSuccess: (commandeId: string) => void
+}) {
+  return <ComptoirOrderModal {...props} withCreneaux={SNACK_CRENEAUX} tagInitial="SNACKING" />
+})
 
 function KPI({ label, value, accent = 'default', pulse }: { label: string; value: string | number; accent?: 'default' | 'red' | 'orange'; pulse?: boolean }) {
   const cls = { default: 'bg-zinc-800 text-zinc-100', red: 'bg-red-600 text-white', orange: 'bg-amber-500 text-white' }[accent]

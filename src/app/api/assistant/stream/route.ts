@@ -9,6 +9,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getProfile } from '@/lib/auth'
 import { construireSystemBlocks } from '@/lib/assistant/system-prompt'
 import type { SnapshotKPI } from '@/lib/assistant/snapshot'
 import type { Anomalie } from '@/lib/assistant/anomalies'
@@ -19,6 +20,19 @@ export const dynamic = 'force-dynamic'
 type ContexteSnap = { snapshot: SnapshotKPI; anomalies: Anomalie[] } | null
 
 export async function POST(req: Request) {
+  // 🔒 Sécurité : seuls les profils manager peuvent consommer l'API IA (coût Anthropic)
+  const profil = await getProfile()
+  if (!profil) {
+    return new Response(JSON.stringify({ error: 'Non authentifié' }), {
+      status: 401, headers: { 'content-type': 'application/json' },
+    })
+  }
+  if (profil.role !== 'manager') {
+    return new Response(JSON.stringify({ error: 'Accès réservé aux managers' }), {
+      status: 403, headers: { 'content-type': 'application/json' },
+    })
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY manquante côté serveur' }), {

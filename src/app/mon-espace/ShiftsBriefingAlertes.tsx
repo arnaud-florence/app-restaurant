@@ -126,7 +126,8 @@ export default async function ShiftsBriefingAlertes({ employeId, poste, posteWid
   })
 
   // Compteur total alertes (pour affichage badge)
-  const totalAlertes = (tachesAFaire > 0 ? 1 : 0) + certifsExp.length + ncs.length + resasVip.length
+  // tachesAFaire retiré du total d'alertes (suivi déplacé sur les écrans ops)
+  const totalAlertes = certifsExp.length + ncs.length + resasVip.length
 
   // Données pour rendering
   type ShiftRow = { id: string; date_travail: string; heure_debut: string; heure_fin: string; poste_jour: string | null; notes: string | null }
@@ -225,38 +226,25 @@ export default async function ShiftsBriefingAlertes({ employeId, poste, posteWid
         ) : null}
       </Card>
 
-      {/* ─── 3. Centre alertes personnelles ──────────────────── */}
+      {/* ─── 3. Centre alertes personnelles — masqué si rien à afficher ───── */}
+      {totalAlertes > 0 && (
       <Card className={cn(
         'p-4',
         totalAlertes >= 3 ? 'border-red-300 bg-red-50/50' :
-        totalAlertes >= 1 ? 'border-amber-300 bg-amber-50/50' :
-                            'border-emerald-300 bg-emerald-50/50',
+                            'border-amber-300 bg-amber-50/50',
       )}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold flex items-center gap-1.5 text-sm">
             <Bell className="h-4 w-4 text-amber-600" /> À faire pour toi
-            {totalAlertes > 0 && (
-              <Badge variant="outline" className={cn(
-                'ml-1 text-[10px]',
-                totalAlertes >= 3 ? 'bg-red-200 text-red-900 border-red-400' :
-                                    'bg-amber-200 text-amber-900 border-amber-400',
-              )}>{totalAlertes}</Badge>
-            )}
+            <Badge variant="outline" className={cn(
+              'ml-1 text-[10px]',
+              totalAlertes >= 3 ? 'bg-red-200 text-red-900 border-red-400' :
+                                  'bg-amber-200 text-amber-900 border-amber-400',
+            )}>{totalAlertes}</Badge>
           </h3>
         </div>
-        {totalAlertes === 0 ? (
-          <p className="text-xs text-emerald-700 italic text-center py-4">✨ Tout est à jour, bravo !</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {tachesAFaire > 0 && (
-              <li className="rounded-md bg-white border p-2 text-xs flex items-start gap-2">
-                <ListChecks className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-bold">{tachesAFaire} tâche{tachesAFaire > 1 ? 's' : ''} obligatoire{tachesAFaire > 1 ? 's' : ''} non faite{tachesAFaire > 1 ? 's' : ''} aujourd'hui</p>
-                  <p className="text-[11px] text-zinc-600">Sur ton service ou la fin de journée.</p>
-                </div>
-              </li>
-            )}
+        <ul className="space-y-1.5">
+            {/* Alerte tâches retirée : suivi des tâches désormais uniquement dans les écrans ops */}
             {ncs.map(nc => (
               <li key={nc.id} className="rounded-md bg-white border border-red-200 p-2 text-xs flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
@@ -297,8 +285,8 @@ export default async function ShiftsBriefingAlertes({ employeId, poste, posteWid
               </Link>
             </li>
           </ul>
-        )}
       </Card>
+      )}
     </div>
   )
 }

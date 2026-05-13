@@ -22,6 +22,11 @@ const POSTE_TO_WIDGET: Record<string, PosteWidget> = {
   second:         'second',
   plonge:         'plonge',
   extra:          'plonge',
+  // Nouveaux postes (Phase 1 fiches)
+  snacking:        'snacking',
+  caisse:          'caisse',
+  caisse_snacking: 'caisse_snacking',
+  livreur:         'livreur',
 }
 
 function widgetPosteFor(poste: string | null): PosteWidget | null {

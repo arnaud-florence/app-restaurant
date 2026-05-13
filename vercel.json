@@ -33,6 +33,10 @@
     {
       "path": "/api/cron/collecte-avis",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/rappel-reservations",
+      "schedule": "0 9 * * *"
     }
   ]
 }

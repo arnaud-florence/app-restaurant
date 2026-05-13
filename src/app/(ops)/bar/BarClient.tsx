@@ -6,12 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   type CommandeService, type StatutArticle,
-  STATUT_ARTICLE_LABEL, SOURCE_LABEL, statutMinuteur, STATUT_MINUTEUR_STYLE, formatEcoule, playDing,
+  STATUT_ARTICLE_LABEL, SOURCE_LABEL, TAG_DEST_LABEL, statutMinuteur, STATUT_MINUTEUR_STYLE, formatEcoule, playDing,
 } from '@/lib/service'
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import TachesSequentielles from '@/components/TachesSequentielles'
 import ComptoirOrderModal from './ComptoirOrderModal'
 import EncaissementModal from '../serveur/EncaissementModal'
 import { fmtPrix } from '@/lib/service'
@@ -92,6 +93,7 @@ export default function BarClient({
       .channel('bar-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes' }, () => router.refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commande_articles' }, () => router.refresh())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => router.refresh())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [router])
@@ -191,7 +193,7 @@ export default function BarClient({
       ))}
 
       <div className="px-3 pt-3 bg-zinc-900">
-        <TachesDuJourWidget poste="barman" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+        <TachesSequentielles poste="barman" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
       </div>
 
       {/* Section commandes comptoir à encaisser (violet = COMPTOIR) */}
@@ -205,7 +207,7 @@ export default function BarClient({
               </p>
               <p className="text-[11px] text-violet-400">Clic sur une note pour ouvrir l&apos;encaissement</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {commandesComptoir.map(c => {
                 const totalArticles = c.articles.reduce((s, a) => s + (a.quantite ?? 1), 0)
                 return (
@@ -332,6 +334,11 @@ function TicketCommande({
   const minSty = STATUT_MINUTEUR_STYLE[min]
   const sourceSty = SOURCE_LABEL[commande.source]
 
+  // Autres articles de la commande (pas BAR) — pour coordination livraison
+  const idsBar = new Set(articles.map(a => a.id))
+  const autresArticles = commande.articles.filter(a => !idsBar.has(a.id))
+  const tousLesAutresPrets = autresArticles.length > 0 && autresArticles.every(a => a.statut === 'pret' || a.statut === 'servi')
+
   const sourceBorderL =
     commande.source === 'TABLE'    ? 'border-l-[6px] border-l-blue-500' :
     commande.source === 'COMPTOIR' ? 'border-l-[6px] border-l-violet-500' :
@@ -364,11 +371,15 @@ function TicketCommande({
     : tousEnPrep ? 'border-amber-500/50'
     : 'border-blue-500/50'
 
-  // Créneau retrait pour ONLINE (compte à rebours visible)
+  // Bandeau créneau retrait : pour les commandes multi-zones, on utilise le créneau
+  // SPÉCIFIQUE au tag de ce ticket (BAR) plutôt que le créneau global.
   const isOnline = commande.source === 'ONLINE'
-  const creneauTime = commande.creneau_retrait ? new Date(commande.creneau_retrait).getTime() : null
+  const tagDuTicket = articles[0]?.tag_destination
+  const creneauTag = tagDuTicket ? commande.creneaux_par_tag?.[tagDuTicket] : null
+  const creneauIso = creneauTag ?? commande.creneau_retrait ?? null
+  const creneauTime = creneauIso ? new Date(creneauIso).getTime() : null
   const minutesRestantes = creneauTime ? Math.round((creneauTime - now) / 60000) : null
-  const urgenceCls = !isOnline || minutesRestantes === null ? null
+  const urgenceCls = !creneauTime || minutesRestantes === null ? null
     : minutesRestantes < 0 ? 'bg-red-600 animate-pulse'
     : minutesRestantes < 10 ? 'bg-amber-500'
     : minutesRestantes < 20 ? 'bg-blue-500'
@@ -376,13 +387,15 @@ function TicketCommande({
 
   return (
     <div className={cn('rounded-lg border-2 bg-zinc-900 overflow-hidden', sourceBorderL, borderClasse)}>
-      {/* Bandeau ONLINE : créneau retrait + compte à rebours */}
-      {isOnline && creneauTime && (
+      {/* Bandeau créneau retrait — visible pour ONLINE et COMPTOIR (snack avec réservation) */}
+      {creneauTime && (
         <div className={cn('px-3 py-2 text-white flex items-center justify-between gap-2', urgenceCls)}>
           <div className="flex items-center gap-2">
-            <span className="text-lg">📦</span>
+            <span className="text-lg">{isOnline ? '📦' : '🛒'}</span>
             <div>
-              <p className="text-[10px] uppercase tracking-wider opacity-90 leading-none">Retrait à</p>
+              <p className="text-[10px] uppercase tracking-wider opacity-90 leading-none">
+                Retrait {isOnline ? 'web' : 'comptoir'} à
+              </p>
               <p className="text-base font-bold tabular-nums leading-tight">
                 {new Date(creneauTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </p>
@@ -472,6 +485,31 @@ function TicketCommande({
           )
         })}
       </ul>
+
+      {/* Autres articles de la commande (cuisine/snack/pizza) — coordination livraison */}
+      {autresArticles.length > 0 && (
+        <div className="mx-3 mb-2 mt-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5">
+          <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
+            📦 Aussi dans cette commande {tousLesAutresPrets && <span className="text-emerald-400">· tout est prêt</span>}
+          </p>
+          <ul className="space-y-0.5">
+            {autresArticles.map(a => {
+              const tagSty = TAG_DEST_LABEL[a.tag_destination] ?? { emoji: '·', label: a.tag_destination, cls: '' }
+              const aSty = STATUT_ARTICLE_LABEL[a.statut]
+              return (
+                <li key={a.id} className="flex items-center justify-between text-[11px] gap-2">
+                  <span className="truncate">
+                    <span className="opacity-70">{tagSty.emoji}</span> <b className="tabular-nums">×{a.quantite}</b> {a.recette_nom}
+                  </span>
+                  <span className={cn('text-[9px] px-1 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
+                    {aSty.emoji}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* Action groupée : avancer tous les articles d'un coup */}
       {!tousPret && (

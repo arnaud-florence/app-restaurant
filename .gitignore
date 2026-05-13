@@ -36,3 +36,10 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# claude code (skill régénérable via `npx uipro-cli init -a claude` ; settings locaux)
+.claude/skills/
+.claude/settings.local.json
+
+# Téléchargements partiels (ex: vidéos en cours de DL)
+*.crdownload

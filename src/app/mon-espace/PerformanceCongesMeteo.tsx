@@ -133,7 +133,6 @@ export default async function PerformanceCongesMeteo({ employeId, poste, soldeCo
         </div>
         <div className="space-y-2">
           <PerfRow label="Heures travaillées" current={`${heuresM.toFixed(1)} h`} prev={`${heuresP.toFixed(1)} h`} delta={heuresDelta} />
-          <PerfRow label="Tâches obligatoires" current={String(tachesM.count ?? 0)} prev={String(tachesP.count ?? 0)} delta={tachesDelta} />
           {perfPoste && perfDelta && (
             <PerfRow
               label={perfPoste.label}

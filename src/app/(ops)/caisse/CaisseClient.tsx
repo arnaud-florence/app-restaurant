@@ -13,6 +13,7 @@ import {
 } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import TachesSequentielles from '@/components/TachesSequentielles'
 
 const METHODES_LABEL: Record<string, { label: string; emoji: string }> = {
   especes:      { label: 'Espèces',      emoji: '💵' },
@@ -84,7 +85,7 @@ export default function CaisseClient({
       </header>
 
       <main className="flex-1 p-4 space-y-6">
-        <TachesDuJourWidget poste="caisse" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+        <TachesSequentielles poste="caisse" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
         {!resume ? (
           <OuvertureForm
             employes={employes}

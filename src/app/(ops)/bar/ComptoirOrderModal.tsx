@@ -1,17 +1,25 @@
 'use client'
 
-// Modal de saisie commande COMPTOIR depuis le bar.
+// Modal de saisie commande COMPTOIR depuis le bar OU /emporter (poste snack).
 // Catalogue + panier minimal réutilisant la logique du serveur.
-// À la validation : creerCommande(source: 'COMPTOIR') → push en cuisine/bar/pizza.
+// À la validation : creerCommande(source: 'COMPTOIR') → push en cuisine/bar/pizza/snacking.
+//
+// Multi-créneaux : si withCreneaux.tagsAvecPlanning est fourni, on affiche un
+// sélecteur de créneau pour CHAQUE tag présent dans le panier qui fait partie de
+// cette liste. Ex : panier mixte snack+pizza sur /emporter → 2 sélecteurs.
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { cn } from '@/lib/utils'
-import { creerCommande } from '../actions'
+import { creerCommande, listerCreneauxDisponibles } from '../actions'
 import { fmtPrix } from '@/lib/service'
+import { createClient } from '@/lib/supabase/client'
+
+type TagPanier = 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
+type TagPlanning = 'SNACKING' | 'PIZZA' | 'BAR'
 
 type Recette = {
   id: string; nom: string; categorie: string;
-  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
+  tag_destination: TagPanier
   prix_vente_ht: number
 }
 
@@ -19,29 +27,150 @@ type LignePanier = {
   recette_id: string
   recette_nom: string
   prix_unitaire_ht: number
-  tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
+  tag_destination: TagPanier
   quantite: number
   commentaire: string
 }
 
+type Slot = { heure: string; iso: string; disponible: boolean; count: number; max: number }
+
 const TAGS = [
-  { key: 'BAR' as const,     label: '🍷 Bar',     hint: 'Boissons / cocktails' },
-  { key: 'CUISINE' as const, label: '👨‍🍳 Cuisine', hint: 'Plats / snacks' },
-  { key: 'PIZZA' as const,   label: '🍕 Pizza',   hint: 'Pizzas' },
+  { key: 'BAR' as const,      label: '🍷 Bar',      hint: 'Boissons / cocktails' },
+  { key: 'CUISINE' as const,  label: '👨‍🍳 Cuisine',  hint: 'Plats' },
+  { key: 'SNACKING' as const, label: '🥪 Snacking', hint: 'Snacks rapides' },
+  { key: 'PIZZA' as const,    label: '🍕 Pizza',    hint: 'Pizzas' },
 ]
 
+// Libellés courts pour les titres de sélecteurs créneaux (1 par zone)
+const TAG_LABEL_COURT: Record<TagPlanning, { emoji: string; label: string }> = {
+  SNACKING: { emoji: '🥪', label: 'Snack' },
+  PIZZA:    { emoji: '🍕', label: 'Pizza' },
+  BAR:      { emoji: '🍷', label: 'Bar' },
+}
+
 export default function ComptoirOrderModal({
-  recettes, barmanId, onClose, onSuccess,
+  recettes, barmanId, onClose, onSuccess, withCreneaux = null, tagInitial = 'BAR',
 }: {
   recettes: Recette[]
   barmanId: string | null
   onClose: () => void
   onSuccess: (commandeId: string) => void
+  // Si fourni : la modal proposera un sélecteur de créneau pour chaque tag du
+  // panier qui figure dans `tagsAvecPlanning`. Si null/absent : commande
+  // immédiate (pas de creneau_retrait, pas de creneaux_par_tag).
+  withCreneaux?: { tagsAvecPlanning: TagPlanning[] } | null
+  // Onglet sélectionné à l'ouverture (utile pour préfiltrer selon le poste appelant)
+  tagInitial?: TagPanier
 }) {
-  const [tagActif, setTagActif] = useState<'BAR' | 'CUISINE' | 'PIZZA'>('BAR')
+  const [tagActif, setTagActif] = useState<TagPanier>(tagInitial)
   const [panier, setPanier] = useState<LignePanier[]>([])
   const [erreur, setErreur] = useState('')
   const [isPending, startTransition] = useTransition()
+
+  // ─── Créneaux retrait multi-zones ────────────────────────────
+  // Une seule date partagée (le client passe chercher tout le même jour),
+  // mais un slot distinct par tag (planning séparé snack/pizza/bar).
+  const [dateChoisie, setDateChoisie] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  // Map tag → slot ISO choisi (null = ASAP/pas encore choisi)
+  const [creneauxParTag, setCreneauxParTag] = useState<Partial<Record<TagPlanning, string | null>>>({})
+  // Map tag → liste des slots disponibles (chargés via listerCreneauxDisponibles)
+  const [slotsParTag, setSlotsParTag] = useState<Partial<Record<TagPlanning, Slot[]>>>({})
+  // Map tag → en cours de chargement
+  const [loadingParTag, setLoadingParTag] = useState<Partial<Record<TagPlanning, boolean>>>({})
+
+  // Tags qui ont un planning configuré (passé par le parent)
+  const tagsAvecPlanning = useMemo(() => withCreneaux?.tagsAvecPlanning ?? [], [withCreneaux])
+
+  // Tags actuellement présents dans le panier ET ayant un planning → besoin d'un sélecteur
+  const tagsAReserver = useMemo<TagPlanning[]>(() => {
+    if (tagsAvecPlanning.length === 0) return []
+    const tagsDuPanier = new Set(panier.map(p => p.tag_destination))
+    return tagsAvecPlanning.filter(t => tagsDuPanier.has(t))
+  }, [panier, tagsAvecPlanning])
+
+  // Clé stable de la liste des tags à réserver (pour dépendance useEffect)
+  const tagsAReserverKey = tagsAReserver.slice().sort().join(',')
+
+  // Fetch des créneaux : pour chaque tag à réserver, charge ses slots.
+  // Re-déclenché quand la date change ou quand on ajoute/retire un tag du panier.
+  useEffect(() => {
+    if (tagsAReserver.length === 0) return
+    let cancelled = false
+    setLoadingParTag(prev => {
+      const next = { ...prev }
+      for (const t of tagsAReserver) next[t] = true
+      return next
+    })
+    Promise.all(tagsAReserver.map(async t => {
+      try {
+        const slots = await listerCreneauxDisponibles(t, dateChoisie)
+        return [t, slots] as const
+      } catch {
+        return [t, [] as Slot[]] as const
+      }
+    })).then(results => {
+      if (cancelled) return
+      setSlotsParTag(prev => {
+        const next = { ...prev }
+        for (const [t, slots] of results) next[t] = slots
+        return next
+      })
+      setLoadingParTag(prev => {
+        const next = { ...prev }
+        for (const [t] of results) next[t] = false
+        return next
+      })
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tagsAReserverKey, dateChoisie])
+
+  // Reset les choix de créneaux quand on change de date (les slots changent)
+  useEffect(() => {
+    setCreneauxParTag({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateChoisie])
+
+  // Realtime : refetch tous les créneaux des tags concernés dès qu'une commande
+  // est créée/modifiée (ONLINE depuis le site web ou COMPTOIR depuis un autre poste).
+  // Évite que le snack-man réserve un slot qu'un client web vient de prendre.
+  useEffect(() => {
+    if (tagsAReserver.length === 0) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel('comptoir-creneaux-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commandes' }, () => {
+        Promise.all(tagsAReserver.map(async t => {
+          try {
+            const slots = await listerCreneauxDisponibles(t, dateChoisie)
+            return [t, slots] as const
+          } catch { return [t, [] as Slot[]] as const }
+        })).then(results => {
+          setSlotsParTag(prev => {
+            const next = { ...prev }
+            for (const [t, slots] of results) next[t] = slots
+            return next
+          })
+        })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tagsAReserverKey, dateChoisie])
+
+  // Génère les 7 prochains jours pour le sélecteur de date
+  const datesDispo = useMemo(() => {
+    const out: Array<{ key: string; label: string; date: string }> = []
+    const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    for (let i = 0; i < 7; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() + i)
+      const date = d.toISOString().slice(0, 10)
+      const label = i === 0 ? "Aujourd'hui" : i === 1 ? 'Demain' : `${JOURS[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`
+      out.push({ key: date, label, date })
+    }
+    return out
+  }, [])
 
   const recettesAffichees = useMemo(
     () => recettes.filter(r => r.tag_destination === tagActif),
@@ -85,9 +214,13 @@ export default function ComptoirOrderModal({
     setPanier(prev => prev.flatMap(p => {
       if (p.recette_id !== recette_id) return [p]
       const q = p.quantite + delta
-      if (q <= 0) return []
+      if (q <= 0) return [] as LignePanier[]
       return [{ ...p, quantite: q }]
     }))
+  }
+
+  function setSlotPourTag(tag: TagPlanning, iso: string | null) {
+    setCreneauxParTag(prev => ({ ...prev, [tag]: iso }))
   }
 
   function envoyer() {
@@ -95,10 +228,29 @@ export default function ComptoirOrderModal({
     setErreur('')
     startTransition(async () => {
       try {
+        // Pour chaque tag à réserver : si pas de choix explicite, on prend le
+        // PROCHAIN slot libre de ce tag. Si rien de libre → on échoue
+        // explicitement (la cuisine est saturée pour ce jour).
+        const creneauxFinaux: Record<TagPlanning, string> = {} as Record<TagPlanning, string>
+        for (const t of tagsAReserver) {
+          let iso = creneauxParTag[t] ?? null
+          if (!iso) {
+            const prochain = (slotsParTag[t] ?? []).find(s => s.disponible)
+            if (prochain) iso = prochain.iso
+          }
+          if (!iso) {
+            throw new Error(`Aucun créneau libre pour ${TAG_LABEL_COURT[t].label.toLowerCase()} à cette date.`)
+          }
+          creneauxFinaux[t] = iso
+        }
+
+        const hasCreneaux = Object.keys(creneauxFinaux).length > 0
         const r = await creerCommande({
           source: 'COMPTOIR',
           numero_table: null,
           serveur_id: barmanId || null,
+          // Multi-créneaux (envoyé seulement s'il y en a)
+          ...(hasCreneaux ? { creneaux_par_tag: creneauxFinaux } : {}),
           articles: panier.map(p => ({
             recette_id: p.recette_id,
             quantite: p.quantite,
@@ -117,6 +269,8 @@ export default function ComptoirOrderModal({
 
   // Sur mobile : panier en bottom-sheet ouvrable au tap
   const [showPanierMobile, setShowPanierMobile] = useState(false)
+
+  const hasAnyPlanning = tagsAReserver.length > 0
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-stretch justify-center">
@@ -154,6 +308,30 @@ export default function ComptoirOrderModal({
             </button>
           ))}
         </div>
+
+        {/* Bande créneaux MOBILE — visible si au moins un tag à réserver. Empile un sélecteur par tag. */}
+        {hasAnyPlanning && (
+          <div className="md:hidden flex-shrink-0 bg-zinc-950 border-b border-zinc-800">
+            <SelecteurDate
+              datesDispo={datesDispo}
+              dateChoisie={dateChoisie}
+              setDateChoisie={setDateChoisie}
+              compact
+            />
+            {tagsAReserver.map(tag => (
+              <SelecteurSlotTag
+                key={tag}
+                tag={tag}
+                slots={slotsParTag[tag] ?? []}
+                slotChoisi={creneauxParTag[tag] ?? null}
+                setSlotChoisi={iso => setSlotPourTag(tag, iso)}
+                loading={!!loadingParTag[tag]}
+                isToday={dateChoisie === datesDispo[0]?.date}
+                compact
+              />
+            ))}
+          </div>
+        )}
 
         {/* 2 zones : catalogue + panier (côte à côte sur md+, empilé sur mobile) */}
         <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden min-h-0">
@@ -200,7 +378,6 @@ export default function ComptoirOrderModal({
 
           {/* Panier — desktop : sidebar fixe / mobile : bottom-sheet ouvrable */}
           <div className={cn(
-            // Desktop : sidebar visible
             'border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-950 flex-col',
             'hidden md:flex',
           )}>
@@ -213,6 +390,14 @@ export default function ComptoirOrderModal({
               modifier={modifier}
               envoyer={envoyer}
               onClose={onClose}
+              tagsAReserver={tagsAReserver}
+              slotsParTag={slotsParTag}
+              creneauxParTag={creneauxParTag}
+              setSlotPourTag={setSlotPourTag}
+              loadingParTag={loadingParTag}
+              datesDispo={datesDispo}
+              dateChoisie={dateChoisie}
+              setDateChoisie={setDateChoisie}
             />
           </div>
         </div>
@@ -265,6 +450,14 @@ export default function ComptoirOrderModal({
                 envoyer={() => { setShowPanierMobile(false); envoyer() }}
                 onClose={onClose}
                 hideHeader
+                tagsAReserver={tagsAReserver}
+                slotsParTag={slotsParTag}
+                creneauxParTag={creneauxParTag}
+                setSlotPourTag={setSlotPourTag}
+                loadingParTag={loadingParTag}
+                datesDispo={datesDispo}
+                dateChoisie={dateChoisie}
+                setDateChoisie={setDateChoisie}
               />
             </div>
           </div>
@@ -275,10 +468,127 @@ export default function ComptoirOrderModal({
   )
 }
 
-// Sous-composant panier (réutilisé desktop sidebar + mobile bottom-sheet)
+// ─── Sous-composant : sélecteur de date (1 seule date partagée pour tous les tags) ───
+function SelecteurDate({
+  datesDispo, dateChoisie, setDateChoisie, compact = false,
+}: {
+  datesDispo: Array<{ key: string; label: string; date: string }>
+  dateChoisie: string
+  setDateChoisie: (d: string) => void
+  compact?: boolean
+}) {
+  const padding = compact ? 'p-2' : 'px-3 pt-3'
+  const labelCls = compact
+    ? 'text-[10px] font-bold uppercase tracking-wider text-zinc-400'
+    : 'text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2'
+  return (
+    <div className={cn(padding, 'flex-shrink-0')}>
+      <p className={labelCls}>📅 Jour de retrait</p>
+      <div className="flex gap-1 mt-1 mb-1 overflow-x-auto -mx-1 px-1 pb-1">
+        {datesDispo.map(d => (
+          <button
+            key={d.key}
+            onClick={() => setDateChoisie(d.date)}
+            className={cn(
+              'inline-flex items-center px-3 min-h-[36px] rounded text-xs font-bold whitespace-nowrap border transition-colors',
+              dateChoisie === d.date
+                ? 'bg-emerald-500 text-white border-emerald-400'
+                : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800',
+            )}
+          >
+            {d.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Sous-composant : sélecteur de slot pour 1 tag (Snack / Pizza / Bar) ───
+function SelecteurSlotTag({
+  tag, slots, slotChoisi, setSlotChoisi, loading, isToday, compact = false,
+}: {
+  tag: TagPlanning
+  slots: Slot[]
+  slotChoisi: string | null
+  setSlotChoisi: (iso: string | null) => void
+  loading: boolean
+  isToday: boolean
+  compact?: boolean
+}) {
+  const lib = TAG_LABEL_COURT[tag]
+  const padding = compact ? 'px-2 pb-2' : 'px-3 pt-3 pb-2'
+  const labelCls = compact
+    ? 'text-[10px] font-bold uppercase tracking-wider text-zinc-400'
+    : 'text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5'
+  const slotsMax = compact ? 'max-h-[80px]' : 'max-h-[140px]'
+  const heureChoisie = slotChoisi ? slots.find(s => s.iso === slotChoisi)?.heure : null
+  return (
+    <div className={cn(padding, !compact && 'border-t border-zinc-800', 'flex-shrink-0')}>
+      <p className={labelCls}>
+        <span className="text-base mr-1">{lib.emoji}</span>
+        Retrait {lib.label.toLowerCase()}
+        {heureChoisie && <span className="ml-2 text-emerald-400 normal-case font-bold">{heureChoisie}</span>}
+      </p>
+      {isToday && (
+        <button
+          onClick={() => {
+            const prochain = slots.find(s => s.disponible)
+            setSlotChoisi(prochain ? prochain.iso : null)
+          }}
+          disabled={slots.length > 0 && !slots.some(s => s.disponible)}
+          className={cn(
+            'w-full rounded-md text-xs font-bold mb-1 transition-colors border',
+            compact ? 'min-h-[32px]' : 'min-h-[40px]',
+            'bg-zinc-900 text-emerald-300 border-emerald-700 hover:bg-emerald-950',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+          )}
+        >
+          🚀 Dès que possible
+        </button>
+      )}
+      {loading ? (
+        <p className="text-xs text-zinc-500 italic text-center py-2">Chargement créneaux…</p>
+      ) : slots.length === 0 ? (
+        <p className="text-[11px] text-zinc-500 italic text-center py-1">
+          Aucun créneau planifié {isToday ? "aujourd'hui" : 'ce jour'} pour {lib.label.toLowerCase()}.
+        </p>
+      ) : (
+        <div className={cn('grid grid-cols-4 sm:grid-cols-3 gap-1 overflow-y-auto', slotsMax)}>
+          {slots.map(s => {
+            const isActive = slotChoisi === s.iso
+            return (
+              <button
+                key={s.iso}
+                onClick={() => s.disponible && setSlotChoisi(s.iso)}
+                disabled={!s.disponible}
+                className={cn(
+                  'rounded text-xs font-bold tabular-nums transition-colors border flex flex-col items-center justify-center px-1 py-0.5',
+                  compact ? 'min-h-[34px]' : 'min-h-[40px]',
+                  !s.disponible
+                    ? 'bg-zinc-900 text-zinc-600 border-zinc-800 line-through cursor-not-allowed opacity-50'
+                    : isActive
+                      ? 'bg-emerald-500 text-white border-emerald-400'
+                      : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800',
+                )}
+                title={s.disponible ? `Réserver ${s.heure}` : 'Saturé'}
+              >
+                <span className="text-sm">{s.heure}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Sous-composant panier (réutilisé desktop sidebar + mobile bottom-sheet) ───
 function PanierContent({
   panier, totalPanier, nbArticles, erreur, isPending,
   modifier, envoyer, onClose, hideHeader = false,
+  tagsAReserver, slotsParTag, creneauxParTag, setSlotPourTag, loadingParTag,
+  datesDispo, dateChoisie, setDateChoisie,
 }: {
   panier: LignePanier[]
   totalPanier: number
@@ -289,7 +599,16 @@ function PanierContent({
   envoyer: () => void
   onClose: () => void
   hideHeader?: boolean
+  tagsAReserver: TagPlanning[]
+  slotsParTag: Partial<Record<TagPlanning, Slot[]>>
+  creneauxParTag: Partial<Record<TagPlanning, string | null>>
+  setSlotPourTag: (tag: TagPlanning, iso: string | null) => void
+  loadingParTag: Partial<Record<TagPlanning, boolean>>
+  datesDispo: Array<{ key: string; label: string; date: string }>
+  dateChoisie: string
+  setDateChoisie: (d: string) => void
 }) {
+  const isToday = dateChoisie === datesDispo[0]?.date
   return (
     <>
       {!hideHeader && (
@@ -329,6 +648,28 @@ function PanierContent({
 
       {erreur && (
         <div className="px-4 py-2 bg-red-900/30 border-t border-red-800 text-red-300 text-sm">⚠️ {erreur}</div>
+      )}
+
+      {/* Sélecteur date + slot par tag — desktop uniquement (mobile = bande en haut du modal) */}
+      {tagsAReserver.length > 0 && (
+        <div className="border-t border-zinc-800 flex-shrink-0">
+          <SelecteurDate
+            datesDispo={datesDispo}
+            dateChoisie={dateChoisie}
+            setDateChoisie={setDateChoisie}
+          />
+          {tagsAReserver.map(tag => (
+            <SelecteurSlotTag
+              key={tag}
+              tag={tag}
+              slots={slotsParTag[tag] ?? []}
+              slotChoisi={creneauxParTag[tag] ?? null}
+              setSlotChoisi={iso => setSlotPourTag(tag, iso)}
+              loading={!!loadingParTag[tag]}
+              isToday={isToday}
+            />
+          ))}
+        </div>
       )}
 
       <div className="p-3 border-t border-zinc-800 space-y-2 flex-shrink-0">

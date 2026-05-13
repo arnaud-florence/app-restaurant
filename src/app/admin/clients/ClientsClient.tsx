@@ -136,7 +136,7 @@ function FichierTab({ clients, onError, onOk }: { clients: Client[]; onError: (e
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun client.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="responsive-table w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Client</th>
@@ -231,16 +231,16 @@ function ClientModal({ client, clients, onClose, onError, onSuccess }: { client:
 
   return (
     <Modal title={isEdit ? `Modifier — ${client!.prenom} ${client!.nom}` : 'Nouveau client'} onClose={onClose} disabled={isPending}>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Prénom"><input value={prenom} onChange={e => setPrenom(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Nom"><input value={nom} onChange={e => setNom(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Téléphone"><input value={telephone} onChange={e => setTelephone(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       </div>
       <Field label="Adresse"><input value={adresse} onChange={e => setAdresse(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Date naissance"><input type="date" value={naissance} onChange={e => setNaissance(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Parrainé par">
           <select value={parrainId} onChange={e => setParrainId(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
@@ -379,7 +379,7 @@ function CampagneModal({ clients, onClose, onError, onSuccess }: { clients: Clie
   return (
     <Modal title="Nouvelle campagne marketing" onClose={onClose} disabled={isPending}>
       <Field label="Titre interne"><input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Ex: Promo Saint-Valentin 2026" className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Type">
           <select value={type} onChange={e => setType(e.target.value as TypeCampagne)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
             <option value="email">✉️ Email</option>
@@ -431,7 +431,7 @@ function DestinatairesModal({ campagne, clients, onClose }: { campagne: Campagne
         <button onClick={copier} className="text-xs h-8 px-3 rounded bg-zinc-900 text-white font-bold">📋 Copier emails</button>
       </div>
       <div className="max-h-96 overflow-y-auto border border-zinc-200 rounded">
-        <table className="w-full text-xs">
+        <table className="responsive-table w-full text-xs">
           <tbody className="divide-y divide-zinc-100">
             {dests.map(c => (
               <tr key={c.id}>
@@ -720,7 +720,7 @@ function RetourModal({ clients, recettes, employes, onClose, onError, onSuccess 
           {clients.map(c => <option key={c.id} value={c.id}>{c.prenom} {c.nom}</option>)}
         </select>
       </Field>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Recette de la carte">
           <select value={recetteId} onChange={e => setRecetteId(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
             <option value="">— Choisir / nom libre —</option>
@@ -732,7 +732,7 @@ function RetourModal({ clients, recettes, employes, onClose, onError, onSuccess 
       {!recetteId && (
         <Field label="OU nom libre"><input value={nomLibre} onChange={e => setNomLibre(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Motif">
           <select value={motif} onChange={e => setMotif(e.target.value as MotifRetour)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
             {Object.entries(MOTIF_RETOUR_LABEL).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}

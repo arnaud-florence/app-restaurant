@@ -110,8 +110,37 @@ export async function POST(req: Request) {
 
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge
-        // TODO : marquer la commande comme remboursée + trace mouvement
-        console.log('[stripe-webhook] remboursement reçu', charge.id)
+        const paymentIntentId = typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : charge.payment_intent?.id
+        if (paymentIntentId) {
+          // Cherche la commande liée au PaymentIntent (via metadata.commande_id ou lookup)
+          const { data: cmd } = await sb.from('commandes')
+            .select('id, montant_total_ttc, client_id')
+            .eq('stripe_payment_intent_id', paymentIntentId)
+            .maybeSingle()
+
+          if (cmd) {
+            const refundedAmount = (charge.amount_refunded ?? 0) / 100
+            const totalCmd = Number(cmd.montant_total_ttc)
+            const isPartial = refundedAmount < totalCmd
+
+            await sb.from('commandes').update({
+              statut: isPartial ? 'remboursee_partielle' : 'remboursee',
+            }).eq('id', cmd.id)
+
+            // Trace le mouvement de remboursement
+            if (cmd.client_id) {
+              await sb.from('mouvements_points').insert({
+                client_id: cmd.client_id,
+                type: 'remboursement',
+                points: 0,
+                motif: `Remboursement ${refundedAmount.toFixed(2)} € (Stripe ${charge.id})`,
+              }).then(() => {}, () => {})
+            }
+          }
+        }
+        console.log('[stripe-webhook] remboursement traité', charge.id)
         break
       }
 

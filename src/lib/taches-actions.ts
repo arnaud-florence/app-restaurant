@@ -23,14 +23,19 @@ async function autoriserPour(employeId: string) {
 
 const cocherSchema = z.object({
   employe_id:  z.string().uuid(),
-  tache_id:    z.string().min(1).max(50),
+  tache_id:    z.string().min(1).max(80),
   poste:       z.string().min(1).max(50),
   moment:      z.enum(['matin', 'service', 'fin']),
   obligatoire: z.boolean().default(false),
 })
 
 export async function cocherTache(input: unknown): Promise<{ ok: true }> {
-  const p = cocherSchema.parse(input)
+  let p
+  try { p = cocherSchema.parse(input) }
+  catch (e) {
+    console.error('[cocherTache] validation failed:', e, 'input:', input)
+    throw new Error(`Tâche invalide : ${e instanceof Error ? e.message : 'inconnue'}`)
+  }
   await autoriserPour(p.employe_id)
 
   const supabase = await createClient()
@@ -42,16 +47,65 @@ export async function cocherTache(input: unknown): Promise<{ ok: true }> {
     obligatoire: p.obligatoire,
     date:        new Date().toISOString().slice(0, 10),
   }, { onConflict: 'employe_id,tache_id,date' })
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[cocherTache] DB upsert failed:', error, 'payload:', p)
+    throw new Error(`DB : ${error.message}`)
+  }
 
-  revalidatePath('/admin/pilotage')
+  // revalidatePath retiré : si /admin/pilotage est en erreur (build), ça crash
+  // tout le serveur en cascade. Les pages se rafraîchiront au prochain GET.
   return { ok: true as const }
 }
 
 const decocherSchema = z.object({
   employe_id: z.string().uuid(),
-  tache_id:   z.string().min(1).max(50),
+  tache_id:   z.string().min(1).max(80),
 })
+
+// Enregistre une valeur saisie pour une tâche (température, montant, kilométrage…).
+// L'enregistrement de saisie ne marque PAS la tâche complétée — l'UI chaîne
+// `enregistrerSaisie` puis `cocherTache` à la validation finale.
+const saisirSchema = z.object({
+  employe_id:   z.string().uuid(),
+  tache_id:     z.string().min(1).max(80),
+  poste:        z.string().min(1).max(50),
+  moment:       z.enum(['matin', 'service', 'fin']),
+  type_saisie:  z.enum(['temperature', 'montant', 'nombre', 'texte']),
+  valeur_num:   z.number().nullable().optional(),
+  valeur_texte: z.string().max(500).nullable().optional(),
+  unite:        z.string().max(20).nullable().optional(),
+  commentaire:  z.string().max(500).nullable().optional(),
+})
+
+export async function enregistrerSaisie(input: unknown): Promise<{ ok: true }> {
+  let p
+  try { p = saisirSchema.parse(input) }
+  catch (e) {
+    console.error('[enregistrerSaisie] validation failed:', e, 'input:', input)
+    throw new Error(`Saisie invalide : ${e instanceof Error ? e.message : 'inconnue'}`)
+  }
+  await autoriserPour(p.employe_id)
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('valeurs_saisies_taches').insert({
+    tache_id:     p.tache_id,
+    employe_id:   p.employe_id,
+    poste:        p.poste,
+    moment:       p.moment,
+    type_saisie:  p.type_saisie,
+    valeur_num:   p.valeur_num ?? null,
+    valeur_texte: p.valeur_texte ?? null,
+    unite:        p.unite ?? null,
+    commentaire:  p.commentaire ?? null,
+  })
+  if (error) {
+    console.error('[enregistrerSaisie] DB insert failed:', error, 'payload:', p)
+    throw new Error(`DB : ${error.message}`)
+  }
+
+  // revalidatePath retiré : voir cocherTache pour la raison.
+  return { ok: true as const }
+}
 
 export async function decocherTache(input: unknown): Promise<{ ok: true }> {
   const p = decocherSchema.parse(input)
@@ -64,6 +118,5 @@ export async function decocherTache(input: unknown): Promise<{ ok: true }> {
     .eq('date', new Date().toISOString().slice(0, 10))
   if (error) throw new Error(error.message)
 
-  revalidatePath('/admin/pilotage')
   return { ok: true as const }
 }

@@ -72,10 +72,19 @@ export async function POST(req: Request) {
     }, { status: 409, headers: cors })
   }
 
-  // Récupère prix de la chambre
+  // Récupère prix + nom de la chambre
   const { data: chambre } = await sb.from('chambres')
-    .select('prix_nuit_ht').eq('id', p.chambre_id).maybeSingle()
+    .select('prix_nuit_ht, nom').eq('id', p.chambre_id).maybeSingle()
   const prixHT = Number(chambre?.prix_nuit_ht ?? 0)
+  const chambreNom = chambre?.nom ?? 'Chambre'
+
+  // Lie au client existant si email correspond
+  let clientId: string | null = null
+  try {
+    const { data: existingClient } = await sb.from('clients')
+      .select('id').eq('email', p.email).maybeSingle()
+    clientId = (existingClient?.id as string) ?? null
+  } catch {}
 
   // Calcul nb nuits
   const nuits = Math.ceil(
@@ -85,6 +94,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await sb.from('reservations_chambres').insert({
     chambre_id: p.chambre_id,
+    client_id: clientId,
     client_nom: `${p.prenom ?? ''} ${p.nom}`.trim(),
     client_email: p.email,
     client_telephone: p.telephone,
@@ -92,7 +102,7 @@ export async function POST(req: Request) {
     date_depart: p.date_depart,
     nb_personnes: p.nb_personnes,
     montant_total: totalTTC,
-    acompte_verse: 0,                    // sera maj après paiement Stripe
+    acompte_verse: 0,
     statut: 'demande',
     notes: p.message || null,
   }).select('id').single()
@@ -118,11 +128,32 @@ export async function POST(req: Request) {
     }
   } catch (e) { console.error('[notif-resa-chambre] :', e) }
 
+  // Email confirmation client (best-effort)
+  const acompte = Math.round(totalTTC * 0.30 * 100) / 100
+  if (p.email) {
+    try {
+      const { sendEmail, emailConfirmationReservationChambre } = await import('@/lib/email')
+      const tpl = emailConfirmationReservationChambre({
+        chambre_nom: chambreNom,
+        date_arrivee: p.date_arrivee,
+        date_depart: p.date_depart,
+        nuits,
+        montant_total: totalTTC,
+        acompte,
+        client_prenom: p.prenom ?? null,
+        client_nom: p.nom,
+      })
+      await sendEmail({ to: p.email, subject: tpl.subject, html: tpl.html, text: tpl.text })
+    } catch (e) {
+      console.error('[email-resa-chambre] :', e)
+    }
+  }
+
   return Response.json({
     id: data.id,
     statut: 'demande',
     nuits,
     montant_total: totalTTC,
-    acompte_a_verser: Math.round(totalTTC * 0.30 * 100) / 100,
+    acompte_a_verser: acompte,
   }, { headers: cors })
 }

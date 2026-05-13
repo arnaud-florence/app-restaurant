@@ -108,6 +108,24 @@ export default function BonsPrintClient({ data, auto }: { data: BonsPrintData; a
                 <div className="text-[11px] mb-2">Serveur : <b>{commande.serveur_nom}</b></div>
               )}
 
+              {/* Créneau de retrait — bien visible pour cuisine/snack/pizza */}
+              {commande.creneau_retrait && (() => {
+                const cr = parseISO(commande.creneau_retrait)
+                const heureRetrait = format(cr, 'HH:mm', { locale: fr })
+                const today = new Date()
+                const sameDay = cr.toDateString() === today.toDateString()
+                const dateRetrait = sameDay
+                  ? "AUJOURD'HUI"
+                  : format(cr, 'EEE dd/MM', { locale: fr }).toUpperCase()
+                return (
+                  <div className="my-2 px-2 py-1.5 border-2 border-zinc-900 bg-zinc-900 text-white text-center">
+                    <div className="text-[10px] font-bold tracking-wider opacity-80">RETRAIT</div>
+                    <div className="text-xl font-black leading-tight">🕒 {heureRetrait}</div>
+                    <div className="text-[10px] font-bold">{dateRetrait}</div>
+                  </div>
+                )
+              })()}
+
               {/* Articles : grosse quantité × nom */}
               <ul className="space-y-1.5 border-y-2 border-dashed border-zinc-900 py-2">
                 {items.map(a => (

@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   }
 
   const sb = createAdminClient()
-  const [cliRes, cmdsRes, mvtsRes] = await Promise.all([
+  const [cliRes, cmdsRes, mvtsRes, resaChambresRes] = await Promise.all([
     sb.from('clients')
       .select('id, prenom, nom, email, telephone, points_fidelite, niveau_fidelite, nb_visites, total_depense, derniere_visite, code_parrainage, allergies, opt_in_marketing, date_naissance')
       .eq('id', client_id).single(),
@@ -44,6 +44,11 @@ export async function GET(req: Request) {
       .select('id, type, points, motif, created_at')
       .eq('client_id', client_id)
       .order('created_at', { ascending: false })
+      .limit(20),
+    sb.from('reservations_chambres')
+      .select('id, statut, date_arrivee, date_depart, nb_personnes, montant_total, created_at, chambre:chambres(nom, numero)')
+      .eq('client_id', client_id)
+      .order('date_arrivee', { ascending: false })
       .limit(20),
   ])
 
@@ -107,6 +112,21 @@ export async function GET(req: Request) {
       points: Number(m.points),
       motif: m.motif,
       created_at: m.created_at,
+    })),
+    reservations_chambres: ((resaChambresRes.data ?? []) as unknown as Array<{
+      id: string; statut: string; date_arrivee: string; date_depart: string;
+      nb_personnes: number; montant_total: number; created_at: string;
+      chambre: { nom: string; numero: string } | null;
+    }>).map(r => ({
+      id: r.id,
+      statut: r.statut,
+      date_arrivee: r.date_arrivee,
+      date_depart: r.date_depart,
+      nb_personnes: r.nb_personnes,
+      montant_total: Number(r.montant_total ?? 0),
+      created_at: r.created_at,
+      chambre_nom: r.chambre?.nom ?? null,
+      chambre_numero: r.chambre?.numero ?? null,
     })),
   }, { headers: cors })
 }

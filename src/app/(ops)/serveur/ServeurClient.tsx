@@ -15,6 +15,7 @@ import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import AppelsServeurBanner from './AppelsServeurBanner'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import TachesSequentielles from '@/components/TachesSequentielles'
 
 type Table = {
   id: string
@@ -298,7 +299,7 @@ export default function ServeurClient({
 
       {/* Contenu de l'onglet */}
       <main className="flex-1 p-4 space-y-4">
-        <TachesDuJourWidget poste="serveur" theme="dark" employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+        <TachesSequentielles poste="serveur" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
         {tab === 'plan' && (
           <PlanSalle
             zones={zones}
@@ -628,17 +629,37 @@ function CatalogueModal({
   onClose: () => void
   onEnvoyer: () => void
 }) {
+  // Onglet destination (CUISINE / PIZZA / BAR / SNACKING) en premier niveau,
+  // puis filtre catégorie (entrées, plats, vins, cocktails…) en second niveau.
+  // Évite à la serveuse de scroller dans tout le menu pour trouver une pizza.
+  const [tagActif, setTagActif] = useState<TagDestination>('CUISINE')
   const [filtreCat, setFiltreCat] = useState<string>('')
 
-  const categories = useMemo(() => {
-    const set = new Set<string>()
-    recettes.forEach(r => set.add(r.categorie))
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
+  // Compteurs par destination (sur l'ensemble du menu, pas filtré)
+  const countByTag = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const r of recettes) m[r.tag_destination] = (m[r.tag_destination] ?? 0) + 1
+    return m
   }, [recettes])
 
+  // 1er niveau : filtre par destination
+  const recettesParTag = useMemo(() => {
+    return recettes.filter(r => r.tag_destination === tagActif)
+  }, [recettes, tagActif])
+
+  // 2nd niveau : catégories disponibles dans cette destination
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    recettesParTag.forEach(r => set.add(r.categorie))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
+  }, [recettesParTag])
+
+  // Reset le filtre catégorie quand on change de destination (sinon catégorie orpheline)
+  useEffect(() => { setFiltreCat('') }, [tagActif])
+
   const filtered = useMemo(() => {
-    return filtreCat ? recettes.filter(r => r.categorie === filtreCat) : recettes
-  }, [recettes, filtreCat])
+    return filtreCat ? recettesParTag.filter(r => r.categorie === filtreCat) : recettesParTag
+  }, [recettesParTag, filtreCat])
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D0D0D] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -680,23 +701,52 @@ function CatalogueModal({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-0 pb-[110px] lg:pb-0">
         {/* Catalogue */}
         <div className="overflow-y-auto p-4">
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            <button
-              onClick={() => setFiltreCat('')}
-              className={cn('px-3 py-1.5 rounded-full text-xs font-bold', !filtreCat ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
-            >
-              Toutes
-            </button>
-            {categories.map(c => (
-              <button
-                key={c}
-                onClick={() => setFiltreCat(c)}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-bold', filtreCat === c ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
-              >
-                {c}
-              </button>
-            ))}
+          {/* 1er niveau : destination — onglets gros & visibles pour le rush */}
+          <div className="flex gap-1.5 mb-3 -mx-1 px-1 overflow-x-auto">
+            {(['CUISINE', 'PIZZA', 'BAR', 'SNACKING'] as const).map(t => {
+              const isActive = tagActif === t
+              const count = countByTag[t] ?? 0
+              if (count === 0) return null
+              const label = `${TAG_DEST_LABEL[t].emoji} ${TAG_DEST_LABEL[t].label}`
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTagActif(t)}
+                  className={cn(
+                    'inline-flex items-center gap-2 px-4 min-h-[44px] rounded-md text-sm font-bold whitespace-nowrap transition-colors',
+                    isActive ? 'bg-emerald-500 text-white shadow-md' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  )}
+                >
+                  {label}
+                  <span className={cn(
+                    'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
+                    isActive ? 'bg-white/25 text-white' : 'bg-zinc-700 text-zinc-400'
+                  )}>{count}</span>
+                </button>
+              )
+            })}
           </div>
+
+          {/* 2nd niveau : catégorie au sein de la destination */}
+          {categories.length > 1 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              <button
+                onClick={() => setFiltreCat('')}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-bold', !filtreCat ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
+              >
+                Toutes
+              </button>
+              {categories.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setFiltreCat(c)}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-bold', filtreCat === c ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {filtered.map(r => {

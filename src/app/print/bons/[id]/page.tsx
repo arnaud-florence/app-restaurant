@@ -25,7 +25,7 @@ export default async function BonsPrintPage({
   const { data: cmd } = await supabase
     .from('commandes')
     .select(`
-      id, numero, source, numero_table, notes, created_at,
+      id, numero, source, numero_table, notes, created_at, creneau_retrait,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, quantite, tag_destination, commentaire, allergenes_a_eviter, recette:recettes(nom))
     `)
@@ -69,6 +69,7 @@ export default async function BonsPrintPage({
       numero_table: (cmd.numero_table as string) ?? null,
       notes: (cmd.notes as string) ?? null,
       created_at: cmd.created_at as string,
+      creneau_retrait: (cmd.creneau_retrait as string) ?? null,
       serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
     },
     articles,

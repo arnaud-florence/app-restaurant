@@ -11,6 +11,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 
+// Helper : construit un ISO UTC qui, affiché en Europe/Paris, donne HH:MM le jour `dateStr`.
+// Évite le décalage de 2h (été) ou 1h (hiver) entre le serveur Vercel UTC et l'heure FR.
+function parisIsoFor(dateStr: string, hh: number, mm: number): string {
+  const naive = new Date(`${dateStr}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00Z`)
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+  const parts = fmt.formatToParts(naive)
+  const parisH = Number(parts.find(p => p.type === 'hour')?.value ?? '0')
+  const parisM = Number(parts.find(p => p.type === 'minute')?.value ?? '0')
+  const diffMin = (parisH * 60 + parisM) - (hh * 60 + mm)
+  return new Date(naive.getTime() - diffMin * 60_000).toISOString()
+}
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -54,9 +68,11 @@ export async function GET(req: Request) {
   // Compte commandes ONLINE déjà existantes pour ce jour avec creneau_retrait
   const dayStart = new Date(dateStr + 'T00:00:00').toISOString()
   const dayEnd = new Date(dateStr + 'T23:59:59').toISOString()
+  // On compte ONLINE *et* COMPTOIR — les commandes prises en interne (poste Snack)
+  // chargent aussi la cuisine. Évite que le snack-man réserve un créneau déjà saturé par le web.
   const { data: cmds } = await sb.from('commandes')
     .select('creneau_retrait')
-    .eq('source', 'ONLINE')
+    .in('source', ['ONLINE', 'COMPTOIR'])
     .not('statut', 'in', '(annule)')
     .gte('creneau_retrait', dayStart)
     .lte('creneau_retrait', dayEnd)
@@ -79,11 +95,12 @@ export async function GET(req: Request) {
       const h = Math.floor(curMin / 60)
       const m = curMin % 60
       const heureStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-      const slotStart = new Date(`${dateStr}T${heureStr}:00`)
-      const slotEnd = new Date(slotStart.getTime() + duree * 60_000)
+      const slotIso = parisIsoFor(dateStr, h, m)
+      const slotStartMs = new Date(slotIso).getTime()
+      const slotEndMs = slotStartMs + duree * 60_000
 
       // Skip si déjà passé (avec marge 15 min)
-      if (slotStart.getTime() < now.getTime() + 15 * 60_000) {
+      if (slotStartMs < now.getTime() + 15 * 60_000) {
         curMin += duree
         continue
       }
@@ -92,13 +109,14 @@ export async function GET(req: Request) {
       const count = (cmds ?? []).filter(c => {
         if (!c.creneau_retrait) return false
         const t = new Date(c.creneau_retrait as string).getTime()
-        return t >= slotStart.getTime() && t < slotEnd.getTime()
+        return t >= slotStartMs && t < slotEndMs
       }).length
 
+      // Règle métier : 1 commande max par créneau (cohérent avec listerCreneauxDisponibles).
       slots.push({
         heure: heureStr,
-        iso: slotStart.toISOString(),
-        disponible: count < max,
+        iso: slotIso,
+        disponible: count === 0,
       })
       curMin += duree
     }

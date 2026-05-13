@@ -171,7 +171,7 @@ function DashboardTab({ data }: { data: DataEnergie }) {
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📊 Comparaison N vs N-1 (12 derniers mois)</h2>
         </header>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="responsive-table w-full text-xs">
             <thead className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-2 py-1.5">Type</th>
@@ -266,7 +266,7 @@ function RelevesTab({ releves, onError, onOk }: { releves: ReleveEnergie[]; onEr
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun relevé. Saisis le premier !</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="responsive-table w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Type</th>

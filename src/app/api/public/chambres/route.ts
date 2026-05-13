@@ -14,8 +14,10 @@ export async function GET(req: Request) {
   if (!guard.ok) return guard.response
 
   const sb = await createClient()
+  // SELECT * pour tolérer les colonnes optionnelles (video_360_url peut ne pas exister
+  // sur des DB anciennes — on l'extrait ensuite si présente)
   const { data, error } = await sb.from('chambres')
-    .select('id, nom, numero, capacite, prix_nuit_ht, description, equipements, photos, video_360_url')
+    .select('*')
     .eq('actif', true)
     .order('numero')
 
@@ -28,7 +30,7 @@ export async function GET(req: Request) {
     capacite: number | string; prix_nuit_ht: number | string;
     description: string | null;
     equipements: string[] | null; photos: string[] | null;
-    video_360_url: string | null;
+    video_360_url?: string | null;
   }
   const items = ((data ?? []) as Row[]).map(c => ({
     id: c.id,
@@ -39,7 +41,7 @@ export async function GET(req: Request) {
     description: c.description,
     equipements: c.equipements ?? [],
     photos: c.photos ?? [],
-    video_360_url: c.video_360_url,
+    video_360_url: c.video_360_url ?? null,
   }))
 
   return Response.json({ items, count: items.length }, {
