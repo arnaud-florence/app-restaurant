@@ -11,28 +11,51 @@ import { type Fournisseur, type BonCommande, type Facture } from '@/lib/fourniss
 import { createFacture } from './actions'
 
 export default function FactureFormModal({
-  fournisseurs, bons, onClose, onSaved,
+  fournisseurs, bons, onClose, onSaved, initial,
 }: {
   fournisseurs: Fournisseur[]
   bons: BonCommande[]
   onClose: () => void
   onSaved: () => void
+  /** Données pré-remplies (ex: depuis le Scanner OCR) */
+  initial?: {
+    fournisseur_nom?: string | null
+    numero?: string | null
+    date_emission?: string | null
+    date_echeance?: string | null
+    montant_ht?: number | null
+    montant_ttc?: number | null
+    notes?: string | null
+  }
 }) {
   const [isPending, startTransition] = useTransition()
   const [erreur, setErreur] = useState('')
 
-  const [fournisseurId, setFournisseurId] = useState(fournisseurs[0]?.id ?? '')
+  // Si un nom de fournisseur est fourni (scan OCR), tente de matcher dans la liste
+  const fournisseurInitId = (() => {
+    if (initial?.fournisseur_nom) {
+      const cible = initial.fournisseur_nom.toLowerCase().trim()
+      const match = fournisseurs.find(f =>
+        f.nom.toLowerCase().includes(cible) || cible.includes(f.nom.toLowerCase()),
+      )
+      if (match) return match.id
+    }
+    return fournisseurs[0]?.id ?? ''
+  })()
+
+  const [fournisseurId, setFournisseurId] = useState(fournisseurInitId)
   const [bonId, setBonId] = useState<string>('')
-  const [numero, setNumero] = useState('')
-  const [dateEmission, setDateEmission] = useState(new Date().toISOString().slice(0, 10))
+  const [numero, setNumero] = useState(initial?.numero ?? '')
+  const [dateEmission, setDateEmission] = useState(initial?.date_emission ?? new Date().toISOString().slice(0, 10))
   const [dateEcheance, setDateEcheance] = useState(() => {
+    if (initial?.date_echeance) return initial.date_echeance
     const d = new Date(); d.setDate(d.getDate() + 30)
     return d.toISOString().slice(0, 10)
   })
-  const [montantHT, setMontantHT] = useState('0')
-  const [montantTTC, setMontantTTC] = useState('0')
+  const [montantHT, setMontantHT] = useState(initial?.montant_ht != null ? String(initial.montant_ht) : '0')
+  const [montantTTC, setMontantTTC] = useState(initial?.montant_ttc != null ? String(initial.montant_ttc) : '0')
   const [statut, setStatut] = useState<Facture['statut']>('a_payer')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
 
   const bonsDuFournisseur = bons.filter(b => b.fournisseur_id === fournisseurId)
 

@@ -31,6 +31,18 @@ import FournisseurFormModal from './FournisseurFormModal'
 import BonCommandeFormModal from './BonCommandeFormModal'
 import ReceptionModal from './ReceptionModal'
 import FactureFormModal from './FactureFormModal'
+import FactureScanner from './FactureScanner'
+
+// Données pré-remplies par le scanner OCR (Agent 8) — passées à FactureFormModal
+type ScannedFacture = {
+  fournisseur_nom: string | null
+  numero: string | null
+  date_emission: string | null
+  date_echeance: string | null
+  montant_ht: number | null
+  montant_ttc: number | null
+  notes: string | null
+}
 
 type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
 
@@ -54,6 +66,8 @@ export default function FournisseursClient({
   const [creatingBon, setCreatingBon] = useState(false)
   const [receptionBon, setReceptionBon] = useState<BonCommande | null>(null)
   const [creatingFacture, setCreatingFacture] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannedData, setScannedData] = useState<ScannedFacture | null>(null)
 
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
@@ -230,6 +244,7 @@ export default function FournisseursClient({
             factures={factures}
             alertes={alertesFac}
             onCreate={() => setCreatingFacture(true)}
+            onScan={() => setScannerOpen(true)}
             onChangerStatut={(id, statut) => startTransition(async () => {
               try { await changerStatutFacture(id, statut); flashOk('Statut facture mis à jour'); router.refresh() }
               catch (e) { flashKo(e) }
@@ -290,8 +305,29 @@ export default function FournisseursClient({
         <FactureFormModal
           fournisseurs={fournisseurs.filter(f => f.actif)}
           bons={bons}
-          onClose={() => setCreatingFacture(false)}
-          onSaved={() => { setCreatingFacture(false); router.refresh() }}
+          initial={scannedData ?? undefined}
+          onClose={() => { setCreatingFacture(false); setScannedData(null) }}
+          onSaved={() => { setCreatingFacture(false); setScannedData(null); router.refresh() }}
+        />
+      )}
+      {scannerOpen && (
+        <FactureScanner
+          onClose={() => setScannerOpen(false)}
+          onExtractionComplete={(data) => {
+            setScannedData({
+              fournisseur_nom: data.fournisseur_nom,
+              numero: data.numero,
+              date_emission: data.date_emission,
+              date_echeance: data.date_echeance,
+              montant_ht: data.montant_ht,
+              montant_ttc: data.montant_ttc,
+              notes: data.notes
+                ? `Scanné par Agent IA. Notes : ${data.notes}`
+                : 'Scanné par Agent IA',
+            })
+            setScannerOpen(false)
+            setCreatingFacture(true)
+          }}
         />
       )}
     </div>
@@ -547,17 +583,21 @@ function BonsTab({
 
 // ─── Onglet : Factures ───────────────────────────────────────────────
 function FacturesTab({
-  factures, alertes, onCreate, onChangerStatut, onDelete,
+  factures, alertes, onCreate, onScan, onChangerStatut, onDelete,
 }: {
   factures: Facture[]
   alertes: ReturnType<typeof alertesFactures>
   onCreate: () => void
+  onScan: () => void
   onChangerStatut: (id: string, statut: 'a_payer'|'paye'|'en_retard'|'litige'|'annule') => void
   onDelete: (f: Facture) => void
 }) {
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button onClick={onScan} variant="outline" title="Photographier ou uploader une facture — Claude Vision extrait les données">
+          📷 Scanner une facture
+        </Button>
         <Button onClick={onCreate}>+ Nouvelle facture</Button>
       </div>
 
@@ -590,7 +630,7 @@ function FacturesTab({
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="responsive-table w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     <th className="text-left py-2.5 px-3">Numéro</th>
