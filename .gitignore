@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Téléchargements partiels (ex: vidéos en cours de DL)
 *.crdownload
+
+# Setup pg_cron contenant CRON_SECRET en clair (à régénérer si rotation)
+sql/setup-pgcron-agents.sql
