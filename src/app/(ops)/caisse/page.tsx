@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getResumeSession, listSessionsFermees } from '../actions'
 import CaisseClient from './CaisseClient'
+import BriefingPoste from '@/components/BriefingPoste'
 import { getProfile } from '@/lib/auth'
+import { getBriefingForPoste } from '@/lib/briefing/poste'
 
 export const metadata = { title: 'Caisse — Z-report' }
 export const dynamic = 'force-dynamic'
@@ -42,14 +44,21 @@ export default async function CaissePage() {
     initialDone = (data ?? []).map(r => r.tache_id as string)
   }
 
+  const briefing = await getBriefingForPoste(supabase, 'caisse', {
+    prenom: profil?.prenom ?? null,
+  })
+
   return (
-    <CaisseClient
-      initialResume={resume}
-      sessionsFermees={sessionsFermees}
-      employes={employes}
-      navProfil={navProfil}
-      widgetEmployeId={employeId}
-      widgetInitialDone={initialDone}
-    />
+    <>
+      <BriefingPoste briefing={briefing} />
+      <CaisseClient
+        initialResume={resume}
+        sessionsFermees={sessionsFermees}
+        employes={employes}
+        navProfil={navProfil}
+        widgetEmployeId={employeId}
+        widgetInitialDone={initialDone}
+      />
+    </>
   )
 }

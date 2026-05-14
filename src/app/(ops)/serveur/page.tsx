@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { listCommandesActives } from '../actions'
 import ServeurClient from './ServeurClient'
+import BriefingPoste from '@/components/BriefingPoste'
 import { getProfile } from '@/lib/auth'
+import { getBriefingForPoste } from '@/lib/briefing/poste'
 
 export const metadata = { title: 'Serveur — Service' }
 export const dynamic = 'force-dynamic'
@@ -72,15 +74,22 @@ export default async function ServeurPage() {
     initialDone = (data ?? []).map(r => r.tache_id as string)
   }
 
+  const briefing = await getBriefingForPoste(supabase, 'serveur', {
+    prenom: profil?.prenom ?? null,
+  })
+
   return (
-    <ServeurClient
-      initialCommandes={commandes}
-      tables={tables}
-      recettes={recettes}
-      employes={employes}
-      navProfil={navProfil}
-      widgetEmployeId={employeId}
-      widgetInitialDone={initialDone}
-    />
+    <>
+      <BriefingPoste briefing={briefing} />
+      <ServeurClient
+        initialCommandes={commandes}
+        tables={tables}
+        recettes={recettes}
+        employes={employes}
+        navProfil={navProfil}
+        widgetEmployeId={employeId}
+        widgetInitialDone={initialDone}
+      />
+    </>
   )
 }

@@ -5,8 +5,10 @@
 
 import { listCommandesActives } from '../actions'
 import EmporterClient from './EmporterClient'
+import BriefingPoste from '@/components/BriefingPoste'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { getBriefingForPoste } from '@/lib/briefing/poste'
 
 export const metadata = { title: 'Emporter — Service ONLINE' }
 export const dynamic = 'force-dynamic'
@@ -65,15 +67,22 @@ export default async function EmporterPage() {
     initialDone = (data ?? []).map(r => r.tache_id as string)
   }
 
+  const briefing = await getBriefingForPoste(supabase, 'caisse_snacking', {
+    prenom: profil?.prenom ?? null,
+  })
+
   return (
-    <EmporterClient
-      initial={commandes}
-      recettes={recettes}
-      employes={employes}
-      operateurId={employeId}
-      navProfil={navProfil}
-      widgetEmployeId={employeId}
-      widgetInitialDone={initialDone}
-    />
+    <>
+      <BriefingPoste briefing={briefing} />
+      <EmporterClient
+        initial={commandes}
+        recettes={recettes}
+        employes={employes}
+        operateurId={employeId}
+        navProfil={navProfil}
+        widgetEmployeId={employeId}
+        widgetInitialDone={initialDone}
+      />
+    </>
   )
 }

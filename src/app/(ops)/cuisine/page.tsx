@@ -1,7 +1,9 @@
 import CuisineClient from './CuisineClient'
+import BriefingPoste from '@/components/BriefingPoste'
 import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { getBriefingForPoste } from '@/lib/briefing/poste'
 import type { PosteWidget } from '@/lib/taches-du-jour'
 
 export const metadata = { title: 'Cuisine — Service' }
@@ -30,9 +32,9 @@ export default async function CuisinePage({ searchParams }: { searchParams: { ro
 
   // Tâches déjà cochées aujourd'hui pour l'employé connecté (DB persist)
   const employeId = profil?.employe_id ?? null
+  const supabase = await createClient()
   let initialDone: string[] = []
   if (employeId) {
-    const supabase = await createClient()
     const { data } = await supabase.from('taches_completees')
       .select('tache_id')
       .eq('employe_id', employeId)
@@ -40,14 +42,23 @@ export default async function CuisinePage({ searchParams }: { searchParams: { ro
     initialDone = (data ?? []).map(r => r.tache_id as string)
   }
 
+  // Briefing personnalisé pour le poste détecté
+  const briefingPoste = role === 'pizzaiolo' ? 'pizzaiolo' : 'cuisinier'
+  const briefing = await getBriefingForPoste(supabase, briefingPoste, {
+    prenom: profil?.prenom ?? null,
+  })
+
   return (
-    <CuisineClient
-      initial={commandes}
-      role={role}
-      widgetPoste={widgetPoste}
-      navProfil={navProfil}
-      widgetEmployeId={employeId}
-      widgetInitialDone={initialDone}
-    />
+    <>
+      <BriefingPoste briefing={briefing} />
+      <CuisineClient
+        initial={commandes}
+        role={role}
+        widgetPoste={widgetPoste}
+        navProfil={navProfil}
+        widgetEmployeId={employeId}
+        widgetInitialDone={initialDone}
+      />
+    </>
   )
 }
