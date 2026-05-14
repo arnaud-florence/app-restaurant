@@ -24,15 +24,29 @@ import {
 
 type ProgRow = Progression & { employes?: { prenom: string; nom: string; poste: string } }
 
+type CertifRow = {
+  id: string; employe_id: string; poste: string; obtenue_le: string; score_pct: number
+  employe?: { prenom: string; nom: string } | Array<{ prenom: string; nom: string }> | null
+}
+type QuestionIaRow = {
+  id: string; question: string; reponse: string; poste: string | null; guide_id: string | null; created_at: string
+  employe?: { prenom: string; nom: string } | Array<{ prenom: string; nom: string }> | null
+}
+type BadgeRow = { employe_id: string; badge_code: string; badge_titre: string; badge_emoji: string; obtenu_le: string }
+
 export default function FormationAdminClient({
   guides, etapes, questions, progressions, employes,
+  certifications = [], questionsIa = [], badges = [],
 }: {
   guides: Guide[]; etapes: Etape[]; questions: Question[]
   progressions: ProgRow[]
   employes: Array<{ id: string; prenom: string; nom: string; poste: string }>
+  certifications?: CertifRow[]
+  questionsIa?: QuestionIaRow[]
+  badges?: BadgeRow[]
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'guides' | 'progressions'>('guides')
+  const [tab, setTab] = useState<'guides' | 'progressions' | 'certifications' | 'questions_ia'>('guides')
   const [showGuideForm, setShowGuideForm] = useState<Guide | true | null>(null)
   const [openGuideId, setOpenGuideId] = useState<string | null>(guides[0]?.id ?? null)
   const [, startTransition] = useTransition()
@@ -59,10 +73,24 @@ export default function FormationAdminClient({
         </div>
       </div>
 
-      <div className="flex gap-2 border-b">
-        <TabBtn active={tab === 'guides'}       onClick={() => setTab('guides')}><BookOpen className="h-4 w-4 inline mr-1" /> Guides ({guides.length})</TabBtn>
-        <TabBtn active={tab === 'progressions'} onClick={() => setTab('progressions')}><Users className="h-4 w-4 inline mr-1" /> Progressions ({progressions.length})</TabBtn>
+      <div className="flex gap-2 border-b overflow-x-auto">
+        <TabBtn active={tab === 'guides'}         onClick={() => setTab('guides')}><BookOpen className="h-4 w-4 inline mr-1" /> Guides ({guides.length})</TabBtn>
+        <TabBtn active={tab === 'progressions'}   onClick={() => setTab('progressions')}><Users className="h-4 w-4 inline mr-1" /> Progressions ({progressions.length})</TabBtn>
+        <TabBtn active={tab === 'certifications'} onClick={() => setTab('certifications')}>🏆 Certifs ({certifications.length})</TabBtn>
+        <TabBtn active={tab === 'questions_ia'}   onClick={() => setTab('questions_ia')}>🤖 Questions IA ({questionsIa.length})</TabBtn>
       </div>
+
+      {tab === 'certifications' && (
+        <CertificationsTab
+          certifications={certifications}
+          employes={employes}
+          badges={badges}
+        />
+      )}
+
+      {tab === 'questions_ia' && (
+        <QuestionsIaTab questionsIa={questionsIa} />
+      )}
 
       {tab === 'guides' && (
         <div className="space-y-3">
@@ -485,6 +513,204 @@ function QuestionModal({ guide_id, question, ordreSuivant, onClose, onSaved }: {
           <Button onClick={save} disabled={pending || !questionTxt.trim()}>Enregistrer</Button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Onglet CERTIFICATIONS — qui peut faire quoi le jour de l'ouverture
+// ─────────────────────────────────────────────────────────────
+function CertificationsTab({
+  certifications, employes, badges,
+}: {
+  certifications: CertifRow[]
+  employes: Array<{ id: string; prenom: string; nom: string; poste: string }>
+  badges: BadgeRow[]
+}) {
+  // Matrice : pour chaque employé, quels postes sont certifiés
+  const postesUniques = useMemo(
+    () => [...new Set(certifications.map(c => c.poste))].sort(),
+    [certifications],
+  )
+  const certifsByEmp = useMemo(() => {
+    const m = new Map<string, Map<string, CertifRow>>()
+    for (const c of certifications) {
+      if (!m.has(c.employe_id)) m.set(c.employe_id, new Map())
+      m.get(c.employe_id)!.set(c.poste, c)
+    }
+    return m
+  }, [certifications])
+  const badgesByEmp = useMemo(() => {
+    const m = new Map<string, BadgeRow[]>()
+    for (const b of badges) {
+      const arr = m.get(b.employe_id) ?? []
+      arr.push(b)
+      m.set(b.employe_id, arr)
+    }
+    return m
+  }, [badges])
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4">
+        <h3 className="font-bold text-zinc-900 mb-2">🏆 Qui peut faire quoi le jour de l'ouverture</h3>
+        <p className="text-xs text-zinc-500 mb-3">Matrice employés × postes. Une coche = certifié.</p>
+        {certifications.length === 0 ? (
+          <p className="text-sm text-zinc-500 italic">Aucune certification émise. L'Agent Formateur attribue les certifs automatiquement quand un employé valide tous les guides de son poste.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-zinc-50">
+                  <th className="text-left px-2 py-1.5 font-bold">Employé</th>
+                  {postesUniques.map(p => (
+                    <th key={p} className="text-center px-2 py-1.5 font-bold">{p}</th>
+                  ))}
+                  <th className="text-center px-2 py-1.5 font-bold">Badges</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employes.map(emp => {
+                  const certifs = certifsByEmp.get(emp.id) ?? new Map()
+                  const empBadges = badgesByEmp.get(emp.id) ?? []
+                  return (
+                    <tr key={emp.id} className="border-t hover:bg-zinc-50">
+                      <td className="px-2 py-1.5 font-medium">
+                        {emp.prenom} {emp.nom}
+                        <span className="ml-1 text-[10px] text-zinc-500">({emp.poste})</span>
+                      </td>
+                      {postesUniques.map(p => {
+                        const c = certifs.get(p)
+                        return (
+                          <td key={p} className="text-center px-2 py-1.5">
+                            {c ? (
+                              <span title={`Certifié le ${format(parseISO(c.obtenue_le), 'd MMM yyyy', { locale: fr })} · score ${c.score_pct}%`}>
+                                ✅
+                              </span>
+                            ) : <span className="text-zinc-300">—</span>}
+                          </td>
+                        )
+                      })}
+                      <td className="text-center px-2 py-1.5">
+                        {empBadges.length > 0 ? (
+                          <span className="inline-flex gap-0.5" title={empBadges.map(b => b.badge_titre).join(' · ')}>
+                            {empBadges.map(b => <span key={b.badge_code}>{b.badge_emoji}</span>)}
+                          </span>
+                        ) : <span className="text-zinc-300">—</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Détail certifications récentes */}
+      {certifications.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-bold text-zinc-900 mb-2">📅 Dernières certifications obtenues</h3>
+          <ul className="text-xs space-y-1">
+            {certifications.slice(0, 20).map(c => {
+              const emp = Array.isArray(c.employe) ? c.employe[0] : c.employe
+              return (
+                <li key={c.id} className="flex justify-between text-zinc-700 border-b py-1 last:border-0">
+                  <span><b className="text-emerald-700">{emp?.prenom} {emp?.nom}</b> · {c.poste}</span>
+                  <span className="text-zinc-500">
+                    Score {c.score_pct}% · {format(parseISO(c.obtenue_le), 'd MMM yyyy', { locale: fr })}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// Onglet QUESTIONS IA — top questions posées + analyse fréquence
+// ─────────────────────────────────────────────────────────────
+function QuestionsIaTab({ questionsIa }: { questionsIa: QuestionIaRow[] }) {
+  // Agrégation : compte des questions par poste pour identifier où enrichir
+  const parPoste = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const q of questionsIa) {
+      const k = q.poste ?? '?'
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  }, [questionsIa])
+
+  const [selected, setSelected] = useState<QuestionIaRow | null>(null)
+
+  return (
+    <div className="space-y-3">
+      {questionsIa.length === 0 ? (
+        <Card className="p-6 text-center text-zinc-500 italic">
+          Aucune question posée à l'IA pour l'instant. Les employés peuvent poser des questions depuis chaque guide.
+        </Card>
+      ) : (
+        <>
+          <Card className="p-4">
+            <h3 className="font-bold text-zinc-900 mb-2">📊 Questions par poste — où enrichir les modules</h3>
+            <div className="flex flex-wrap gap-2">
+              {parPoste.map(([p, n]) => (
+                <span key={p} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold">
+                  {p} · {n} question{n > 1 ? 's' : ''}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500 mt-2 italic">
+              Les postes avec le plus de questions sont ceux où les modules manquent de clarté — bon angle pour les enrichir.
+            </p>
+          </Card>
+
+          <Card className="p-4">
+            <h3 className="font-bold text-zinc-900 mb-2">💬 100 dernières questions posées</h3>
+            <ul className="divide-y text-xs">
+              {questionsIa.slice(0, 100).map(q => {
+                const emp = Array.isArray(q.employe) ? q.employe[0] : q.employe
+                return (
+                  <li key={q.id} className="py-1.5 flex items-center justify-between gap-2 hover:bg-zinc-50 cursor-pointer" onClick={() => setSelected(q)}>
+                    <span className="min-w-0 truncate flex-1">
+                      <b className="text-zinc-900">{emp?.prenom ?? '?'}</b> · {q.poste ?? '—'} ·{' '}
+                      <span className="text-zinc-700">{q.question.slice(0, 90)}{q.question.length > 90 ? '…' : ''}</span>
+                    </span>
+                    <span className="text-zinc-400 shrink-0">{format(parseISO(q.created_at), 'd MMM HH:mm', { locale: fr })}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+        </>
+      )}
+
+      {/* Modal détail Q/R */}
+      {selected && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto p-4 space-y-3">
+            <header className="flex items-center justify-between">
+              <h3 className="font-bold">💬 Question IA détaillée</h3>
+              <button onClick={() => setSelected(null)} className="text-zinc-400 hover:text-zinc-900 text-2xl leading-none w-8 h-8 rounded-full hover:bg-zinc-100">×</button>
+            </header>
+            <div className="rounded-md bg-zinc-100 p-3 text-sm">
+              <p className="text-xs font-bold text-zinc-500 mb-1">🙋 Question</p>
+              <p>{selected.question}</p>
+            </div>
+            <div className="rounded-md bg-violet-50 border border-violet-200 p-3 text-sm">
+              <p className="text-xs font-bold text-violet-600 mb-1">🤖 Réponse Claude</p>
+              <p className="whitespace-pre-wrap">{selected.reponse}</p>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              {selected.poste && <>Poste {selected.poste} · </>}
+              {format(parseISO(selected.created_at), 'd MMM yyyy à HH:mm', { locale: fr })}
+            </p>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

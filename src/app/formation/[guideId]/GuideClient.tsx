@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { type Guide, type Etape, type Progression, POSTE_INFO, STATUT_INFO } from '@/lib/formation'
 import { marquerEtapeVue } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import PoserQuestion from '@/components/PoserQuestion'
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -117,6 +118,16 @@ export default function GuideClient({
             </div>
           )}
         </Card>
+
+        {/* Poser une question à l'IA sur cette étape */}
+        <div className="flex justify-end">
+          <PoserQuestion
+            guideId={guide.id}
+            etapeId={etape.id}
+            employeId={employe.id}
+            contexte="Pas clair ? Demande à l'IA — elle connaît ce module."
+          />
+        </div>
 
         {/* Navigation */}
         <div className="flex items-center justify-between gap-2">

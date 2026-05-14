@@ -8,6 +8,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import FormationListClient from './FormationListClient'
+import MonProfilFormation from '@/components/MonProfilFormation'
 import { guideAccessibleAuPoste, type Guide, type Progression } from '@/lib/formation'
 import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
 
@@ -71,15 +72,22 @@ export default async function FormationListPage() {
   } : null
 
   return (
-    <FormationListClient
-      guides={guides}
-      employes={employes}
-      progressions={(progRes.data ?? []) as unknown as Progression[]}
-      nbEtapesParGuide={Object.fromEntries(nbEtapesParGuide)}
-      nbQuestionsParGuide={Object.fromEntries(nbQuestionsParGuide)}
-      lockedEmployeId={lockedEmployeId}
-      isManager={isManager}
-      navProfil={navProfil}
-    />
+    <>
+      {lockedEmployeId && (
+        <div className="max-w-6xl mx-auto px-4 pt-4">
+          <MonProfilFormation employeId={lockedEmployeId} />
+        </div>
+      )}
+      <FormationListClient
+        guides={guides}
+        employes={employes}
+        progressions={(progRes.data ?? []) as unknown as Progression[]}
+        nbEtapesParGuide={Object.fromEntries(nbEtapesParGuide)}
+        nbQuestionsParGuide={Object.fromEntries(nbQuestionsParGuide)}
+        lockedEmployeId={lockedEmployeId}
+        isManager={isManager}
+        navProfil={navProfil}
+      />
+    </>
   )
 }
