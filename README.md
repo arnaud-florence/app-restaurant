@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# app-restaurant
 
-## Getting Started
+> Logiciel de gestion complète d'un restaurant indépendant (single-tenant).
+> Du back-office (recettes, food cost, stocks, fournisseurs, équipe) au service en salle (caisse, plan de salle, écrans cuisine/bar/serveur en temps réel), avec 15 agents IA qui tournent 24/7 en arrière-plan.
 
-First, run the development server:
+🌐 **Prod** : https://app-restaurant-livid.vercel.app
 
-```bash
+---
+
+## Stack
+
+- **Next.js 14** App Router + Server Components + Server Actions
+- **TypeScript** strict
+- **Supabase** (Postgres + Realtime + Storage + Auth)
+- **Tailwind 3** + shadcn/ui + lucide-react
+- **Anthropic Claude** (assistant IA, scanner factures, génération de contenu)
+- **Vercel** (hosting + edge functions)
+
+## Périmètre fonctionnel
+
+28 modules livrés couvrant l'ensemble des besoins d'un restaurant indépendant :
+
+| Domaine | Modules |
+|---|---|
+| Carte & coûts | Ingrédients, Recettes & Food Cost, Menu Engineering, Boissons |
+| Service | KDS Cuisine/Bar/Serveur, Caisse + Z-report, Tickets 80mm |
+| Stock & achats | Stocks (déduction auto), Fournisseurs + Bons de commande |
+| Hygiène & légal | HACCP, Allergènes, Maintenance, Obligations légales, Déchets |
+| RH | Fiches employés, Planning, Pointage, Paie, Pourboires |
+| Pilotage | Finances (P&L, TVA, trésorerie), Énergie, Pilotage 10 KPI |
+| Client & ventes | CRM & Fidélité, Réservations chambres+tables, Groupes |
+| IA & data | Assistant gérant Claude, Prévisionnel météo, Journal, Marketing IA |
+| Comm & form | Équipes, Affichage TV, Formation niveaux 1-3 + certifs + badges |
+| Sécurité | Supabase Auth, RBAC manager/employé, 2FA TOTP, audit, sauvegardes |
+
+**Plus** : site public + API publique + 15 agents IA permanents.
+
+## Agents IA permanents
+
+15 agents tournent automatiquement via `pg_cron` (Supabase) :
+
+🌙 Veilleur · 🌤️ Météorologue · 📦 Stock · 💰 Financier · 👥 RH · 🌡️ HACCP · 💬 Commercial · 📄 Scanner factures · 🎯 Stratégique · 🛡️ Sécurité · 👨‍🍳🍷🥪🍽 4 agents temps réel par poste · 🎓 Formateur
+
+Chacun loggue ses runs + findings dans Supabase, alimente le dashboard `/admin/pilotage` et envoie des push notifs sur les alertes critiques (`sendPushToEmployeRateLimited`, max 3/h).
+
+## Quick start
+
+```sh
+git clone https://github.com/arnaud-florence/app-restaurant.git
+cd app-restaurant
+npm install
+cp .env.local.example .env.local   # puis remplir avec ton projet Supabase
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Voir [`CLAUDE.md`](./CLAUDE.md) pour le guide projet complet (architecture, conventions, gotchas, agents, modules).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Statut
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Projet personnel, déployé en production. Pas de contributions externes attendues — le code est public à des fins de transparence et de documentation.
 
-## Learn More
+## Licence
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tous droits réservés.

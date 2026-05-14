@@ -36,12 +36,17 @@ Cible matérielle : tablettes Android/iPad pour le service, desktop pour l'admin
 (ops)/serveur                  → Module 9A (plan de salle, prise commande, encaissement)
 (ops)/caisse                   → Module 9A (dashboard live + ouverture/clôture session)
   └ /[id]/print                → rapport Z imprimable
+(ops)/emporter                 → Phase 0 — service ONLINE différencié
+(ops)/livreur                  → tableau de bord livraisons du jour (MVP, sans flag mode_retrait)
+(ops)/reception                → arrivées/départs jour, demandes résa, acomptes (adossé Module 21)
 
 print/bons/[id]                → Module 9B — bons de prep 80mm (?dest=CUISINE|PIZZA|BAR, ?auto=1)
 print/ticket/[id]              → Module 9B — ticket client 80mm (?auto=1)
 ```
 
-### Planifiées (Modules 10-28)
+Chaque écran (ops) affiche en haut un `<BriefingPoste />` personnalisé (`src/lib/briefing/poste.ts`) : météo, plats à pousser, points HACCP, alertes stock du poste.
+
+### Modules administratifs (10-28) — tous livrés
 
 ```
 /equipes                       → Module 10 (com interne, hors /admin car aussi accessible postes)
@@ -103,7 +108,45 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | 27 | Formation (guides step-by-step par poste + quiz QCM seuil 80% + suivi progression + fiche poste imprimable) | ✅ | 0047, 0048 |
 | 28 | Sécurité (Supabase Auth + RBAC manager/employe + 2FA TOTP + audit + connexions + sauvegarde JSON) | ✅ | 0049, 0050 |
 
+### Évolutions post-Module 28 (Phases business 0-6 et système d'agents)
+
+| Périmètre | Détail | Migrations |
+|---|---|---|
+| Phase 0 — site public + ONLINE | catalogue site, différenciation source ONLINE dans cuisine/pizza/bar, notifs internes, email client commande, réputation/avis | 0051–0076 |
+| Phase 1 — API publique outil 1 | 11 routes `/api/public/*`, auth client magic link, RGPD export, Stripe webhook, carte cadeau, realtime publi | 0077 |
+| Phase 4 — Chambres d'hôtes | API publique chambres + réservation, page `/admin/chambres`, vidéo 360° par chambre | 0078 |
+| Phase 6 — Marketing IA + créneaux | génération posts Claude, cron collecte avis J+1, créneaux multi-zones snack/pizza | 0079–0081 |
+| Agents IA permanents | 15 agents (10 cron + 4 RT par poste + Formateur), dashboard `/admin/pilotage`, push rate-limited | 0082, 0083 |
+| Push rate-limited | `sendPushToEmployeRateLimited()` plafonne 3 push/h/employé | 0084, 0085 |
+| Endpoint admin exec-sql | `/api/admin/exec-sql` + fonction PG `exec_sql()` security definer pour migrations automatiques | 0086 |
+| Module 27 enrichi | niveaux 1/2/3, simulations interactives, certifications par poste, badges, Q/R IA contextualisée | 0087 |
+
+**Migrations actuelles : 0001 → 0087** (87 fichiers dans `supabase/migrations/`).
+
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
+
+### Agents IA permanents — architecture
+
+15 agents définis dans `src/lib/agents/types.ts`. Chaque agent a une route `POST /api/cron/agents/<id>` ou `/api/cron/agents/realtime/<poste>`, auth `Authorization: Bearer ${CRON_SECRET}`, runner partagé `src/lib/agents/runner.ts` (timing, persistance run dans `agents_runs`, dedup findings, push notif rouge automatique).
+
+| # | Agent | Planning |
+|---|---|---|
+| 1 | 🌙 Veilleur | 01h UTC (= 02h Paris hiver) — clôture/backup/recap J-1 |
+| 2 | 🌤️ Météorologue | 05h UTC (= 06h Paris) — OWM + prévision CA 7j |
+| 3 | 📦 Stock | toutes les 2h — ruptures J+3, bons commande, DLC |
+| 4 | 💰 Financier | chaque heure HH:05 — food cost, masse sal, trésorerie |
+| 5 | 👥 RH | 21h UTC (= 22h Paris) — productivité, heures sup, pourboires |
+| 6 | 🌡️ HACCP | chaque heure HH:10 — températures, checklists, DLC |
+| 7 | 💬 Commercial | 19h UTC (= 20h Paris) — dormants, anniv, avis non répondus |
+| 8 | 📄 Scanner | event-driven (upload facture) — OCR Claude Vision |
+| 9 | 🎯 Stratégique | lundi 06h UTC (= 07h Paris) — synthèse hebdo Claude |
+| 10 | 🛡️ Sécurité | toutes les 30 min — connexions, écarts caisse, agents erreur |
+| 11-14 | 👨‍🍳 RT par poste (cuisine, serveur, bar, snack) | toutes les 15 min — alertes service en cours |
+| 15 | 🎓 Formateur | 08h UTC (= 09h Paris) — progression, badges, alertes J-30 certif |
+
+**Déclenchement cron :** pg_cron + pg_net dans Supabase, fichier `sql/setup-pgcron-agents.sql` (gitignored car contient `CRON_SECRET` en clair). Alternative : `.github/workflows/agents-cron.yml` (ne couvre que les 9 agents originaux, à étendre si on bascule dessus).
+
+**Dashboard :** `/admin/pilotage` affiche `<AgentsAuTravail />` avec emoji + statut + findings actifs. Drill-down `/admin/pilotage/agents/[id]` pour résoudre/ignorer/relancer.
 
 ### Roadmap détaillée 10-28
 
@@ -296,6 +339,12 @@ fmtPct(n)   // 12,3 %
 4. Annoncer dans le récap final : ce qui est livré, où, et **explicitement** "pas de migration" si c'est le cas.
 
 ## 8. Gotchas connus
+
+- **Déploiement prod** : `https://app-restaurant-livid.vercel.app` (Vercel, repo public `arnaud-florence/app-restaurant`, branche `main` auto-deploy). Toutes les env vars critiques (Supabase, Anthropic, CRON_SECRET, VAPID, Resend) sont configurées côté Vercel. Manque : `OPENWEATHER_API_KEY` (agent Météo + Module 22 ne tourneront pas sans).
+
+- **Agents cron** : déclenchés par pg_cron dans Supabase (`sql/setup-pgcron-agents.sql`, gitignored). Si on régénère `CRON_SECRET`, regénérer ce fichier et relancer le SQL. Monitoring : `select status_code, count(*) from net._http_response where created > now() - interval '1 day' group by 1` — toute valeur ≠ 200 = agent qui plante.
+
+- **Endpoint exec-sql** : `POST /api/admin/exec-sql` permet à un script (ou à l'AI) d'exécuter du SQL arbitraire sans passer par le SQL Editor Supabase, auth Bearer `CRON_SECRET`. Utilise la fonction PG `exec_sql()` créée par migration 0086, EXECUTE granté uniquement à `service_role`.
 
 - **Jest worker crash sur Windows** : Next dev en local plante régulièrement avec `Jest worker encountered child process exceptions, exceeding retry limit` sur les routes dynamiques `[id]`. Symptôme : 500 sur `/caisse/[id]/print`, `/print/bons/[id]`, etc. Toutes les routes statiques marchent. **Fix : redémarrer `npm run dev`**, ce n'est pas le code.
 
