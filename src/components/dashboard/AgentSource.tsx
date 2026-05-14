@@ -4,11 +4,12 @@
 import { AGENTS, type AgentId } from '@/lib/agents/types'
 
 export default function AgentSource({
-  agentId, lastRunAt, status,
+  agentId, lastRunAt, status, variant = 'light',
 }: {
   agentId: AgentId
   lastRunAt: string | null
   status?: 'success' | 'error' | 'running' | null
+  variant?: 'light' | 'dark'
 }) {
   const def = AGENTS[agentId]
   if (!def) return null
@@ -18,9 +19,9 @@ export default function AgentSource({
     : `${def.emoji} ${def.nom} — ${def.scheduleHuman}`
 
   return (
-    <p className="mt-2 text-[10px] text-zinc-400 font-normal">
+    <p className={`mt-2 text-[10px] font-normal ${variant === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
       {label}
-      {status === 'error' && <span className="text-red-600 font-medium ml-1">⚠ dernière exécution en erreur</span>}
+      {status === 'error' && <span className="text-red-500 font-medium ml-1">⚠ dernière exécution en erreur</span>}
     </p>
   )
 }

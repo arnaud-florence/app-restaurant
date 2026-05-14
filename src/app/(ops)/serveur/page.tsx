@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { listCommandesActives } from '../actions'
 import ServeurClient from './ServeurClient'
 import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getProfile } from '@/lib/auth'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 
@@ -81,6 +82,7 @@ export default async function ServeurPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['commercial', 'strategique', 'serveur_rt']} />
       <ServeurClient
         initialCommandes={commandes}
         tables={tables}
