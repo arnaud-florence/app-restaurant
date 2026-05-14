@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useId } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export type AgentRun = {
@@ -33,12 +33,16 @@ export function useLiveAgentRuns(
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set())
   const highlightMs = options.highlightDurationMs ?? 3000
 
+  // ID unique par instance → channel Supabase distinct par composant qui appelle
+  // ce hook. Évite le conflit "cannot add postgres_changes callbacks after
+  // subscribe()" quand 2 composants utilisent le hook avec mêmes paramètres.
+  const instanceId = useId()
   const agentIdsKey = options.agentIds?.sort().join(',') ?? ''
 
   useEffect(() => {
     const sb = createClient()
     const channel = sb
-      .channel(`agents_runs_live_${agentIdsKey}`)
+      .channel(`agents_runs_live_${instanceId}_${agentIdsKey}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'agents_runs' },
@@ -76,7 +80,7 @@ export function useLiveAgentRuns(
     return () => {
       sb.removeChannel(channel)
     }
-  }, [agentIdsKey, highlightMs, options.agentIds])
+  }, [instanceId, agentIdsKey, highlightMs, options.agentIds])
 
   return { latestByAgent, recentlyUpdated }
 }

@@ -13,7 +13,7 @@
 
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useId } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 export type Finding = {
@@ -40,14 +40,19 @@ export function useLiveFindings(
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
   const highlightMs = options.highlightDurationMs ?? 4000
 
-  // Stabiliser les filtres pour le useEffect
+  // ID unique par instance du hook → un channel Supabase par composant qui
+  // l'appelle, évite le conflit "cannot add postgres_changes callbacks after
+  // subscribe()" quand 2 composants utilisent useLiveFindings avec mêmes filtres.
+  const instanceId = useId()
+
+  // Stabiliser les filtres pour le useEffect (memo via .join)
   const agentIdsKey = options.agentIds?.sort().join(',') ?? ''
   const urgencesKey = options.urgences?.sort().join(',') ?? ''
 
   useEffect(() => {
     const sb = createClient()
     const channel = sb
-      .channel(`agent_findings_live_${agentIdsKey}_${urgencesKey}`)
+      .channel(`agent_findings_live_${instanceId}_${agentIdsKey}_${urgencesKey}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'agent_findings' },
@@ -96,7 +101,7 @@ export function useLiveFindings(
     return () => {
       sb.removeChannel(channel)
     }
-  }, [agentIdsKey, urgencesKey, highlightMs, options.agentIds, options.urgences])
+  }, [instanceId, agentIdsKey, urgencesKey, highlightMs, options.agentIds, options.urgences])
 
   return { findings, newIds }
 }
