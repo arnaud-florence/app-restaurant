@@ -100,10 +100,13 @@ const GROUPES: Group[] = [
 const STORAGE_KEY = 'admin_nav_collapsed'
 
 const SHORTCUTS_OPS = [
-  { href: '/caisse',  label: 'Caisse',  icon: Wallet },
-  { href: '/serveur', label: 'Serveur', icon: BookOpen },
-  { href: '/cuisine', label: 'Cuisine', icon: ChefHat },
-  { href: '/bar',     label: 'Bar',     icon: Wine },
+  { href: '/caisse',    label: 'Caisse',    icon: Wallet },
+  { href: '/serveur',   label: 'Serveur',   icon: BookOpen },
+  { href: '/cuisine',   label: 'Cuisine',   icon: ChefHat },
+  { href: '/bar',       label: 'Bar',       icon: Wine },
+  { href: '/emporter',  label: 'Snack',     icon: Store },
+  { href: '/livreur',   label: 'Livreur',   icon: Truck },
+  { href: '/reception', label: 'Réception', icon: Building2 },
 ]
 
 type AdminNavProfil = {
