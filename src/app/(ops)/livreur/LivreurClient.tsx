@@ -113,7 +113,20 @@ export default function LivreurClient({
                       </div>
                     )}
 
-                    {/* Coordonnées client (à enrichir avec adresse quand le modèle data l'aura) */}
+                    {/* Adresse de livraison — info la plus critique pour le livreur */}
+                    {c.adresse_livraison && (
+                      <a
+                        href={`https://maps.google.com/maps?q=${encodeURIComponent(c.adresse_livraison)}`}
+                        target="_blank"
+                        rel="noopener"
+                        className="block rounded bg-emerald-950/60 border border-emerald-800 px-2 py-1.5 text-emerald-100 hover:bg-emerald-900/60 transition-colors"
+                      >
+                        <p className="text-[10px] uppercase tracking-wider font-bold opacity-70">📍 Adresse — tap pour Maps</p>
+                        <p className="text-sm font-medium leading-tight">{c.adresse_livraison}</p>
+                      </a>
+                    )}
+
+                    {/* Coordonnées client */}
                     <div className="space-y-1 text-xs">
                       {c.client_telephone && (
                         <a href={`tel:${c.client_telephone}`} className="block text-blue-400 underline">
@@ -174,11 +187,10 @@ export default function LivreurClient({
           </section>
         )}
 
-        {/* Note Phase 2 */}
+        {/* Note Phase 3 (à venir) */}
         <div className="rounded-md bg-zinc-900 border border-zinc-800 p-3 text-xs text-zinc-500 italic">
-          <p className="font-bold text-zinc-400 mb-1 not-italic">📋 À venir Phase 2</p>
-          <p>Adresse de livraison · Optimisation trajet via maps · SMS auto au client si retard · Calcul kilométrage + frais.</p>
-          <p className="mt-1">Nécessite : ajout colonnes `adresse_livraison` + `mode_retrait` sur commandes, intégration Twilio/Brevo pour SMS.</p>
+          <p className="font-bold text-zinc-400 mb-1 not-italic">📋 À venir Phase 3</p>
+          <p>Optimisation trajet multi-livraisons · SMS auto au client si retard · Statut dédié 'en_livraison'.</p>
         </div>
       </main>
 

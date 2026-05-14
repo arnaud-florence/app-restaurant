@@ -1,12 +1,10 @@
 // Vue Livreur — tableau de bord du livreur.
 //
-// MVP : liste les commandes ONLINE du jour à statut "prêt pour retrait" ou
-// "retiré par client" qui ont été marquées pour livraison. Tant qu'il n'y a pas
-// de flag "livraison" sur les commandes (vs retrait sur place), on prend toutes
-// les commandes ONLINE du jour comme livraisons potentielles.
+// Filtre commandes ONLINE du jour avec mode_retrait='livraison' (migration 0089).
+// Affiche l'adresse de livraison, le créneau prévu, et le statut.
 //
-// À venir (Phase 2) : ajout d'un flag `mode_retrait` sur commandes (sur_place/livraison),
-// optimisation trajet via API maps, SMS auto retard.
+// À venir (Phase 3) : optimisation trajet via API maps, SMS auto retard,
+// statut "en_livraison" dédié (vs "pret"/"retire_par_client").
 
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
@@ -24,11 +22,12 @@ export default async function LivreurPage() {
   const dayStart = `${today}T00:00:00.000Z`
   const dayEnd   = `${today}T23:59:59.999Z`
 
-  // Commandes ONLINE du jour
+  // Commandes ONLINE du jour avec livraison à effectuer
   const { data: cmds } = await supabase
     .from('commandes')
-    .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation')
+    .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation, mode_retrait, adresse_livraison')
     .eq('source', 'ONLINE')
+    .eq('mode_retrait', 'livraison')
     .gte('created_at', dayStart)
     .lte('created_at', dayEnd)
     .not('statut', 'in', '(annule)')
@@ -73,4 +72,6 @@ export type CommandeLivreur = {
   created_at: string
   notes: string | null
   consommation: string | null
+  mode_retrait: string | null
+  adresse_livraison: string | null
 }

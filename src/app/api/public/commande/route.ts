@@ -10,6 +10,8 @@
 //   code_promo?: string,                 // optionnel
 //   pourboire?: number,                  // optionnel
 //   notes?: string,
+//   mode_retrait?: 'a_emporter' | 'livraison',  // défaut 'a_emporter'
+//   adresse_livraison?: string,          // REQUIS si mode_retrait='livraison'
 //   honeypot?: string,                   // doit rester vide
 //   captcha_token?: string,              // optionnel si HCAPTCHA_SECRET défini
 // }
@@ -45,9 +47,17 @@ const commandeSchema = z.object({
   code_promo:       z.string().max(40).nullable().optional(),
   pourboire:        z.coerce.number().min(0).max(1000).default(0),
   notes:            z.string().max(1000).nullable().optional(),
+  // ─── Mode retrait (migration 0089) ──────────────────────────────
+  // 'a_emporter' (défaut) = retrait magasin au créneau choisi
+  // 'livraison' = livreur amène à l'adresse → adresse_livraison requise
+  mode_retrait:      z.enum(['a_emporter', 'livraison']).default('a_emporter'),
+  adresse_livraison: z.string().max(500).nullable().optional(),
   honeypot:         z.string().nullable().optional(),
   captcha_token:    z.string().nullable().optional(),
-})
+}).refine(
+  d => d.mode_retrait !== 'livraison' || (d.adresse_livraison && d.adresse_livraison.trim().length > 5),
+  { message: 'Adresse de livraison requise pour le mode livraison', path: ['adresse_livraison'] },
+)
 
 export async function POST(req: Request) {
   const guard = await guardPublicRoute(req, 'commande', { windowMs: 60_000, max: 30 })
@@ -217,6 +227,8 @@ export async function POST(req: Request) {
     client_nom: p.client_nom || null,
     client_email: p.client_email || null,
     client_telephone: p.client_telephone || null,
+    mode_retrait: p.mode_retrait,
+    adresse_livraison: p.mode_retrait === 'livraison' ? p.adresse_livraison : null,
     notes: notesAvecIdem,
   }).select('id, numero, montant_total_ttc, statut').single()
 
