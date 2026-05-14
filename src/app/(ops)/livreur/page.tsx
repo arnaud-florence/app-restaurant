@@ -25,7 +25,7 @@ export default async function LivreurPage() {
   // Commandes ONLINE du jour avec livraison à effectuer
   const { data: cmds } = await supabase
     .from('commandes')
-    .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation, mode_retrait, adresse_livraison')
+    .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation, mode_retrait, adresse_livraison, livraison_depart_at, email_retard_envoye_at, mode_paiement')
     .eq('source', 'ONLINE')
     .eq('mode_retrait', 'livraison')
     .gte('created_at', dayStart)
@@ -74,4 +74,7 @@ export type CommandeLivreur = {
   consommation: string | null
   mode_retrait: string | null
   adresse_livraison: string | null
+  livraison_depart_at: string | null
+  email_retard_envoye_at: string | null
+  mode_paiement: string | null
 }
