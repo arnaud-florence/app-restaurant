@@ -40,7 +40,16 @@ const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permission
  */
 export async function getProfile(): Promise<Profil | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // try/catch obligatoire : si le refresh token est invalide/expiré, getUser()
+  // throw une AuthApiError qui crash le RSC. On traite alors l'user comme
+  // non authentifié (le middleware s'occupera de rediriger vers /login).
+  let user = null
+  try {
+    const result = await supabase.auth.getUser()
+    user = result.data.user
+  } catch {
+    return null
+  }
   if (!user) return null
 
   const { data: existing } = await supabase

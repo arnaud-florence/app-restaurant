@@ -23,6 +23,15 @@ export async function updateSession(request: NextRequest) {
   )
 
   // IMPORTANT : appel obligatoire pour rafraîchir la session avant tout RSC.
-  const { data: { user } } = await supabase.auth.getUser()
+  // try/catch : si le refresh token est invalide/expiré (cookies "stale"),
+  // getUser() throw une AuthApiError. On traite alors l'user comme non
+  // connecté pour ne pas faire crasher le middleware.
+  let user = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch {
+    user = null
+  }
   return { response, user, supabase }
 }
