@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { AGENTS, AGENT_IDS, URGENCE_STYLE, type AgentId, type Urgence } from '@/lib/agents/types'
-import AgentActions from './AgentActions'
+import AgentActions, { FindingActions } from './AgentActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +115,7 @@ export default async function AgentDrilldownPage({ params }: { params: { id: str
                           {f.action_label ?? 'Voir →'}
                         </Link>
                       )}
-                      <AgentActions.FindingActions findingId={f.id as string} />
+                      <FindingActions findingId={f.id as string} />
                     </div>
                   </div>
                 </li>

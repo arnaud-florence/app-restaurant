@@ -12,6 +12,12 @@ export type AgentId =
   | 'scanner'       // 8. Scanner documents (temps réel)
   | 'strategique'   // 9. Conseiller stratégique (lundi matin)
   | 'securite'      // 10. Vigile sécurité (permanent)
+  // ─── Agents temps réel par poste (cron */15min) ────────────────
+  | 'cuisine_rt'    // 11. Cuisine temps réel : retards prép, food cost live
+  | 'serveur_rt'    // 12. Serveur temps réel : table sans cmd, plat prêt non servi, addition >2h
+  | 'bar_rt'        // 13. Bar temps réel : cmd boisson en attente >5min
+  | 'snack_rt'      // 14. Snack temps réel : cmd online non prise en charge >5min
+  | 'formateur'     // 15. Formateur (09h00) : suit progression équipe, encouragements, badges
 
 export type Urgence = 'rouge' | 'jaune' | 'vert'
 
@@ -38,6 +44,12 @@ export const AGENTS: Record<AgentId, AgentDefinition> = {
   scanner:     { id: 'scanner',     nom: 'Scanner documents',     emoji: '📄', description: 'OCR factures, BL, tickets, fiches de paie',                  schedule: 'event-driven',  scheduleHuman: 'En temps réel (upload)' },
   strategique: { id: 'strategique', nom: 'Conseiller stratégique', emoji: '🎯', description: 'Bilan hebdo, opportunités, benchmark, plan semaine',         schedule: '0 7 * * 1',     scheduleHuman: 'Chaque lundi à 07h00' },
   securite:    { id: 'securite',    nom: 'Vigile sécurité',       emoji: '🛡️', description: 'Connexions suspectes, intégrité data, perf app',             schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 minutes' },
+  // ─── Temps réel par poste ───────────────────────────────────────
+  cuisine_rt:  { id: 'cuisine_rt',  nom: 'Cuisine — temps réel',  emoji: '👨‍🍳', description: 'Retards prép > 20min, alertes pendant le service',           schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
+  serveur_rt:  { id: 'serveur_rt',  nom: 'Serveur — temps réel',  emoji: '🍽',  description: 'Table sans cmd >10min, plat prêt non servi, addition >2h',  schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
+  bar_rt:      { id: 'bar_rt',      nom: 'Bar — temps réel',      emoji: '🍷', description: 'Cmd boisson en attente >5min',                              schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
+  snack_rt:    { id: 'snack_rt',    nom: 'Snack — temps réel',    emoji: '🥪', description: 'Cmd online non prise en charge >5min',                      schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
+  formateur:   { id: 'formateur',   nom: 'Formateur',             emoji: '🎓', description: 'Suit progression équipe, encouragements, badges, alertes J-30', schedule: '0 9 * * *',     scheduleHuman: 'Chaque matin à 09h00' },
 }
 
 export const AGENT_IDS = Object.keys(AGENTS) as AgentId[]

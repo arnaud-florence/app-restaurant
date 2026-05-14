@@ -37,8 +37,11 @@ export default function AgentActions({ agentId }: { agentId: AgentId }) {
   )
 }
 
-// Boutons résoudre / ignorer pour un finding individuel (sous-composant)
-AgentActions.FindingActions = function FindingActions({ findingId }: { findingId: string }) {
+// Sous-composant exporté séparément (et non comme propriété de AgentActions)
+// pour franchir proprement la frontière Server Component → Client Component
+// en Next.js RSC. Les références client n'autorisent pas l'accès à des
+// propriétés sur les fonctions exportées (.FindingActions échouerait).
+export function FindingActions({ findingId }: { findingId: string }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
