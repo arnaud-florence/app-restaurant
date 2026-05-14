@@ -6,6 +6,7 @@
 import { listCommandesActives } from '../actions'
 import EmporterClient from './EmporterClient'
 import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
@@ -74,6 +75,7 @@ export default async function EmporterPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['stock', 'haccp', 'snack_rt']} />
       <EmporterClient
         initial={commandes}
         recettes={recettes}

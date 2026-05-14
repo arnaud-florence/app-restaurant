@@ -11,6 +11,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import LivreurClient from './LivreurClient'
 
@@ -50,6 +51,7 @@ export default async function LivreurPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['commercial', 'serveur_rt']} />
       <LivreurClient
         commandes={(cmds ?? []) as CommandeLivreur[]}
         caJour={caJour}

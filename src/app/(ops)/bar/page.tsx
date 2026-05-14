@@ -1,5 +1,6 @@
 import BarClient from './BarClient'
 import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -64,6 +65,7 @@ export default async function BarPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['stock', 'haccp', 'bar_rt']} />
       <BarClient
         initial={commandes}
         recettes={recettes}

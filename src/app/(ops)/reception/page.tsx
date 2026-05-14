@@ -5,6 +5,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import ReceptionClient from './ReceptionClient'
 
@@ -62,6 +63,7 @@ export default async function ReceptionPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['commercial']} />
       <ReceptionClient
         arrivees={(arriveesRes.data ?? []) as Reservation[]}
         departs={(departsRes.data ?? []) as Reservation[]}
