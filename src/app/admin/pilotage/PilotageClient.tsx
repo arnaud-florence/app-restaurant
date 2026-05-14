@@ -58,7 +58,8 @@ const PRIORITE_BG: Record<ActionRow['priorite'], string> = {
 
 export default function PilotageClient({
   kpis, saisonnier, objectifs, actions, employes, periode,
-  widgetEmployeId = null, widgetInitialDone = [], tachesEquipeCard = null, agentsBlock = null,
+  widgetEmployeId = null, widgetInitialDone = [],
+  aujourdhuiSections = null, strategieExtras = null,
 }: {
   kpis: Kpi[]
   saisonnier: AnalyseMois[]
@@ -68,15 +69,16 @@ export default function PilotageClient({
   periode: Periode
   widgetEmployeId?: string | null
   widgetInitialDone?: string[]
-  /** Carte serveur « Checklists d'équipe — aujourd'hui ». */
-  tachesEquipeCard?: React.ReactNode
-  /** Bloc serveur « Mes agents au travail » — résumé des 10 agents permanents. */
-  agentsBlock?: React.ReactNode
+  /** Onglet "Aujourd'hui" : 7 sections agents pré-rendues côté serveur. */
+  aujourdhuiSections?: React.ReactNode
+  /** Onglet "Stratégie" : bandeau setup, tâches équipe, performance. */
+  strategieExtras?: React.ReactNode
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const [showObjForm, setShowObjForm] = useState<{ kpi: KpiCode } | null>(null)
   const [showActForm, setShowActForm] = useState<ActionRow | true | null>(null)
+  const [vue, setVue] = useState<'aujourdhui' | 'strategie'>('aujourdhui')
 
   // Map objectifs du mois courant pour vue par KPI
   const objMois = useMemo(() => {
@@ -95,23 +97,51 @@ export default function PilotageClient({
   }), [actions])
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 max-w-7xl mx-auto space-y-4 bg-[#FAFAFA] min-h-screen">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <BarChart3 className="h-6 w-6 text-emerald-600" /> Pilotage stratégique
         </h1>
         <p className="text-sm text-zinc-500">
-          Vue 2 minutes — KPIs clés, objectifs, plan d'action, saisonnalité.
+          Tableau de bord gérant — alimenté en continu par les 15 agents IA.
         </p>
       </div>
 
-      {/* 🤖 Mes agents au travail — résumé des 10 agents permanents (Phase 0+) */}
-      {agentsBlock}
+      {/* Onglets */}
+      <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 shadow-sm">
+        <button
+          onClick={() => setVue('aujourdhui')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+            vue === 'aujourdhui' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-600 hover:text-zinc-900',
+          )}
+        >
+          Aujourd'hui
+        </button>
+        <button
+          onClick={() => setVue('strategie')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium rounded-md transition-colors',
+            vue === 'strategie' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-600 hover:text-zinc-900',
+          )}
+        >
+          Stratégie
+        </button>
+      </div>
 
-      <TachesDuJourWidget poste="gerant" defaultOpen employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+      {/* Onglet "Aujourd'hui" : 7 sections agents */}
+      {vue === 'aujourdhui' && (
+        <div className="space-y-4">
+          <TachesDuJourWidget poste="gerant" defaultOpen employeId={widgetEmployeId} initialDone={widgetInitialDone} />
+          {aujourdhuiSections}
+        </div>
+      )}
 
-      {tachesEquipeCard}
+      {/* Onglet "Stratégie" : contenu historique (KPIs charts, objectifs, kanban, saisonnier) */}
+      {vue === 'strategie' && (<>
+
+      {strategieExtras}
 
       {/* ─── 10 KPIs ─────────────────────────────────────────────── */}
       <section>
@@ -273,6 +303,8 @@ export default function PilotageClient({
           </ResponsiveContainer>
         </Card>
       </section>
+
+      </>)}
 
       {/* ─── Modale objectif ─────────────────────────────────────── */}
       {showObjForm && (
