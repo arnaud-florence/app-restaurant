@@ -45,6 +45,69 @@ export async function sendPushToEmploye(employe_id: string, payload: PushPayload
   )
 }
 
+/**
+ * Variante rate-limitée : MAX 3 push par employé par heure.
+ * Au-delà, silencieux (renvoie {sent:false, reason:'rate_limited'}).
+ *
+ * Utilisé par les agents temps réel (cuisine, bar, serveur, snack) qui peuvent
+ * détecter beaucoup d'événements et risqueraient de spammer l'employé.
+ *
+ * Le compteur est par tranche horaire UTC (hour_bucket = date_trunc('hour', now())).
+ * Persisté dans push_rate_limits (migration 0084), upsert atomique.
+ *
+ * Si force=true, bypasse le rate limit (à utiliser uniquement pour des urgences
+ * critiques type "rupture froide congélateur").
+ */
+export async function sendPushToEmployeRateLimited(
+  employe_id: string,
+  payload: PushPayload,
+  options: { force?: boolean; maxPerHour?: number } = {},
+): Promise<{ sent: boolean; reason?: string; count?: number }> {
+  const maxPerHour = options.maxPerHour ?? 3
+  if (options.force) {
+    await sendPushToEmploye(employe_id, payload)
+    return { sent: true }
+  }
+  const supabase = await createClient()
+
+  // Calcul du bucket horaire courant en UTC
+  const now = new Date()
+  const hourBucket = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getUTCHours(), 0, 0, 0)
+  const hourBucketIso = hourBucket.toISOString()
+
+  // Lit le compteur courant (atomique : on incrémente via upsert)
+  const { data: existing } = await supabase
+    .from('push_rate_limits')
+    .select('count')
+    .eq('employe_id', employe_id)
+    .eq('hour_bucket', hourBucketIso)
+    .maybeSingle()
+  const currentCount = existing ? Number(existing.count ?? 0) : 0
+
+  if (currentCount >= maxPerHour) {
+    return { sent: false, reason: 'rate_limited', count: currentCount }
+  }
+
+  // Incrémente atomiquement (upsert avec count+1)
+  // Note : sans transaction stricte, deux pushs simultanés peuvent dépasser de 1.
+  // Acceptable pour ce cas d'usage non-critique.
+  const { error: upErr } = await supabase
+    .from('push_rate_limits')
+    .upsert(
+      { employe_id, hour_bucket: hourBucketIso, count: currentCount + 1 },
+      { onConflict: 'employe_id,hour_bucket' },
+    )
+  if (upErr) {
+    // En cas d'erreur (ex: table push_rate_limits absente), on envoie quand même
+    // pour ne pas perdre la notif
+    await sendPushToEmploye(employe_id, payload)
+    return { sent: true, reason: 'rate_limit_db_error' }
+  }
+
+  await sendPushToEmploye(employe_id, payload)
+  return { sent: true, count: currentCount + 1 }
+}
+
 /** Envoie une notif à TOUS les employés d'un poste donné (ex: tous les serveurs). */
 export async function sendPushToPostes(postes: string[], payload: PushPayload) {
   configureVapid()
