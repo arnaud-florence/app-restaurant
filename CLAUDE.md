@@ -342,6 +342,14 @@ fmtPct(n)   // 12,3 %
 
 - **Déploiement prod** : `https://app-restaurant-livid.vercel.app` (Vercel, repo public `arnaud-florence/app-restaurant`, branche `main` auto-deploy). Toutes les env vars critiques (Supabase, Anthropic, CRON_SECRET, VAPID, Resend) sont configurées côté Vercel. Manque : `OPENWEATHER_API_KEY` (agent Météo + Module 22 ne tourneront pas sans).
 
+- **Auth Supabase : `getUser()` doit OBLIGATOIREMENT être en try/catch côté serveur**. Quand le refresh token est expiré (cookies stales, ce qui arrive après un déploiement, un reset, ou plusieurs heures), `supabase.auth.getUser()` throw `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` (code `refresh_token_not_found`). Sans try/catch, l'erreur remonte dans le RSC qui crash → page d'erreur Next générique. **Fix appliqué dans `src/lib/auth.ts:getProfile()` et `src/lib/supabase/middleware.ts:updateSession()`** (commit 8f281ec). Si tu ajoutes un nouveau wrapper auth, applique le même pattern.
+
+- **Supabase Realtime : nom de channel UNIQUE par instance de hook**. Si 2 Client Components instancient le même hook (genre `useLiveFindings()`) avec les mêmes filtres, ils créent deux channels avec le même nom (ex: `agent_findings_live__`). Le 2ᵉ `subscribe()` throw "cannot add `postgres_changes` callbacks after `subscribe()`". **Fix** : utiliser `useId()` React pour générer un ID stable SSR/CSR unique par instance et l'inclure dans le nom du channel (cf. `src/hooks/useLiveFindings.ts` et `useLiveAgentRuns.ts`, commit df789fb).
+
+- **Service Worker cache : bumper `CACHE_VERSION` quand on push du code critique**. Le SW (`public/sw.js`) cache les chunks `/_next/static/*` en cache-first (immutables car hash). Mais entre 2 builds, les anciens chunks restent dans le cache et peuvent être servis si toujours référencés. **Solution** : incrémenter `CACHE_VERSION` (ligne 8) à chaque fix critique → l'event `activate` vide les anciens caches → next fetch va en réseau.
+
+- **Vercel logs en CLI** : `npx vercel logs --since 30m --level error --expand --no-follow` permet de voir les erreurs runtime de la prod sans passer par le dashboard. L'auth se fait automatiquement via `VERCEL_OIDC_TOKEN` (dans `.env.local`). Très utile pour diagnostiquer un "Oups une erreur" générique côté utilisateur.
+
 - **Agents cron** : déclenchés par pg_cron dans Supabase (`sql/setup-pgcron-agents.sql`, gitignored). Si on régénère `CRON_SECRET`, regénérer ce fichier et relancer le SQL. Monitoring : `select status_code, count(*) from net._http_response where created > now() - interval '1 day' group by 1` — toute valeur ≠ 200 = agent qui plante.
 
 - **Endpoint exec-sql** : `POST /api/admin/exec-sql` permet à un script (ou à l'AI) d'exécuter du SQL arbitraire sans passer par le SQL Editor Supabase, auth Bearer `CRON_SECRET`. Utilise la fonction PG `exec_sql()` créée par migration 0086, EXECUTE granté uniquement à `service_role`.
