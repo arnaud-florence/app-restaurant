@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type PlanHaccp, type Lot, type NonConformite, type Intervention3D,
   type PlanNettoyage, type ReleveTemperature, type ProcedureHygiene, type ChecklistHygiene,
@@ -65,37 +66,42 @@ export default function HygieneClient(props: {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">🧼</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Sécurité alimentaire</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Hygiène</h1>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <KpiBadge label="NC ouvertes" value={ncOuvertes} accent={ncOuvertes > 0 ? 'red' : 'zinc'} />
-            <KpiBadge label="Lots expirés" value={lotsExpires} accent={lotsExpires > 0 ? 'red' : 'zinc'} />
-            <KpiBadge label="DLC < 3j" value={lotsProche} accent={lotsProche > 0 ? 'amber' : 'zinc'} />
-            <KpiBadge label="Checklists du jour" value={`${checklistsTodayCount}/${proceduresJourCount}`} accent="zinc" />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'quotidien'} onClick={() => setTab('quotidien')}>📅 Quotidien</PillTab>
-          <PillTab active={tab === 'haccp'} onClick={() => setTab('haccp')}>🛡️ HACCP & nettoyage</PillTab>
-          <PillTab active={tab === 'lots'} onClick={() => setTab('lots')}>
-            🏷️ Traçabilité <PillCount n={props.lots.length} active={tab === 'lots'} />
-          </PillTab>
-          <PillTab active={tab === 'registres'} onClick={() => setTab('registres')}>
-            📋 Registres <PillCount n={ncOuvertes + props.interventions.length} active={tab === 'registres'} />
-          </PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4 space-y-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="red"
+          subtitle="Conformité"
+          title="Hygiène & HACCP"
+          description="CCP, températures, lots et DLC, checklists, non-conformités."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KpiBadge label="NC ouvertes" value={ncOuvertes} accent={ncOuvertes > 0 ? 'red' : 'zinc'} />
+              <KpiBadge label="Lots expirés" value={lotsExpires} accent={lotsExpires > 0 ? 'red' : 'zinc'} />
+              <KpiBadge label="DLC < 3j" value={lotsProche} accent={lotsProche > 0 ? 'amber' : 'zinc'} />
+              <KpiBadge label="Checklists" value={`${checklistsTodayCount}/${proceduresJourCount}`} accent="zinc" />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'quotidien'} onClick={() => setTab('quotidien')}>📅 Quotidien</PillTab>
+            <PillTab active={tab === 'haccp'} onClick={() => setTab('haccp')}>🛡️ HACCP & nettoyage</PillTab>
+            <PillTab active={tab === 'lots'} onClick={() => setTab('lots')}>
+              🏷️ Traçabilité <PillCount n={props.lots.length} active={tab === 'lots'} />
+            </PillTab>
+            <PillTab active={tab === 'registres'} onClick={() => setTab('registres')}>
+              📋 Registres <PillCount n={ncOuvertes + props.interventions.length} active={tab === 'registres'} />
+            </PillTab>
+          </div>
+        </AdminPageHeader>
+
         {props.widgetPoste && <TachesDuJourWidget poste={props.widgetPoste} defaultOpen />}
         {tab === 'quotidien' && (
           <QuotidienTab

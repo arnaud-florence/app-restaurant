@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type CompteResultat, type TvaSummary, type ChargeFixe, type NoteDeFrais,
   type CategorieCharge, type FrequenceCharge, type StatutNDF, type ProjectionPoint,
@@ -54,36 +55,42 @@ export default function FinancesClient({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">📊</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Pilotage</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Finances</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label={`Résultat ${moisLibelle}`} value={fmtPrix(cr.resultat_net)} accent={cr.resultat_net >= 0 ? 'vert' : 'rouge'} />
-            <KPI label="TVA à reverser" value={fmtPrix(tva.tva_a_reverser)} accent={tva.tva_a_reverser > 0 ? 'orange' : 'zinc'} />
-            <KPI label="Trésorerie" value={fmtPrix(tresorSolde)} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'cr'}      onClick={() => setTab('cr')}>📊 Compte de résultat</PillTab>
-          <PillTab active={tab === 'charges'} onClick={() => setTab('charges')}>
-            💸 Charges & TVA {echeancesProches > 0 && <PillCount n={echeancesProches} active={tab === 'charges'} />}
-          </PillTab>
-          <PillTab active={tab === 'tresor'}  onClick={() => setTab('tresor')}>💰 Trésorerie & simulateurs</PillTab>
-          <PillTab active={tab === 'ndf'}     onClick={() => setTab('ndf')}>
-            📋 Notes de frais {ndfEnAttente > 0 && <PillCount n={ndfEnAttente} active={tab === 'ndf'} />}
-          </PillTab>
-          <PillTab active={tab === 'export'}  onClick={() => setTab('export')}>📤 Export & rapport</PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Finances"
+          title="Finances & TVA"
+          description="P&L live, trésorerie 30/60/90j, charges fixes, simulateurs, notes de frais."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label={`Résultat ${moisLibelle}`} value={fmtPrix(cr.resultat_net)} accent={cr.resultat_net >= 0 ? 'vert' : 'rouge'} />
+              <KPI label="TVA" value={fmtPrix(tva.tva_a_reverser)} accent={tva.tva_a_reverser > 0 ? 'orange' : 'zinc'} />
+              <KPI label="Trésor." value={fmtPrix(tresorSolde)} />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'cr'}      onClick={() => setTab('cr')}>📊 Compte de résultat</PillTab>
+            <PillTab active={tab === 'charges'} onClick={() => setTab('charges')}>
+              💸 Charges & TVA {echeancesProches > 0 && <PillCount n={echeancesProches} active={tab === 'charges'} />}
+            </PillTab>
+            <PillTab active={tab === 'tresor'}  onClick={() => setTab('tresor')}>💰 Trésorerie & simulateurs</PillTab>
+            <PillTab active={tab === 'ndf'}     onClick={() => setTab('ndf')}>
+              📋 Notes de frais {ndfEnAttente > 0 && <PillCount n={ndfEnAttente} active={tab === 'ndf'} />}
+            </PillTab>
+            <PillTab active={tab === 'export'}  onClick={() => setTab('export')}>📤 Export & rapport</PillTab>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'cr'      && <CRTab cr={cr} moisLibelle={moisLibelle} chargesFixesMensuelles={cr.charges_fixes_mensuelles} masseSalariale={cr.masse_salariale} />}
         {tab === 'charges' && <ChargesTab charges={charges} tva={tva} moisLibelle={moisLibelle} onError={flashKo} onOk={flashOk} />}
         {tab === 'tresor'  && <TresorTab solde={tresorSolde} date={tresorDate} caJour={caJourMoyen} projection={projection} cr={cr} onError={flashKo} onOk={flashOk} />}

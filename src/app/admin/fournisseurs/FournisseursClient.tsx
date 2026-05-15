@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 
 import {
   type Fournisseur, type BonCommande, type Facture, type EntreePrix,
@@ -130,29 +131,29 @@ export default function FournisseursClient({
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-xl shadow-lg shadow-indigo-500/30 shrink-0">
-                🚚
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Achats</p>
-                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Fournisseurs</h1>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={autoGenerer} variant="outline" size="sm" title="Génère un brouillon par fournisseur depuis les ingrédients sous le seuil minimum">
-                ✨ Auto-bons depuis stock
-              </Button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-          {/* Tabs premium tactile */}
-          <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="indigo"
+          subtitle="Cuisine & stock"
+          title="Fournisseurs"
+          description="Bons de commande, factures, réceptions et comparateur de prix."
+          actions={
+            <Button onClick={autoGenerer} variant="outline" size="sm" title="Génère un brouillon par fournisseur depuis les ingrédients sous le seuil minimum">
+              ✨ Auto-bons depuis stock
+            </Button>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
             <PillTab active={tab === 'fournisseurs'} onClick={() => setTab('fournisseurs')}>
               👥 Fournisseurs <PillCount n={fournisseurs.length} active={tab === 'fournisseurs'} />
             </PillTab>
@@ -171,10 +172,8 @@ export default function FournisseursClient({
               📊 Comparateur prix
             </PillTab>
           </div>
-        </div>
-      </header>
+        </AdminPageHeader>
 
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
         {/* KPIs globaux */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3">
           <KPI label="Fournisseurs"     value={String(stats.nbActifs)}                  icon="👥" />
