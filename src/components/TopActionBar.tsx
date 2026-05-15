@@ -19,6 +19,10 @@ import {
   Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Star,
   Home, BarChart3, Utensils, ChefHat, Users, Wallet, ShieldCheck, Settings,
   Wine, Pizza, ShoppingBag, Bike, BellRing, Receipt, GraduationCap,
+  Target, Sparkles, Notebook, CloudSun, Leaf, Package, Truck,
+  Calendar, BedDouble, User, Gift, Tag, Ticket, Award, Megaphone,
+  MessageSquare, BookOpen, Trophy, Calculator, Zap, Trash2, ScrollText,
+  Wrench, Lock, Tv,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -53,16 +57,69 @@ const ICON_BY_CAT_SLUG: Record<string, LucideIcon> = {
   systeme:       Settings,
 }
 
-const ICON_BY_OPS_HREF: Record<string, LucideIcon> = {
-  '/serveur':   Utensils,
-  '/caisse':    Receipt,
-  '/cuisine':   ChefHat,
-  '/pizza':     Pizza,
-  '/bar':       Wine,
-  '/emporter':  ShoppingBag,
-  '/livreur':   Bike,
-  '/reception': BellRing,
+/** Mapping exhaustif href → icône Lucide pour tous les sous-modules
+ *  (ops + admin). Utilisé par les chips épingles, le drawer Modules
+ *  et la propagation des icônes partout dans la navigation. */
+const ICON_BY_HREF: Record<string, LucideIcon> = {
+  // Ops (service)
+  '/serveur':                 Utensils,
+  '/caisse':                  Receipt,
+  '/cuisine':                 ChefHat,
+  '/pizza':                   Pizza,
+  '/bar':                     Wine,
+  '/emporter':                ShoppingBag,
+  '/livreur':                 Bike,
+  '/reception':               BellRing,
+  // Pilotage
+  '/mon-espace':              Home,
+  '/admin':                   BarChart3,
+  '/admin/pilotage':          Target,
+  '/admin/assistant':         Sparkles,
+  '/admin/journal':           Notebook,
+  '/admin/previsionnel':      CloudSun,
+  // Cuisine & stock
+  '/admin/recettes':          ChefHat,
+  '/admin/plats-du-jour':     Sparkles,
+  '/admin/capacite-cuisine':  Settings,
+  '/admin/ingredients':       Leaf,
+  '/admin/stock':             Package,
+  '/admin/fournisseurs':      Truck,
+  '/admin/boissons':          Wine,
+  '/admin/allergenes':        AlertTriangle,
+  // Clientèle
+  '/admin/reservations':      Calendar,
+  '/admin/chambres':          BedDouble,
+  '/admin/groupes':           Users,
+  '/admin/clients':           User,
+  '/admin/clients/fidelite':  Star,
+  '/admin/promotions':        Gift,
+  '/admin/codes-promo':       Tag,
+  '/admin/cartes-cadeaux':    Ticket,
+  '/admin/reputation':        Award,
+  '/admin/marketing':         Megaphone,
+  '/admin/affichage':         Tv,
+  // Équipe & formation
+  '/admin/rh':                Users,
+  '/equipes':                 MessageSquare,
+  '/formation':               BookOpen,
+  '/admin/formation':         GraduationCap,
+  '/admin/challenges':        Trophy,
+  // Finances
+  '/admin/finances':          Wallet,
+  '/admin/economie':          Calculator,
+  '/admin/energie':           Zap,
+  // Conformité
+  '/admin/hygiene':           Sparkles,
+  '/admin/dechets':           Trash2,
+  '/admin/legal':             ScrollText,
+  '/admin/maintenance':       Wrench,
+  // Système
+  '/admin/setup':             Settings,
+  '/admin/securite':          Lock,
 }
+
+// Alias pour compat (utilisé dans le code ops chips)
+const ICON_BY_OPS_HREF = ICON_BY_HREF
 
 /** Style du mini "icon-glow" : carré gradient avec icône blanche dedans. */
 function ChipIcon({
@@ -807,19 +864,22 @@ export default function TopActionBar({
                           const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
                           const pinnedThis = isPinned(it.href)
                           const pinDisabled = !pinnedThis && nbPinned >= MAX_PINNED
+                          const ResIcon = ICON_BY_HREF[it.href] ?? Settings
                           return (
                             <div key={it.href} className="relative">
                               <Link
                                 href={it.href}
                                 onClick={() => setOpen(false)}
                                 className={cn(
-                                  'flex items-center gap-3 rounded-xl px-3 py-3 pr-12 text-sm font-bold min-h-[52px] border-2 active:scale-[0.98] transition',
+                                  'flex items-center gap-3 rounded-xl px-2.5 py-2.5 pr-12 text-sm font-bold min-h-[52px] border-2 active:scale-[0.98] transition',
                                   active
                                     ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                                     : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
                                 )}
                               >
-                                <span className="text-xl leading-none shrink-0">{it.emoji}</span>
+                                <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-zinc-100 text-zinc-700 shrink-0">
+                                  <ResIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                                </span>
                                 <div className="flex-1 min-w-0">
                                   <p className="truncate">{it.label}</p>
                                   <p className="text-[10px] text-zinc-400 font-normal truncate">{it.groupeEmoji} {it.groupe}</p>
@@ -858,27 +918,32 @@ export default function TopActionBar({
                         Mes épingles · {pinnedItems.filter(p => peutVoir(p.href)).length}
                       </h3>
                       <div className="space-y-1.5">
-                        {pinnedItems.filter(p => peutVoir(p.href)).map(p => (
-                          <div key={p.href} className="relative">
-                            <Link
-                              href={p.href}
-                              onClick={() => setOpen(false)}
-                              className="flex items-center gap-3 rounded-xl px-3 py-2.5 pr-12 text-sm font-bold min-h-[48px] border-2 border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-400 active:scale-[0.98] transition"
-                            >
-                              <span className="text-xl leading-none shrink-0">{p.emoji}</span>
-                              <span className="truncate">{p.label}</span>
-                            </Link>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); togglePin(p.href) }}
-                              aria-label={`Désépingler ${p.label}`}
-                              title="Désépingler"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-8 h-8 rounded-full text-amber-600 hover:bg-amber-200 active:scale-90 transition"
-                            >
-                              <Star className="h-4 w-4 fill-current" aria-hidden />
-                            </button>
-                          </div>
-                        ))}
+                        {pinnedItems.filter(p => peutVoir(p.href)).map(p => {
+                          const PinIcon = ICON_BY_HREF[p.href] ?? Star
+                          return (
+                            <div key={p.href} className="relative">
+                              <Link
+                                href={p.href}
+                                onClick={() => setOpen(false)}
+                                className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 pr-12 text-sm font-bold min-h-[48px] border-2 border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-400 active:scale-[0.98] transition"
+                              >
+                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shrink-0`}>
+                                  <PinIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                                </span>
+                                <span className="truncate flex-1">{p.label}</span>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); togglePin(p.href) }}
+                                aria-label={`Désépingler ${p.label}`}
+                                title="Désépingler"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-8 h-8 rounded-full text-amber-600 hover:bg-amber-200 active:scale-90 transition"
+                              >
+                                <Star className="h-4 w-4 fill-current" aria-hidden />
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -895,7 +960,16 @@ export default function TopActionBar({
                           const slug = cat.slug
                           const itemsVisibles = cat.items.filter(it => peutVoir(it.href)).length
                           const active = pathname === `/admin/cat/${slug}` || pathname.startsWith(`/admin/cat/${slug}/`)
-                          const tone = tones[cat.tone as Tone]
+                          const CatIcon = ICON_BY_CAT_SLUG[slug] ?? Settings
+                          const gradients: Record<Tone, string> = {
+                            emerald: 'from-emerald-500 to-teal-600',
+                            amber:   'from-amber-500 to-orange-600',
+                            violet:  'from-violet-500 to-purple-600',
+                            blue:    'from-blue-500 to-sky-600',
+                            red:     'from-red-500 to-rose-600',
+                            rose:    'from-rose-500 to-pink-600',
+                            zinc:    'from-zinc-700 to-zinc-900',
+                          }
                           return (
                             <Link
                               key={slug}
@@ -908,7 +982,9 @@ export default function TopActionBar({
                                   : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
                               )}
                             >
-                              <span className="text-2xl leading-none shrink-0">{cat.emoji}</span>
+                              <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[cat.tone as Tone]} text-white shadow-md shrink-0 group-hover:scale-105 transition-transform`}>
+                                <CatIcon className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                              </span>
                               <div className="flex-1 min-w-0">
                                 <p className="text-[13px] font-black tracking-tight truncate">{cat.label}</p>
                                 <p className="text-[10px] text-zinc-500 font-normal">{itemsVisibles} module{itemsVisibles > 1 ? 's' : ''}</p>

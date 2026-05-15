@@ -15,8 +15,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
+import {
+  ChevronLeft, BarChart3, Utensils, ChefHat, Users, GraduationCap, Wallet,
+  ShieldCheck, Settings, type LucideIcon,
+} from 'lucide-react'
 import { findCategoryByHref, type Category } from '@/lib/navigation'
+
+const ICON_BY_CAT: Record<string, LucideIcon> = {
+  pilotage:        BarChart3,
+  service:         Utensils,
+  'cuisine-stock': ChefHat,
+  clientele:       Users,
+  equipe:          GraduationCap,
+  finances:        Wallet,
+  conformite:      ShieldCheck,
+  systeme:         Settings,
+}
 
 const TONE_BG: Record<Category['tone'], string> = {
   emerald: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200 hover:border-emerald-400',
@@ -61,16 +75,19 @@ export default function BackToCategoryButton({
   if (!cat) return null
 
   const cls = theme === 'dark' ? TONE_BG_DARK[cat.tone] : TONE_BG[cat.tone]
+  const CatIcon = ICON_BY_CAT[cat.slug] ?? Settings
 
   return (
     <div className="px-3 sm:px-4 pt-3">
       <Link
         href={`/admin/cat/${cat.slug}`}
-        className={`inline-flex items-center gap-2 h-10 pl-2.5 pr-4 rounded-full border-2 text-xs sm:text-sm font-bold active:scale-95 transition ${cls}`}
+        className={`group inline-flex items-center gap-2 h-10 pl-1.5 pr-4 rounded-full border-2 text-xs sm:text-sm font-bold active:scale-95 transition ${cls}`}
         aria-label={`Retour à la catégorie ${cat.label}`}
       >
-        <ChevronLeft className="h-4 w-4" />
-        <span className="text-base leading-none" aria-hidden>{cat.emoji}</span>
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/80 text-zinc-900 shadow-sm group-hover:bg-white transition">
+          <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+        </span>
+        <CatIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden />
         <span>Retour à {cat.label}</span>
       </Link>
     </div>
