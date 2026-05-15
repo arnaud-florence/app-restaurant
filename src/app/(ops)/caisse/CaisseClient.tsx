@@ -70,16 +70,32 @@ export default function CaisseClient({
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
 
   return (
-    <div className="min-h-screen flex flex-col pb-mobile-nav">
+    <div className="min-h-screen flex flex-col pb-mobile-nav bg-[#0D0D0D]">
       <OpsBottomNav profil={navProfil} />
-      <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Service — Fin de shift</p>
-            <h1 className="text-2xl sm:text-3xl font-bold">💰 Caisse</h1>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-lg shadow-emerald-900/40">
+              💰
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Service · Z-report</p>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Caisse</h1>
+            </div>
+            {resume && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold ml-1">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                Ouverte
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/serveur" className="text-sm px-3 h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100">← Salle</Link>
+            <Link href="/serveur" className="text-sm px-3 h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 transition-colors">
+              ← Salle
+            </Link>
           </div>
         </div>
       </header>
@@ -217,30 +233,32 @@ function SessionVivante({ resume, onClickCloture }: {
   const dateLocal = new Date(s.date_session).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
-    <div className="space-y-5">
-      {/* Bandeau session */}
-      <div className="rounded-xl bg-zinc-900 border border-zinc-800 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">🟢 Session ouverte</p>
-          <h2 className="text-xl font-bold capitalize">{dateLocal}</h2>
-          <p className="text-sm text-zinc-400">
-            Ouverte à {ouvLocal}{s.ouverte_par_nom ? ` par ${s.ouverte_par_nom}` : ''} · Fond initial {fmtPrix(s.fond_initial)}
-          </p>
+    <div className="space-y-4 lg:space-y-5">
+      {/* Bandeau session — gradient premium + dashboard intégré */}
+      <div className="rounded-2xl bg-gradient-to-br from-emerald-950/60 via-zinc-900 to-zinc-950 border border-emerald-800/40 shadow-2xl shadow-emerald-900/20 backdrop-blur overflow-hidden">
+        <div className="px-4 lg:px-5 py-3 lg:py-4 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-900/30">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Session ouverte</p>
+            <h2 className="text-lg lg:text-2xl font-black text-white tracking-tight capitalize leading-tight">{dateLocal}</h2>
+            <p className="text-[11px] lg:text-xs text-zinc-500 mt-0.5 truncate">
+              <span aria-hidden>🕒</span> {ouvLocal}{s.ouverte_par_nom ? ` · ${s.ouverte_par_nom}` : ''} · Fond {fmtPrix(s.fond_initial)}
+            </p>
+          </div>
+          <button
+            onClick={onClickCloture}
+            className="min-h-[48px] lg:min-h-[56px] px-4 lg:px-6 rounded-xl bg-gradient-to-br from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 text-white font-bold uppercase tracking-wider text-xs lg:text-sm shadow-lg shadow-rose-900/40 transition-all active:scale-95"
+          >
+            🔒 Clôturer
+          </button>
         </div>
-        <button
-          onClick={onClickCloture}
-          className="min-h-[56px] px-6 rounded-md bg-red-600 hover:bg-red-500 text-white font-bold uppercase tracking-wider transition-colors"
-        >
-          🔒 Clôturer la caisse
-        </button>
-      </div>
 
-      {/* Big numbers */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <BigStat label="CA TTC" value={fmtPrix(resume.ca_total_ttc)} accent="emerald" />
-        <BigStat label="Commandes" value={String(resume.nb_commandes_encaissees)} accent="zinc" />
-        <BigStat label="Pourboires" value={fmtPrix(resume.pourboires_total)} accent="amber" />
-        <BigStat label="Caisse attendue" value={fmtPrix(resume.caisse_attendue)} accent="blue" />
+        {/* Stats grid — 4 cards mobile, 4 cards desktop (avec accent premium) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 p-3 lg:p-4">
+          <BigStat label="CA TTC"          value={fmtPrix(resume.ca_total_ttc)}              accent="emerald" />
+          <BigStat label="Encaissées"      value={String(resume.nb_commandes_encaissees)}     accent="zinc" />
+          <BigStat label="Pourboires"      value={fmtPrix(resume.pourboires_total)}          accent="amber" />
+          <BigStat label="Caisse attendue" value={fmtPrix(resume.caisse_attendue)}           accent="blue" />
+        </div>
       </div>
 
       {/* Encaissements par méthode */}
@@ -499,16 +517,17 @@ function Historique({ sessions }: { sessions: SessionFermee[] }) {
 
 // ─── Petits composants ───────────────────────────────────────────────
 function BigStat({ label, value, accent }: { label: string; value: string; accent: 'emerald' | 'amber' | 'blue' | 'zinc' }) {
-  const cls = {
-    emerald: 'border-emerald-700/50 bg-emerald-900/20 text-emerald-100',
-    amber:   'border-amber-700/50 bg-amber-900/20 text-amber-100',
-    blue:    'border-blue-700/50 bg-blue-900/20 text-blue-100',
-    zinc:    'border-zinc-700 bg-zinc-900 text-zinc-100',
-  }[accent]
+  const STYLES = {
+    emerald: { card: 'bg-gradient-to-br from-emerald-500/20 to-emerald-700/5 border-emerald-500/30 shadow-emerald-900/20', text: 'text-emerald-200', label: 'text-emerald-400/80' },
+    amber:   { card: 'bg-gradient-to-br from-amber-500/20 to-amber-700/5 border-amber-500/30 shadow-amber-900/20',         text: 'text-amber-200',   label: 'text-amber-400/80' },
+    blue:    { card: 'bg-gradient-to-br from-blue-500/20 to-blue-700/5 border-blue-500/30 shadow-blue-900/20',             text: 'text-blue-200',    label: 'text-blue-400/80' },
+    zinc:    { card: 'bg-zinc-900 border-zinc-800',                                                                         text: 'text-white',       label: 'text-zinc-500' },
+  }
+  const s = STYLES[accent]
   return (
-    <div className={cn('rounded-xl border px-4 py-3', cls)}>
-      <p className="text-[10px] uppercase tracking-wider opacity-70">{label}</p>
-      <p className="text-2xl sm:text-3xl font-bold tabular-nums mt-0.5">{value}</p>
+    <div className={cn('rounded-xl border shadow-lg px-3 lg:px-4 py-2 lg:py-3 backdrop-blur', s.card)}>
+      <p className={cn('text-[9px] lg:text-[10px] uppercase tracking-widest font-bold', s.label)}>{label}</p>
+      <p className={cn('text-xl sm:text-2xl lg:text-3xl font-black tabular-nums mt-0.5 leading-tight', s.text)}>{value}</p>
     </div>
   )
 }
