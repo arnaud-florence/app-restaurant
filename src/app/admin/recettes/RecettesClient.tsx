@@ -152,39 +152,48 @@ export default function RecettesClient({
         </div>
 
         {/* Filtres */}
-        <Card>
-          <CardContent className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-2">
-            <Input
-              type="search"
-              placeholder="🔍 Rechercher par nom ou catégorie…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <Select value={filtreTag} onChange={e => setFiltreTag(e.target.value as TagDestination | '')} className="md:w-44">
-              <option value="">Tous postes</option>
-              {TAGS_DESTINATION.map(t => (
-                <option key={t} value={t}>{TAG_STYLE[t].emoji} {TAG_STYLE[t].label}</option>
-              ))}
-            </Select>
-            <Select value={filtreFC} onChange={e => setFiltreFC(e.target.value as typeof filtreFC)} className="md:w-44">
-              <option value="tous">Tout food cost</option>
-              <option value="vert">✓ &lt; 28% (sain)</option>
-              <option value="orange">⚠ 28–32%</option>
-              <option value="rouge">🔴 &gt; 32%</option>
-              <option value="alerte">🚨 Alerte (&gt; 30%)</option>
-            </Select>
-            <Select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value as 'actifs' | 'inactifs' | 'tous')} className="md:w-40">
-              <option value="actifs">Actives uniquement</option>
-              <option value="tous">Toutes (actives + inactives)</option>
-              <option value="inactifs">Inactives uniquement</option>
-            </Select>
-            <Select value={filtreOnline} onChange={e => setFiltreOnline(e.target.value as typeof filtreOnline)} className="md:w-44">
-              <option value="tous">🌐 Vente en ligne : tous</option>
-              <option value="online">🌐 En ligne uniquement</option>
-              <option value="offline">🚫 Pas en ligne</option>
-            </Select>
-          </CardContent>
-        </Card>
+        {/* Toolbar premium — recherche + 4 segmented controls pills (tactile mobile/tablette) */}
+        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+          <Input
+            type="search"
+            placeholder="🔍 Rechercher un plat..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-11 text-base"
+          />
+          {/* Niveau 1 : Destination (gros pills tactiles) */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab active={filtreTag === ''} onClick={() => setFiltreTag('')}>
+              ✦ Toutes <PillCount n={enriched.length} active={filtreTag === ''} />
+            </PillTab>
+            {TAGS_DESTINATION.map(t => {
+              const n = enriched.filter(e => e.recette.tag_destination === t).length
+              if (n === 0) return null
+              return (
+                <PillTab key={t} active={filtreTag === t} onClick={() => setFiltreTag(t)}>
+                  {TAG_STYLE[t].emoji} {TAG_STYLE[t].label} <PillCount n={n} active={filtreTag === t} />
+                </PillTab>
+              )
+            })}
+          </div>
+
+          {/* Niveau 2 : Food cost + Statut + Online — pills compactes */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab small active={filtreFC === 'tous'}   onClick={() => setFiltreFC('tous')}>📊 Tout FC</PillTab>
+            <PillTab small active={filtreFC === 'vert'}   onClick={() => setFiltreFC('vert')}>🟢 Sain</PillTab>
+            <PillTab small active={filtreFC === 'orange'} onClick={() => setFiltreFC('orange')}>🟡 Surveiller</PillTab>
+            <PillTab small active={filtreFC === 'rouge'}  onClick={() => setFiltreFC('rouge')}>🔴 Élevé</PillTab>
+            <PillTab small active={filtreFC === 'alerte'} onClick={() => setFiltreFC('alerte')}>🚨 Alerte</PillTab>
+            <span className="w-px bg-zinc-300 mx-1"></span>
+            <PillTab small active={filtreStatut === 'actifs'}   onClick={() => setFiltreStatut('actifs')}>✓ Actifs</PillTab>
+            <PillTab small active={filtreStatut === 'tous'}     onClick={() => setFiltreStatut('tous')}>Tous</PillTab>
+            <PillTab small active={filtreStatut === 'inactifs'} onClick={() => setFiltreStatut('inactifs')}>🚫 Inactifs</PillTab>
+            <span className="w-px bg-zinc-300 mx-1"></span>
+            <PillTab small active={filtreOnline === 'tous'}    onClick={() => setFiltreOnline('tous')}>Tous</PillTab>
+            <PillTab small active={filtreOnline === 'online'}  onClick={() => setFiltreOnline('online')}>🌐 En ligne</PillTab>
+            <PillTab small active={filtreOnline === 'offline'} onClick={() => setFiltreOnline('offline')}>🚫 Hors ligne</PillTab>
+          </div>
+        </div>
 
         {/* Liste */}
         {filtered.length === 0 ? (
@@ -274,6 +283,40 @@ function KPI({ label, value, tone, icon, pulse }: {
         <p className="text-2xl sm:text-3xl font-bold mt-1 tabular-nums">{value}</p>
       </CardContent>
     </Card>
+  )
+}
+
+// ─── PillTab : segmented control pill tactile (mobile/tablette) ─────────
+function PillTab({
+  active, onClick, children, small = false,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+  small?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full whitespace-nowrap font-bold border-2 transition-all shrink-0',
+        small ? 'px-3 min-h-[36px] text-xs' : 'px-4 min-h-[44px] text-sm',
+        active
+          ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
+          : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function PillCount({ n, active }: { n: number; active: boolean }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
+      active ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-500',
+    )}>{n}</span>
   )
 }
 
