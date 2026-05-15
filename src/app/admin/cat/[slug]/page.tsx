@@ -230,10 +230,23 @@ export default async function CategoriePage({ params }: { params: { slug: string
       />
 
       <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8">
-        {/* ─── HERO BANNER catégorie — full immersion photo ─────────── */}
-        <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-2xl ring-1 ring-zinc-200 min-h-[200px] sm:min-h-[280px]">
-          {/* Image fond + animation ken-burns lente */}
-          {cat.imageUrl ? (
+        {/* ─── HERO BANNER catégorie — vidéo immersive si dispo, sinon photo ── */}
+        <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-2xl ring-1 ring-zinc-200 min-h-[240px] sm:min-h-[320px]">
+          {/* Vidéo ou image en fond */}
+          {cat.videoUrl ? (
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              poster={cat.imageUrl}
+              className="absolute inset-0 w-full h-full object-cover"
+              aria-hidden
+            >
+              <source src={cat.videoUrl} type="video/mp4" />
+            </video>
+          ) : cat.imageUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={cat.imageUrl}
@@ -248,8 +261,19 @@ export default async function CategoriePage({ params }: { params: { slug: string
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/20" aria-hidden />
           <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/30" aria-hidden />
 
-          {/* Contenu du header — placé en bas pour effet "movie poster" */}
-          <div className="relative z-10 h-full min-h-[200px] sm:min-h-[280px] flex flex-col justify-end p-5 sm:p-8 text-white">
+          {/* Contenu du header — top logo + bottom title (effet "movie poster") */}
+          <div className="relative z-10 h-full min-h-[240px] sm:min-h-[320px] flex flex-col justify-between p-5 sm:p-8 text-white">
+            {/* Top : logo restaurant pour cohérence brand */}
+            <div className="flex items-start justify-between gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-relais.png"
+                alt="Logo Le Relais"
+                className="h-10 sm:h-12 w-auto drop-shadow-2xl"
+              />
+            </div>
+
+            {/* Bottom : emoji-glow + titre */}
             <div className="flex items-end gap-3 sm:gap-4">
               <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${tone.gradient} text-white text-3xl sm:text-5xl shadow-2xl ring-4 ring-white/30 shrink-0`}>
                 {cat.emoji}

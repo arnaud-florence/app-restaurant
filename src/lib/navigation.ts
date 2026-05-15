@@ -26,6 +26,9 @@ export type Category = {
   /** URL Unsplash thématique pour la photo de fond des tuiles (mode photo).
    *  Fallback emoji + gradient si absent. */
   imageUrl?: string
+  /** URL vidéo (mp4) pour le hero banner immersif de la page catégorie.
+   *  Si présente, joue en autoplay loop muted en background. */
+  videoUrl?: string
   items: SubModule[]
 }
 
@@ -56,6 +59,7 @@ export const CATEGORIES: Category[] = [
     pitch: 'Tous les écrans temps réel de service.',
     tone: 'blue',
     imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=75',
+    videoUrl: '/videos/brasserie.mp4.mp4',
     items: [
       { href: '/serveur',         emoji: '🍽',   label: 'Salle / Serveur',  description: 'Plan de salle + prise de commande + encaissement.',  imageUrl: u('1414235077428-338989a2e8c0') },
       { href: '/caisse',          emoji: '💰',   label: 'Caisse',           description: 'Dashboard live, ouverture/clôture session, rapport Z.', imageUrl: u('1556742502-ec7c0e9f34b1') },
@@ -75,6 +79,7 @@ export const CATEGORIES: Category[] = [
     pitch: 'Fiches techniques, achats et inventaires.',
     tone: 'amber',
     imageUrl: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=75',
+    videoUrl: '/videos/pizza.mp4.mp4',
     items: [
       { href: '/admin/recettes',         emoji: '👨‍🍳', label: 'Recettes',         description: 'Food cost, allergènes, fiches techniques.',         imageUrl: u('1546069901-ba9599a7e63c') },
       { href: '/admin/plats-du-jour',    emoji: '✨',  label: 'Plats du jour',    description: 'Carte du jour, suggestions IA selon stock.',       imageUrl: u('1567620905732-2d1ec7ab7445') },
@@ -93,6 +98,7 @@ export const CATEGORIES: Category[] = [
     pitch: 'CRM, fidélité, réservations, marketing.',
     tone: 'rose',
     imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=75',
+    videoUrl: '/videos/chambre.mp4.mp4',
     items: [
       { href: '/admin/reservations',     emoji: '📅', label: 'Réservations',      description: 'Tables, terrasse, chambres, événementiel.',              imageUrl: u('1517248135467-4c7edcad34c4') },
       { href: '/admin/chambres',         emoji: '🛏',  label: 'Chambres',          description: 'Calendrier multi-chambres, check-in, facture PDF.',      imageUrl: u('1582719478250-c89cae4dc85b') },
@@ -113,6 +119,7 @@ export const CATEGORIES: Category[] = [
     pitch: 'RH, formation, communication, challenges.',
     tone: 'violet',
     imageUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=800&q=75',
+    videoUrl: '/videos/evenement.mp4.mp4',
     items: [
       { href: '/admin/rh',         emoji: '👥', label: 'Ressources humaines', description: 'Fiches, planning, paie, pourboires, congés.',           imageUrl: u('1521737852567-6949f3f9f2b5') },
       { href: '/equipes',          emoji: '💬', label: 'Chat équipe',         description: 'Messagerie interne 5 canaux, CR, matériel.',           imageUrl: u('1573164574572-cb89e39749b4') },

@@ -73,52 +73,83 @@ export default async function CatIndexPage() {
       />
 
       <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8">
-        {/* ─── HERO HEADER ─────────────────────────────────────────── */}
-        <header className="space-y-4">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="space-y-2 min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        {/* ─── HERO BANNER avec vidéo + logo restaurant ────────────── */}
+        <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-2xl ring-1 ring-zinc-200 min-h-[280px] sm:min-h-[360px]">
+          {/* Vidéo background autoplay loop muted */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            poster="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=75"
+            className="absolute inset-0 w-full h-full object-cover"
+            aria-hidden
+          >
+            <source src="/videos/hero.mp4.mp4" type="video/mp4" />
+          </video>
+          {/* Overlay multi-couche premium pour lisibilité texte */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20" aria-hidden />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/30" aria-hidden />
+
+          {/* Contenu hero — logo + texte */}
+          <div className="relative z-10 h-full min-h-[280px] sm:min-h-[360px] flex flex-col justify-between p-5 sm:p-8 text-white">
+            {/* Top : logo restaurant + status badge */}
+            <div className="flex items-start justify-between gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-relais.png"
+                alt="Logo Le Relais"
+                className="h-12 sm:h-16 w-auto drop-shadow-2xl"
+              />
+              <span className="inline-flex items-center gap-1.5 h-7 sm:h-8 px-3 rounded-full bg-white/15 backdrop-blur-md text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] ring-1 ring-white/30">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live
+              </span>
+            </div>
+
+            {/* Bottom : title + subtitle */}
+            <div className="space-y-2">
+              <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-white/80">
                 {bonjourSelonHeure()}{profil?.email ? ` · ${profil.email.split('@')[0]}` : ''}
               </p>
-              <h1 className="text-3xl sm:text-5xl font-black text-zinc-900 tracking-[-0.03em] leading-[0.95]">
-                Tableau de bord
+              <h1 className="text-4xl sm:text-6xl font-black tracking-[-0.035em] leading-[0.9] drop-shadow-2xl">
+                Tableau<br className="sm:hidden" /> de bord
               </h1>
-              <p className="text-sm sm:text-base text-zinc-500 max-w-xl leading-relaxed">
-                Tout ce qu'il faut piloter ton restaurant, organisé thématiquement.
-                <span className="text-zinc-400"> Clique sur une catégorie pour explorer.</span>
+              <p className="text-sm sm:text-base text-white/90 max-w-xl leading-relaxed">
+                Pilote ton restaurant en temps réel — toutes les fonctionnalités organisées thématiquement.
               </p>
             </div>
           </div>
-
-          {/* Bento stats — 3 cards alertes / CA / équipe */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <StatCard
-              label="Alertes urgentes"
-              value={nbAlertesRouges.toString()}
-              icon={<AlertTriangle className="h-4 w-4" strokeWidth={2.5} />}
-              tone={nbAlertesRouges > 0 ? 'red' : 'emerald'}
-              hint={nbAlertesRouges > 0 ? 'à traiter maintenant' : 'tout est sous contrôle'}
-              href="/admin/cat/pilotage"
-            />
-            <StatCard
-              label="CA du mois"
-              value={caMois.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'}
-              icon={<TrendingUp className="h-4 w-4" strokeWidth={2.5} />}
-              tone="emerald"
-              hint="commandes encaissées"
-              href="/admin/cat/finances"
-            />
-            <StatCard
-              label="Équipe active"
-              value={nbEquipe.toString()}
-              icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
-              tone="violet"
-              hint="employés"
-              href="/admin/cat/equipe"
-            />
-          </div>
         </header>
+
+        {/* Bento stats — 3 cards alertes / CA / équipe */}
+        <section className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatCard
+            label="Alertes urgentes"
+            value={nbAlertesRouges.toString()}
+            icon={<AlertTriangle className="h-4 w-4" strokeWidth={2.5} />}
+            tone={nbAlertesRouges > 0 ? 'red' : 'emerald'}
+            hint={nbAlertesRouges > 0 ? 'à traiter maintenant' : 'tout est sous contrôle'}
+            href="/admin/cat/pilotage"
+          />
+          <StatCard
+            label="CA du mois"
+            value={caMois.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'}
+            icon={<TrendingUp className="h-4 w-4" strokeWidth={2.5} />}
+            tone="emerald"
+            hint="commandes encaissées"
+            href="/admin/cat/finances"
+          />
+          <StatCard
+            label="Équipe active"
+            value={nbEquipe.toString()}
+            icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
+            tone="violet"
+            hint="employés"
+            href="/admin/cat/equipe"
+          />
+        </section>
 
         {/* ─── SECTION CATÉGORIES ──────────────────────────────────── */}
         <section className="space-y-3">
