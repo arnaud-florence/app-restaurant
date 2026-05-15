@@ -7,6 +7,7 @@ import {
   ListTree, Sparkles, ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -133,19 +134,23 @@ export default function EconomieClient({
   }
 
   return (
-    <div className="p-4 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-          <Wallet className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Pilotage</p>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Centre économique</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            Source unique : config + charges + contrats → point mort + challenges.
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Finances"
+          title="Centre économique"
+          description="Point mort, marges, surplus, redistribution — source unique config + charges + contrats."
+        />
 
       {/* ─── 0. Vue d'ensemble live ─────────────────────────────── */}
       <Card className="p-5 bg-gradient-to-br from-emerald-50 to-stone-50 border-emerald-200">
@@ -542,6 +547,7 @@ export default function EconomieClient({
           Au-delà, le surplus est partagé entre l'équipe à <strong>{Number(config?.pct_redistribution_surplus ?? 30).toFixed(0)} %</strong>.
         </div>
       </Card>
+      </main>
     </div>
   )
 }

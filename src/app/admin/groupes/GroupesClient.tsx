@@ -7,6 +7,7 @@ import { format, addMonths, subMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Groupe, type Paiement, type MenuGroupe,
   type TypeGroupe, type StatutGroupe, type TypePaiement, type MethodePaiement,
@@ -40,34 +41,40 @@ export default function GroupesClient({ data }: { data: DataGroupes }) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xl shadow-lg shadow-violet-500/30 shrink-0">🎉</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">B2B & événements</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Groupes</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="À venir" value={String(aVenir)} />
-            <KPI label="CA prévu" value={fmtPrix(totalRevenuPrevu)} />
-            <KPI label="À facturer" value={String(aFacturer.length)} accent={aFacturer.length > 0 ? 'orange' : 'zinc'} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'liste'} onClick={() => setTab('liste')}>
-            📋 Liste <PillCount n={data.groupes.length} active={tab === 'liste'} />
-          </PillTab>
-          <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>📅 Planning</PillTab>
-          <PillTab active={tab === 'facturation'} onClick={() => setTab('facturation')}>
-            💰 Facturation {aFacturer.length > 0 && <PillCount n={aFacturer.length} active={tab === 'facturation'} />}
-          </PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="violet"
+          subtitle="Clientèle"
+          title="Groupes"
+          description="Tour-opérateurs, menus négociés, arrhes/solde, planning événementiel."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="À venir" value={String(aVenir)} />
+              <KPI label="CA prévu" value={fmtPrix(totalRevenuPrevu)} />
+              <KPI label="À facturer" value={String(aFacturer.length)} accent={aFacturer.length > 0 ? 'orange' : 'zinc'} />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'liste'} onClick={() => setTab('liste')}>
+              📋 Liste <PillCount n={data.groupes.length} active={tab === 'liste'} />
+            </PillTab>
+            <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>📅 Planning</PillTab>
+            <PillTab active={tab === 'facturation'} onClick={() => setTab('facturation')}>
+              💰 Facturation {aFacturer.length > 0 && <PillCount n={aFacturer.length} active={tab === 'facturation'} />}
+            </PillTab>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'liste'       && <ListeTab data={data} onError={flashKo} onOk={flashOk} />}
         {tab === 'planning'    && <PlanningTab groupes={data.groupes} />}
         {tab === 'facturation' && <FacturationTab groupes={aFacturer} paiements={data.paiements} onError={flashKo} onOk={flashOk} />}

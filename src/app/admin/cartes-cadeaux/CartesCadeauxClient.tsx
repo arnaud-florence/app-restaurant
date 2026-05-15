@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Gift, Plus, Trash2, Copy, Check, Search, X, History } from 'lucide-react'
@@ -79,25 +80,30 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6">
-      <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white text-xl shadow-lg shadow-rose-500/30 shrink-0">
-            <Gift className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-600">Fidélité</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Cartes cadeaux</h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              {nbActives} active{nbActives > 1 ? 's' : ''} · {fmtPrix(totalRestant)} de solde restant · {fmtPrix(totalEmis)} émis au total
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => setCreating(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Émettre une carte
-        </Button>
-      </header>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="rose"
+          subtitle="Clientèle"
+          title="Cartes cadeaux"
+          description={`${nbActives} active${nbActives > 1 ? 's' : ''} · ${fmtPrix(totalRestant)} de solde restant · ${fmtPrix(totalEmis)} émis au total.`}
+          actions={
+            <Button onClick={() => setCreating(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Émettre une carte
+            </Button>
+          }
+        />
+
 
       <Card className="p-4 bg-pink-50 border-pink-200">
         <p className="text-xs uppercase tracking-wider text-pink-700 font-bold mb-2">🎁 Comment ça marche</p>
@@ -270,6 +276,7 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
       )}
 
       {showHistory && <HistoryModal carte={showHistory} onClose={() => setShowHistory(null)} />}
+      </main>
     </div>
   )
 }
