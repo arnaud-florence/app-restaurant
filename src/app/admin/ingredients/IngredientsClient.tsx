@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { getIngredientPhoto } from '@/lib/ingredientPhoto'
 import {
   type Ingredient, statutStock, STATUT_STOCK_STYLE, iconAllergene,
   CATEGORIES_DEFAUT,
@@ -298,17 +299,28 @@ function IngredientCard({
 }) {
   const stat = statutStock(i.stock_actuel, i.stock_minimum)
   const sty = STATUT_STOCK_STYLE[stat]
+  const photoUrl = getIngredientPhoto({
+    photo_url: (i as any).photo_url,
+    categorie: i.categorie,
+    nom: i.nom,
+    allergenes: i.allergenes,
+  })
   return (
-    <Card className={cn(!i.actif && 'opacity-60')}>
+    <Card className={cn('overflow-hidden', !i.actif && 'opacity-60')}>
+      {/* Photo header (fallback Unsplash thématique par catégorie) */}
+      <div className="relative aspect-[16/8] bg-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoUrl} alt={i.nom} loading="lazy" className="w-full h-full object-cover" />
+        <span className={cn('absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shadow', sty.bg, sty.text, sty.border)}>
+          {sty.label}
+        </span>
+      </div>
       <CardContent className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="font-bold text-base truncate">{i.nom}</p>
             <p className="text-xs text-muted-foreground">{i.categorie} · {i.unite}</p>
           </div>
-          <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', sty.bg, sty.text, sty.border)}>
-            {sty.label}
-          </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -364,11 +376,23 @@ function IngredientRow({
 }) {
   const stat = statutStock(i.stock_actuel, i.stock_minimum)
   const sty = STATUT_STOCK_STYLE[stat]
+  const photoUrl = getIngredientPhoto({
+    photo_url: (i as any).photo_url,
+    categorie: i.categorie,
+    nom: i.nom,
+    allergenes: i.allergenes,
+  })
   return (
     <tr className={cn('border-b last:border-b-0 hover:bg-muted/30 transition-colors', !i.actif && 'opacity-60')}>
       <td className="py-3 px-4">
-        <p className="font-semibold">{i.nom}</p>
-        {!i.actif && <Badge variant="secondary" className="mt-0.5">inactif</Badge>}
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoUrl} alt={i.nom} loading="lazy" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-zinc-200" />
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{i.nom}</p>
+            {!i.actif && <Badge variant="secondary" className="mt-0.5">inactif</Badge>}
+          </div>
+        </div>
       </td>
       <td className="py-3 px-2 text-muted-foreground">{i.categorie}</td>
       <td className="py-3 px-2 text-right tabular-nums font-semibold">

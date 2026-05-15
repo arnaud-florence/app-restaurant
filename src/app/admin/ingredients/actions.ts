@@ -23,6 +23,7 @@ const ingredientSchema = z.object({
     arr.filter(a => (ALLERGENES_KEYS as readonly string[]).includes(a))
   ),
   actif: z.boolean().default(true),
+  photo_url: z.string().trim().max(2000).optional().nullable(),
 }).refine(d => d.stock_minimum <= (d.stock_maximum || Infinity) || d.stock_maximum === 0, {
   message: 'Le stock minimum ne peut pas être supérieur au stock maximum.',
   path: ['stock_minimum'],
@@ -114,6 +115,7 @@ export async function createIngredient(input: unknown): Promise<Ingredient> {
       dlc_moyenne_jours: parsed.dlc_moyenne_jours,
       allergenes: parsed.allergenes,
       actif: parsed.actif,
+      photo_url: parsed.photo_url || null,
     })
     .select('*')
     .single()
@@ -145,6 +147,7 @@ export async function updateIngredient(id: string, input: unknown): Promise<Ingr
       dlc_moyenne_jours: parsed.dlc_moyenne_jours,
       allergenes: parsed.allergenes,
       actif: parsed.actif,
+      photo_url: parsed.photo_url || null,
     })
     .eq('id', id)
     .select('*')

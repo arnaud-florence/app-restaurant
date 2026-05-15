@@ -34,6 +34,7 @@ const formSchema = z.object({
   dlc_moyenne_jours: z.number().int().min(0).max(3650),
   allergenes: z.array(z.string()),
   actif: z.boolean(),
+  photo_url: z.string().trim().max(2000).optional().nullable(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -62,8 +63,9 @@ export default function IngredientFormModal({
         dlc_moyenne_jours: ingredient.dlc_moyenne_jours,
         allergenes: ingredient.allergenes,
         actif: ingredient.actif,
+        photo_url: (ingredient as any).photo_url ?? '',
       }
-    : { ...defaultIngredient() } as FormData
+    : { ...defaultIngredient(), photo_url: '' } as FormData
 
   const {
     register, handleSubmit, control, watch, setError,
@@ -113,6 +115,13 @@ export default function IngredientFormModal({
 
             <Field label="Nom *" error={errors.nom?.message}>
               <Input {...register('nom')} placeholder="Tomate San Marzano" autoFocus />
+            </Field>
+
+            <Field label="Photo (URL publique optionnelle)" error={errors.photo_url?.message as string | undefined}>
+              <Input type="url" {...register('photo_url')} placeholder="https://exemple.com/tomate.jpg" />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Laisse vide pour utiliser un visuel Unsplash automatique selon la catégorie/nom.
+              </p>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
