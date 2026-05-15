@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Pesee, type Collecte, type TypeDechet,
   TYPE_DECHET_INFO, fmtPrix, fmtPoids, fmtDate,
@@ -43,10 +44,14 @@ export default function DechetsClient({ data }: { data: DataDechets }) {
             <KPI label="Bio 7j" value={fmtPoids(bio7jPoids)} accent={bio7jPoids > 5 ? 'rouge' : 'vert'} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</TabBtn>
-          <TabBtn active={tab === 'pesees'}    onClick={() => setTab('pesees')}>⚖️ Pesées ({data.pesees.length})</TabBtn>
-          <TabBtn active={tab === 'collectes'} onClick={() => setTab('collectes')}>🚛 Collectes ({data.collectes.length})</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</PillTab>
+          <PillTab active={tab === 'pesees'} onClick={() => setTab('pesees')}>
+            ⚖️ Pesées <PillCount n={data.pesees.length} active={tab === 'pesees'} />
+          </PillTab>
+          <PillTab active={tab === 'collectes'} onClick={() => setTab('collectes')}>
+            🚛 Collectes <PillCount n={data.collectes.length} active={tab === 'collectes'} />
+          </PillTab>
         </div>
       </header>
 

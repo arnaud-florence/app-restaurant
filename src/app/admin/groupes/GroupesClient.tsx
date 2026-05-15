@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, addMonths, subMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Groupe, type Paiement, type MenuGroupe,
   type TypeGroupe, type StatutGroupe, type TypePaiement, type MethodePaiement,
@@ -55,10 +56,14 @@ export default function GroupesClient({ data }: { data: DataGroupes }) {
             <KPI label="À facturer" value={String(aFacturer.length)} accent={aFacturer.length > 0 ? 'orange' : 'zinc'} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'liste'}       onClick={() => setTab('liste')}>📋 Liste ({data.groupes.length})</TabBtn>
-          <TabBtn active={tab === 'planning'}    onClick={() => setTab('planning')}>📅 Planning</TabBtn>
-          <TabBtn active={tab === 'facturation'} onClick={() => setTab('facturation')}>💰 Facturation{aFacturer.length > 0 && ` (${aFacturer.length})`}</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'liste'} onClick={() => setTab('liste')}>
+            📋 Liste <PillCount n={data.groupes.length} active={tab === 'liste'} />
+          </PillTab>
+          <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>📅 Planning</PillTab>
+          <PillTab active={tab === 'facturation'} onClick={() => setTab('facturation')}>
+            💰 Facturation {aFacturer.length > 0 && <PillCount n={aFacturer.length} active={tab === 'facturation'} />}
+          </PillTab>
         </div>
       </header>
 

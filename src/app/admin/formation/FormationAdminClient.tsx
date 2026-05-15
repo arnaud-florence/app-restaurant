@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, BookOpen, GraduationCa
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -77,11 +78,19 @@ export default function FormationAdminClient({
         </div>
       </div>
 
-      <div className="flex gap-2 border-b overflow-x-auto">
-        <TabBtn active={tab === 'guides'}         onClick={() => setTab('guides')}><BookOpen className="h-4 w-4 inline mr-1" /> Guides ({guides.length})</TabBtn>
-        <TabBtn active={tab === 'progressions'}   onClick={() => setTab('progressions')}><Users className="h-4 w-4 inline mr-1" /> Progressions ({progressions.length})</TabBtn>
-        <TabBtn active={tab === 'certifications'} onClick={() => setTab('certifications')}>🏆 Certifs ({certifications.length})</TabBtn>
-        <TabBtn active={tab === 'questions_ia'}   onClick={() => setTab('questions_ia')}>🤖 Questions IA ({questionsIa.length})</TabBtn>
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        <PillTab active={tab === 'guides'} onClick={() => setTab('guides')}>
+          📖 Guides <PillCount n={guides.length} active={tab === 'guides'} />
+        </PillTab>
+        <PillTab active={tab === 'progressions'} onClick={() => setTab('progressions')}>
+          👥 Progressions <PillCount n={progressions.length} active={tab === 'progressions'} />
+        </PillTab>
+        <PillTab active={tab === 'certifications'} onClick={() => setTab('certifications')}>
+          🏆 Certifs <PillCount n={certifications.length} active={tab === 'certifications'} />
+        </PillTab>
+        <PillTab active={tab === 'questions_ia'} onClick={() => setTab('questions_ia')}>
+          🤖 Questions IA <PillCount n={questionsIa.length} active={tab === 'questions_ia'} />
+        </PillTab>
       </div>
 
       {tab === 'certifications' && (

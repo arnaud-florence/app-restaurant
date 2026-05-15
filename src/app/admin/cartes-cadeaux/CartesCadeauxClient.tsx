@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Gift, Plus, Trash2, Copy, Check, Search, X, History } from 'lucide-react'
+import { PillTab } from '@/components/ui/PillTab'
 import { creerCarteCadeau, annulerCarteCadeau, crediterCarteCadeau, supprimerCarteCadeau } from './actions'
 import { createClient } from '@/lib/supabase/client'
 import type { CarteCadeau, MouvementCarte } from './page'
@@ -108,30 +109,28 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
         </ul>
       </Card>
 
-      {/* Filtres */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-          <Input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Code, acheteur, bénéficiaire…"
-            className="pl-8"
-          />
+      {/* Filtres premium tactile */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+            <Input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="🔍 Code, acheteur, bénéficiaire…"
+              className="pl-8 h-11"
+            />
+          </div>
+          <span className="text-xs text-zinc-500 ml-auto">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
         </div>
-        <select
-          value={filtreStatut}
-          onChange={e => setFiltreStatut(e.target.value as typeof filtreStatut)}
-          className="h-10 px-3 rounded-md border border-input bg-background text-sm"
-        >
-          <option value="tous">Tous statuts</option>
-          <option value="active">Actives</option>
-          <option value="utilisee">Utilisées</option>
-          <option value="expiree">Expirées</option>
-          <option value="annulee">Annulées</option>
-        </select>
-        <span className="text-xs text-zinc-500 ml-auto">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+          <PillTab small active={filtreStatut === 'tous'}     onClick={() => setFiltreStatut('tous')}>Tous</PillTab>
+          <PillTab small active={filtreStatut === 'active'}   onClick={() => setFiltreStatut('active')}>✓ Actives</PillTab>
+          <PillTab small active={filtreStatut === 'utilisee'} onClick={() => setFiltreStatut('utilisee')}>💳 Utilisées</PillTab>
+          <PillTab small active={filtreStatut === 'expiree'}  onClick={() => setFiltreStatut('expiree')}>⏰ Expirées</PillTab>
+          <PillTab small active={filtreStatut === 'annulee'}  onClick={() => setFiltreStatut('annulee')}>🚫 Annulées</PillTab>
+        </div>
       </div>
 
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
