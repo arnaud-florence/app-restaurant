@@ -396,6 +396,50 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 // ─── Plan de salle ───────────────────────────────────────────────────
+
+// Styles premium par statut — gradients + shadows colorées (override local de STATUT_TABLE_STYLE)
+const TABLE_STYLE_PREMIUM: Record<StatutTable, {
+  label: string
+  card: string       // background gradient + border
+  shadow: string     // shadow colorée pour la profondeur
+  numero: string     // couleur du numéro de table
+  badge: string      // pastille label
+  accent: string     // ligne accent au-dessus du footer
+}> = {
+  libre: {
+    label: 'Disponible',
+    card: 'bg-gradient-to-br from-emerald-950/80 via-zinc-900 to-zinc-950 border-emerald-700/40',
+    shadow: 'shadow-lg shadow-emerald-900/30',
+    numero: 'text-emerald-300',
+    badge: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    accent: 'bg-emerald-500/40',
+  },
+  occupee: {
+    label: 'Service en cours',
+    card: 'bg-gradient-to-br from-amber-950/80 via-zinc-900 to-zinc-950 border-amber-700/40',
+    shadow: 'shadow-lg shadow-amber-900/30',
+    numero: 'text-amber-200',
+    badge: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+    accent: 'bg-amber-500/40',
+  },
+  reservee: {
+    label: 'Réservée',
+    card: 'bg-gradient-to-br from-blue-950/80 via-zinc-900 to-zinc-950 border-blue-700/40',
+    shadow: 'shadow-lg shadow-blue-900/30',
+    numero: 'text-blue-200',
+    badge: 'bg-blue-500/15 text-blue-300 border border-blue-500/30',
+    accent: 'bg-blue-500/40',
+  },
+  a_encaisser: {
+    label: 'À encaisser',
+    card: 'bg-gradient-to-br from-rose-950/90 via-red-950/60 to-zinc-950 border-rose-600/50',
+    shadow: 'shadow-xl shadow-rose-900/50',
+    numero: 'text-rose-200',
+    badge: 'bg-rose-500/20 text-rose-200 border border-rose-500/40',
+    accent: 'bg-rose-500/60',
+  },
+}
+
 function PlanSalle({
   zones, cmdParTable, pretsParTable, onOuvrir,
 }: {
@@ -435,33 +479,52 @@ function PlanSalle({
   }, [zones, cmdParTable])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {zones.map(([zone, tables]) => {
         const s = zoneStats[zone]
         return (
           <section key={zone}>
-            {/* Header zone avec compteur stats */}
-            <header className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
-              <h2 className="text-xl font-black capitalize text-white flex items-center gap-2">
-                <span aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
-                {zone}
-                <span className="text-xs font-normal text-zinc-500">— {s.couvertsOccupes}/{s.capaTotale} couverts</span>
-              </h2>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
-                {s.libre > 0 && <span className="px-2 py-1 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800">✓ {s.libre} libre{s.libre > 1 ? 's' : ''}</span>}
-                {s.occupee > 0 && <span className="px-2 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800">● {s.occupee} occupée{s.occupee > 1 ? 's' : ''}</span>}
-                {s.aEncaisser > 0 && <span className="px-2 py-1 rounded-full bg-red-950/60 text-red-300 border border-red-800 animate-pulse">💶 {s.aEncaisser} à encaisser</span>}
+            {/* Header zone — titre dramatique + pastilles stats */}
+            <header className="mb-4 flex items-end justify-between flex-wrap gap-3 px-1">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
+                  <h2 className="text-3xl font-black capitalize text-white tracking-tight">{zone}</h2>
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5 ml-12">
+                  {s.couvertsOccupes}/{s.capaTotale} couverts · {s.total} table{s.total > 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                {s.libre > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    {s.libre} libre{s.libre > 1 ? 's' : ''}
+                  </span>
+                )}
+                {s.occupee > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                    {s.occupee} occupée{s.occupee > 1 ? 's' : ''}
+                  </span>
+                )}
+                {s.aEncaisser > 0 && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/15 text-rose-200 border border-rose-500/40 shadow-md shadow-rose-900/30">
+                    <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+                    {s.aEncaisser} à encaisser
+                  </span>
+                )}
               </div>
             </header>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {tables.map(t => {
                 const cmd = cmdParTable.get(t.numero)
                 const nbPrets = pretsParTable.get(t.numero) ?? 0
                 const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
                   : cmd ? 'occupee'
                   : t.statut
-                const sty = STATUT_TABLE_STYLE[statutEffectif]
+                const sty = TABLE_STYLE_PREMIUM[statutEffectif]
 
                 // Durée d'occupation en min depuis ouverture commande
                 const dureeMin = cmd ? Math.max(0, Math.round((now - new Date(cmd.created_at).getTime()) / 60_000)) : null
@@ -475,47 +538,68 @@ function PlanSalle({
                     key={t.id}
                     onClick={() => onOuvrir(t)}
                     className={cn(
-                      'relative min-h-[140px] rounded-xl ring-2 transition-all active:scale-95 p-3 flex flex-col items-stretch overflow-hidden',
-                      sty.bg, sty.text, sty.ring,
+                      'relative min-h-[180px] rounded-2xl border transition-all duration-300',
+                      'flex flex-col items-stretch overflow-hidden text-left',
+                      'hover:-translate-y-1 active:scale-[0.98]',
+                      sty.card, sty.shadow,
+                      statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/30',
                     )}
                   >
-                    {/* Badge plats prêts en top-right */}
+                    {/* Badge plats prêts en top-right (glow vert) */}
                     {nbPrets > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 border-2 border-zinc-900 text-xs font-bold flex items-center justify-center shadow-lg animate-pulse z-10">
+                      <span className="absolute -top-2 -right-2 min-w-8 h-8 px-2.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-lg shadow-emerald-500/50 z-10 ring-2 ring-zinc-950">
                         🔔 {nbPrets}
                       </span>
                     )}
 
-                    {/* Header card : numéro + couverts */}
-                    <div className="flex items-start justify-between gap-1">
-                      <span className="text-3xl font-black leading-none">{t.numero}</span>
-                      <span className="inline-flex items-center gap-0.5 text-xs font-bold opacity-90" aria-label={`${t.capacite} couverts`}>
+                    {/* Top : numéro de table en grand + capacité subtile */}
+                    <div className="px-4 pt-4 pb-2 flex items-start justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Table</p>
+                        <p className={cn('text-5xl font-black leading-none mt-0.5 tabular-nums', sty.numero)}>{t.numero}</p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-300 bg-zinc-900/60 px-2 py-1 rounded-full border border-zinc-800 backdrop-blur-sm">
                         <span aria-hidden>👥</span>{t.capacite}
                       </span>
                     </div>
 
-                    {/* Centre : statut */}
-                    <div className="flex-1 flex items-center justify-center my-1">
-                      <span className="text-[11px] uppercase tracking-wider font-black opacity-95">{sty.label}</span>
+                    {/* Badge statut */}
+                    <div className="px-4 pb-2">
+                      <span className={cn(
+                        'inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full',
+                        sty.badge,
+                      )}>
+                        {sty.label}
+                      </span>
                     </div>
 
-                    {/* Footer card : infos commande si occupée/à encaisser */}
+                    {/* Ligne accent (séparateur coloré) */}
+                    <div className={cn('h-px mx-4', sty.accent)}></div>
+
+                    {/* Footer : infos commande ou état vide */}
                     {cmd ? (
-                      <div className="space-y-0.5 text-[11px] font-medium opacity-95 tabular-nums">
-                        <div className="flex items-center justify-between">
-                          <span className={cn('inline-flex items-center gap-0.5', dureeUrgent && 'text-red-200 animate-pulse')}>
-                            <span aria-hidden>⏱</span>{dureeMin}min
+                      <div className="px-4 py-3 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-zinc-300 tabular-nums">
+                          <span className={cn(
+                            'inline-flex items-center gap-1 font-semibold',
+                            dureeUrgent ? 'text-red-300' : '',
+                          )}>
+                            <span aria-hidden>⏱</span>
+                            <span>{dureeMin} min</span>
+                            {dureeUrgent && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
                           </span>
-                          <span>{cmd.articles.length} art.</span>
+                          <span className="text-zinc-400">{cmd.articles.length} art.</span>
                         </div>
                         {totalCmd > 0 && (
-                          <div className="text-center font-black text-sm">
+                          <p className="text-xl font-black text-white tabular-nums">
                             {fmtPrix(totalCmd)}
-                          </div>
+                          </p>
                         )}
                       </div>
                     ) : (
-                      <p className="text-center text-[10px] opacity-70">Disponible</p>
+                      <div className="px-4 py-3 flex-1 flex items-end">
+                        <p className="text-[10px] text-zinc-500 italic">Tap pour ouvrir une commande</p>
+                      </div>
                     )}
                   </button>
                 )
