@@ -58,6 +58,44 @@ const CHIPS_PRIMAIRES: Chip[] = [
   { href: '/admin/reservations', emoji: '📅', label: 'Résa',      tone: 'blue' },
 ]
 
+// ─── Réordonnancement contextuel selon le poste ──────────────────────
+// Pour chaque poste, on définit les hrefs PRIORITAIRES qui seront placés
+// en début de barre. Les autres chips suivent dans leur ordre par défaut.
+// Ainsi un cuisinier voit "Cuisine/Pizza/Stock" en premier au lieu de
+// scroller jusqu'au milieu.
+const POSTE_PRIORITES: Record<string, string[]> = {
+  manager:        ['/admin/pilotage', '/admin/assistant', '/mon-espace', '/admin/stock', '/admin/reservations'],
+  gerant:         ['/admin/pilotage', '/admin/assistant', '/mon-espace', '/admin/stock', '/admin/reservations'],
+  cuisinier:      ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/assistant'],
+  cuisine:        ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/assistant'],
+  pizzaiolo:      ['/pizza', '/cuisine', '/admin/stock', '/mon-espace'],
+  second:         ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/pilotage'],
+  bar:            ['/bar', '/caisse', '/mon-espace', '/admin/assistant'],
+  barman:         ['/bar', '/caisse', '/mon-espace', '/admin/assistant'],
+  serveur:        ['/serveur', '/caisse', '/admin/reservations', '/mon-espace'],
+  salle:          ['/serveur', '/caisse', '/admin/reservations', '/mon-espace'],
+  receptionniste: ['/reception', '/admin/reservations', '/serveur', '/mon-espace'],
+  plonge:         ['/cuisine', '/mon-espace'],
+  extra:          ['/cuisine', '/mon-espace'],
+}
+
+/** Réordonne les chips selon les priorités du poste. */
+function reordonnerChipsParPoste(chips: Chip[], poste: string | null | undefined): Chip[] {
+  if (!poste) return chips
+  const priorites = POSTE_PRIORITES[poste]
+  if (!priorites || priorites.length === 0) return chips
+
+  const byHref = new Map(chips.map(c => [c.href, c]))
+  const prioritaires: Chip[] = []
+  const dejaVu = new Set<string>()
+  for (const href of priorites) {
+    const c = byHref.get(href)
+    if (c) { prioritaires.push(c); dejaVu.add(href) }
+  }
+  const reste = chips.filter(c => !dejaVu.has(c.href))
+  return [...prioritaires, ...reste]
+}
+
 // ─── Tous les modules pour le drawer "Plus" (filtré canAccess) ──────
 const ALL_GROUPES: Group[] = [
   {
@@ -234,7 +272,14 @@ export default function TopActionBar({
       .filter(g => g.items.length > 0)
   }, [profil?.poste, profil?.custom_permissions, isManager, query])
 
-  const chipsVisibles = CHIPS_PRIMAIRES.filter(c => peutVoir(c.href))
+  // Chips visibles filtrés par permissions ET réordonnés selon le poste
+  const chipsVisibles = useMemo(
+    () => reordonnerChipsParPoste(
+      CHIPS_PRIMAIRES.filter(c => peutVoir(c.href)),
+      profil?.poste,
+    ),
+    [profil?.poste, profil?.custom_permissions, isManager],
+  )
 
   // ─── Auto-scroll : centre la chip active au montage et au changement ─
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -247,6 +292,38 @@ export default function TopActionBar({
       block: 'nearest',
     })
   }, [pathname])
+
+  // ─── Détection scroll left/right pour fades intelligents ─────────────
+  const [scrollState, setScrollState] = useState<{ canLeft: boolean; canRight: boolean }>({
+    canLeft: false,
+    canRight: true,
+  })
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const update = () => {
+      const canLeft = el.scrollLeft > 4
+      const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+      setScrollState(prev =>
+        prev.canLeft === canLeft && prev.canRight === canRight ? prev : { canLeft, canRight },
+      )
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [chipsVisibles.length])
+
+  // ─── Haptic feedback léger au tap sur mobile ─────────────────────────
+  function tapHaptic() {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(8) } catch { /* ignore */ }
+    }
+  }
 
   // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
   // Page light → barre sombre · Page dark → barre claire.
@@ -287,6 +364,7 @@ export default function TopActionBar({
                   key={it.href}
                   href={it.href}
                   ref={active ? activeChipRef : undefined}
+                  onClick={tapHaptic}
                   style={{ scrollSnapAlign: 'start' }}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
@@ -304,7 +382,7 @@ export default function TopActionBar({
             {/* Bouton "☰ Modules" — ouvre le drawer complet, avec badge alerte rouge live */}
             <button
               type="button"
-              onClick={() => setOpen(true)}
+              onClick={() => { tapHaptic(); setOpen(true) }}
               className={cn(
                 'relative inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                 'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
@@ -332,22 +410,24 @@ export default function TopActionBar({
           </div>
         </div>
 
-        {/* Gradient fade aux bords — indique qu'il y a plus à scroller (mobile uniquement) */}
+        {/* Gradient fade conditionnel — visible uniquement si scroll possible dans la direction */}
         <div
           className={cn(
-            'md:hidden pointer-events-none absolute inset-y-0 left-0 w-6 rounded-l-3xl',
+            'md:hidden pointer-events-none absolute inset-y-0 left-0 w-8 rounded-l-3xl transition-opacity duration-200',
+            scrollState.canLeft ? 'opacity-100' : 'opacity-0',
             theme === 'dark'
-              ? 'bg-gradient-to-r from-white to-transparent'
-              : 'bg-gradient-to-r from-zinc-900 to-transparent',
+              ? 'bg-gradient-to-r from-white via-white/80 to-transparent'
+              : 'bg-gradient-to-r from-zinc-900 via-zinc-900/80 to-transparent',
           )}
           aria-hidden
         />
         <div
           className={cn(
-            'md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 rounded-r-3xl',
+            'md:hidden pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-3xl transition-opacity duration-200',
+            scrollState.canRight ? 'opacity-100' : 'opacity-0',
             theme === 'dark'
-              ? 'bg-gradient-to-l from-white to-transparent'
-              : 'bg-gradient-to-l from-zinc-900 to-transparent',
+              ? 'bg-gradient-to-l from-white via-white/80 to-transparent'
+              : 'bg-gradient-to-l from-zinc-900 via-zinc-900/80 to-transparent',
           )}
           aria-hidden
         />
