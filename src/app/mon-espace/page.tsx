@@ -372,142 +372,180 @@ export default async function MonEspacePage() {
   const quizCls = quizScore == null ? 'text-zinc-500'
     : quizScore >= (monGuide?.seuil_reussite_pct ?? 80) ? 'text-emerald-600' : 'text-red-600'
 
+  // CTA principal selon poste
+  const actionPrincipale = POSTE_TO_ACTION[emp.poste as string] ?? POSTE_TO_ACTION.autre
+
   return (
-    <div className="min-h-screen bg-stone-50 pb-mobile-nav">
+    <div className="min-h-screen bg-[#FAFAFA] pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
 
-      <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-5">
-        {/* CTA principal : aller bosser */}
-        {(() => {
-          const action = POSTE_TO_ACTION[emp.poste as string] ?? POSTE_TO_ACTION.autre
-          return (
-            <Link href={action.href} className="block">
-              <Card className="p-4 bg-zinc-900 text-white border-zinc-700 hover:bg-zinc-800 transition-colors flex items-center gap-3">
-                <div className="text-3xl">{action.emoji}</div>
-                <div className="flex-1">
-                  <p className="text-xs uppercase tracking-wider opacity-70">Démarrer ton service</p>
-                  <p className="font-bold text-lg">{action.label}</p>
-                </div>
-                <Rocket className="h-5 w-5 opacity-80" />
-                <ChevronRight className="h-5 w-5 opacity-60" />
-              </Card>
-            </Link>
-          )
-        })()}
-
-        {/* Pointage rapide arrivée/sortie */}
-        <PointageCard pointage={pointageJour} />
-
-        {/* 3 cards day-to-day : prochains shifts + briefing + alertes perso */}
-        <ShiftsBriefingAlertes
-          employeId={empId}
-          poste={emp.poste as string}
-          posteWidget={posteWidget}
-        />
-
-        {/* 3 cards perf & équipe : comparaison + congés + météo affluence */}
-        <PerformanceCongesMeteo
-          employeId={empId}
-          poste={emp.poste as string}
-          soldeConges={Number((emp as { solde_conges_jours?: number }).solde_conges_jours ?? 0)}
-        />
-
-        {/* Header identité */}
-        <Card className="p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-emerald-700">
-          <div className="flex items-start gap-4">
-            <div className="h-16 w-16 rounded-full bg-white/20 backdrop-blur text-white text-2xl font-bold flex items-center justify-center shrink-0 border-2 border-white/30">
+      <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-3">
+        {/* Header compact : avatar + identité + résumé inline + cloche + CTA principal */}
+        <header className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-lg font-black shadow-lg shadow-emerald-500/30 shrink-0">
               {(emp.prenom as string)[0]?.toUpperCase()}
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <h1 className="text-2xl font-bold truncate">{emp.prenom} {emp.nom}</h1>
-                <div className="-mt-1 -mr-1"><NotificationsBell inverse /></div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mt-1">
-                {posteWidget && (
-                  <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
-                    {POSTE_INFO_WIDGET[posteWidget].emoji} {POSTE_INFO_WIDGET[posteWidget].label}
-                  </Badge>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                {posteWidget ? `${POSTE_INFO_WIDGET[posteWidget].emoji} ${POSTE_INFO_WIDGET[posteWidget].label}` : 'Membre équipe'}
+              </p>
+              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">
+                {emp.prenom} {emp.nom}
+              </h1>
+              <p className="text-[11px] text-zinc-500 mt-1">
+                {emp.type_contrat ?? 'CDI'} · {emp.heures_contrat ?? 35}h/sem
+                <span className="ml-2 text-zinc-400">· équipe depuis {ancMois} mois</span>
+                {heuresSemaine > 0 && (
+                  <span className={cn('ml-2 font-bold', heuresSemaine >= heuresContrat ? 'text-emerald-700' : 'text-zinc-600')}>
+                    · {heuresSemaine.toFixed(1)}h cette semaine
+                  </span>
                 )}
-                <span className="text-xs opacity-80">{emp.type_contrat ?? 'CDI'} · {emp.heures_contrat ?? 35}h/sem</span>
-                <span className="text-xs opacity-80">· dans l'équipe depuis {ancMois} mois</span>
-              </div>
-              <p className="text-xs opacity-80 mt-1">{emp.email}</p>
+              </p>
             </div>
           </div>
-        </Card>
 
-        {/* KPIs principaux — KPI Tâches retiré (cf demande user : gérer les tâches dans les écrans ops uniquement) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <KpiCard
-            icon={<CalendarDays className="h-4 w-4" />}
-            label="Heures cette semaine"
-            value={`${heuresSemaine.toFixed(1)} h`}
-            sublabel={`mois : ${heuresMois.toFixed(0)} h`}
-            cls={heuresSemaine >= heuresContrat ? 'text-emerald-600' : 'text-zinc-700'}
+          {/* CTAs principaux toujours visibles */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={actionPrincipale.href}
+              className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition"
+            >
+              {actionPrincipale.emoji} {actionPrincipale.label}
+            </Link>
+            <NotificationsBell />
+          </div>
+        </header>
+
+        {/* Bandeau actions rapides — 8 raccourcis tactiles */}
+        <section className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+          <Raccourci href={actionPrincipale.href} emoji={actionPrincipale.emoji} label="Mon poste" tone="emerald" />
+          <Raccourci href="/formation" emoji="🎓" label="Formation" tone="blue" />
+          <Raccourci href="/equipes" emoji="💬" label="Équipe" tone="violet" />
+          <Raccourci href="/mon-espace#pointage" emoji="⏱" label="Pointage" tone="amber" />
+          <Raccourci href="/mon-espace#shifts" emoji="📅" label="Planning" tone="blue" />
+          <Raccourci href="/mon-espace#paie" emoji="💰" label="Paie" tone="emerald" />
+          <Raccourci href="/mon-espace#conges" emoji="🏖" label="Congés" tone="amber" />
+          <Raccourci href="/mon-espace#challenges" emoji="🏆" label="Challenges" tone="violet" />
+        </section>
+
+        {/* Pointage rapide arrivée/sortie */}
+        <div id="pointage">
+          <PointageCard pointage={pointageJour} />
+        </div>
+
+        {/* KPIs flash en bandeau dense */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <KpiTile
+            icon={<CalendarDays className="h-3.5 w-3.5" />}
+            label="Heures semaine"
+            value={`${heuresSemaine.toFixed(1)}h`}
+            sublabel={`/ ${heuresContrat}h contrat · mois ${heuresMois.toFixed(0)}h`}
+            tone={heuresSemaine >= heuresContrat ? 'emerald' : 'zinc'}
           />
-          <KpiCard
-            icon={<GraduationCap className="h-4 w-4" />}
-            label="Score quiz formation"
+          <KpiTile
+            icon={<GraduationCap className="h-3.5 w-3.5" />}
+            label="Quiz formation"
             value={quizScore != null ? `${quizScore}%` : '—'}
             sublabel={maProgression?.statut ? statutLabel(maProgression.statut) : 'pas commencé'}
-            cls={quizCls}
+            tone={quizScore == null ? 'zinc' : quizScore >= (monGuide?.seuil_reussite_pct ?? 80) ? 'emerald' : 'red'}
           />
-          <KpiCard
-            icon={<ShieldCheck className="h-4 w-4" />}
+          <KpiTile
+            icon={<ShieldCheck className="h-3.5 w-3.5" />}
             label="Onboarding"
             value={onboarded ? 'Validé' : 'En cours'}
             sublabel={onboardingDate ?? 'à compléter'}
-            cls={onboarded ? 'text-emerald-600' : 'text-amber-600'}
+            tone={onboarded ? 'emerald' : 'amber'}
           />
-        </div>
+          <KpiTile
+            icon={<Trophy className="h-3.5 w-3.5" />}
+            label="Challenges"
+            value={`${evaluations.filter(e => e.cible_atteinte).length}/${evaluations.length}`}
+            sublabel="atteints ce mois"
+            tone={evaluations.filter(e => e.cible_atteinte).length > 0 ? 'emerald' : 'zinc'}
+          />
+        </section>
 
-        {/* Stats spécifiques au poste */}
-        {statsPoste.length > 0 && (
-          <Card className="p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
-              {iconForPoste(emp.poste as string)}
-              Mon activité — {emp.poste}
+        {/* Stats poste + 7 jours en 2 colonnes desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          {statsPoste.length > 0 && (
+            <Card className="p-3 lg:col-span-2">
+              <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1.5">
+                {iconForPoste(emp.poste as string)}
+                Mon activité — {emp.poste}
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {statsPoste.map(s => (
+                  <div key={s.label} className="rounded-lg bg-zinc-50 p-2.5">
+                    <p className="text-lg leading-none">{s.emoji}</p>
+                    <p className="text-lg font-black tabular-nums mt-1">{s.value}</p>
+                    <p className="text-[10px] text-zinc-700 font-bold">{s.label}</p>
+                    {s.sublabel && <p className="text-[9px] text-zinc-500 mt-0.5">{s.sublabel}</p>}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <Card className={cn('p-3', statsPoste.length === 0 && 'lg:col-span-3')}>
+            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2">
+              7 derniers jours
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {statsPoste.map(s => (
-                <div key={s.label} className="rounded-md bg-zinc-50 p-3">
-                  <p className="text-2xl">{s.emoji}</p>
-                  <p className="text-xl font-bold tabular-nums mt-0.5">{s.value}</p>
-                  <p className="text-xs text-zinc-700">{s.label}</p>
-                  {s.sublabel && <p className="text-[10px] text-zinc-500">{s.sublabel}</p>}
+            <div className="grid grid-cols-7 gap-1">
+              {days7.map(d => (
+                <div key={d.iso} className={cn(
+                  'rounded-md border p-1.5 text-center',
+                  d.iso === todayISO ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 bg-zinc-50',
+                )}>
+                  <p className="text-[9px] uppercase font-bold text-zinc-500 leading-none">{d.jour}</p>
+                  <p className="text-[9px] text-zinc-400 mt-0.5">{d.iso.slice(8)}</p>
+                  <p className="text-xs font-black mt-0.5">{d.heures > 0 ? `${d.heures.toFixed(1)}h` : '—'}</p>
                 </div>
               ))}
             </div>
           </Card>
-        )}
+        </div>
 
-        {/* Historique 7 jours */}
-        <Card className="p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3">
-            7 derniers jours
-          </h2>
-          <div className="grid grid-cols-7 gap-2">
-            {days7.map(d => (
-              <div key={d.iso} className={cn(
-                'rounded-md border p-2 text-center',
-                d.iso === todayISO ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 bg-zinc-50',
-              )}>
-                <p className="text-[10px] uppercase font-bold text-zinc-500">{d.jour}</p>
-                <p className="text-[10px] text-zinc-400">{d.iso.slice(8)}</p>
-                <p className="text-sm font-bold mt-1">{d.heures > 0 ? `${d.heures.toFixed(1)}h` : '—'}</p>
-              </div>
-            ))}
+        {/* Shifts/briefing + Performance/congés — collapsibles */}
+        <details id="shifts" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+              📅 Prochains shifts · briefing · alertes perso
+            </h2>
+            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div className="p-3 border-t border-zinc-100">
+            <ShiftsBriefingAlertes
+              employeId={empId}
+              poste={emp.poste as string}
+              posteWidget={posteWidget}
+            />
           </div>
-        </Card>
+        </details>
+
+        <details id="conges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+              🏖 Performance · congés · météo affluence
+            </h2>
+            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div className="p-3 border-t border-zinc-100">
+            <PerformanceCongesMeteo
+              employeId={empId}
+              poste={emp.poste as string}
+              soldeConges={Number((emp as { solde_conges_jours?: number }).solde_conges_jours ?? 0)}
+            />
+          </div>
+        </details>
 
         {/* Manuels formation */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
-              <ScrollText className="h-4 w-4" /> Mes manuels de formation
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+              <ScrollText className="h-3.5 w-3.5" /> Mes manuels de formation
             </h2>
-            <Link href="/formation" className="text-xs text-emerald-700 hover:text-emerald-900 font-medium">
+            <Link href="/formation" className="text-xs text-emerald-700 hover:text-emerald-900 font-bold">
               Tout voir →
             </Link>
           </div>
@@ -543,7 +581,7 @@ export default async function MonEspacePage() {
           )}
         </Card>
 
-        {/* Rémunération du mois — estimation brute */}
+        {/* Rémunération du mois — estimation brute (collapsible) */}
         {(() => {
           const baseHeures = heuresMois * smic
           const primesFixes = evaluations
@@ -552,10 +590,17 @@ export default async function MonEspacePage() {
           const bonusSurplus = surplusInfo.ma_part
           const total = baseHeures + primesFixes + bonusSurplus
           return (
-            <Card className="p-5">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
-                <Wallet className="h-4 w-4" /> Ma rémunération brute estimée — ce mois
-              </h2>
+            <details id="paie" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+              <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+                <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                  <Wallet className="h-3.5 w-3.5" /> Ma rémunération brute estimée — ce mois
+                  <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-zinc-900 text-white text-[10px] font-black tabular-nums normal-case tracking-normal">
+                    {total.toFixed(0)} €
+                  </span>
+                </h2>
+                <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+              </summary>
+              <div className="p-3 border-t border-zinc-100">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-md bg-zinc-50 p-3">
                   <p className="text-xs text-zinc-500">Heures × SMIC</p>
@@ -587,15 +632,23 @@ export default async function MonEspacePage() {
               <p className="mt-2 text-[11px] text-zinc-500 italic">
                 Estimation live. Le total final sera arrêté à la clôture du mois par le manager.
               </p>
-            </Card>
+              </div>
+            </details>
           )
         })()}
 
-        {/* Mes challenges actifs */}
-        <Card className="p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
-            <Target className="h-4 w-4" /> Mes challenges actifs
-          </h2>
+        {/* Mes challenges actifs (collapsible) */}
+        <details id="challenges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+              <Target className="h-3.5 w-3.5" /> Mes challenges actifs
+              <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-black tabular-nums normal-case tracking-normal">
+                {evaluations.filter(e => e.cible_atteinte).length} / {evaluations.length}
+              </span>
+            </h2>
+            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+          </summary>
+          <div className="p-3 border-t border-zinc-100">
           {evaluations.length === 0 ? (
             <p className="text-sm text-zinc-500 italic text-center py-6">
               Aucun challenge actif pour ton poste. Demande au gérant.
@@ -716,8 +769,62 @@ export default async function MonEspacePage() {
           <p className="mt-3 text-[11px] text-zinc-400 italic">
             🎯 Atteins tes cibles pour décrocher les primes. Mises à jour live à chaque action.
           </p>
-        </Card>
+          </div>
+        </details>
+      </main>
+    </div>
+  )
+}
+
+// ─── Raccourci tactile ────────────────────────────────────────────
+function Raccourci({ href, emoji, label, tone }: {
+  href: string; emoji: string; label: string
+  tone: 'emerald' | 'amber' | 'violet' | 'blue' | 'zinc'
+}) {
+  const tones: Record<typeof tone, string> = {
+    emerald: 'hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900',
+    amber:   'hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900',
+    violet:  'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-900',
+    blue:    'hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900',
+    zinc:    'hover:bg-zinc-50 hover:border-zinc-300 hover:text-zinc-900',
+  }
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group flex flex-col items-center justify-center text-center min-h-[64px] p-2 rounded-xl border border-zinc-200 bg-white text-zinc-700 active:scale-95 transition',
+        tones[tone],
+      )}
+    >
+      <span className="text-xl leading-none" aria-hidden>{emoji}</span>
+      <span className="text-[11px] font-bold mt-1">{label}</span>
+    </Link>
+  )
+}
+
+// ─── KPI tile dense ───────────────────────────────────────────────
+function KpiTile({ icon, label, value, sublabel, tone }: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  sublabel?: string
+  tone: 'emerald' | 'amber' | 'red' | 'zinc'
+}) {
+  const tones: Record<typeof tone, { bg: string; value: string; label: string }> = {
+    emerald: { bg: 'bg-emerald-50 border-emerald-200', value: 'text-emerald-700', label: 'text-emerald-700' },
+    amber:   { bg: 'bg-amber-50 border-amber-200',     value: 'text-amber-800',   label: 'text-amber-700' },
+    red:     { bg: 'bg-red-50 border-red-200',         value: 'text-red-700',     label: 'text-red-700' },
+    zinc:    { bg: 'bg-white border-zinc-200',         value: 'text-zinc-900',    label: 'text-zinc-500' },
+  }
+  const t = tones[tone]
+  return (
+    <div className={cn('rounded-2xl border p-3', t.bg)}>
+      <div className={cn('flex items-center gap-1 text-[10px] font-black uppercase tracking-wider', t.label)}>
+        {icon}
+        <span className="truncate">{label}</span>
       </div>
+      <p className={cn('text-xl font-black tabular-nums mt-1 leading-none', t.value)}>{value}</p>
+      {sublabel && <p className="text-[10px] text-zinc-500 mt-1 truncate">{sublabel}</p>}
     </div>
   )
 }
