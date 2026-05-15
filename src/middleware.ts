@@ -65,6 +65,11 @@ export async function middleware(request: NextRequest) {
   // Sur ops : pas de check matrice (un cuisinier peut aller sur /caisse en mode kiosk)
   if (isOps) return response
 
+  // Pages catégorie /admin/cat/[slug] : accessibles à tous les profils onboardés
+  // (juste un index de tuiles, les tuiles elles-mêmes sont filtrées par canAccess
+  // dans la page Server Component).
+  if (path === '/admin/cat' || path.startsWith('/admin/cat/')) return response
+
   // Sur admin : check matrice
   const overrides = (profil?.custom_permissions ?? null) as CustomPermissions | null
   if (canAccess(profil?.poste, path, overrides)) return response

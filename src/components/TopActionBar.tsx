@@ -313,16 +313,14 @@ export default function TopActionBar({
       if (!Number.isInteger(n) || n < 1 || n > 9) return
       const cat = chipsVisibles[n - 1]
       if (!cat) return
-      const href = cat.slug === 'accueil'
-        ? (isManager ? '/admin/pilotage' : '/mon-espace')
-        : `/admin/cat/${cat.slug}`
+      const href = `/admin/cat/${cat.slug}`
       e.preventDefault()
       setPendingHref(href)
       router.push(href)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [chipsVisibles, router, isManager])
+  }, [chipsVisibles, router])
 
   // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
   // Page light → barre sombre · Page dark → barre claire.
@@ -356,13 +354,10 @@ export default function TopActionBar({
         >
           <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
             {chipsVisibles.map((cat, idx) => {
-              // Pour le chip "Accueil", manager pointe directement vers /admin/pilotage
-              // sinon vers /mon-espace. Les autres catégories pointent vers /admin/cat/<slug>.
-              const href = cat.slug === 'accueil'
-                ? (isManager ? '/admin/pilotage' : '/mon-espace')
-                : `/admin/cat/${cat.slug}`
+              // Toutes les catégories pointent vers leur page /admin/cat/<slug>
+              // (y compris Accueil — l'utilisateur veut voir ses sous-modules en tuiles).
+              const href = `/admin/cat/${cat.slug}`
               const active = activeCategory?.slug === cat.slug
-                || (cat.slug === 'accueil' && (pathname === '/mon-espace' || pathname === '/admin' || pathname.startsWith('/admin/pilotage') || pathname.startsWith('/admin/assistant') || pathname.startsWith('/admin/journal') || pathname.startsWith('/admin/previsionnel')))
               const isPending = pendingHref === href
               const cls = active ? tones[cat.tone].active : tones[cat.tone].base
               const shortcut = idx < 9 ? `Alt+${idx + 1}` : undefined
