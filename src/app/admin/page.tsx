@@ -67,18 +67,6 @@ export default async function AdminHome() {
           </div>
         </header>
 
-        {/* Bandeau actions rapides ultra-dense — 8 boutons tactiles */}
-        <section className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-          <Raccourci href="/serveur"             emoji="🍽" label="Service" tone="emerald" />
-          <Raccourci href="/caisse"              emoji="💰" label="Caisse" tone="amber" />
-          <Raccourci href="/cuisine"             emoji="👨‍🍳" label="Cuisine" tone="amber" />
-          <Raccourci href="/bar"                 emoji="🍷" label="Bar" tone="violet" />
-          <Raccourci href="/admin/stock"         emoji="📦" label="Stock" tone="blue" />
-          <Raccourci href="/admin/reservations"  emoji="📅" label="Résa" tone="blue" />
-          <Raccourci href="/admin/fournisseurs"  emoji="🚚" label="Fournis." tone="zinc" />
-          <Raccourci href="/admin/rh"            emoji="👥" label="Équipe" tone="zinc" />
-        </section>
-
         {/* Alertes — liste compacte avec CTA inline (1 alerte = 1 ligne, max 4) */}
         {alertes.length > 0 ? (
           <section className="rounded-2xl border-2 border-red-200 bg-white p-2 shadow-sm">

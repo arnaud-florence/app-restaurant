@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import TopActionBar from '@/components/TopActionBar'
 
 // Layout commun aux écrans de service (cuisine, bar, serveur).
 // Force le fond sombre #0D0D0D + texte clair pour l'usage tablette
@@ -19,6 +20,7 @@ export const viewport: Viewport = {
 export default function OpsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-zinc-100" data-ops-theme="dark">
+      <TopActionBar theme="dark" variant="ops" />
       {children}
     </div>
   )

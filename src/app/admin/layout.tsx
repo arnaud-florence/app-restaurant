@@ -5,6 +5,7 @@
 import { getProfile } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AdminNav from './AdminNav'
+import TopActionBar from '@/components/TopActionBar'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-stone-50">
       <AdminNav profil={profil} />
-      <div className="flex-1 min-w-0 pb-mobile-nav">{children}</div>
+      <div className="flex-1 min-w-0 pb-mobile-nav flex flex-col">
+        <TopActionBar theme="light" variant="admin" />
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
     </div>
   )
 }

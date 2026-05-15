@@ -11,6 +11,7 @@ import FormationListClient from './FormationListClient'
 import MonProfilFormation from '@/components/MonProfilFormation'
 import { guideAccessibleAuPoste, type Guide, type Progression } from '@/lib/formation'
 import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import TopActionBar from '@/components/TopActionBar'
 
 export const metadata = { title: 'Formation' }
 export const dynamic = 'force-dynamic'
@@ -73,6 +74,7 @@ export default async function FormationListPage() {
 
   return (
     <>
+      <TopActionBar theme="light" variant="admin" />
       {lockedEmployeId && (
         <div className="max-w-6xl mx-auto px-4 pt-4">
           <MonProfilFormation employeId={lockedEmployeId} />

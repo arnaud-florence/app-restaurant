@@ -30,6 +30,7 @@ import PointageCard, { type Pointage as PointageRow } from './PointageCard'
 import ShiftsBriefingAlertes from './ShiftsBriefingAlertes'
 import PerformanceCongesMeteo from './PerformanceCongesMeteo'
 import NotificationsBell from '@/components/NotificationsBell'
+import TopActionBar from '@/components/TopActionBar'
 import { evaluerChallengesEmploye, partSurplusPondereeHeures } from '@/lib/challenges-evaluation'
 import { calculerMetrique, METRIQUE_LABEL, periodeMoisCourant } from '@/lib/challenges-metrics'
 import { leaderboardsPourEmploye, type ChallengeLeaderboard } from '@/lib/challenges-leaderboards'
@@ -378,6 +379,7 @@ export default async function MonEspacePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
+      <TopActionBar theme="light" variant="admin" />
 
       <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-3">
         {/* Header compact : avatar + identité + résumé inline + cloche + CTA principal */}
@@ -416,18 +418,6 @@ export default async function MonEspacePage() {
             <NotificationsBell />
           </div>
         </header>
-
-        {/* Bandeau actions rapides — 8 raccourcis tactiles */}
-        <section className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-          <Raccourci href={actionPrincipale.href} emoji={actionPrincipale.emoji} label="Mon poste" tone="emerald" />
-          <Raccourci href="/formation" emoji="🎓" label="Formation" tone="blue" />
-          <Raccourci href="/equipes" emoji="💬" label="Équipe" tone="violet" />
-          <Raccourci href="/mon-espace#pointage" emoji="⏱" label="Pointage" tone="amber" />
-          <Raccourci href="/mon-espace#shifts" emoji="📅" label="Planning" tone="blue" />
-          <Raccourci href="/mon-espace#paie" emoji="💰" label="Paie" tone="emerald" />
-          <Raccourci href="/mon-espace#conges" emoji="🏖" label="Congés" tone="amber" />
-          <Raccourci href="/mon-espace#challenges" emoji="🏆" label="Challenges" tone="violet" />
-        </section>
 
         {/* Pointage rapide arrivée/sortie */}
         <div id="pointage">
