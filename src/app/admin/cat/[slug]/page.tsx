@@ -8,6 +8,7 @@ import { CATEGORIES, type Category } from '@/lib/navigation'
 import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -340,34 +341,45 @@ export default async function CategoriePage({ params }: { params: { slug: string
                     </>
                   )}
 
-                  {/* Badge compteur en haut à droite */}
+                  {/* Numéro éditorial top-left — style magazine restaurant */}
+                  <span className={cn(
+                    'absolute top-4 left-4 font-serif italic text-2xl sm:text-3xl tabular-nums leading-none drop-shadow-lg z-10',
+                    hasImage ? 'text-white/90' : tone.cardLabel,
+                  )}>
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+
+                  {/* Badge compteur top-right (style éditorial chic) */}
                   {compteur && (
                     <span
-                      className={`absolute top-3 right-3 inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[11px] font-black tabular-nums shadow-xl ring-1 z-10 ${
+                      className={cn(
+                        'absolute top-4 right-4 inline-flex items-center gap-1 h-6 px-2 text-[10px] font-black uppercase tracking-[0.1em] tabular-nums z-10',
                         compteur.urgent
-                          ? 'bg-red-600 text-white shadow-red-500/40 animate-pulse ring-red-400/50'
-                          : 'bg-white/95 backdrop-blur text-zinc-900 ring-black/5'
-                      }`}
+                          ? 'bg-red-600 text-white px-2.5 rounded-full shadow-lg shadow-red-500/40 animate-pulse'
+                          : (hasImage
+                              ? 'text-white/95 bg-white/15 backdrop-blur-md rounded-full ring-1 ring-white/30 px-2.5'
+                              : 'text-zinc-900 bg-white/95 backdrop-blur rounded-full ring-1 ring-zinc-200 px-2.5'),
+                      )}
                     >
-                      {compteur.urgent && <span className="text-[9px]">🔴</span>}
                       {compteur.count.toLocaleString('fr-FR')}
                     </span>
                   )}
 
-                  {/* Pastille emoji en haut à gauche (accent gradient) */}
-                  <span className={`absolute top-3 left-3 inline-flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-2xl shadow-2xl z-10 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 ring-2 ring-white/40`}>
-                    {it.emoji}
-                  </span>
+                  {/* Trait décoratif vertical centre-gauche (signature éditoriale) */}
+                  <span className={cn(
+                    'absolute top-1/3 bottom-1/3 left-0 w-[3px] z-10',
+                    hasImage ? 'bg-white/30' : `bg-gradient-to-b ${tone.cardEmojiGradient}`,
+                  )} aria-hidden />
 
                   {/* Texte en bas (sur l'overlay si image, sinon centré) */}
                   {hasImage ? (
-                    <div className="relative z-10 mt-auto p-3.5 sm:p-4 text-white space-y-1">
+                    <div className="relative z-10 mt-auto p-4 sm:p-5 text-white space-y-1.5">
                       {compteur?.label && (
-                        <p className={`text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${compteur.urgent ? 'text-red-300' : 'text-white/75'}`}>
+                        <p className={`text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] ${compteur.urgent ? 'text-red-300' : 'text-white/75'}`}>
                           {compteur.label}
                         </p>
                       )}
-                      <h3 className="text-base sm:text-lg font-black tracking-[-0.02em] leading-tight drop-shadow-lg">
+                      <h3 className="text-lg sm:text-xl font-black tracking-[-0.02em] leading-[1.1] drop-shadow-lg">
                         {it.label}
                       </h3>
                       <p className="text-[11px] sm:text-xs text-white/85 line-clamp-2 leading-snug pt-0.5">
@@ -375,8 +387,8 @@ export default async function CategoriePage({ params }: { params: { slug: string
                       </p>
                     </div>
                   ) : (
-                    <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-5 pt-16 space-y-1">
-                      <h3 className={`text-base sm:text-lg font-black tracking-[-0.02em] leading-tight ${tone.cardLabel}`}>
+                    <div className="relative z-10 mt-auto p-4 sm:p-5 space-y-1.5">
+                      <h3 className={`text-lg sm:text-xl font-black tracking-[-0.02em] leading-[1.1] ${tone.cardLabel}`}>
                         {it.label}
                       </h3>
                       {compteur?.label && (

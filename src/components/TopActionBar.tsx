@@ -121,40 +121,26 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
 // Alias pour compat (utilisé dans le code ops chips)
 const ICON_BY_OPS_HREF = ICON_BY_HREF
 
-/** Style du mini "icon-glow" : carré gradient avec icône blanche dedans. */
+/** Style éditorial premium : juste un trait vertical coloré + icône line discrète.
+ *  Inspiré des menus de restaurants haut de gamme — moins "jeu mobile", plus "magazine". */
 function ChipIcon({
   Icon, tone, active,
 }: { Icon: LucideIcon; tone: Tone; active: boolean }) {
-  const gradients: Record<Tone, string> = {
-    emerald: 'from-emerald-500 to-teal-600',
-    amber:   'from-amber-500 to-orange-600',
-    violet:  'from-violet-500 to-purple-600',
-    blue:    'from-blue-500 to-sky-600',
-    red:     'from-red-500 to-rose-600',
-    rose:    'from-rose-500 to-pink-600',
-    zinc:    'from-zinc-700 to-zinc-900',
-  }
-  const shadows: Record<Tone, string> = {
-    emerald: 'shadow-emerald-500/40',
-    amber:   'shadow-amber-500/40',
-    violet:  'shadow-violet-500/40',
-    blue:    'shadow-blue-500/40',
-    red:     'shadow-red-500/40',
-    rose:    'shadow-rose-500/40',
-    zinc:    'shadow-zinc-900/30',
+  const colors: Record<Tone, string> = {
+    emerald: 'bg-emerald-500',
+    amber:   'bg-amber-500',
+    violet:  'bg-violet-500',
+    blue:    'bg-blue-500',
+    red:     'bg-red-500',
+    rose:    'bg-rose-500',
+    zinc:    'bg-zinc-900',
   }
   return (
-    <span
-      className={cn(
-        'inline-flex items-center justify-center rounded-lg shrink-0 transition-transform duration-300 group-active:scale-90 group-hover:scale-105',
-        'w-7 h-7 md:w-6 md:h-6',
-        active
-          ? 'bg-white text-zinc-900 shadow-md'
-          : `bg-gradient-to-br ${gradients[tone]} text-white shadow-lg ${shadows[tone]}`,
-      )}
-      aria-hidden
-    >
-      <Icon className="h-4 w-4 md:h-3.5 md:w-3.5" strokeWidth={2.5} />
+    <span className="inline-flex items-center gap-2 shrink-0" aria-hidden>
+      {/* Trait vertical de couleur (style "marker éditorial") */}
+      <span className={cn('w-[3px] h-5 md:h-4 rounded-full', active ? 'bg-current' : colors[tone])} />
+      {/* Icône ligne discrète, pas de carré encadrant */}
+      <Icon className={cn('h-4 w-4 md:h-3.5 md:w-3.5', active ? 'opacity-100' : 'opacity-70')} strokeWidth={2} />
     </span>
   )
 }

@@ -8,6 +8,7 @@ import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { ArrowRight, Sparkles, AlertTriangle, TrendingUp, Users } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Accueil — Tableau de bord' }
@@ -192,26 +193,24 @@ export default async function CatIndexPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/0" aria-hidden />
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30" aria-hidden />
 
-                  {/* Badge nb sous-modules — top right */}
-                  <span className="absolute top-3 right-3 inline-flex items-center justify-center min-w-[28px] h-7 px-2.5 rounded-full bg-white/95 backdrop-blur text-zinc-900 text-[11px] font-black tabular-nums shadow-xl z-10 ring-1 ring-black/5">
-                    {cat.items.length}
+                  {/* Numéro éditorial — top right, style magazine */}
+                  <span className="absolute top-4 right-4 text-white/90 font-serif italic text-2xl sm:text-3xl tracking-tight tabular-nums drop-shadow-lg z-10 leading-none">
+                    {String(idx + 1).padStart(2, '0')}
                   </span>
 
-                  {/* Pastille emoji — top left */}
-                  <span className={`absolute top-3 left-3 inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br ${tone.emojiGradient} text-white text-2xl shadow-2xl z-10 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 ring-2 ring-white/40`}>
-                    {cat.emoji}
-                  </span>
+                  {/* Trait décoratif vertical à gauche (signature éditoriale) */}
+                  <span className="absolute top-1/4 bottom-1/4 left-0 w-[3px] bg-white/40 z-10" aria-hidden />
 
                   {/* Texte + flèche en bas (sur l'overlay) */}
-                  <div className="relative z-10 p-3.5 sm:p-4 text-white space-y-1">
-                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] text-white/75">
+                  <div className="relative z-10 p-4 sm:p-5 text-white space-y-1.5">
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/70">
                       {cat.items.length} module{cat.items.length > 1 ? 's' : ''}
                     </p>
                     <div className="flex items-end justify-between gap-2">
-                      <h3 className="text-lg sm:text-xl font-black tracking-[-0.02em] leading-tight drop-shadow-lg">
+                      <h3 className="text-xl sm:text-2xl font-black tracking-[-0.02em] leading-[1.05] drop-shadow-lg">
                         {cat.label}
                       </h3>
-                      <ArrowRight className="h-4 w-4 text-white/70 shrink-0 mb-0.5 group-hover:translate-x-1 group-hover:text-white transition-all duration-300" strokeWidth={2.5} />
+                      <ArrowRight className="h-5 w-5 text-white/70 shrink-0 mb-1 group-hover:translate-x-1 group-hover:text-white transition-all duration-300" strokeWidth={1.75} />
                     </div>
                     <p className="text-[11px] sm:text-xs text-white/85 line-clamp-2 leading-snug pt-0.5">
                       {cat.pitch}
@@ -238,64 +237,37 @@ function StatCard({
   hint: string
   href: string
 }) {
-  const tones: Record<typeof tone, {
-    bg: string; iconGradient: string; iconShadow: string; valueText: string; labelText: string; glowHover: string;
-  }> = {
-    emerald: {
-      bg: 'bg-white',
-      iconGradient: 'from-emerald-500 to-teal-600',
-      iconShadow: 'shadow-emerald-500/30',
-      valueText: 'text-emerald-700',
-      labelText: 'text-emerald-600',
-      glowHover: 'hover:shadow-emerald-500/10',
-    },
-    red: {
-      bg: 'bg-white',
-      iconGradient: 'from-red-500 to-rose-600',
-      iconShadow: 'shadow-red-500/30',
-      valueText: 'text-red-700',
-      labelText: 'text-red-600',
-      glowHover: 'hover:shadow-red-500/10',
-    },
-    violet: {
-      bg: 'bg-white',
-      iconGradient: 'from-violet-500 to-purple-600',
-      iconShadow: 'shadow-violet-500/30',
-      valueText: 'text-violet-700',
-      labelText: 'text-violet-600',
-      glowHover: 'hover:shadow-violet-500/10',
-    },
-    amber: {
-      bg: 'bg-white',
-      iconGradient: 'from-amber-500 to-orange-600',
-      iconShadow: 'shadow-amber-500/30',
-      valueText: 'text-amber-700',
-      labelText: 'text-amber-600',
-      glowHover: 'hover:shadow-amber-500/10',
-    },
+  // Style éditorial : trait vertical coloré + grand chiffre + label uppercase
+  const tones: Record<typeof tone, { accent: string; valueText: string; labelText: string; iconColor: string }> = {
+    emerald: { accent: 'bg-emerald-500', valueText: 'text-zinc-900', labelText: 'text-emerald-700', iconColor: 'text-emerald-700' },
+    red:     { accent: 'bg-red-500',     valueText: 'text-red-900',  labelText: 'text-red-700',     iconColor: 'text-red-700' },
+    violet:  { accent: 'bg-violet-500',  valueText: 'text-zinc-900', labelText: 'text-violet-700',  iconColor: 'text-violet-700' },
+    amber:   { accent: 'bg-amber-500',   valueText: 'text-zinc-900', labelText: 'text-amber-700',   iconColor: 'text-amber-700' },
   }
   const t = tones[tone]
   return (
     <Link
       href={href}
-      className={`lift-on-hover group relative flex flex-col p-3 sm:p-4 rounded-2xl ring-1 ring-zinc-200 hover:ring-zinc-300 hover:shadow-xl ${t.glowHover} active:scale-[0.98] active:translate-y-0 ${t.bg} overflow-hidden`}
+      className="lift-on-hover group relative flex bg-white rounded-2xl ring-1 ring-zinc-200 hover:ring-zinc-400 hover:shadow-xl active:scale-[0.98] active:translate-y-0 overflow-hidden"
     >
-      {/* Subtle gradient overlay top-right pour profondeur */}
-      <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full bg-gradient-to-br ${t.iconGradient} opacity-[0.06] blur-2xl pointer-events-none`} aria-hidden />
+      {/* Trait vertical coloré — signature éditoriale gauche */}
+      <span className={cn('w-1 self-stretch shrink-0', t.accent)} aria-hidden />
 
-      <div className="relative flex items-center justify-between gap-2">
-        <span className={`inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br ${t.iconGradient} text-white shadow-lg ${t.iconShadow}`}>
-          {icon}
-        </span>
-        <ArrowRight className="h-3.5 w-3.5 text-zinc-300 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition-all" strokeWidth={2.5} />
+      <div className="flex-1 p-3 sm:p-4 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className={cn('inline-flex items-center justify-center', t.iconColor)}>
+            {icon}
+          </span>
+          <ArrowRight className="h-3.5 w-3.5 text-zinc-300 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition-all" strokeWidth={1.75} />
+        </div>
+        <p className={cn('mt-3 sm:mt-4 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] truncate', t.labelText)}>
+          {label}
+        </p>
+        <p className={cn('text-xl sm:text-3xl font-black tracking-[-0.035em] tabular-nums leading-none mt-1.5 truncate', t.valueText)}>
+          {value}
+        </p>
+        <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-1.5 truncate">{hint}</p>
       </div>
-      <p className={`relative mt-2 sm:mt-3 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${t.labelText} truncate`}>
-        {label}
-      </p>
-      <p className={`relative text-xl sm:text-3xl font-black tracking-[-0.03em] tabular-nums leading-none mt-1 ${t.valueText} truncate`}>
-        {value}
-      </p>
-      <p className="relative text-[10px] sm:text-[11px] text-zinc-400 mt-1 truncate">{hint}</p>
     </Link>
   )
 }
