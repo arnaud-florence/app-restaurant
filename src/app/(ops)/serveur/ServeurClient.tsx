@@ -404,48 +404,126 @@ function PlanSalle({
   pretsParTable: Map<string, number>
   onOuvrir: (t: Table) => void
 }) {
+  // tick chaque 30s pour rafraîchir la durée d'occupation des tables
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(i)
+  }, [])
+
+  // Stats globales par zone
+  const zoneStats = useMemo(() => {
+    const stats: Record<string, { libre: number; occupee: number; aEncaisser: number; total: number; couvertsOccupes: number; capaTotale: number }> = {}
+    for (const [zone, tables] of zones) {
+      const s = { libre: 0, occupee: 0, aEncaisser: 0, total: tables.length, couvertsOccupes: 0, capaTotale: 0 }
+      for (const t of tables) {
+        s.capaTotale += t.capacite
+        const cmd = cmdParTable.get(t.numero)
+        const statutEffectif = cmd?.statut === 'servi' ? 'a_encaisser' : cmd ? 'occupee' : t.statut
+        if (statutEffectif === 'libre') s.libre++
+        else if (statutEffectif === 'a_encaisser') {
+          s.aEncaisser++
+          s.couvertsOccupes += t.capacite
+        } else if (statutEffectif === 'occupee') {
+          s.occupee++
+          s.couvertsOccupes += t.capacite
+        }
+      }
+      stats[zone] = s
+    }
+    return stats
+  }, [zones, cmdParTable])
+
   return (
     <div className="space-y-6">
-      {zones.map(([zone, tables]) => (
-        <section key={zone}>
-          <h2 className="text-lg font-bold mb-2 capitalize">{zone}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {tables.map(t => {
-              const cmd = cmdParTable.get(t.numero)
-              const nbPrets = pretsParTable.get(t.numero) ?? 0
-              // Statut d'affichage : a_encaisser si commande servi sur cette table, sinon t.statut
-              const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
-                : cmd ? 'occupee'
-                : t.statut
-              const sty = STATUT_TABLE_STYLE[statutEffectif]
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => onOuvrir(t)}
-                  className={cn(
-                    'relative min-h-[120px] rounded-xl ring-4 transition-all active:scale-95 p-3 flex flex-col items-center justify-center gap-1',
-                    sty.bg, sty.text, sty.ring,
-                  )}
-                >
-                  {nbPrets > 0 && (
-                    <span className="absolute -top-2 -right-2 min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 border-2 border-zinc-900 text-xs font-bold flex items-center justify-center shadow-lg animate-pulse">
-                      🔔 {nbPrets}
-                    </span>
-                  )}
-                  <p className="text-3xl font-bold">T{t.numero}</p>
-                  <p className="text-xs opacity-90">{t.capacite} couvert{t.capacite > 1 ? 's' : ''}</p>
-                  <p className="text-[10px] uppercase tracking-wider font-bold opacity-90">{sty.label}</p>
-                  {cmd && (
-                    <p className="text-[10px] opacity-80 mt-0.5">
-                      {cmd.articles.length} article{cmd.articles.length > 1 ? 's' : ''}
-                    </p>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+      {zones.map(([zone, tables]) => {
+        const s = zoneStats[zone]
+        return (
+          <section key={zone}>
+            {/* Header zone avec compteur stats */}
+            <header className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+              <h2 className="text-xl font-black capitalize text-white flex items-center gap-2">
+                <span aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
+                {zone}
+                <span className="text-xs font-normal text-zinc-500">— {s.couvertsOccupes}/{s.capaTotale} couverts</span>
+              </h2>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+                {s.libre > 0 && <span className="px-2 py-1 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800">✓ {s.libre} libre{s.libre > 1 ? 's' : ''}</span>}
+                {s.occupee > 0 && <span className="px-2 py-1 rounded-full bg-amber-950/60 text-amber-300 border border-amber-800">● {s.occupee} occupée{s.occupee > 1 ? 's' : ''}</span>}
+                {s.aEncaisser > 0 && <span className="px-2 py-1 rounded-full bg-red-950/60 text-red-300 border border-red-800 animate-pulse">💶 {s.aEncaisser} à encaisser</span>}
+              </div>
+            </header>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {tables.map(t => {
+                const cmd = cmdParTable.get(t.numero)
+                const nbPrets = pretsParTable.get(t.numero) ?? 0
+                const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
+                  : cmd ? 'occupee'
+                  : t.statut
+                const sty = STATUT_TABLE_STYLE[statutEffectif]
+
+                // Durée d'occupation en min depuis ouverture commande
+                const dureeMin = cmd ? Math.max(0, Math.round((now - new Date(cmd.created_at).getTime()) / 60_000)) : null
+                const dureeUrgent = dureeMin !== null && dureeMin > 90  // > 1h30 = potentiel oubli
+
+                // Total addition
+                const totalCmd = cmd ? (cmd.montant_total_ttc ?? cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)) : 0
+
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => onOuvrir(t)}
+                    className={cn(
+                      'relative min-h-[140px] rounded-xl ring-2 transition-all active:scale-95 p-3 flex flex-col items-stretch overflow-hidden',
+                      sty.bg, sty.text, sty.ring,
+                    )}
+                  >
+                    {/* Badge plats prêts en top-right */}
+                    {nbPrets > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 border-2 border-zinc-900 text-xs font-bold flex items-center justify-center shadow-lg animate-pulse z-10">
+                        🔔 {nbPrets}
+                      </span>
+                    )}
+
+                    {/* Header card : numéro + couverts */}
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="text-3xl font-black leading-none">{t.numero}</span>
+                      <span className="inline-flex items-center gap-0.5 text-xs font-bold opacity-90" aria-label={`${t.capacite} couverts`}>
+                        <span aria-hidden>👥</span>{t.capacite}
+                      </span>
+                    </div>
+
+                    {/* Centre : statut */}
+                    <div className="flex-1 flex items-center justify-center my-1">
+                      <span className="text-[11px] uppercase tracking-wider font-black opacity-95">{sty.label}</span>
+                    </div>
+
+                    {/* Footer card : infos commande si occupée/à encaisser */}
+                    {cmd ? (
+                      <div className="space-y-0.5 text-[11px] font-medium opacity-95 tabular-nums">
+                        <div className="flex items-center justify-between">
+                          <span className={cn('inline-flex items-center gap-0.5', dureeUrgent && 'text-red-200 animate-pulse')}>
+                            <span aria-hidden>⏱</span>{dureeMin}min
+                          </span>
+                          <span>{cmd.articles.length} art.</span>
+                        </div>
+                        {totalCmd > 0 && (
+                          <div className="text-center font-black text-sm">
+                            {fmtPrix(totalCmd)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-center text-[10px] opacity-70">Disponible</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })}
     </div>
   )
 }
