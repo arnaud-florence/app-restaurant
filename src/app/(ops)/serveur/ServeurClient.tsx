@@ -252,12 +252,17 @@ export default function ServeurClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Header premium */}
+      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Service — Salle</p>
-            <h1 className="text-2xl sm:text-3xl font-bold">🪑 Serveur</h1>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-lg shadow-indigo-900/40">
+              🪑
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Service · Salle</p>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Serveur</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -386,8 +391,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex items-center px-4 min-h-[44px] sm:min-h-0 sm:py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-        active ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+        'inline-flex items-center gap-1.5 px-4 min-h-[40px] sm:min-h-0 sm:py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border-2',
+        active
+          ? 'bg-white text-zinc-900 border-white shadow-lg shadow-white/10 scale-105'
+          : 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:border-zinc-600 backdrop-blur',
       )}
     >
       {children}
@@ -878,22 +885,23 @@ function ListeAServir({
 }) {
   if (commandes.length === 0) {
     return (
-      <div className="text-center py-16 text-zinc-500">
-        <p className="text-6xl mb-3">✨</p>
-        <p className="text-base">Aucun plat prêt à servir pour le moment.</p>
-        <p className="text-sm mt-2 text-zinc-600">La cuisine et le bar marquent les plats « prêts ».<br/>Tu les retrouveras ici dès qu&apos;un est terminé.</p>
+      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 py-16 px-6 text-center shadow-lg">
+        <p className="text-6xl mb-3" aria-hidden>✨</p>
+        <p className="text-base font-bold text-zinc-200">Tout est sous contrôle</p>
+        <p className="text-sm mt-1 text-zinc-500">Aucun plat prêt à servir pour le moment.</p>
+        <p className="text-xs mt-3 text-zinc-600">La cuisine et le bar marquent les plats « prêts ».<br/>Tu les retrouveras ici dès qu&apos;un est terminé.</p>
       </div>
     )
   }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
       {commandes.map(c => {
         const articlesPrets = c.articles.filter(a => a.statut === 'pret')
         const autresArticles = c.articles.filter(a => a.statut !== 'pret')
         return (
-          <div key={c.id} className="rounded-lg border-2 border-emerald-500/60 bg-zinc-900 overflow-hidden">
+          <div key={c.id} className="rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/70 via-zinc-900 to-zinc-950 overflow-hidden shadow-lg shadow-emerald-900/20 hover:-translate-y-0.5 transition-all">
             {/* Header */}
-            <div className="px-3 py-2 bg-emerald-600/30 flex items-center justify-between">
+            <div className="px-3.5 py-2.5 bg-emerald-500/15 border-b border-emerald-500/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold">
                   {c.numero_table ? `🪑 T${c.numero_table}` : c.numero}
@@ -980,19 +988,20 @@ function ListeAEncaisser({
 }) {
   if (commandes.length === 0) {
     return (
-      <div className="text-center py-16 text-zinc-500">
-        <p className="text-6xl mb-3">✨</p>
-        <p className="text-base">Aucune commande à encaisser pour le moment.</p>
+      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 py-16 px-6 text-center shadow-lg">
+        <p className="text-6xl mb-3" aria-hidden>✨</p>
+        <p className="text-base font-bold text-zinc-200">Tout est encaissé</p>
+        <p className="text-sm mt-1 text-zinc-500">Aucune commande à encaisser pour le moment.</p>
       </div>
     )
   }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
       {commandes.map(c => {
         const total = c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
         return (
-          <div key={c.id} className="rounded-lg border-2 border-red-500/50 bg-zinc-900 overflow-hidden">
-            <div className="px-3 py-2 bg-red-600/30 flex items-center justify-between">
+          <div key={c.id} className="rounded-2xl border border-rose-500/40 bg-gradient-to-br from-rose-950/70 via-zinc-900 to-zinc-950 overflow-hidden shadow-lg shadow-rose-900/20 hover:-translate-y-0.5 transition-all">
+            <div className="px-3.5 py-2.5 bg-rose-500/15 border-b border-rose-500/20 flex items-center justify-between">
               <span className="text-sm font-bold">
                 {c.numero_table ? `T${c.numero_table}` : c.numero}
               </span>
