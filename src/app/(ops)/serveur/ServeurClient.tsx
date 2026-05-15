@@ -35,6 +35,7 @@ type Recette = {
   prix_vente_ht: number
   image_url?: string | null
   photo_url?: string | null
+  favori?: boolean
 }
 
 type Employe = { id: string; prenom: string; nom: string; poste: string }
@@ -807,6 +808,35 @@ function CatalogueModal({
             </div>
           )}
 
+          {/* Quick access — Favoris (badge ⭐) du catalogue actif, en 1ʳᵉ ligne */}
+          {!searchQuery && !filtreCat && (() => {
+            const favoris = recettesParTag.filter(r => r.favori === true)
+            if (favoris.length === 0) return null
+            return (
+              <div className="mb-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-yellow-400 mb-2 flex items-center gap-2">
+                  <span>⭐</span>
+                  <span>Favoris du gérant</span>
+                  <span className="text-[10px] text-yellow-600 font-normal">{favoris.length}</span>
+                  <span className="h-px flex-1 bg-yellow-900/40"></span>
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {favoris.map(r => {
+                    const dejaAuPanier = panier.find(p => p.recette_id === r.id)
+                    return (
+                      <ProduitCard
+                        key={r.id}
+                        produit={r}
+                        compteur={dejaAuPanier?.quantite ?? 0}
+                        onClick={() => onAjouter(r)}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Grille produits — cards plus grosses style kiosque (3 cols max) */}
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
@@ -866,9 +896,24 @@ function CatalogueModal({
         {/* Panier — caché sur mobile (footer sticky en bas remplace), visible sur lg+ */}
         {/* min-h-0 OBLIGATOIRE pour que flex-1 overflow-y-auto interne fonctionne dans le grid parent */}
         <div className="hidden lg:flex bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col min-h-0">
-          <div className="px-4 py-2 border-b border-zinc-800">
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Panier</p>
-            <p className="text-2xl font-bold tabular-nums">{fmtPrix(totalPanier)}</p>
+          {/* Header panier — emerald accent + badge nb articles */}
+          <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span className="text-xl" aria-hidden>🛒</span>
+                Panier
+              </h2>
+              {panier.length > 0 && (
+                <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-emerald-500 text-white text-xs font-bold tabular-nums">
+                  {panier.reduce((s, p) => s + p.quantite, 0)}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-zinc-500">
+              {panier.length === 0
+                ? 'Aucun article'
+                : `${panier.length} ligne${panier.length > 1 ? 's' : ''} · ${panier.reduce((s, p) => s + p.quantite, 0)} article${panier.reduce((s, p) => s + p.quantite, 0) > 1 ? 's' : ''}`}
+            </p>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {panier.length === 0 ? (
@@ -929,14 +974,35 @@ function CatalogueModal({
               ))
             )}
           </div>
-          <div className="p-3 border-t border-zinc-800" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}>
-            <button
-              onClick={onEnvoyer}
-              disabled={panier.length === 0}
-              className="w-full min-h-[56px] rounded-md bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-bold uppercase tracking-wider text-base transition-colors active:scale-[0.97]"
-            >
-              📡 Envoyer la commande {fmtPrix(totalPanier)}
-            </button>
+          {/* Footer panier — total séparé + bouton ENVOYER gros */}
+          <div className="border-t border-zinc-800 bg-zinc-900/50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            {panier.length > 0 && (
+              <div className="px-4 py-3 flex items-center justify-between border-b border-zinc-800">
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total à envoyer</span>
+                <span className="text-2xl font-black text-white tabular-nums">{fmtPrix(totalPanier)}</span>
+              </div>
+            )}
+            <div className="p-3">
+              <button
+                onClick={onEnvoyer}
+                disabled={panier.length === 0}
+                className={cn(
+                  'w-full min-h-[64px] rounded-lg font-bold uppercase tracking-wider text-base transition-all active:scale-[0.97] flex items-center justify-center gap-2',
+                  panier.length === 0
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30',
+                )}
+              >
+                {panier.length === 0 ? (
+                  <span>Panier vide</span>
+                ) : (
+                  <>
+                    <span className="text-xl" aria-hidden>📡</span>
+                    <span>Envoyer en cuisine</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

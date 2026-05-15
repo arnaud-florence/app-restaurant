@@ -24,6 +24,7 @@ export type ProduitCardData = {
   tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   image_url?: string | null
   photo_url?: string | null
+  favori?: boolean
 }
 
 const FALLBACK_BY_DEST: Record<string, { emoji: string; bg: string }> = {
@@ -105,6 +106,14 @@ export default function ProduitCard({
         )}>
           {fallback.emoji}
         </span>
+
+        {/* Étoile favori en bottom-left si applicable */}
+        {produit.favori && (
+          <span
+            className="absolute bottom-2 left-2 inline-flex items-center justify-center w-7 h-7 rounded-full bg-yellow-500/90 text-white shadow-md text-base"
+            aria-label="Favori"
+          >★</span>
+        )}
       </div>
 
       {/* Footer : nom + prix */}

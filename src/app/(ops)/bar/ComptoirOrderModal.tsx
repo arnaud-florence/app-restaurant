@@ -24,6 +24,7 @@ type Recette = {
   prix_vente_ht: number
   image_url?: string | null
   photo_url?: string | null
+  favori?: boolean
 }
 
 type LignePanier = {
