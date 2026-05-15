@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab } from '@/components/ui/PillTab'
 import {
   type Entree, type Humeur, type Analyses,
   HUMEUR_INFO, fmtPrix, fmtDate, fmtDateCourt,
@@ -113,24 +114,24 @@ export default function JournalClient({
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
           <aside className="rounded-lg border border-zinc-200 bg-white">
             <div className="p-3 border-b border-zinc-200 space-y-2">
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher titre, contenu, tag…"
-                className="w-full h-10 px-3 rounded-md border border-zinc-300 text-sm" />
-              <div className="flex flex-wrap gap-1">
-                <button onClick={() => setFiltreHumeur('')} className={cn(
-                  'px-2 h-7 rounded-full text-[10px] font-bold border',
-                  filtreHumeur === '' ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300'
-                )}>Toutes</button>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="🔍 Rechercher titre, contenu, tag…"
+                className="w-full h-11 px-3 rounded-md border border-zinc-300 text-base focus:border-emerald-500 outline-none"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                <PillTab small active={filtreHumeur === ''} onClick={() => setFiltreHumeur('')}>Toutes</PillTab>
                 {(Object.keys(HUMEUR_INFO) as Humeur[]).map(h => {
                   const i = HUMEUR_INFO[h]
                   return (
-                    <button key={h} onClick={() => setFiltreHumeur(filtreHumeur === h ? '' : h)} className={cn(
-                      'px-2 h-7 rounded-full text-[10px] font-bold border',
-                      filtreHumeur === h ? i.cls + ' border-current' : 'bg-white text-zinc-500 border-zinc-200'
-                    )} title={i.label}>{i.emoji}</button>
+                    <PillTab key={h} small active={filtreHumeur === h} onClick={() => setFiltreHumeur(filtreHumeur === h ? '' : h)}>
+                      <span title={i.label}>{i.emoji}</span>
+                    </PillTab>
                   )
                 })}
               </div>
-              <button onClick={() => setShowForm(true)} className="w-full min-h-[40px] rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle entrée</button>
+              <button onClick={() => setShowForm(true)} className="w-full min-h-[44px] rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm active:scale-95 transition-transform">+ Nouvelle entrée</button>
             </div>
             <ul className="divide-y divide-zinc-100 max-h-[70vh] overflow-y-auto">
               {filtered.length === 0 ? (

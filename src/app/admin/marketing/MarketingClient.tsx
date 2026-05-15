@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Megaphone, Sparkles, Plus, Trash2, Copy, Check, Eye, Calendar } from 'lucide-react'
+import { PillTab } from '@/components/ui/PillTab'
 import { creerPost, modifierPost, changerStatutPost, supprimerPost } from './actions'
 import type { PostMarketing } from './page'
 
@@ -119,23 +120,25 @@ export default function MarketingClient({
         </ul>
       </Card>
 
-      {/* Filtres */}
-      <div className="flex flex-wrap gap-2">
-        <select value={filterStatut} onChange={e => setFilterStatut(e.target.value as typeof filterStatut)}
-          className="h-10 px-3 rounded-md border text-sm">
-          <option value="tous">Tous statuts</option>
+      {/* Filtres premium tactile */}
+      <div className="space-y-2">
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+          <PillTab small active={filterStatut === 'tous'} onClick={() => setFilterStatut('tous')}>📊 Tous statuts</PillTab>
           {(Object.keys(STATUT_INFO) as PostMarketing['statut'][]).map(s => (
-            <option key={s} value={s}>{STATUT_INFO[s].label}</option>
+            <PillTab key={s} small active={filterStatut === s} onClick={() => setFilterStatut(s)}>
+              {STATUT_INFO[s].label}
+            </PillTab>
           ))}
-        </select>
-        <select value={filterCanal} onChange={e => setFilterCanal(e.target.value as typeof filterCanal)}
-          className="h-10 px-3 rounded-md border text-sm">
-          <option value="tous">Tous canaux</option>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1 items-center">
+          <PillTab small active={filterCanal === 'tous'} onClick={() => setFilterCanal('tous')}>📡 Tous canaux</PillTab>
           {(Object.keys(CANAL_INFO) as PostMarketing['canal'][]).map(c => (
-            <option key={c} value={c}>{CANAL_INFO[c].label}</option>
+            <PillTab key={c} small active={filterCanal === c} onClick={() => setFilterCanal(c)}>
+              {CANAL_INFO[c].label}
+            </PillTab>
           ))}
-        </select>
-        <span className="ml-auto self-center text-xs text-zinc-500">{filtered.length} post{filtered.length > 1 ? 's' : ''}</span>
+          <span className="ml-auto self-center text-xs text-zinc-500 shrink-0">{filtered.length} post{filtered.length > 1 ? 's' : ''}</span>
+        </div>
       </div>
 
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
