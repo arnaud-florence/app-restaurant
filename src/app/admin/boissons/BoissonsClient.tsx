@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Boisson, TYPE_LABEL, COULEUR_LABEL,
   margeBouteille, margeVerre, margePinte, rendementFut,
@@ -77,27 +78,33 @@ export default function BoissonsClient({
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xl shadow-lg shadow-violet-500/30 shrink-0">🍷</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Carte boissons</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Vins & boissons</h1>
-            </div>
-          </div>
-          {!readOnly && (
-            <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
-              <span className="text-lg">+</span>
-              <span className="hidden sm:inline">Nouvelle boisson</span>
-              <span className="sm:hidden">Ajouter</span>
-            </Button>
-          )}
-        </div>
-      </header>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="violet"
+          subtitle="Cuisine & stock"
+          title="Vins & boissons"
+          description="Multi-format, accords mets-vins, food cost, gestion fûts et bouteilles."
+          actions={
+            !readOnly && (
+              <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
+                <span className="text-lg">+</span>
+                <span className="hidden sm:inline">Nouvelle boisson</span>
+                <span className="sm:hidden">Ajouter</span>
+              </Button>
+            )
+          }
+        />
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
           <KPI label="Références actives" value={String(stats.totalActifs)} icon="🍶" />

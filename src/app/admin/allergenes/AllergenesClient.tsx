@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Allergene, ALLERGENES_EU, ALLERGENE_INFO,
   type TypeProcedureUrgence, TYPE_PROC_URGENCE_INFO, type ProcedureUrgence,
@@ -35,30 +36,36 @@ export default function AllergenesClient({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 text-white text-xl shadow-lg shadow-orange-500/30 shrink-0">⚠️</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-orange-600">Sécurité client</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Allergènes</h1>
-            </div>
-          </div>
-          <div className="flex gap-2 text-sm text-zinc-600">
-            <span><b className="text-zinc-900">{nbRecettesAvecAllergenes}</b>/{recettes.length} plats avec allergènes</span>
-            <span>·</span>
-            <span><b className="text-zinc-900">{nbProc}</b> procédure{nbProc > 1 ? 's' : ''} d&apos;urgence</span>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'catalogue'}  onClick={() => setTab('catalogue')}>🍽️ Catalogue plats × allergènes</TabBtn>
-          <TabBtn active={tab === 'procedures'} onClick={() => setTab('procedures')}>🚨 Procédures d&apos;urgence ({nbProc})</TabBtn>
-          <TabBtn active={tab === 'qr'}         onClick={() => setTab('qr')}>📱 QR salle</TabBtn>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="orange"
+          subtitle="Cuisine & stock"
+          title="Allergènes"
+          description="14 allergènes EU, QR code en salle, alerte cuisine, procédures d'urgence."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm text-zinc-600">
+              <span><b className="text-zinc-900">{nbRecettesAvecAllergenes}</b>/{recettes.length} plats</span>
+              <span className="text-zinc-300">·</span>
+              <span><b className="text-zinc-900">{nbProc}</b> procédure{nbProc > 1 ? 's' : ''}</span>
+            </div>
+          }
+        >
+          <div className="flex gap-1 overflow-x-auto">
+            <TabBtn active={tab === 'catalogue'}  onClick={() => setTab('catalogue')}>🍽️ Catalogue plats × allergènes</TabBtn>
+            <TabBtn active={tab === 'procedures'} onClick={() => setTab('procedures')}>🚨 Procédures d&apos;urgence ({nbProc})</TabBtn>
+            <TabBtn active={tab === 'qr'}         onClick={() => setTab('qr')}>📱 QR salle</TabBtn>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'catalogue'  && <CatalogueTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'procedures' && <ProceduresTab procedures={procedures} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'qr'         && <QRTab />}

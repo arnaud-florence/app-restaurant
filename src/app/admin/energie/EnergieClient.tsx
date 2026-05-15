@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { cn } from '@/lib/utils'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type ReleveEnergie, type TypeEnergie, type UniteEnergie,
   TYPE_ENERGIE_INFO, ALERTE_STYLE, fmtPrix, fmtConso, fmtPct, fmtDate,
@@ -30,30 +31,36 @@ export default function EnergieClient({ data }: { data: DataEnergie }) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">⚡</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Pilotage</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Énergie</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="Coût mois" value={fmtPrix(data.total_energie_mois)} />
-            <KPI label="Coût / plat" value={fmtPrix(data.cout_par_plat_mois)} accent={data.cout_par_plat_mois > 1.5 ? 'rouge' : data.cout_par_plat_mois > 1 ? 'orange' : 'vert'} />
-            <KPI label="Alertes" value={nbAlertes} accent={nbAlertes > 0 ? 'orange' : 'vert'} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</TabBtn>
-          <TabBtn active={tab === 'releves'}   onClick={() => setTab('releves')}>📝 Relevés ({data.releves.length})</TabBtn>
-          <TabBtn active={tab === 'suggestions'} onClick={() => setTab('suggestions')}>💡 Suggestions ({data.suggestions.length})</TabBtn>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="amber"
+          subtitle="Finances"
+          title="Énergie"
+          description="Élec/gaz/eau, comparaison N-1, alertes consommation, coût par plat."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="Coût mois" value={fmtPrix(data.total_energie_mois)} />
+              <KPI label="Coût/plat" value={fmtPrix(data.cout_par_plat_mois)} accent={data.cout_par_plat_mois > 1.5 ? 'rouge' : data.cout_par_plat_mois > 1 ? 'orange' : 'vert'} />
+              <KPI label="Alertes" value={nbAlertes} accent={nbAlertes > 0 ? 'orange' : 'vert'} />
+            </div>
+          }
+        >
+          <div className="flex gap-1 overflow-x-auto">
+            <TabBtn active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</TabBtn>
+            <TabBtn active={tab === 'releves'}   onClick={() => setTab('releves')}>📝 Relevés ({data.releves.length})</TabBtn>
+            <TabBtn active={tab === 'suggestions'} onClick={() => setTab('suggestions')}>💡 Suggestions ({data.suggestions.length})</TabBtn>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'dashboard'   && <DashboardTab data={data} />}
         {tab === 'releves'     && <RelevesTab releves={data.releves} onError={flashKo} onOk={flashOk} />}
         {tab === 'suggestions' && <SuggestionsTab suggestions={data.suggestions} />}

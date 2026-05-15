@@ -7,6 +7,7 @@ import { format, parseISO, addMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Equipement, type Intervention,
   type CategorieEquip, type TypeControle, type TypeIntervention,
@@ -39,39 +40,45 @@ export default function MaintenanceClient({ data }: { data: DataMaintenance }) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">🔧</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Patrimoine</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Maintenance</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="Équipements actifs" value={equipsActifs.length} />
-            <KPI label="Maintenances proches" value={planningProche} accent={planningProche > 0 ? 'orange' : 'zinc'} />
-            <KPI label="Contrôles ≤ 1 mois" value={controlesAlerte} accent={controlesAlerte > 0 ? 'rouge' : 'vert'} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'equipements'} onClick={() => setTab('equipements')}>
-            🛠️ Équipements <PillCount n={equipsActifs.length} active={tab === 'equipements'} />
-          </PillTab>
-          <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>
-            📅 Planning {planningProche > 0 && <PillCount n={planningProche} active={tab === 'planning'} />}
-          </PillTab>
-          <PillTab active={tab === 'interventions'} onClick={() => setTab('interventions')}>
-            🔧 Interventions <PillCount n={data.interventions.length} active={tab === 'interventions'} />
-          </PillTab>
-          <PillTab active={tab === 'controles'} onClick={() => setTab('controles')}>
-            🚨 Contrôles obligatoires {controlesAlerte > 0 && <PillCount n={controlesAlerte} active={tab === 'controles'} />}
-          </PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Conformité"
+          title="Maintenance"
+          description="Équipements, planning préventif, interventions, contrôles obligatoires."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="Équipements" value={equipsActifs.length} />
+              <KPI label="Maint. proches" value={planningProche} accent={planningProche > 0 ? 'orange' : 'zinc'} />
+              <KPI label="Contrôles ≤1M" value={controlesAlerte} accent={controlesAlerte > 0 ? 'rouge' : 'vert'} />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'equipements'} onClick={() => setTab('equipements')}>
+              🛠️ Équipements <PillCount n={equipsActifs.length} active={tab === 'equipements'} />
+            </PillTab>
+            <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>
+              📅 Planning {planningProche > 0 && <PillCount n={planningProche} active={tab === 'planning'} />}
+            </PillTab>
+            <PillTab active={tab === 'interventions'} onClick={() => setTab('interventions')}>
+              🔧 Interventions <PillCount n={data.interventions.length} active={tab === 'interventions'} />
+            </PillTab>
+            <PillTab active={tab === 'controles'} onClick={() => setTab('controles')}>
+              🚨 Contrôles obligatoires {controlesAlerte > 0 && <PillCount n={controlesAlerte} active={tab === 'controles'} />}
+            </PillTab>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'equipements'   && <EquipementsTab equipements={data.equipements} interventions={data.interventions} onError={flashKo} onOk={flashOk} />}
         {tab === 'planning'      && <PlanningTab equipements={equipsActifs} onError={flashKo} onOk={flashOk} />}
         {tab === 'interventions' && <InterventionsTab interventions={data.interventions} equipements={equipsActifs} onError={flashKo} onOk={flashOk} />}

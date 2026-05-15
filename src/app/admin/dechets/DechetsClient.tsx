@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Pesee, type Collecte, type TypeDechet,
   TYPE_DECHET_INFO, fmtPrix, fmtPoids, fmtDate,
@@ -28,34 +29,40 @@ export default function DechetsClient({ data }: { data: DataDechets }) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">🗑️</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Tri sélectif & gaspillage</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Déchets</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="Total an" value={fmtPoids(data.total_an_poids)} />
-            <KPI label="Coût mois" value={fmtPrix(data.total_mois_cout)} accent={data.total_mois_cout > 200 ? 'orange' : 'zinc'} />
-            <KPI label="Bio 7j" value={fmtPoids(bio7jPoids)} accent={bio7jPoids > 5 ? 'rouge' : 'vert'} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</PillTab>
-          <PillTab active={tab === 'pesees'} onClick={() => setTab('pesees')}>
-            ⚖️ Pesées <PillCount n={data.pesees.length} active={tab === 'pesees'} />
-          </PillTab>
-          <PillTab active={tab === 'collectes'} onClick={() => setTab('collectes')}>
-            🚛 Collectes <PillCount n={data.collectes.length} active={tab === 'collectes'} />
-          </PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="amber"
+          subtitle="Conformité"
+          title="Déchets (AGEC)"
+          description="Pesées 8 types, coût gaspillage, registre collectes, rapport annuel."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="Total an" value={fmtPoids(data.total_an_poids)} />
+              <KPI label="Coût mois" value={fmtPrix(data.total_mois_cout)} accent={data.total_mois_cout > 200 ? 'orange' : 'zinc'} />
+              <KPI label="Bio 7j" value={fmtPoids(bio7jPoids)} accent={bio7jPoids > 5 ? 'rouge' : 'vert'} />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>📊 Tableau de bord</PillTab>
+            <PillTab active={tab === 'pesees'} onClick={() => setTab('pesees')}>
+              ⚖️ Pesées <PillCount n={data.pesees.length} active={tab === 'pesees'} />
+            </PillTab>
+            <PillTab active={tab === 'collectes'} onClick={() => setTab('collectes')}>
+              🚛 Collectes <PillCount n={data.collectes.length} active={tab === 'collectes'} />
+            </PillTab>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'dashboard' && <DashboardTab data={data} />}
         {tab === 'pesees'    && <PeseesTab pesees={data.pesees} employes={data.employes} onError={flashKo} onOk={flashOk} />}
         {tab === 'collectes' && <CollectesTab collectes={data.collectes} onError={flashKo} onOk={flashOk} />}
