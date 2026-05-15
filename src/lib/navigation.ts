@@ -146,12 +146,24 @@ export const CATEGORIES: Category[] = [
   },
 ]
 
-/** Retourne la catégorie qui contient un href donné, ou null. */
+/** Retourne la catégorie qui contient un href donné, ou null.
+ *  Quand plusieurs items matchent (cas d'items "préfixes" comme /admin qui match aussi
+ *  /admin/stock), on retourne celui dont le href est le PLUS LONG (le plus spécifique).
+ *  → Pour /admin/stock on retourne 'cuisine-stock' (item /admin/stock) et non 'pilotage'
+ *    (item /admin qui matchait comme préfixe trop générique).
+ */
 export function findCategoryByHref(href: string): Category | null {
+  let best: { cat: Category; itemLen: number } | null = null
   for (const c of CATEGORIES) {
-    if (c.items.some(it => it.href === href || href.startsWith(it.href + '/'))) return c
+    for (const it of c.items) {
+      const matches = it.href === href || href.startsWith(it.href + '/')
+      if (!matches) continue
+      if (!best || it.href.length > best.itemLen) {
+        best = { cat: c, itemLen: it.href.length }
+      }
+    }
   }
-  return null
+  return best?.cat ?? null
 }
 
 /** Retourne la catégorie active pour un pathname donné (en priorité : URL /admin/cat/<slug>). */
