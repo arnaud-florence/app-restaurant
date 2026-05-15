@@ -460,6 +460,8 @@ function PlanSalle({
   const [filtre, setFiltre] = useState<FiltreStatut>('tous')
   const [compact, setCompact] = useState(false)
   const [searchT, setSearchT] = useState('')
+  // Mobile : tab zone active (sur desktop toutes les zones s'affichent)
+  const [activeZone, setActiveZone] = useState<string>(zones[0]?.[0] ?? '')
 
   // Helper : calcule le statut effectif d'une table
   function statutEffectif(t: Table): StatutTable {
@@ -525,12 +527,30 @@ function PlanSalle({
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* ═══ Dashboard header — Stats du service en cours ═══ */}
-      <section className="mb-6 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-4 lg:p-5 shadow-2xl shadow-black/40 backdrop-blur">
+      {/* ═══ MOBILE — Dashboard ultra-compact (3 chips en row) ═══ */}
+      <section className="lg:hidden mb-3 rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 px-3 py-2.5 shadow-lg">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h1 className="text-base font-black text-white tracking-tight flex items-center gap-1.5">
+            <span aria-hidden>📊</span>Plan de salle
+          </h1>
+          <span className="relative flex h-1.5 w-1.5" title="Live">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          <MiniChip icon="💶" value={fmtPrix(globalStats.caEnCours)} label="CA"           accent="emerald" />
+          <MiniChip icon="🪑" value={`${globalStats.nbTablesOuvertes}`} label="Tables"   accent="amber" />
+          <MiniChip icon="💳" value={`${globalStats.nbTablesAEncaisser}`} label="À enc." accent="rose" pulse={globalStats.nbTablesAEncaisser > 0} />
+        </div>
+      </section>
+
+      {/* ═══ DESKTOP — Dashboard header complet (6 tuiles) ═══ */}
+      <section className="hidden lg:block mb-6 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-5 shadow-2xl shadow-black/40 backdrop-blur">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Service en cours</p>
-            <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">Plan de salle</h1>
+            <h1 className="text-3xl font-black text-white tracking-tight">Plan de salle</h1>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-zinc-400">
             <span className="relative flex h-2 w-2">
@@ -541,7 +561,7 @@ function PlanSalle({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
           <StatTile icon="💶" label="CA en cours"     value={fmtPrix(globalStats.caEnCours)} accent="emerald" />
           <StatTile icon="🪑" label="Tables ouvertes" value={`${globalStats.nbTablesOuvertes}`} sub={`${globalStats.nbCouvertsOccupes} couverts`} accent="amber" />
           <StatTile icon="🧾" label="Ticket moyen"    value={fmtPrix(globalStats.ticketMoyen)} accent="violet" />
@@ -551,9 +571,42 @@ function PlanSalle({
         </div>
       </section>
 
+      {/* ═══ MOBILE — Tabs zones horizontales scrollables ═══ */}
+      {zones.length > 1 && (
+        <div className="lg:hidden mb-3 flex gap-1.5 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
+          {zones.map(([zone, ts]) => {
+            const s = zoneStats[zone]
+            const isActive = activeZone === zone
+            const zoneIcon = zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'
+            return (
+              <button
+                key={zone}
+                onClick={() => setActiveZone(zone)}
+                className={cn(
+                  'snap-start inline-flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-bold whitespace-nowrap border-2 transition-all',
+                  isActive
+                    ? 'bg-white text-zinc-900 border-white shadow-lg'
+                    : 'bg-zinc-900 text-zinc-300 border-zinc-800',
+                )}
+              >
+                <span className="text-base" aria-hidden>{zoneIcon}</span>
+                <span className="capitalize">{zone}</span>
+                <span className={cn(
+                  'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
+                  isActive ? 'bg-zinc-900 text-white' : 'bg-zinc-800 text-zinc-500',
+                )}>{ts.length}</span>
+                {s.aEncaisser > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" aria-label={`${s.aEncaisser} à encaisser`}></span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* ═══ Toolbar : filtres rapides + recherche + density toggle ═══ */}
-      <div className="sticky top-0 z-10 mb-5 -mx-3 px-3 py-2.5 bg-zinc-950/85 backdrop-blur-md border-y border-zinc-800">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="sticky top-0 z-10 mb-4 -mx-3 px-3 py-2 bg-zinc-950/90 backdrop-blur-md border-y border-zinc-800">
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto lg:flex-wrap">
           {/* Filtres statut */}
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-1">
             {([
@@ -613,10 +666,14 @@ function PlanSalle({
         const s = zoneStats[zone]
         const tablesFiltrees = tables.filter(shouldShow)
         if (tablesFiltrees.length === 0) return null
+        // Sur mobile : cacher si pas la zone active. Sur desktop : tout afficher.
         return (
-          <section key={zone} className="animate-in fade-in duration-500">
-            {/* Header zone — titre dramatique + pastilles stats */}
-            <header className="mb-4 flex items-end justify-between flex-wrap gap-3 px-1">
+          <section key={zone} className={cn(
+            'animate-in fade-in duration-500',
+            zones.length > 1 && activeZone !== zone && 'hidden lg:block',
+          )}>
+            {/* Header zone — titre dramatique + pastilles stats (caché sur mobile, géré par tabs) */}
+            <header className="hidden lg:flex mb-4 items-end justify-between flex-wrap gap-3 px-1">
               <div>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
@@ -649,10 +706,10 @@ function PlanSalle({
             </header>
 
             <div className={cn(
-              'grid gap-4',
+              'grid gap-2 lg:gap-4',
               compact
                 ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10'
-                : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+                : 'grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
             )}>
               {tablesFiltrees.map(t => {
                 const cmd = cmdParTable.get(t.numero)
@@ -674,9 +731,9 @@ function PlanSalle({
                     key={t.id}
                     onClick={() => onOuvrir(t)}
                     className={cn(
-                      'relative min-h-[180px] rounded-2xl border transition-all duration-300',
+                      'relative min-h-[120px] lg:min-h-[180px] rounded-xl lg:rounded-2xl border transition-all duration-300',
                       'flex flex-col items-stretch overflow-hidden text-left',
-                      'hover:-translate-y-1 active:scale-[0.98]',
+                      'hover:-translate-y-0.5 lg:hover:-translate-y-1 active:scale-[0.98]',
                       sty.card, sty.shadow,
                       statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/30',
                     )}
@@ -689,20 +746,20 @@ function PlanSalle({
                     )}
 
                     {/* Top : numéro de table en grand + capacité subtile */}
-                    <div className="px-4 pt-4 pb-2 flex items-start justify-between">
+                    <div className="px-3 lg:px-4 pt-3 lg:pt-4 pb-1.5 lg:pb-2 flex items-start justify-between">
                       <div>
-                        <p className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Table</p>
-                        <p className={cn('text-5xl font-black leading-none mt-0.5 tabular-nums', sty.numero)}>{t.numero}</p>
+                        <p className="text-[9px] lg:text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Table</p>
+                        <p className={cn('text-4xl lg:text-5xl font-black leading-none mt-0.5 tabular-nums', sty.numero)}>{t.numero}</p>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-zinc-300 bg-zinc-900/60 px-2 py-1 rounded-full border border-zinc-800 backdrop-blur-sm">
+                      <span className="inline-flex items-center gap-0.5 lg:gap-1 text-[10px] lg:text-[11px] font-bold text-zinc-300 bg-zinc-900/60 px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full border border-zinc-800 backdrop-blur-sm">
                         <span aria-hidden>👥</span>{t.capacite}
                       </span>
                     </div>
 
                     {/* Badge statut */}
-                    <div className="px-4 pb-2">
+                    <div className="px-3 lg:px-4 pb-1.5 lg:pb-2">
                       <span className={cn(
-                        'inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full',
+                        'inline-flex items-center text-[9px] lg:text-[10px] font-bold uppercase tracking-wider px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full',
                         sty.badge,
                       )}>
                         {sty.label}
@@ -710,31 +767,31 @@ function PlanSalle({
                     </div>
 
                     {/* Ligne accent (séparateur coloré) */}
-                    <div className={cn('h-px mx-4', sty.accent)}></div>
+                    <div className={cn('h-px mx-3 lg:mx-4', sty.accent)}></div>
 
                     {/* Footer : infos commande ou état vide */}
                     {cmd ? (
-                      <div className="px-4 py-3 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] text-zinc-300 tabular-nums">
+                      <div className="px-3 lg:px-4 py-2 lg:py-3 space-y-0.5 lg:space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] lg:text-[11px] text-zinc-300 tabular-nums">
                           <span className={cn(
-                            'inline-flex items-center gap-1 font-semibold',
+                            'inline-flex items-center gap-0.5 lg:gap-1 font-semibold',
                             dureeUrgent ? 'text-red-300' : '',
                           )}>
                             <span aria-hidden>⏱</span>
-                            <span>{dureeMin} min</span>
+                            <span>{dureeMin}m</span>
                             {dureeUrgent && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
                           </span>
-                          <span className="text-zinc-400">{cmd.articles.length} art.</span>
+                          <span className="text-zinc-400 hidden lg:inline">{cmd.articles.length} art.</span>
                         </div>
                         {totalCmd > 0 && (
-                          <p className="text-xl font-black text-white tabular-nums">
+                          <p className="text-base lg:text-xl font-black text-white tabular-nums">
                             {fmtPrix(totalCmd)}
                           </p>
                         )}
                       </div>
                     ) : (
-                      <div className="px-4 py-3 flex-1 flex items-end">
-                        <p className="text-[10px] text-zinc-500 italic">Tap pour ouvrir une commande</p>
+                      <div className="px-3 lg:px-4 py-2 lg:py-3 flex-1 flex items-end">
+                        <p className="text-[9px] lg:text-[10px] text-zinc-500 italic hidden lg:block">Tap pour ouvrir une commande</p>
                       </div>
                     )}
                   </button>
@@ -744,6 +801,34 @@ function PlanSalle({
           </section>
         )
       })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Mini chip (mobile compact) ─────────────────────────────────────────
+function MiniChip({
+  icon, value, label, accent = 'zinc', pulse = false,
+}: {
+  icon: string
+  value: string
+  label: string
+  accent?: 'emerald' | 'amber' | 'rose' | 'zinc'
+  pulse?: boolean
+}) {
+  const ACCENTS: Record<string, { value: string; bg: string }> = {
+    emerald: { value: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+    amber:   { value: 'text-amber-300',   bg: 'bg-amber-500/10 border-amber-500/20' },
+    rose:    { value: 'text-rose-300',    bg: 'bg-rose-500/10 border-rose-500/20' },
+    zinc:    { value: 'text-zinc-100',    bg: 'bg-zinc-800 border-zinc-700' },
+  }
+  const a = ACCENTS[accent]
+  return (
+    <div className={cn('rounded-lg px-2 py-1.5 border flex items-center gap-1.5', a.bg, pulse && 'ring-1 ring-rose-500/50')}>
+      <span className="text-base shrink-0" aria-hidden>{icon}</span>
+      <div className="min-w-0">
+        <p className={cn('text-sm font-black tabular-nums leading-none', a.value, pulse && 'animate-pulse')}>{value}</p>
+        <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold mt-0.5 truncate">{label}</p>
       </div>
     </div>
   )
