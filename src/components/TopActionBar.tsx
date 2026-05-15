@@ -353,6 +353,37 @@ export default function TopActionBar({
           style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
+            {/* Chip "Accueil" spéciale — toujours en premier, pointe vers la vue d'ensemble */}
+            {(() => {
+              const href = '/admin/cat'
+              const active = pathname === '/admin/cat'
+              const isPending = pendingHref === href
+              const cls = active ? tones.emerald.active : tones.emerald.base
+              return (
+                <Link
+                  href={href}
+                  ref={active ? activeChipRef : undefined}
+                  onClick={() => { tapHaptic(); setPendingHref(href) }}
+                  style={{ scrollSnapAlign: 'start' }}
+                  aria-current={active ? 'page' : undefined}
+                  title="Accueil · Vue d'ensemble"
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    isPending && 'animate-pulse',
+                    cls,
+                  )}
+                >
+                  {isPending ? (
+                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <span className="text-xl md:text-base leading-none" aria-hidden>🏠</span>
+                  )}
+                  <span>Accueil</span>
+                </Link>
+              )
+            })()}
+
             {chipsVisibles.map((cat, idx) => {
               // Toutes les catégories pointent vers leur page /admin/cat/<slug>
               // (y compris Accueil — l'utilisateur veut voir ses sous-modules en tuiles).

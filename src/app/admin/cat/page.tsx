@@ -8,7 +8,7 @@ import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Toutes les catégories — Admin' }
+export const metadata = { title: 'Accueil — Tableau de bord' }
 
 const TONES: Record<Category['tone'], {
   cardBg: string
@@ -101,18 +101,18 @@ export default async function CatIndexPage() {
         {/* Header premium */}
         <header className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-zinc-700 to-zinc-900 text-white text-3xl shadow-lg ring-4 ring-zinc-500/30 shrink-0">
-              🧭
+            <span className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-3xl shadow-lg ring-4 ring-emerald-500/30 shrink-0">
+              🏠
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                Navigation · {categoriesVisibles.length} catégorie{categoriesVisibles.length > 1 ? 's' : ''}
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                Accueil · {categoriesVisibles.length} catégorie{categoriesVisibles.length > 1 ? 's' : ''}
               </p>
               <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">
-                Toutes les catégories
+                Bienvenue
               </h1>
               <p className="text-xs sm:text-sm text-zinc-500 mt-1.5">
-                Tout ce que tu peux faire dans l'app, organisé thématiquement.
+                Toutes les fonctionnalités de l'app, organisées thématiquement.
                 {nbAlertesRouges != null && nbAlertesRouges > 0 && (
                   <span className="ml-2 inline-flex items-center gap-1 text-red-700 font-bold">
                     · 🔴 {nbAlertesRouges} alerte{nbAlertesRouges > 1 ? 's' : ''} urgente{nbAlertesRouges > 1 ? 's' : ''}

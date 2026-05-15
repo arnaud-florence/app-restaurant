@@ -91,7 +91,7 @@ async function fetchCompteurs(slug: string): Promise<Record<string, Compteur>> {
       result['/admin/maintenance'] = { count: equipements.count ?? 0, label: 'équipements' }
     }
 
-    if (slug === 'accueil') {
+    if (slug === 'pilotage') {
       const { count: alertes } = await sb.from('agent_findings').select('id', { count: 'exact', head: true })
         .eq('resolu', false).eq('urgence', 'rouge')
       result['/admin/pilotage'] = { count: alertes ?? 0, urgent: (alertes ?? 0) > 0, label: alertes ? 'alertes' : 'tout ok' }

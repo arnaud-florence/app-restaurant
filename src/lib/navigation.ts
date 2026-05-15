@@ -21,14 +21,15 @@ export type Category = {
   items: SubModule[]
 }
 
-// Le chip "Accueil" pointe par défaut vers /mon-espace (employé) ; le code
-// dans TopActionBar le remplace par /admin/pilotage si profil = manager.
+// La chip "Accueil" est traitée spécialement dans TopActionBar : elle pointe
+// vers /admin/cat (vue d'ensemble globale, page principale de l'app).
+// La catégorie 'pilotage' ci-dessous contient les sous-modules stratégiques.
 export const CATEGORIES: Category[] = [
   {
-    slug: 'accueil',
-    emoji: '🏠',
-    label: 'Accueil',
-    pitch: 'Ton tableau de bord personnel et stratégique.',
+    slug: 'pilotage',
+    emoji: '📊',
+    label: 'Pilotage',
+    pitch: 'Tableau de bord stratégique et personnel.',
     tone: 'emerald',
     items: [
       { href: '/mon-espace',         emoji: '🏠', label: 'Mon espace',       description: 'Tableau de bord personnel : pointage, paie, planning, challenges.' },
@@ -162,17 +163,17 @@ export function resolveActiveCategory(pathname: string): Category | null {
 
 /** Priorité d'ordre des catégories selon le poste de l'utilisateur. */
 export const POSTE_PRIORITES_CATEGORIES: Record<string, string[]> = {
-  manager:        ['accueil', 'service', 'finances', 'clientele', 'equipe'],
-  gerant:         ['accueil', 'service', 'finances', 'clientele', 'equipe'],
-  cuisinier:      ['service', 'cuisine-stock', 'accueil', 'equipe'],
-  cuisine:        ['service', 'cuisine-stock', 'accueil', 'equipe'],
-  pizzaiolo:      ['service', 'cuisine-stock', 'accueil'],
-  second:         ['service', 'cuisine-stock', 'accueil', 'conformite'],
-  bar:            ['service', 'cuisine-stock', 'accueil', 'equipe'],
-  barman:         ['service', 'cuisine-stock', 'accueil', 'equipe'],
-  serveur:        ['service', 'clientele', 'accueil', 'equipe'],
-  salle:          ['service', 'clientele', 'accueil', 'equipe'],
-  receptionniste: ['service', 'clientele', 'accueil'],
-  plonge:         ['service', 'conformite', 'accueil'],
-  extra:          ['service', 'accueil'],
+  manager:        ['pilotage', 'service', 'finances', 'clientele', 'equipe'],
+  gerant:         ['pilotage', 'service', 'finances', 'clientele', 'equipe'],
+  cuisinier:      ['service', 'cuisine-stock', 'pilotage', 'equipe'],
+  cuisine:        ['service', 'cuisine-stock', 'pilotage', 'equipe'],
+  pizzaiolo:      ['service', 'cuisine-stock', 'pilotage'],
+  second:         ['service', 'cuisine-stock', 'pilotage', 'conformite'],
+  bar:            ['service', 'cuisine-stock', 'pilotage', 'equipe'],
+  barman:         ['service', 'cuisine-stock', 'pilotage', 'equipe'],
+  serveur:        ['service', 'clientele', 'pilotage', 'equipe'],
+  salle:          ['service', 'clientele', 'pilotage', 'equipe'],
+  receptionniste: ['service', 'clientele', 'pilotage'],
+  plonge:         ['service', 'conformite', 'pilotage'],
+  extra:          ['service', 'pilotage'],
 }
