@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type PlanHaccp, type Lot, type NonConformite, type Intervention3D,
   type PlanNettoyage, type ReleveTemperature, type ProcedureHygiene, type ChecklistHygiene,
@@ -82,11 +83,15 @@ export default function HygieneClient(props: {
             <KpiBadge label="Checklists du jour" value={`${checklistsTodayCount}/${proceduresJourCount}`} accent="zinc" />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'quotidien'} onClick={() => setTab('quotidien')}>📅 Quotidien</TabBtn>
-          <TabBtn active={tab === 'haccp'} onClick={() => setTab('haccp')}>🛡️ HACCP & nettoyage</TabBtn>
-          <TabBtn active={tab === 'lots'} onClick={() => setTab('lots')}>🏷️ Traçabilité ({props.lots.length})</TabBtn>
-          <TabBtn active={tab === 'registres'} onClick={() => setTab('registres')}>📋 Registres ({ncOuvertes + props.interventions.length})</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'quotidien'} onClick={() => setTab('quotidien')}>📅 Quotidien</PillTab>
+          <PillTab active={tab === 'haccp'} onClick={() => setTab('haccp')}>🛡️ HACCP & nettoyage</PillTab>
+          <PillTab active={tab === 'lots'} onClick={() => setTab('lots')}>
+            🏷️ Traçabilité <PillCount n={props.lots.length} active={tab === 'lots'} />
+          </PillTab>
+          <PillTab active={tab === 'registres'} onClick={() => setTab('registres')}>
+            📋 Registres <PillCount n={ncOuvertes + props.interventions.length} active={tab === 'registres'} />
+          </PillTab>
         </div>
       </header>
 

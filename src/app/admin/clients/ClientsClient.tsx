@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Client, type Campagne, type Reclamation, type RetourPlat,
   type SegmentClient, type SegmentCampagne, type TypeCampagne, type StatutCampagne,
@@ -119,18 +120,34 @@ function FichierTab({ clients, onError, onOk }: { clients: Client[]; onError: (e
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-2 flex-wrap items-center">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher nom, email..."
-            className="h-10 px-3 rounded-md border border-zinc-300 text-sm w-72" />
-          <FiltreBtn active={filtreSeg === ''} onClick={() => setFiltreSeg('')}>Tous ({clients.length})</FiltreBtn>
+      <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="🔍 Rechercher nom, email..."
+            className="h-11 px-3 rounded-md border border-zinc-300 text-base flex-1 min-w-[200px] max-w-md focus:border-emerald-500 outline-none"
+          />
+          <button
+            onClick={() => setShowForm(true)}
+            className="min-h-[44px] px-4 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm shrink-0 active:scale-95 transition-transform"
+          >+ Nouveau client</button>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+          <PillTab active={filtreSeg === ''} onClick={() => setFiltreSeg('')}>
+            ✦ Tous <PillCount n={clients.length} active={filtreSeg === ''} />
+          </PillTab>
           {(Object.keys(SEGMENT_INFO) as SegmentClient[]).map(s => {
             const info = SEGMENT_INFO[s]
             const n = clients.filter(c => appartientSegment(c, s)).length
-            return n > 0 ? <FiltreBtn key={s} active={filtreSeg === s} onClick={() => setFiltreSeg(s)}>{info.emoji} {info.label} ({n})</FiltreBtn> : null
+            if (n === 0) return null
+            return (
+              <PillTab key={s} active={filtreSeg === s} onClick={() => setFiltreSeg(s)}>
+                {info.emoji} {info.label} <PillCount n={n} active={filtreSeg === s} />
+              </PillTab>
+            )
           })}
         </div>
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau client</button>
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">

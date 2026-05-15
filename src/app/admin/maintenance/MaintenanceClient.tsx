@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO, addMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Equipement, type Intervention,
   type CategorieEquip, type TypeControle, type TypeIntervention,
@@ -54,11 +55,19 @@ export default function MaintenanceClient({ data }: { data: DataMaintenance }) {
             <KPI label="Contrôles ≤ 1 mois" value={controlesAlerte} accent={controlesAlerte > 0 ? 'rouge' : 'vert'} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'equipements'}   onClick={() => setTab('equipements')}>🛠️ Équipements ({equipsActifs.length})</TabBtn>
-          <TabBtn active={tab === 'planning'}      onClick={() => setTab('planning')}>📅 Planning préventif{planningProche > 0 && ` (${planningProche})`}</TabBtn>
-          <TabBtn active={tab === 'interventions'} onClick={() => setTab('interventions')}>🔧 Interventions ({data.interventions.length})</TabBtn>
-          <TabBtn active={tab === 'controles'}     onClick={() => setTab('controles')}>🚨 Contrôles obligatoires{controlesAlerte > 0 && ` (${controlesAlerte})`}</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'equipements'} onClick={() => setTab('equipements')}>
+            🛠️ Équipements <PillCount n={equipsActifs.length} active={tab === 'equipements'} />
+          </PillTab>
+          <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>
+            📅 Planning {planningProche > 0 && <PillCount n={planningProche} active={tab === 'planning'} />}
+          </PillTab>
+          <PillTab active={tab === 'interventions'} onClick={() => setTab('interventions')}>
+            🔧 Interventions <PillCount n={data.interventions.length} active={tab === 'interventions'} />
+          </PillTab>
+          <PillTab active={tab === 'controles'} onClick={() => setTab('controles')}>
+            🚨 Contrôles obligatoires {controlesAlerte > 0 && <PillCount n={controlesAlerte} active={tab === 'controles'} />}
+          </PillTab>
         </div>
       </header>
 

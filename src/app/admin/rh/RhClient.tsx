@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Employe, type Document, type Formation, type Shift, type Pointage, type Conge,
   type TypeDocument, type TypeFormation,
@@ -57,12 +58,16 @@ export default function RhClient({ data }: { data: DataRH }) {
             <KPI label="Congés en attente" value={congesEnAttente} accent={congesEnAttente > 0 ? 'orange' : 'zinc'} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'equipe'}    onClick={() => setTab('equipe')}>👥 Équipe ({data.employes.filter(e => e.actif).length})</TabBtn>
-          <TabBtn active={tab === 'planning'}  onClick={() => setTab('planning')}>📅 Planning & pointage</TabBtn>
-          <TabBtn active={tab === 'conges'}    onClick={() => setTab('conges')}>🏖️ Congés{congesEnAttente > 0 && ` (${congesEnAttente})`}</TabBtn>
-          <TabBtn active={tab === 'paie'}      onClick={() => setTab('paie')}>💰 Paie & pourboires</TabBtn>
-          <TabBtn active={tab === 'registre'}  onClick={() => setTab('registre')}>📜 Registre</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'equipe'} onClick={() => setTab('equipe')}>
+            👥 Équipe <PillCount n={data.employes.filter(e => e.actif).length} active={tab === 'equipe'} />
+          </PillTab>
+          <PillTab active={tab === 'planning'} onClick={() => setTab('planning')}>📅 Planning & pointage</PillTab>
+          <PillTab active={tab === 'conges'} onClick={() => setTab('conges')}>
+            🏖️ Congés {congesEnAttente > 0 && <PillCount n={congesEnAttente} active={tab === 'conges'} />}
+          </PillTab>
+          <PillTab active={tab === 'paie'} onClick={() => setTab('paie')}>💰 Paie & pourboires</PillTab>
+          <PillTab active={tab === 'registre'} onClick={() => setTab('registre')}>📜 Registre</PillTab>
         </div>
       </header>
 

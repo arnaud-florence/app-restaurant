@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, addDays, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Chambre, type ResaChambre, type ResaTable, type Evenement,
   type StatutResa, type StatutResaTable, type StatutEvent, type TypeEvenement,
@@ -53,10 +54,16 @@ export default function ReservationsClient({ data, readOnly = false, showTachesD
             <KPI label="Événements à venir" value={evenementsAVenir} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'chambres'}   onClick={() => setTab('chambres')}>🛏️ Chambres ({data.chambres.length})</TabBtn>
-          <TabBtn active={tab === 'tables'}     onClick={() => setTab('tables')}>🪑 Tables/terrasse ({data.resaTables.length})</TabBtn>
-          <TabBtn active={tab === 'evenements'} onClick={() => setTab('evenements')}>🎉 Événements ({data.evenements.length})</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'chambres'}   onClick={() => setTab('chambres')}>
+            🛏️ Chambres <PillCount n={data.chambres.length} active={tab === 'chambres'} />
+          </PillTab>
+          <PillTab active={tab === 'tables'}     onClick={() => setTab('tables')}>
+            🪑 Tables/terrasse <PillCount n={data.resaTables.length} active={tab === 'tables'} />
+          </PillTab>
+          <PillTab active={tab === 'evenements'} onClick={() => setTab('evenements')}>
+            🎉 Événements <PillCount n={data.evenements.length} active={tab === 'evenements'} />
+          </PillTab>
         </div>
       </header>
 

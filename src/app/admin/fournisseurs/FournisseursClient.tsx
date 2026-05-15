@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 
 import {
   type Fournisseur, type BonCommande, type Facture, type EntreePrix,
@@ -150,23 +151,25 @@ export default function FournisseursClient({
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-1 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
-            <TabButton active={tab === 'fournisseurs'} onClick={() => setTab('fournisseurs')}>
-              👥 Fournisseurs <Badge variant="secondary" className="ml-1.5">{fournisseurs.length}</Badge>
-            </TabButton>
-            <TabButton active={tab === 'bons'} onClick={() => setTab('bons')}>
-              📑 Bons de commande <Badge variant="secondary" className="ml-1.5">{bons.length}</Badge>
-            </TabButton>
-            <TabButton active={tab === 'factures'} onClick={() => setTab('factures')}>
+          {/* Tabs premium tactile */}
+          <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
+            <PillTab active={tab === 'fournisseurs'} onClick={() => setTab('fournisseurs')}>
+              👥 Fournisseurs <PillCount n={fournisseurs.length} active={tab === 'fournisseurs'} />
+            </PillTab>
+            <PillTab active={tab === 'bons'} onClick={() => setTab('bons')}>
+              📑 Bons de commande <PillCount n={bons.length} active={tab === 'bons'} />
+            </PillTab>
+            <PillTab active={tab === 'factures'} onClick={() => setTab('factures')}>
               💸 Factures
               {alertesFac.length > 0 && (
-                <Badge variant="destructive" className="ml-1.5 animate-pulse">{alertesFac.length}</Badge>
+                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums bg-rose-500 text-white animate-pulse">
+                  {alertesFac.length}
+                </span>
               )}
-            </TabButton>
-            <TabButton active={tab === 'comparateur'} onClick={() => setTab('comparateur')}>
+            </PillTab>
+            <PillTab active={tab === 'comparateur'} onClick={() => setTab('comparateur')}>
               📊 Comparateur prix
-            </TabButton>
+            </PillTab>
           </div>
         </div>
       </header>

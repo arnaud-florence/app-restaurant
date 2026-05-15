@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type Obligation, type Accident, type Affichage,
   type CategorieObligation, type Gravite, type StatutObligation,
@@ -53,11 +54,17 @@ export default function LegalClient({ data }: { data: DataLegal }) {
             <KPI label="Accidents cette année" value={accidentsAnnee} accent={accidentsAnnee > 0 ? 'orange' : 'vert'} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'obligations'} onClick={() => setTab('obligations')}>📋 Obligations ({data.obligations.length})</TabBtn>
-          <TabBtn active={tab === 'affichages'}  onClick={() => setTab('affichages')}>📌 Affichages{affMissing > 0 && ` (${affMissing} ⚠)`}</TabBtn>
-          <TabBtn active={tab === 'accidents'}   onClick={() => setTab('accidents')}>🩹 Accidents ({data.accidents.length})</TabBtn>
-          <TabBtn active={tab === 'registre'}    onClick={() => setTab('registre')}>📜 Registre sécurité</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'obligations'} onClick={() => setTab('obligations')}>
+            📋 Obligations <PillCount n={data.obligations.length} active={tab === 'obligations'} />
+          </PillTab>
+          <PillTab active={tab === 'affichages'} onClick={() => setTab('affichages')}>
+            📌 Affichages {affMissing > 0 && <PillCount n={affMissing} active={tab === 'affichages'} />}
+          </PillTab>
+          <PillTab active={tab === 'accidents'} onClick={() => setTab('accidents')}>
+            🩹 Accidents <PillCount n={data.accidents.length} active={tab === 'accidents'} />
+          </PillTab>
+          <PillTab active={tab === 'registre'} onClick={() => setTab('registre')}>📜 Registre sécurité</PillTab>
         </div>
       </header>
 

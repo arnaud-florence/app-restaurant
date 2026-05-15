@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount } from '@/components/ui/PillTab'
 import {
   type CompteResultat, type TvaSummary, type ChargeFixe, type NoteDeFrais,
   type CategorieCharge, type FrequenceCharge, type StatutNDF, type ProjectionPoint,
@@ -69,12 +70,16 @@ export default function FinancesClient({
             <KPI label="Trésorerie" value={fmtPrix(tresorSolde)} />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'cr'}      onClick={() => setTab('cr')}>📊 Compte de résultat</TabBtn>
-          <TabBtn active={tab === 'charges'} onClick={() => setTab('charges')}>💸 Charges & TVA{echeancesProches > 0 && ` (${echeancesProches})`}</TabBtn>
-          <TabBtn active={tab === 'tresor'}  onClick={() => setTab('tresor')}>💰 Trésorerie & simulateurs</TabBtn>
-          <TabBtn active={tab === 'ndf'}     onClick={() => setTab('ndf')}>📋 Notes de frais{ndfEnAttente > 0 && ` (${ndfEnAttente})`}</TabBtn>
-          <TabBtn active={tab === 'export'}  onClick={() => setTab('export')}>📤 Export & rapport</TabBtn>
+        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'cr'}      onClick={() => setTab('cr')}>📊 Compte de résultat</PillTab>
+          <PillTab active={tab === 'charges'} onClick={() => setTab('charges')}>
+            💸 Charges & TVA {echeancesProches > 0 && <PillCount n={echeancesProches} active={tab === 'charges'} />}
+          </PillTab>
+          <PillTab active={tab === 'tresor'}  onClick={() => setTab('tresor')}>💰 Trésorerie & simulateurs</PillTab>
+          <PillTab active={tab === 'ndf'}     onClick={() => setTab('ndf')}>
+            📋 Notes de frais {ndfEnAttente > 0 && <PillCount n={ndfEnAttente} active={tab === 'ndf'} />}
+          </PillTab>
+          <PillTab active={tab === 'export'}  onClick={() => setTab('export')}>📤 Export & rapport</PillTab>
         </div>
       </header>
 
