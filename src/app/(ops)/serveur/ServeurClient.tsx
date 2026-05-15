@@ -637,6 +637,7 @@ function CatalogueModal({
   // Évite à la serveuse de scroller dans tout le menu pour trouver une pizza.
   const [tagActif, setTagActif] = useState<TagDestination>('CUISINE')
   const [filtreCat, setFiltreCat] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
   // Compteurs par destination (sur l'ensemble du menu, pas filtré)
   const countByTag = useMemo(() => {
@@ -661,8 +662,13 @@ function CatalogueModal({
   useEffect(() => { setFiltreCat('') }, [tagActif])
 
   const filtered = useMemo(() => {
-    return filtreCat ? recettesParTag.filter(r => r.categorie === filtreCat) : recettesParTag
-  }, [recettesParTag, filtreCat])
+    let r = filtreCat ? recettesParTag.filter(r => r.categorie === filtreCat) : recettesParTag
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      r = r.filter(x => x.nom.toLowerCase().includes(q) || x.categorie.toLowerCase().includes(q))
+    }
+    return r
+  }, [recettesParTag, filtreCat, searchQuery])
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D0D0D] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -704,6 +710,24 @@ function CatalogueModal({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_400px] min-h-0 pb-[110px] lg:pb-0">
         {/* Catalogue */}
         <div className="overflow-y-auto p-4">
+          {/* Recherche plein-texte */}
+          <div className="relative mb-3">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="🔍 Rechercher un plat ou une catégorie..."
+              className="w-full min-h-[48px] px-4 pr-10 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-base"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg leading-none"
+                aria-label="Effacer recherche"
+              >×</button>
+            )}
+          </div>
+
           {/* 1er niveau : destination — onglets gros & visibles pour le rush */}
           <div className="flex gap-1.5 mb-3 -mx-1 px-1 overflow-x-auto">
             {(['CUISINE', 'PIZZA', 'BAR', 'SNACKING'] as const).map(t => {
@@ -767,7 +791,8 @@ function CatalogueModal({
         </div>
 
         {/* Panier — caché sur mobile (footer sticky en bas remplace), visible sur lg+ */}
-        <div className="hidden lg:flex bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col">
+        {/* min-h-0 OBLIGATOIRE pour que flex-1 overflow-y-auto interne fonctionne dans le grid parent */}
+        <div className="hidden lg:flex bg-zinc-950 border-t lg:border-t-0 lg:border-l border-zinc-800 flex-col min-h-0">
           <div className="px-4 py-2 border-b border-zinc-800">
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Panier</p>
             <p className="text-2xl font-bold tabular-nums">{fmtPrix(totalPanier)}</p>

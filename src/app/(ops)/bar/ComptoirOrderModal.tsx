@@ -68,6 +68,7 @@ export default function ComptoirOrderModal({
   const [tagActif, setTagActif] = useState<TagPanier>(tagInitial)
   const [panier, setPanier] = useState<LignePanier[]>([])
   const [erreur, setErreur] = useState('')
+  const [searchQuery, setSearchQuery] = useState<string>('')
   const [isPending, startTransition] = useTransition()
 
   // ─── Créneaux retrait multi-zones ────────────────────────────
@@ -175,10 +176,14 @@ export default function ComptoirOrderModal({
     return out
   }, [])
 
-  const recettesAffichees = useMemo(
-    () => recettes.filter(r => r.tag_destination === tagActif),
-    [recettes, tagActif]
-  )
+  const recettesAffichees = useMemo(() => {
+    let r = recettes.filter(x => x.tag_destination === tagActif)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      r = r.filter(x => x.nom.toLowerCase().includes(q) || x.categorie.toLowerCase().includes(q))
+    }
+    return r
+  }, [recettes, tagActif, searchQuery])
 
   // Groupement par catégorie
   const parCategorie = useMemo(() => {
@@ -340,7 +345,24 @@ export default function ComptoirOrderModal({
         <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden min-h-0">
 
           {/* Catalogue */}
-          <div className="overflow-y-auto p-3 space-y-4">
+          <div className="overflow-y-auto p-3 space-y-3">
+            {/* Recherche plein-texte */}
+            <div className="relative">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="🔍 Rechercher un plat..."
+                className="w-full min-h-[44px] px-4 pr-10 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-base leading-none"
+                  aria-label="Effacer recherche"
+                >×</button>
+              )}
+            </div>
             {parCategorie.length === 0 ? (
               <p className="text-zinc-500 italic text-center py-8">
                 Aucune recette pour {tagActif}.
