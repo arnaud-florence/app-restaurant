@@ -80,10 +80,11 @@
     @apply min-w-full;
   }
 
-  /* Padding bas pour laisser place à la TopActionBar en mode mobile (fixed bottom).
-     Sur desktop la barre passe en haut du contenu (static), donc pas de padding. */
+  /* Padding bas pour laisser place à la TopActionBar en mode mobile
+     (barre flottante h-12 + bottom-3 + bordure = ~76px + safe-area).
+     Sur desktop la barre passe en haut (static), donc pas de padding. */
   .pb-mobile-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5.5rem);
   }
   @media (min-width: 768px) {
     .pb-mobile-nav { padding-bottom: 0; }

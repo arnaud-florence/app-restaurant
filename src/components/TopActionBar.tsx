@@ -209,16 +209,16 @@ export default function TopActionBar({
 
   const tones = theme === 'dark' ? TONES_DARK : TONES_LIGHT
 
-  // Mobile : fixed en bas (zone du pouce, plus accessible)
+  // Mobile : barre flottante remontée du bord bas (pouce confortable)
   // Desktop : static en haut (intégré au flux de la page)
   const wrapperCls = theme === 'dark'
     ? cn(
-        'fixed bottom-0 inset-x-0 z-30 bg-[#0D0D0D]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0D0D0D]/85 border-t border-zinc-800 shadow-[0_-2px_10px_rgba(0,0,0,0.3)]',
-        'md:static md:bg-[#0D0D0D] md:border-t-0 md:border-b md:shadow-none md:backdrop-blur-0',
+        'fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-[#0D0D0D]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0D0D0D]/85 border-2 border-zinc-700 shadow-2xl',
+        'md:static md:inset-auto md:rounded-none md:bg-[#0D0D0D] md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:backdrop-blur-0',
       )
     : cn(
-        'fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-t border-zinc-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]',
-        'md:static md:bg-white md:border-t-0 md:border-b md:shadow-none md:backdrop-blur-0',
+        'fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 border-2 border-zinc-200 shadow-2xl',
+        'md:static md:inset-auto md:rounded-none md:bg-white md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:backdrop-blur-0',
       )
 
   // Bouton "☰ Modules" : ouvre le drawer
@@ -228,12 +228,9 @@ export default function TopActionBar({
 
   return (
     <>
-      <div
-        className={wrapperCls}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      <div className={wrapperCls}>
         <div className="overflow-x-auto scrollbar-thin" style={{ scrollSnapType: 'x mandatory' }}>
-          <div className="flex items-center gap-1.5 px-3 py-2 min-w-max">
+          <div className="flex items-center gap-2 px-2.5 py-2 md:py-1.5 min-w-max">
             {chipsVisibles.map(it => {
               const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
               const cls = active ? tones[it.tone].active : tones[it.tone].base
@@ -243,11 +240,12 @@ export default function TopActionBar({
                   href={it.href}
                   style={{ scrollSnapAlign: 'start' }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full border-2 text-xs font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-12 px-4 text-sm md:h-10 md:px-3.5 md:text-xs',
                     cls,
                   )}
                 >
-                  <span className="text-base leading-none" aria-hidden>{it.emoji}</span>
+                  <span className="text-lg md:text-base leading-none" aria-hidden>{it.emoji}</span>
                   <span>{it.label}</span>
                 </Link>
               )
@@ -258,12 +256,13 @@ export default function TopActionBar({
               type="button"
               onClick={() => setOpen(true)}
               className={cn(
-                'inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full border-2 text-xs font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                'h-12 px-4 text-sm md:h-10 md:px-3.5 md:text-xs',
                 plusBtnCls,
               )}
               aria-label="Tous les modules"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5 md:h-4 md:w-4" />
               <span>Modules</span>
             </button>
           </div>
