@@ -22,6 +22,8 @@ type Recette = {
   id: string; nom: string; categorie: string;
   tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   prix_vente_ht: number
+  image_url?: string | null
+  photo_url?: string | null
 }
 
 type Employe = { id: string; prenom: string; nom: string; poste: string }

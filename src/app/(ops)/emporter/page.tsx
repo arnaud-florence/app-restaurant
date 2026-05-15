@@ -25,7 +25,7 @@ export default async function EmporterPage() {
     listCommandesActives(),
     supabase
       .from('recettes')
-      .select('id, nom, categorie, tag_destination, prix_vente_ht')
+      .select('id, nom, categorie, tag_destination, prix_vente_ht, image_url, photo_url')
       .eq('actif', true)
       .or('tag_destination.in.(SNACKING,PIZZA,BAR),categorie.ilike.dessert%')
       .order('categorie')
@@ -44,6 +44,8 @@ export default async function EmporterPage() {
     categorie: r.categorie as string,
     tag_destination: r.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
     prix_vente_ht: Number(r.prix_vente_ht ?? 0),
+    image_url: (r.image_url as string) ?? null,
+    photo_url: (r.photo_url as string) ?? null,
   }))
   const employes = (employesRes.data ?? []).map(e => ({
     id: e.id as string,

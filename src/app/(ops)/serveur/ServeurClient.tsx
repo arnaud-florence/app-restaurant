@@ -16,6 +16,7 @@ import AppelsServeurBanner from './AppelsServeurBanner'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 import TachesSequentielles from '@/components/TachesSequentielles'
+import ProduitCard from '@/components/ops/ProduitCard'
 
 type Table = {
   id: string
@@ -32,6 +33,8 @@ type Recette = {
   categorie: string
   tag_destination: TagDestination
   prix_vente_ht: number
+  image_url?: string | null
+  photo_url?: string | null
 }
 
 type Employe = { id: string; prenom: string; nom: string; poste: string }
@@ -748,21 +751,16 @@ function CatalogueModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filtered.map(r => {
-              const dest = TAG_DEST_LABEL[r.tag_destination]
+              const dejaAuPanier = panier.find(p => p.recette_id === r.id)
               return (
-                <button
+                <ProduitCard
                   key={r.id}
+                  produit={r}
+                  compteur={dejaAuPanier?.quantite ?? 0}
                   onClick={() => onAjouter(r)}
-                  className="min-h-[100px] rounded-md border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 active:scale-95 transition-all p-3 text-left flex flex-col"
-                >
-                  <span className={cn('inline-block self-start text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mb-1', dest.cls)}>
-                    {dest.emoji} {dest.label}
-                  </span>
-                  <p className="font-semibold text-sm leading-tight flex-1">{r.nom}</p>
-                  <p className="text-emerald-400 font-bold text-base mt-1">{fmtPrix(r.prix_vente_ht)}</p>
-                </button>
+                />
               )
             })}
           </div>

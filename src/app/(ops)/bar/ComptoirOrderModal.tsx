@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { creerCommande, listerCreneauxDisponibles } from '../actions'
 import { fmtPrix } from '@/lib/service'
 import { createClient } from '@/lib/supabase/client'
+import ProduitCard from '@/components/ops/ProduitCard'
 
 type TagPanier = 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
 type TagPlanning = 'SNACKING' | 'PIZZA' | 'BAR'
@@ -21,6 +22,8 @@ type Recette = {
   id: string; nom: string; categorie: string;
   tag_destination: TagPanier
   prix_vente_ht: number
+  image_url?: string | null
+  photo_url?: string | null
 }
 
 type LignePanier = {
@@ -345,30 +348,16 @@ export default function ComptoirOrderModal({
             ) : parCategorie.map(([cat, items]) => (
               <div key={cat}>
                 <p className="text-xs uppercase tracking-wider text-zinc-400 mb-1.5 font-bold">{cat}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {items.map(r => {
                     const dejaAuPanier = panier.find(p => p.recette_id === r.id)
                     return (
-                      <button
+                      <ProduitCard
                         key={r.id}
+                        produit={r}
+                        compteur={dejaAuPanier?.quantite ?? 0}
                         onClick={() => ajouter(r)}
-                        className={cn(
-                          'min-h-[80px] p-2 rounded-md border text-left transition-all active:scale-95 flex flex-col justify-between',
-                          dejaAuPanier
-                            ? 'bg-emerald-900/40 border-emerald-500'
-                            : 'bg-zinc-950 border-zinc-700 hover:border-emerald-500'
-                        )}
-                      >
-                        <p className="text-sm font-medium leading-tight line-clamp-2">{r.nom}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs text-zinc-400 tabular-nums">{fmtPrix(r.prix_vente_ht)}</span>
-                          {dejaAuPanier && (
-                            <span className="text-xs font-bold bg-emerald-500 text-white px-1.5 py-0.5 rounded">
-                              ×{dejaAuPanier.quantite}
-                            </span>
-                          )}
-                        </div>
-                      </button>
+                      />
                     )
                   })}
                 </div>
