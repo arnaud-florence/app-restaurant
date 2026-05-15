@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 
 import {
@@ -89,21 +90,25 @@ export default function StockClient({
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">
-                📦
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Inventaire & mouvements</p>
-                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Stocks</h1>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
+    <div className="min-h-screen bg-zinc-50">
+      {/* Dot pattern subtle premium */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Cuisine & stock"
+          title="Stocks"
+          description="Niveaux temps réel, mouvements, ruptures, liste de courses automatique."
+          actions={
+            <>
               <Button onClick={() => { setIngredientCourant(null); setActionOpen('entree') }} variant="default" size="sm">
                 <span className="text-base">+</span> Livraison
               </Button>
@@ -114,12 +119,10 @@ export default function StockClient({
               <Button onClick={() => setActionOpen('courses')} variant="outline" size="sm">
                 🛒 Liste courses {courses.length > 0 && <Badge variant="destructive" className="ml-1">{courses.length}</Badge>}
               </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+            </>
+          }
+        />
 
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3">
           <KPI label="Total actifs" value={String(stats.totalActifs)} icon="📋" />

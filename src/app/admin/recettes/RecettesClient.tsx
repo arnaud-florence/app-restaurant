@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { getRecettePhoto } from '@/lib/recettePhoto'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   synthese, fmtPrix, fmtPct, STATUT_FOOD_COST_STYLE,
 } from '@/lib/foodCost'
@@ -105,21 +106,24 @@ export default function RecettesClient({
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      {/* Header sticky premium */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">
-                📖
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Carte & food cost</p>
-                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Recettes</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="amber"
+          subtitle="Cuisine & stock"
+          title="Recettes"
+          description="Fiches techniques, food cost, allergènes, menu engineering."
+          actions={
+            <>
               <Link href="/admin/recettes/engineering">
                 <Button size="lg" variant="outline">
                   <span className="hidden sm:inline">📊 Menu engineering</span>
@@ -137,12 +141,10 @@ export default function RecettesClient({
                   </Button>
                 </>
               )}
-            </div>
-          </div>
-        </div>
-      </header>
+            </>
+          }
+        />
 
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
           <KPI label="Recettes actives" value={String(stats.total)} icon="📖" tone="default" />

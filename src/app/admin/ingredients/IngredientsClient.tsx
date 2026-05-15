@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { getIngredientPhoto } from '@/lib/ingredientPhoto'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Ingredient, statutStock, STATUT_STOCK_STYLE, iconAllergene,
   CATEGORIES_DEFAUT,
@@ -82,32 +83,33 @@ export default function IngredientsClient({ initial, readOnly = false }: { initi
   }
 
   return (
-    <div className="min-h-screen bg-muted/40">
-      {/* Header sticky */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-                🥬
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Catalogue produits</p>
-                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Ingrédients</h1>
-              </div>
-            </div>
-            {!readOnly && (
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Cuisine & stock"
+          title="Ingrédients"
+          description="Catalogue produits, prix historique, allergènes, lots et fournisseurs."
+          actions={
+            !readOnly && (
               <Button size="lg" onClick={() => setCreating(true)} className="shrink-0">
                 <span className="text-lg">+</span>
                 <span className="hidden sm:inline">Ajouter un ingrédient</span>
                 <span className="sm:hidden">Ajouter</span>
               </Button>
-            )}
-          </div>
-        </div>
-      </header>
+            )
+          }
+        />
 
-      <main className="max-w-7xl mx-auto px-4 py-4 space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
           <KPI label="Total actifs" value={stats.total} tone="default" icon="📦" />

@@ -7,6 +7,7 @@ import { format, addDays, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   type Chambre, type ResaChambre, type ResaTable, type Evenement,
   type StatutResa, type StatutResaTable, type StatutEvent, type TypeEvenement,
@@ -38,36 +39,42 @@ export default function ReservationsClient({ data, readOnly = false, showTachesD
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">📅</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Hôtellerie & événementiel</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Réservations</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="Arrivées aujourd'hui" value={arriveesCe} accent={arriveesCe > 0 ? 'orange' : 'zinc'} />
-            <KPI label="Tables réservées aujd" value={tablesAujourdhui} />
-            <KPI label="Événements à venir" value={evenementsAVenir} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1.5 overflow-x-auto">
-          <PillTab active={tab === 'chambres'}   onClick={() => setTab('chambres')}>
-            🛏️ Chambres <PillCount n={data.chambres.length} active={tab === 'chambres'} />
-          </PillTab>
-          <PillTab active={tab === 'tables'}     onClick={() => setTab('tables')}>
-            🪑 Tables/terrasse <PillCount n={data.resaTables.length} active={tab === 'tables'} />
-          </PillTab>
-          <PillTab active={tab === 'evenements'} onClick={() => setTab('evenements')}>
-            🎉 Événements <PillCount n={data.evenements.length} active={tab === 'evenements'} />
-          </PillTab>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4 space-y-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Clientèle"
+          title="Réservations"
+          description="Tables, terrasse, chambres et événementiel — calendrier multi-zones."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="Arrivées" value={arriveesCe} accent={arriveesCe > 0 ? 'orange' : 'zinc'} />
+              <KPI label="Tables aujd" value={tablesAujourdhui} />
+              <KPI label="Événements" value={evenementsAVenir} />
+            </div>
+          }
+        >
+          <div className="flex gap-1.5 overflow-x-auto">
+            <PillTab active={tab === 'chambres'}   onClick={() => setTab('chambres')}>
+              🛏️ Chambres <PillCount n={data.chambres.length} active={tab === 'chambres'} />
+            </PillTab>
+            <PillTab active={tab === 'tables'}     onClick={() => setTab('tables')}>
+              🪑 Tables/terrasse <PillCount n={data.resaTables.length} active={tab === 'tables'} />
+            </PillTab>
+            <PillTab active={tab === 'evenements'} onClick={() => setTab('evenements')}>
+              🎉 Événements <PillCount n={data.evenements.length} active={tab === 'evenements'} />
+            </PillTab>
+          </div>
+        </AdminPageHeader>
+
         {showTachesDuJour && <TachesDuJourWidget poste="receptionniste" defaultOpen />}
         {tab === 'chambres'   && <ChambresTab chambres={data.chambres} resas={data.resaChambres} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'tables'     && <TablesTab resas={data.resaTables} tables={data.tables} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
