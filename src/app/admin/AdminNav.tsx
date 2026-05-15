@@ -181,7 +181,7 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">
-          <Link href="/admin/pilotage" className="flex items-center gap-2 font-bold" onClick={() => setOpen(false)}>
+          <Link href="/admin/cat" className="flex items-center gap-2 font-bold" onClick={() => setOpen(false)}>
             <Building2 className="h-5 w-5 text-emerald-400" />
             App Restaurant
           </Link>

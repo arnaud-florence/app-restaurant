@@ -33,7 +33,7 @@ const COMMUN_EMPLOYE = ['/mon-espace', '/equipes', '/formation', '/login', '/']
 export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
   manager: {
     allowed: ['*'],
-    main: '/admin/pilotage',
+    main: '/admin/cat',
     label: 'Gérant / Manager',
   },
 

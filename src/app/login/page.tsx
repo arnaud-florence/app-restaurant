@@ -13,14 +13,14 @@ export default async function LoginPage({ searchParams }: { searchParams: { next
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
     const { data: profil } = await supabase.from('profils').select('role').eq('id', user.id).maybeSingle()
-    if (profil?.role === 'manager') redirect(searchParams.next || '/admin')
+    if (profil?.role === 'manager') redirect(searchParams.next || '/admin/cat')
   }
 
   // Compte le nombre de managers pour afficher le bandeau "1ère installation"
   const { count: nbManagers } = await supabase.from('profils').select('id', { count: 'exact', head: true }).eq('role', 'manager')
 
   return <LoginClient
-    nextUrl={searchParams.next || '/admin'}
+    nextUrl={searchParams.next || '/admin/cat'}
     error={searchParams.error ?? null}
     nbManagers={nbManagers ?? 0}
   />
