@@ -134,13 +134,17 @@ export default function EconomieClient({
 
   return (
     <div className="p-4 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Wallet className="h-6 w-6 text-emerald-600" /> Centre économique
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Source unique pour le pilotage : config + charges fixes/variables + contrats équipe → point mort + challenges.
-        </p>
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
+          <Wallet className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Pilotage</p>
+          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Centre économique</h1>
+          <p className="text-xs text-zinc-500 mt-1">
+            Source unique : config + charges + contrats → point mort + challenges.
+          </p>
+        </div>
       </div>
 
       {/* ─── 0. Vue d'ensemble live ─────────────────────────────── */}

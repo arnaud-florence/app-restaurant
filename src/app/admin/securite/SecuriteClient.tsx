@@ -31,12 +31,18 @@ export default function SecuriteClient({
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-4">
       <header className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Shield className="h-6 w-6 text-emerald-600" /> Sécurité & accès</h1>
-          <p className="text-sm text-zinc-500">
-            Connecté en tant que <strong>{profilCourant.email}</strong> ({profilCourant.role}){' '}
-            {profilCourant.totp_enabled ? <Badge className="bg-emerald-600">2FA activée</Badge> : <Badge variant="outline">2FA désactivée</Badge>}
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
+            <Shield className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Accès & 2FA</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Sécurité</h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              Connecté en tant que <strong>{profilCourant.email}</strong> ({profilCourant.role}){' '}
+              {profilCourant.totp_enabled ? <Badge className="bg-emerald-600">2FA activée</Badge> : <Badge variant="outline">2FA désactivée</Badge>}
+            </p>
+          </div>
         </div>
         <form action={logoutAction}>
           <Button type="submit" variant="outline" className="gap-2"><LogOut className="h-4 w-4" /> Se déconnecter</Button>

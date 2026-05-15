@@ -76,15 +76,17 @@ export default function CodesPromoClient({ codes }: { codes: CodePromo[] }) {
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6">
       <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Ticket className="h-6 w-6 text-amber-500" />
-            Codes promo
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Réductions appliquées au panier en ligne (commande / réservation).
-            {actifsAujourdhui.length} utilisable{actifsAujourdhui.length > 1 ? 's' : ''} aujourd&apos;hui.
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
+            <Ticket className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Marketing</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Codes promo</h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              Réductions sur commande / réservation en ligne · {actifsAujourdhui.length} utilisable{actifsAujourdhui.length > 1 ? 's' : ''} aujourd&apos;hui.
+            </p>
+          </div>
         </div>
         <Button onClick={() => setCreating(true)} className="gap-1.5">
           <Plus className="h-4 w-4" />

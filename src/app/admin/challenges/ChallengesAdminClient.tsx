@@ -77,13 +77,17 @@ export default function ChallengesAdminClient({
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Trophy className="h-6 w-6 text-amber-600" /> Challenges
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Définis les objectifs individuels, équipe et restaurant. Période courante : <strong>{periode.debut}</strong> → <strong>{periode.fin}</strong>.
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">
+            <Trophy className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Motivation équipe</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Challenges</h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              Période courante : <strong>{periode.debut}</strong> → <strong>{periode.fin}</strong>.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button onClick={lancerPack} disabled={packPending} variant="outline" className="gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50">

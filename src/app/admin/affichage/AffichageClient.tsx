@@ -50,11 +50,15 @@ export default function AffichageClient({
     <div className="p-4 max-w-7xl mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Tv className="h-6 w-6 text-emerald-600" /> Affichage salle
-          </h1>
-          <p className="text-sm text-zinc-500">Menu du jour, promos, événements TV + QR appel serveur.</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xl shadow-lg shadow-violet-500/30 shrink-0">
+            <Tv className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Salle</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Affichage</h1>
+            <p className="text-xs text-zinc-500 mt-1">Menu du jour, promos, événements TV + QR appel serveur.</p>
+          </div>
         </div>
         <Link href="/affichage/tv" target="_blank">
           <Button variant="outline" className="gap-2">

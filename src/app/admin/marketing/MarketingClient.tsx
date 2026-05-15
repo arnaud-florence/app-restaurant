@@ -77,12 +77,15 @@ export default function MarketingClient({
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6">
       <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Megaphone className="h-6 w-6 text-pink-500" />
-            Marketing & communication
-          </h1>
-          <p className="text-sm text-zinc-500">Génération posts IA pour Instagram, Facebook, Google My Business…</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white text-xl shadow-lg shadow-rose-500/30 shrink-0">
+            <Megaphone className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-600">Communication & IA</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Marketing</h1>
+            <p className="text-xs text-zinc-500 mt-1">Génération posts IA pour Instagram, Facebook, Google My Business…</p>
+          </div>
         </div>
         <Button onClick={() => setCreating(true)} className="gap-1.5 bg-pink-600 hover:bg-pink-700">
           <Sparkles className="h-4 w-4" /> Générer un post IA

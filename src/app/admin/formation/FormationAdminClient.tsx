@@ -54,11 +54,15 @@ export default function FormationAdminClient({
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <GraduationCap className="h-6 w-6 text-emerald-600" /> Formation des équipes
-          </h1>
-          <p className="text-sm text-zinc-500">Guides interactifs par poste, quiz, suivi des progressions.</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
+            <GraduationCap className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Équipe</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Formation</h1>
+            <p className="text-xs text-zinc-500 mt-1">Guides interactifs par poste, quiz, suivi des progressions.</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/allergenes" className="text-sm text-zinc-600 hover:text-emerald-700 inline-flex items-center gap-1 underline">

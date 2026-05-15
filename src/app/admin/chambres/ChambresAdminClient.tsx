@@ -41,12 +41,15 @@ export default function ChambresAdminClient({ chambres }: { chambres: Chambre[] 
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6">
       <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bed className="h-6 w-6 text-zinc-700" />
-            Chambres d&apos;hôtes
-          </h1>
-          <p className="text-sm text-zinc-500">{chambres.length} chambre{chambres.length > 1 ? 's' : ''} configurée{chambres.length > 1 ? 's' : ''}</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">
+            <Bed className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Hôtellerie</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Chambres d&apos;hôtes</h1>
+            <p className="text-xs text-zinc-500 mt-1">{chambres.length} chambre{chambres.length > 1 ? 's' : ''} configurée{chambres.length > 1 ? 's' : ''}</p>
+          </div>
         </div>
         <div className="flex gap-2">
           {chambres.length === 0 && (
