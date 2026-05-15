@@ -15,12 +15,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Eye, EyeOff } from 'lucide-react'
+import { Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
 import PushNotifSwitch from '@/components/PushNotifSwitch'
 import { useLiveFindings, type Finding } from '@/hooks/useLiveFindings'
+import { usePinnedModules, MAX_PINNED } from '@/hooks/usePinnedModules'
 import { CATEGORIES, resolveActiveCategory, POSTE_PRIORITES_CATEGORIES, type Category } from '@/lib/navigation'
 
 export type TopActionBarTheme = 'light' | 'dark'
@@ -181,6 +182,23 @@ export default function TopActionBar({
   const [query, setQuery] = useState('')
   /** Href de la chip cliquée, en attente que la navigation se complète. */
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  /** Sous-modules épinglés par l'utilisateur (localStorage). Apparaissent dans
+   *  la barre entre Accueil et les catégories. Max 5. Pinning/unpinning via
+   *  l'étoile dans le drawer Modules. */
+  const { pinned, isPinned, togglePin, count: nbPinned } = usePinnedModules()
+
+  // Résout les hrefs pinnés en items concrets (label/emoji/tone) depuis CATEGORIES
+  const pinnedItems = useMemo(() => {
+    const allItems: Array<{ href: string; emoji: string; label: string; tone: Tone }> = []
+    for (const c of CATEGORIES) {
+      for (const it of c.items) {
+        allItems.push({ href: it.href, emoji: it.emoji, label: it.label, tone: c.tone as Tone })
+      }
+    }
+    const byHref = new Map(allItems.map(i => [i.href, i]))
+    return pinned.map(href => byHref.get(href)).filter(Boolean) as Array<{ href: string; emoji: string; label: string; tone: Tone }>
+  }, [pinned])
 
   /** Mode "Service intensif" : remplace les chips catégorie par les écrans ops directs.
    *  Persisté en localStorage 'service_intense_mode' (boolean).
@@ -442,6 +460,41 @@ export default function TopActionBar({
               <span className="hidden sm:inline">{serviceMode ? 'Service' : 'Service'}</span>
             </button>
 
+            {/* Chips ÉPINGLÉS (favoris perso) — entre Accueil/Service et les autres */}
+            {pinnedItems.filter(p => peutVoir(p.href)).map(p => {
+              const active = pathname === p.href || pathname.startsWith(p.href + '/')
+              const isPending = pendingHref === p.href
+              const cls = active ? tones[p.tone].active : tones[p.tone].base
+              return (
+                <Link
+                  key={p.href}
+                  href={p.href}
+                  ref={active ? activeChipRef : undefined}
+                  onClick={() => { tapHaptic(); setPendingHref(p.href) }}
+                  style={{ scrollSnapAlign: 'start' }}
+                  aria-current={active ? 'page' : undefined}
+                  title={`⭐ ${p.label}`}
+                  className={cn(
+                    'relative inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    isPending && 'animate-pulse',
+                    cls,
+                  )}
+                >
+                  {/* Petite étoile en haut à droite pour signaler le pin */}
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] shadow-md">
+                    <Star className="w-2.5 h-2.5 fill-current" aria-hidden />
+                  </span>
+                  {isPending ? (
+                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <span className="text-xl md:text-base leading-none" aria-hidden>{p.emoji}</span>
+                  )}
+                  <span>{p.label}</span>
+                </Link>
+              )
+            })}
+
             {/* En MODE SERVICE INTENSIF : on remplace les chips catégorie par les 8 ops directs */}
             {serviceMode ? opsChipsVisibles.map(op => {
               const active = pathname === op.href || pathname.startsWith(op.href + '/')
@@ -625,11 +678,19 @@ export default function TopActionBar({
                   </button>
                 )}
               </div>
-              {nbAlertesRouges > 0 && !query && (
-                <p className="mt-2 px-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-red-700">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  {nbAlertesRouges} alerte{nbAlertesRouges > 1 ? 's' : ''} urgente{nbAlertesRouges > 1 ? 's' : ''} non résolue{nbAlertesRouges > 1 ? 's' : ''}
-                </p>
+              {!query && (
+                <div className="mt-2 flex items-center justify-between gap-2 px-2">
+                  {nbAlertesRouges > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      {nbAlertesRouges} alerte{nbAlertesRouges > 1 ? 's' : ''} urgente{nbAlertesRouges > 1 ? 's' : ''}
+                    </span>
+                  ) : <span />}
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700">
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    {nbPinned} / {MAX_PINNED} épinglés
+                  </span>
+                </div>
               )}
             </div>
 
@@ -654,21 +715,41 @@ export default function TopActionBar({
                   <div className="grid grid-cols-2 gap-1.5">
                     {g.items.map(it => {
                       const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
+                      const pinnedThis = isPinned(it.href)
+                      const pinDisabled = !pinnedThis && nbPinned >= MAX_PINNED
                       return (
-                        <Link
-                          key={it.href}
-                          href={it.href}
-                          onClick={() => setOpen(false)}
-                          className={cn(
-                            'flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-xs font-bold min-h-[44px] border-2 active:scale-95 transition',
-                            active
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                              : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
-                          )}
-                        >
-                          <span className="text-lg leading-none shrink-0">{it.emoji}</span>
-                          <span className="truncate">{it.label}</span>
-                        </Link>
+                        <div key={it.href} className="relative">
+                          <Link
+                            href={it.href}
+                            onClick={() => setOpen(false)}
+                            className={cn(
+                              'flex items-center gap-2 rounded-xl px-2.5 py-2.5 pr-8 text-xs font-bold min-h-[44px] border-2 active:scale-95 transition',
+                              active
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                                : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
+                            )}
+                          >
+                            <span className="text-lg leading-none shrink-0">{it.emoji}</span>
+                            <span className="truncate">{it.label}</span>
+                          </Link>
+                          {/* Bouton étoile pin/unpin */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); if (!pinDisabled) togglePin(it.href) }}
+                            disabled={pinDisabled}
+                            aria-label={pinnedThis ? `Désépingler ${it.label}` : `Épingler ${it.label}`}
+                            title={pinDisabled ? `Max ${MAX_PINNED} épinglés` : (pinnedThis ? 'Désépingler' : 'Épingler dans la barre')}
+                            className={cn(
+                              'absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition',
+                              pinnedThis
+                                ? 'text-amber-500 hover:bg-amber-100'
+                                : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50',
+                              pinDisabled && 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-300',
+                            )}
+                          >
+                            <Star className={cn('h-4 w-4', pinnedThis && 'fill-current')} aria-hidden />
+                          </button>
+                        </div>
                       )
                     })}
                   </div>
