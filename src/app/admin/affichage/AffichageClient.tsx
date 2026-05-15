@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -47,25 +48,30 @@ export default function AffichageClient({
   const menuToday = useMemo(() => menu.filter(m => m.jour === today), [menu, today])
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xl shadow-lg shadow-violet-500/30 shrink-0">
-            <Tv className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Salle</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Affichage</h1>
-            <p className="text-xs text-zinc-500 mt-1">Menu du jour, promos, événements TV + QR appel serveur.</p>
-          </div>
-        </div>
-        <Link href="/affichage/tv" target="_blank">
-          <Button variant="outline" className="gap-2">
-            <ExternalLink className="h-4 w-4" /> Ouvrir l'écran TV
-          </Button>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="violet"
+          subtitle="Service"
+          title="Affichage TV"
+          description="Menu du jour, promos, événements TV + QR code appel serveur en salle."
+          actions={
+            <Link href="/affichage/tv" target="_blank">
+              <Button variant="outline" className="gap-2">
+                <ExternalLink className="h-4 w-4" /> Ouvrir l'écran TV
+              </Button>
+            </Link>
+          }
+        />
 
       {/* Tabs */}
       <div className="flex gap-2 border-b">
@@ -77,10 +83,11 @@ export default function AffichageClient({
         <TabBtn active={tab === 'qr'}     onClick={() => setTab('qr')}><QrCode className="h-4 w-4 inline mr-1" /> QR tables</TabBtn>
       </div>
 
-      {tab === 'menu'   && <MenuPanel menu={menuToday} today={today} />}
-      {tab === 'promos' && <PromosPanel promos={promos} />}
-      {tab === 'appels' && <AppelsPanel appels={appels} />}
-      {tab === 'qr'     && <QrPanel tables={tables} />}
+        {tab === 'menu'   && <MenuPanel menu={menuToday} today={today} />}
+        {tab === 'promos' && <PromosPanel promos={promos} />}
+        {tab === 'appels' && <AppelsPanel appels={appels} />}
+        {tab === 'qr'     && <QrPanel tables={tables} />}
+      </main>
     </div>
   )
 }

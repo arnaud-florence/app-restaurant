@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Clock, Plus, Trash2, Zap } from 'lucide-react'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
   creerCreneauCapacite, modifierCreneauCapacite, toggleCreneauCapacite,
   supprimerCreneauCapacite, appliquerPresetStandard,
@@ -52,19 +53,23 @@ export default function CapaciteClient({ creneaux }: { creneaux: CreneauCapacite
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6">
-      <header className="flex items-center gap-3 min-w-0">
-        <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">
-          <Clock className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Anti-rush</p>
-          <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Capacité cuisine</h1>
-          <p className="text-xs text-zinc-500 mt-1">
-            Limite max de commandes ONLINE acceptées par créneau, <strong>par cuisine</strong>. Snacking / Pizza / Bar indépendants.
-          </p>
-        </div>
-      </header>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Cuisine & stock"
+          title="Capacité cuisine"
+          description="Limite max de commandes ONLINE acceptées par créneau et par cuisine — Snacking, Pizza et Bar indépendants."
+        />
 
       {/* Tabs zones */}
       <div className="flex flex-wrap gap-2 border-b border-zinc-200">
@@ -202,6 +207,7 @@ export default function CapaciteClient({ creneaux }: { creneaux: CreneauCapacite
           </Card>
         </div>
       )}
+      </main>
     </div>
   )
 }

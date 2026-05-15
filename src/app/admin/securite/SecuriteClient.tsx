@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { logoutAction } from '@/app/login/actions'
 import { activer2FA, desactiver2FA, preparer2FA, changerRole, genererSauvegarde } from './actions'
 
@@ -29,41 +30,45 @@ export default function SecuriteClient({
   const [tab, setTab] = useState<'2fa' | 'profils' | 'audit' | 'connexions' | 'sauvegarde'>('2fa')
 
   return (
-    <div className="p-4 max-w-6xl mx-auto space-y-4">
-      <header className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-            <Shield className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Accès & 2FA</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Sécurité</h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              Connecté en tant que <strong>{profilCourant.email}</strong> ({profilCourant.role}){' '}
-              {profilCourant.totp_enabled ? <Badge className="bg-emerald-600">2FA activée</Badge> : <Badge variant="outline">2FA désactivée</Badge>}
-            </p>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="zinc"
+          subtitle="Système"
+          title="Sécurité"
+          description={`Connecté en tant que ${profilCourant.email} (${profilCourant.role}) · 2FA ${profilCourant.totp_enabled ? 'activée' : 'désactivée'}.`}
+          actions={
+            <form action={logoutAction}>
+              <Button type="submit" variant="outline" className="gap-2"><LogOut className="h-4 w-4" /> Se déconnecter</Button>
+            </form>
+          }
+        >
+          <div className="flex gap-2 border-b overflow-x-auto">
+            <TabBtn a={tab === '2fa'}        on={() => setTab('2fa')}><KeyRound className="h-4 w-4 inline mr-1" /> 2FA</TabBtn>
+            <TabBtn a={tab === 'profils'}    on={() => setTab('profils')}>👥 Profils ({profils.length})</TabBtn>
+            <TabBtn a={tab === 'audit'}      on={() => setTab('audit')}>📜 Journal ({audit.length})</TabBtn>
+            <TabBtn a={tab === 'connexions'} on={() => setTab('connexions')}>
+              <Lock className="h-4 w-4 inline mr-1" /> Connexions {connexions.some(c => c.inhabituelle) && <Badge className="ml-1 bg-amber-500">⚠</Badge>}
+            </TabBtn>
+            <TabBtn a={tab === 'sauvegarde'} on={() => setTab('sauvegarde')}><Download className="h-4 w-4 inline mr-1" /> Sauvegarde</TabBtn>
           </div>
-        </div>
-        <form action={logoutAction}>
-          <Button type="submit" variant="outline" className="gap-2"><LogOut className="h-4 w-4" /> Se déconnecter</Button>
-        </form>
-      </header>
+        </AdminPageHeader>
 
-      <div className="flex gap-2 border-b overflow-x-auto">
-        <TabBtn a={tab === '2fa'}        on={() => setTab('2fa')}><KeyRound className="h-4 w-4 inline mr-1" /> 2FA</TabBtn>
-        <TabBtn a={tab === 'profils'}    on={() => setTab('profils')}>👥 Profils ({profils.length})</TabBtn>
-        <TabBtn a={tab === 'audit'}      on={() => setTab('audit')}>📜 Journal ({audit.length})</TabBtn>
-        <TabBtn a={tab === 'connexions'} on={() => setTab('connexions')}>
-          <Lock className="h-4 w-4 inline mr-1" /> Connexions {connexions.some(c => c.inhabituelle) && <Badge className="ml-1 bg-amber-500">⚠</Badge>}
-        </TabBtn>
-        <TabBtn a={tab === 'sauvegarde'} on={() => setTab('sauvegarde')}><Download className="h-4 w-4 inline mr-1" /> Sauvegarde</TabBtn>
-      </div>
-
-      {tab === '2fa'        && <Panel2FA profilCourant={profilCourant} />}
-      {tab === 'profils'    && <PanelProfils profils={profils} profilCourant={profilCourant} />}
-      {tab === 'audit'      && <PanelAudit audit={audit} />}
-      {tab === 'connexions' && <PanelConnexions connexions={connexions} />}
-      {tab === 'sauvegarde' && <PanelSauvegarde />}
+        {tab === '2fa'        && <Panel2FA profilCourant={profilCourant} />}
+        {tab === 'profils'    && <PanelProfils profils={profils} profilCourant={profilCourant} />}
+        {tab === 'audit'      && <PanelAudit audit={audit} />}
+        {tab === 'connexions' && <PanelConnexions connexions={connexions} />}
+        {tab === 'sauvegarde' && <PanelSauvegarde />}
+      </main>
     </div>
   )
 }

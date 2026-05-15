@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Ticket, Plus, Trash2, Copy, Check } from 'lucide-react'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { creerCodePromo, modifierCodePromo, toggleCodePromo, supprimerCodePromo } from './actions'
 import type { CodePromo } from './page'
 import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
@@ -74,25 +75,29 @@ export default function CodesPromoClient({ codes }: { codes: CodePromo[] }) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6">
-      <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-            <Ticket className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Marketing</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Codes promo</h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              Réductions sur commande / réservation en ligne · {actifsAujourdhui.length} utilisable{actifsAujourdhui.length > 1 ? 's' : ''} aujourd&apos;hui.
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => setCreating(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Nouveau code promo
-        </Button>
-      </header>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Clientèle"
+          title="Codes promo"
+          description={`Réductions commande/réservation en ligne · ${actifsAujourdhui.length} utilisable${actifsAujourdhui.length > 1 ? 's' : ''} aujourd'hui.`}
+          actions={
+            <Button onClick={() => setCreating(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Nouveau code promo
+            </Button>
+          }
+        />
 
       <Card className="p-4 bg-amber-50 border-amber-200">
         <p className="text-xs uppercase tracking-wider text-amber-700 font-bold mb-2">🎟 Comment ça marche</p>
@@ -227,6 +232,7 @@ export default function CodesPromoClient({ codes }: { codes: CodePromo[] }) {
           </Card>
         </div>
       )}
+      </main>
     </div>
   )
 }
