@@ -15,7 +15,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Star } from 'lucide-react'
+import {
+  Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Star,
+  Home, BarChart3, Utensils, ChefHat, Users, Wallet, ShieldCheck, Settings,
+  Wine, Pizza, ShoppingBag, Bike, BellRing, Receipt, GraduationCap,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
@@ -34,6 +39,59 @@ export type TopActionBarProfil = {
 } | null
 
 type Tone = 'emerald' | 'amber' | 'violet' | 'blue' | 'red' | 'rose' | 'zinc'
+
+// ─── Mapping icônes Lucide pour chaque chip ───────────────────────
+// Remplace les emojis par de vraies icônes vectorielles pour un look pro.
+const ICON_BY_CAT_SLUG: Record<string, LucideIcon> = {
+  pilotage:      BarChart3,
+  service:       Utensils,
+  'cuisine-stock': ChefHat,
+  clientele:     Users,
+  equipe:        GraduationCap,
+  finances:      Wallet,
+  conformite:    ShieldCheck,
+  systeme:       Settings,
+}
+
+const ICON_BY_OPS_HREF: Record<string, LucideIcon> = {
+  '/serveur':   Utensils,
+  '/caisse':    Receipt,
+  '/cuisine':   ChefHat,
+  '/pizza':     Pizza,
+  '/bar':       Wine,
+  '/emporter':  ShoppingBag,
+  '/livreur':   Bike,
+  '/reception': BellRing,
+}
+
+/** Style du mini "icon-glow" : carré gradient avec icône blanche dedans. */
+function ChipIcon({
+  Icon, tone, active,
+}: { Icon: LucideIcon; tone: Tone; active: boolean }) {
+  const gradients: Record<Tone, string> = {
+    emerald: 'from-emerald-500 to-teal-600',
+    amber:   'from-amber-500 to-orange-600',
+    violet:  'from-violet-500 to-purple-600',
+    blue:    'from-blue-500 to-sky-600',
+    red:     'from-red-500 to-rose-600',
+    rose:    'from-rose-500 to-pink-600',
+    zinc:    'from-zinc-700 to-zinc-900',
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center justify-center rounded-lg shadow-md shrink-0 transition-transform group-active:scale-90',
+        'w-7 h-7 md:w-6 md:h-6',
+        active
+          ? 'bg-white text-zinc-900'
+          : `bg-gradient-to-br ${gradients[tone]} text-white`,
+      )}
+      aria-hidden
+    >
+      <Icon className="h-4 w-4 md:h-3.5 md:w-3.5" strokeWidth={2.5} />
+    </span>
+  )
+}
 
 type Group = { groupe: string; emoji: string; items: Array<{ href: string; label: string; emoji: string }> }
 
@@ -382,19 +440,28 @@ export default function TopActionBar({
 
   // Mobile : barre flottante remontée du bord bas (pouce confortable)
   // Desktop : static en haut (intégré au flux de la page)
-  // Bordure ambre en mode service intensif pour signaler visuellement l'état
+  // Design premium frosted glass : backdrop-blur fort + gradient subtil + glow colored
+  // Mode service intensif : bordure ambre + ring glow
   const wrapperCls = theme === 'dark'
     ? cn(
-        // Page sombre → barre CLAIRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 shadow-[0_-8px_30px_rgba(255,255,255,0.15)] overflow-hidden',
-        serviceMode ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-zinc-300',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible md:ring-0',
+        // Page sombre → barre CLAIRE en frosted glass
+        'fixed bottom-3 inset-x-3 z-30 rounded-[28px] overflow-hidden',
+        'bg-white/95 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/85',
+        'border shadow-[0_8px_32px_-4px_rgba(0,0,0,0.25),0_4px_12px_-2px_rgba(0,0,0,0.15),0_-1px_0_0_rgba(255,255,255,0.6)_inset]',
+        serviceMode
+          ? 'border-amber-500/80 ring-2 ring-amber-400/40 shadow-amber-500/20'
+          : 'border-zinc-200/80 ring-1 ring-black/5',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible md:ring-0 md:bg-white md:backdrop-blur-0',
       )
     : cn(
-        // Page claire → barre SOMBRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 shadow-[0_-8px_30px_rgba(0,0,0,0.25)] overflow-hidden',
-        serviceMode ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-zinc-700',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible md:ring-0',
+        // Page claire → barre SOMBRE en frosted glass premium
+        'fixed bottom-3 inset-x-3 z-30 rounded-[28px] overflow-hidden',
+        'bg-zinc-900/95 backdrop-blur-2xl supports-[backdrop-filter]:bg-zinc-900/85',
+        'border shadow-[0_8px_32px_-4px_rgba(0,0,0,0.45),0_4px_12px_-2px_rgba(0,0,0,0.25),0_-1px_0_0_rgba(255,255,255,0.08)_inset]',
+        serviceMode
+          ? 'border-amber-500/80 ring-2 ring-amber-400/40 shadow-amber-500/30'
+          : 'border-white/10 ring-1 ring-white/5',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible md:ring-0 md:bg-zinc-900 md:backdrop-blur-0',
       )
 
   // Bouton "☰ Modules" : couleur accent emerald, ressort dans les 2 thèmes
@@ -424,16 +491,18 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title="Accueil · Vue d'ensemble"
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
                   )}
                 >
                   {isPending ? (
-                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                    <span className="inline-flex items-center justify-center w-7 h-7 md:w-6 md:h-6 rounded-lg bg-white/20" aria-hidden>
+                      <Loader2 className="h-4 w-4 md:h-3.5 md:w-3.5 animate-spin" />
+                    </span>
                   ) : (
-                    <span className="text-xl md:text-base leading-none" aria-hidden>🏠</span>
+                    <ChipIcon Icon={Home} tone="emerald" active={active} />
                   )}
                   <span>Accueil</span>
                 </Link>
@@ -445,8 +514,8 @@ export default function TopActionBar({
               type="button"
               onClick={() => { tapHaptic(); toggleServiceMode() }}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                 serviceMode
                   ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/40 animate-pulse'
                   : (theme === 'dark'
@@ -454,10 +523,19 @@ export default function TopActionBar({
                       : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-amber-500/60 hover:text-amber-300'),
               )}
               aria-label={serviceMode ? 'Désactiver le mode service intensif' : 'Activer le mode service intensif'}
-              title={serviceMode ? '🔥 Service en cours — clic pour mode complet' : 'Mode service intensif (ops uniquement)'}
+              title={serviceMode ? 'Service en cours — clic pour mode complet' : 'Mode service intensif (ops uniquement)'}
             >
-              <Flame className={cn('h-5 w-5 md:h-4 md:w-4', serviceMode && 'fill-current')} aria-hidden />
-              <span className="hidden sm:inline">{serviceMode ? 'Service' : 'Service'}</span>
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center rounded-lg shadow-md shrink-0 transition-transform group-active:scale-90',
+                  'w-7 h-7 md:w-6 md:h-6',
+                  serviceMode ? 'bg-white text-amber-600' : 'bg-gradient-to-br from-amber-500 to-orange-600 text-white',
+                )}
+                aria-hidden
+              >
+                <Flame className={cn('h-4 w-4 md:h-3.5 md:w-3.5', serviceMode && 'fill-current')} strokeWidth={2.5} />
+              </span>
+              <span>Service</span>
             </button>
 
             {/* Chips ÉPINGLÉS (favoris perso) — entre Accueil/Service et les autres */}
@@ -465,6 +543,8 @@ export default function TopActionBar({
               const active = pathname === p.href || pathname.startsWith(p.href + '/')
               const isPending = pendingHref === p.href
               const cls = active ? tones[p.tone].active : tones[p.tone].base
+              // Icône : ops mapping en priorité, sinon fallback Star (chip épinglé générique)
+              const PinIcon = ICON_BY_OPS_HREF[p.href] ?? Star
               return (
                 <Link
                   key={p.href}
@@ -475,20 +555,22 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title={`⭐ ${p.label}`}
                   className={cn(
-                    'relative inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    'group relative inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
                   )}
                 >
-                  {/* Petite étoile en haut à droite pour signaler le pin */}
-                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[9px] shadow-md">
+                  {/* Mini étoile en haut à droite pour signaler le pin */}
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 shadow-md z-10">
                     <Star className="w-2.5 h-2.5 fill-current" aria-hidden />
                   </span>
                   {isPending ? (
-                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                    <span className="inline-flex items-center justify-center w-7 h-7 md:w-6 md:h-6 rounded-lg bg-white/20" aria-hidden>
+                      <Loader2 className="h-4 w-4 md:h-3.5 md:w-3.5 animate-spin" />
+                    </span>
                   ) : (
-                    <span className="text-xl md:text-base leading-none" aria-hidden>{p.emoji}</span>
+                    <ChipIcon Icon={PinIcon} tone={p.tone} active={active} />
                   )}
                   <span>{p.label}</span>
                 </Link>
@@ -500,6 +582,7 @@ export default function TopActionBar({
               const active = pathname === op.href || pathname.startsWith(op.href + '/')
               const isPending = pendingHref === op.href
               const cls = active ? tones[op.tone].active : tones[op.tone].base
+              const OpIcon = ICON_BY_OPS_HREF[op.href] ?? Utensils
               return (
                 <Link
                   key={op.href}
@@ -510,28 +593,30 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title={op.label}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
                   )}
                 >
                   {isPending ? (
-                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                    <span className="inline-flex items-center justify-center w-7 h-7 md:w-6 md:h-6 rounded-lg bg-white/20" aria-hidden>
+                      <Loader2 className="h-4 w-4 md:h-3.5 md:w-3.5 animate-spin" />
+                    </span>
                   ) : (
-                    <span className="text-xl md:text-base leading-none" aria-hidden>{op.emoji}</span>
+                    <ChipIcon Icon={OpIcon} tone={op.tone} active={active} />
                   )}
                   <span>{op.label}</span>
                 </Link>
               )
             }) : chipsVisibles.map((cat, idx) => {
               // Toutes les catégories pointent vers leur page /admin/cat/<slug>
-              // (y compris Accueil — l'utilisateur veut voir ses sous-modules en tuiles).
               const href = `/admin/cat/${cat.slug}`
               const active = activeCategory?.slug === cat.slug
               const isPending = pendingHref === href
               const cls = active ? tones[cat.tone].active : tones[cat.tone].base
               const shortcut = idx < 9 ? `Alt+${idx + 1}` : undefined
+              const CatIcon = ICON_BY_CAT_SLUG[cat.slug] ?? Settings
               return (
                 <Link
                   key={cat.slug}
@@ -542,16 +627,18 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title={shortcut ? `${cat.label} · ${shortcut}` : cat.label}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
                   )}
                 >
                   {isPending ? (
-                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                    <span className="inline-flex items-center justify-center w-7 h-7 md:w-6 md:h-6 rounded-lg bg-white/20" aria-hidden>
+                      <Loader2 className="h-4 w-4 md:h-3.5 md:w-3.5 animate-spin" />
+                    </span>
                   ) : (
-                    <span className="text-xl md:text-base leading-none" aria-hidden>{cat.emoji}</span>
+                    <ChipIcon Icon={CatIcon} tone={cat.tone as Tone} active={active} />
                   )}
                   <span>{cat.label}</span>
                 </Link>
