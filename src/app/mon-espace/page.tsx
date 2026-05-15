@@ -378,26 +378,37 @@ export default async function MonEspacePage() {
   const actionPrincipale = POSTE_TO_ACTION[emp.poste as string] ?? POSTE_TO_ACTION.autre
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-mobile-nav">
+    <div className="min-h-screen bg-zinc-50 pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
       <TopActionBar theme="light" profil={navProfil} />
       <BackToCategoryButton theme="light" />
 
-      <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-3">
-        {/* Header compact : avatar + identité + résumé inline + cloche + CTA principal */}
-        <header className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-lg font-black shadow-lg shadow-emerald-500/30 shrink-0">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        {/* Header éditorial : avatar gradient + identité Fraunces + résumé + cloche */}
+        <header className="flex items-start justify-between flex-wrap gap-4">
+          <div className="flex items-stretch gap-4 min-w-0 flex-1">
+            {/* Avatar initiale gradient */}
+            <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-2xl sm:text-3xl font-black shadow-xl shadow-emerald-500/30 ring-4 ring-emerald-500/20 shrink-0">
               {(emp.prenom as string)[0]?.toUpperCase()}
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+            <div className="min-w-0 space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {posteWidget ? `${POSTE_INFO_WIDGET[posteWidget].emoji} ${POSTE_INFO_WIDGET[posteWidget].label}` : 'Membre équipe'}
               </p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">
+              <h1 className="font-display italic text-3xl sm:text-5xl font-medium text-zinc-900 tracking-[-0.02em] leading-[0.95]">
                 {emp.prenom} {emp.nom}
               </h1>
-              <p className="text-[11px] text-zinc-500 mt-1">
+              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
                 {emp.type_contrat ?? 'CDI'} · {emp.heures_contrat ?? 35}h/sem
                 <span className="ml-2 text-zinc-400">· équipe depuis {ancMois} mois</span>
                 {heuresSemaine > 0 && (
