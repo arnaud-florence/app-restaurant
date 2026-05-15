@@ -728,66 +728,139 @@ function CatalogueModal({
             )}
           </div>
 
-          {/* 1er niveau : destination — onglets gros & visibles pour le rush */}
-          <div className="flex gap-1.5 mb-3 -mx-1 px-1 overflow-x-auto">
+          {/* 1er niveau : destination — STYLE KIOSQUE big boutons emoji XL */}
+          <div className="grid grid-cols-4 gap-2 mb-4">
             {(['CUISINE', 'PIZZA', 'BAR', 'SNACKING'] as const).map(t => {
               const isActive = tagActif === t
               const count = countByTag[t] ?? 0
               if (count === 0) return null
-              const label = `${TAG_DEST_LABEL[t].emoji} ${TAG_DEST_LABEL[t].label}`
+              const def = TAG_DEST_LABEL[t]
+              // Couleur dominante par destination
+              const ACCENTS: Record<string, { active: string; idle: string; iconBg: string }> = {
+                CUISINE:  { active: 'bg-amber-500 border-amber-400 shadow-amber-500/30',   idle: 'bg-zinc-900 border-zinc-800 hover:border-amber-700',  iconBg: 'bg-amber-950/60' },
+                PIZZA:    { active: 'bg-red-500 border-red-400 shadow-red-500/30',         idle: 'bg-zinc-900 border-zinc-800 hover:border-red-700',     iconBg: 'bg-red-950/60' },
+                BAR:      { active: 'bg-violet-500 border-violet-400 shadow-violet-500/30', idle: 'bg-zinc-900 border-zinc-800 hover:border-violet-700', iconBg: 'bg-violet-950/60' },
+                SNACKING: { active: 'bg-emerald-500 border-emerald-400 shadow-emerald-500/30', idle: 'bg-zinc-900 border-zinc-800 hover:border-emerald-700', iconBg: 'bg-emerald-950/60' },
+              }
+              const accent = ACCENTS[t]
               return (
                 <button
                   key={t}
                   onClick={() => setTagActif(t)}
                   className={cn(
-                    'inline-flex items-center gap-2 px-4 min-h-[44px] rounded-md text-sm font-bold whitespace-nowrap transition-colors',
-                    isActive ? 'bg-emerald-500 text-white shadow-md' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    'flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all active:scale-95',
+                    isActive ? `${accent.active} text-white shadow-lg` : `${accent.idle} text-zinc-200`,
                   )}
                 >
-                  {label}
                   <span className={cn(
-                    'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
-                    isActive ? 'bg-white/25 text-white' : 'bg-zinc-700 text-zinc-400'
+                    'inline-flex items-center justify-center w-12 h-12 rounded-full text-3xl',
+                    isActive ? 'bg-white/15' : accent.iconBg,
+                  )} aria-hidden>
+                    {def.emoji}
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wide">{def.label}</span>
+                  <span className={cn(
+                    'inline-flex items-center justify-center min-w-6 h-5 px-2 rounded-full text-[10px] font-bold tabular-nums',
+                    isActive ? 'bg-white/25 text-white' : 'bg-zinc-800 text-zinc-400',
                   )}>{count}</span>
                 </button>
               )
             })}
           </div>
 
-          {/* 2nd niveau : catégorie au sein de la destination */}
+          {/* 2nd niveau : catégorie au sein de la destination — pills avec compteurs */}
           {categories.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               <button
                 onClick={() => setFiltreCat('')}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-bold', !filtreCat ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-bold border transition-colors',
+                  !filtreCat ? 'bg-white text-zinc-900 border-white' : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-500',
+                )}
               >
-                Toutes
+                ✦ Toutes
+                <span className={cn(
+                  'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
+                  !filtreCat ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-400',
+                )}>{recettesParTag.length}</span>
               </button>
-              {categories.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setFiltreCat(c)}
-                  className={cn('px-3 py-1.5 rounded-full text-xs font-bold', filtreCat === c ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-400')}
-                >
-                  {c}
-                </button>
-              ))}
+              {categories.map(c => {
+                const n = recettesParTag.filter(r => r.categorie === c).length
+                const isActive = filtreCat === c
+                return (
+                  <button
+                    key={c}
+                    onClick={() => setFiltreCat(c)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-bold border transition-colors',
+                      isActive ? 'bg-white text-zinc-900 border-white' : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-500',
+                    )}
+                  >
+                    {c}
+                    <span className={cn(
+                      'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
+                      isActive ? 'bg-zinc-200 text-zinc-700' : 'bg-zinc-800 text-zinc-400',
+                    )}>{n}</span>
+                  </button>
+                )
+              })}
             </div>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {filtered.map(r => {
-              const dejaAuPanier = panier.find(p => p.recette_id === r.id)
-              return (
-                <ProduitCard
-                  key={r.id}
-                  produit={r}
-                  compteur={dejaAuPanier?.quantite ?? 0}
-                  onClick={() => onAjouter(r)}
-                />
-              )
-            })}
-          </div>
+          {/* Grille produits — cards plus grosses style kiosque (3 cols max) */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+              <span className="text-5xl mb-2 opacity-50" aria-hidden>🔍</span>
+              <p className="text-base font-medium">Aucun plat ne correspond</p>
+              <p className="text-xs mt-1">Essaie de changer de catégorie ou d'effacer ta recherche</p>
+            </div>
+          ) : !filtreCat && categories.length > 1 ? (
+            // Groupé par catégorie quand "Toutes" est sélectionné
+            <div className="space-y-6">
+              {categories.map(cat => {
+                const items = filtered.filter(r => r.categorie === cat)
+                if (items.length === 0) return null
+                return (
+                  <div key={cat}>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-2 flex items-center gap-2">
+                      <span className="h-px flex-1 bg-zinc-800"></span>
+                      <span>{cat}</span>
+                      <span className="text-[10px] text-zinc-500 font-normal">{items.length}</span>
+                      <span className="h-px flex-1 bg-zinc-800"></span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {items.map(r => {
+                        const dejaAuPanier = panier.find(p => p.recette_id === r.id)
+                        return (
+                          <ProduitCard
+                            key={r.id}
+                            produit={r}
+                            compteur={dejaAuPanier?.quantite ?? 0}
+                            onClick={() => onAjouter(r)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            // Grille simple quand une catégorie est filtrée
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {filtered.map(r => {
+                const dejaAuPanier = panier.find(p => p.recette_id === r.id)
+                return (
+                  <ProduitCard
+                    key={r.id}
+                    produit={r}
+                    compteur={dejaAuPanier?.quantite ?? 0}
+                    onClick={() => onAjouter(r)}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Panier — caché sur mobile (footer sticky en bas remplace), visible sur lg+ */}
