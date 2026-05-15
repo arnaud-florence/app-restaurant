@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, LogOut, Search, AlertTriangle, Loader2 } from 'lucide-react'
+import { Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
@@ -182,6 +182,25 @@ export default function TopActionBar({
   /** Href de la chip cliquée, en attente que la navigation se complète. */
   const [pendingHref, setPendingHref] = useState<string | null>(null)
 
+  /** Mode "Service intensif" : remplace les chips catégorie par les écrans ops directs.
+   *  Persisté en localStorage 'service_intense_mode' (boolean).
+   *  Utile pendant le rush où on veut accéder à Salle/Caisse/Cuisine en 1 clic
+   *  sans s'embarrasser des catégories admin (Finances, Conformité, etc.). */
+  const [serviceMode, setServiceMode] = useState(false)
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('service_intense_mode')
+      if (v === '1') setServiceMode(true)
+    } catch { /* SSR / private mode */ }
+  }, [])
+  function toggleServiceMode() {
+    setServiceMode(prev => {
+      const next = !prev
+      try { localStorage.setItem('service_intense_mode', next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }
+
   // Quand le pathname change, on est arrivés à destination : reset pending.
   useEffect(() => { setPendingHref(null) }, [pathname])
 
@@ -228,6 +247,22 @@ export default function TopActionBar({
       }))
       .filter(g => g.items.length > 0)
   }, [profil?.poste, profil?.custom_permissions, isManager, query])
+
+  // Chips OPS pour le mode service intensif (sous-modules directs de cat 'service')
+  const opsChipsBruts: Array<{ href: string; emoji: string; label: string; tone: Tone }> = [
+    { href: '/serveur',   emoji: '🍽',   label: 'Salle',     tone: 'blue' },
+    { href: '/caisse',    emoji: '💰',   label: 'Caisse',    tone: 'amber' },
+    { href: '/cuisine',   emoji: '👨‍🍳', label: 'Cuisine',   tone: 'amber' },
+    { href: '/pizza',     emoji: '🍕',   label: 'Pizza',     tone: 'red' },
+    { href: '/bar',       emoji: '🍷',   label: 'Bar',       tone: 'violet' },
+    { href: '/emporter',  emoji: '🛒',   label: 'Snack',     tone: 'emerald' },
+    { href: '/livreur',   emoji: '🛵',   label: 'Livreur',   tone: 'emerald' },
+    { href: '/reception', emoji: '🛎',   label: 'Réception', tone: 'blue' },
+  ]
+  const opsChipsVisibles = useMemo(
+    () => opsChipsBruts.filter(c => peutVoir(c.href)),
+    [profil?.poste, profil?.custom_permissions, isManager],
+  )
 
   // Catégories visibles filtrées (au moins 1 sous-module visible) et réordonnées par poste
   const chipsVisibles = useMemo<Category[]>(() => {
@@ -329,16 +364,19 @@ export default function TopActionBar({
 
   // Mobile : barre flottante remontée du bord bas (pouce confortable)
   // Desktop : static en haut (intégré au flux de la page)
+  // Bordure ambre en mode service intensif pour signaler visuellement l'état
   const wrapperCls = theme === 'dark'
     ? cn(
         // Page sombre → barre CLAIRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 border-zinc-300 shadow-[0_-8px_30px_rgba(255,255,255,0.15)] overflow-hidden',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible',
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 shadow-[0_-8px_30px_rgba(255,255,255,0.15)] overflow-hidden',
+        serviceMode ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-zinc-300',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible md:ring-0',
       )
     : cn(
         // Page claire → barre SOMBRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 border-zinc-700 shadow-[0_-8px_30px_rgba(0,0,0,0.25)] overflow-hidden',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible',
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 shadow-[0_-8px_30px_rgba(0,0,0,0.25)] overflow-hidden',
+        serviceMode ? 'border-amber-500 ring-2 ring-amber-400/40' : 'border-zinc-700',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible md:ring-0',
       )
 
   // Bouton "☰ Modules" : couleur accent emerald, ressort dans les 2 thèmes
@@ -362,7 +400,7 @@ export default function TopActionBar({
               return (
                 <Link
                   href={href}
-                  ref={active ? activeChipRef : undefined}
+                  ref={active && !serviceMode ? activeChipRef : undefined}
                   onClick={() => { tapHaptic(); setPendingHref(href) }}
                   style={{ scrollSnapAlign: 'start' }}
                   aria-current={active ? 'page' : undefined}
@@ -384,7 +422,56 @@ export default function TopActionBar({
               )
             })()}
 
-            {chipsVisibles.map((cat, idx) => {
+            {/* Toggle "Mode service intensif" — bouton flamme visible juste après Accueil */}
+            <button
+              type="button"
+              onClick={() => { tapHaptic(); toggleServiceMode() }}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                serviceMode
+                  ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/40 animate-pulse'
+                  : (theme === 'dark'
+                      ? 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:border-amber-500/60 hover:text-amber-300'),
+              )}
+              aria-label={serviceMode ? 'Désactiver le mode service intensif' : 'Activer le mode service intensif'}
+              title={serviceMode ? '🔥 Service en cours — clic pour mode complet' : 'Mode service intensif (ops uniquement)'}
+            >
+              <Flame className={cn('h-5 w-5 md:h-4 md:w-4', serviceMode && 'fill-current')} aria-hidden />
+              <span className="hidden sm:inline">{serviceMode ? 'Service' : 'Service'}</span>
+            </button>
+
+            {/* En MODE SERVICE INTENSIF : on remplace les chips catégorie par les 8 ops directs */}
+            {serviceMode ? opsChipsVisibles.map(op => {
+              const active = pathname === op.href || pathname.startsWith(op.href + '/')
+              const isPending = pendingHref === op.href
+              const cls = active ? tones[op.tone].active : tones[op.tone].base
+              return (
+                <Link
+                  key={op.href}
+                  href={op.href}
+                  ref={active ? activeChipRef : undefined}
+                  onClick={() => { tapHaptic(); setPendingHref(op.href) }}
+                  style={{ scrollSnapAlign: 'start' }}
+                  aria-current={active ? 'page' : undefined}
+                  title={op.label}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    isPending && 'animate-pulse',
+                    cls,
+                  )}
+                >
+                  {isPending ? (
+                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <span className="text-xl md:text-base leading-none" aria-hidden>{op.emoji}</span>
+                  )}
+                  <span>{op.label}</span>
+                </Link>
+              )
+            }) : chipsVisibles.map((cat, idx) => {
               // Toutes les catégories pointent vers leur page /admin/cat/<slug>
               // (y compris Accueil — l'utilisateur veut voir ses sous-modules en tuiles).
               const href = `/admin/cat/${cat.slug}`
