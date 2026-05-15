@@ -141,7 +141,7 @@ export default async function CatIndexPage() {
                   key={cat.slug}
                   href={`/admin/cat/${cat.slug}`}
                   style={{ ['--stagger' as any]: `${idx * 50}ms` }}
-                  className="stagger-fadeup group relative flex flex-col justify-end overflow-hidden rounded-3xl bg-zinc-900 ring-1 ring-zinc-200 hover:ring-2 hover:ring-zinc-900/20 active:scale-[0.98] transition-all duration-300 min-h-[220px] sm:min-h-[260px]"
+                  className="stagger-fadeup lift-on-hover group relative flex flex-col justify-end overflow-hidden rounded-3xl bg-zinc-900 ring-1 ring-zinc-200 hover:ring-2 hover:ring-zinc-900/30 hover:shadow-2xl hover:shadow-zinc-900/20 active:scale-[0.98] active:translate-y-0 min-h-[220px] sm:min-h-[260px]"
                 >
                   {/* Image de fond Unsplash avec ken-burns zoom au hover */}
                   {cat.imageUrl ? (
@@ -207,31 +207,64 @@ function StatCard({
   hint: string
   href: string
 }) {
-  const tones: Record<typeof tone, { bg: string; iconBg: string; iconText: string; valueText: string; labelText: string }> = {
-    emerald: { bg: 'bg-white hover:bg-emerald-50/40', iconBg: 'bg-emerald-100', iconText: 'text-emerald-700', valueText: 'text-emerald-700', labelText: 'text-emerald-600' },
-    red:     { bg: 'bg-white hover:bg-red-50/40',     iconBg: 'bg-red-100',     iconText: 'text-red-700',     valueText: 'text-red-700',     labelText: 'text-red-600' },
-    violet:  { bg: 'bg-white hover:bg-violet-50/40',  iconBg: 'bg-violet-100',  iconText: 'text-violet-700',  valueText: 'text-violet-700',  labelText: 'text-violet-600' },
-    amber:   { bg: 'bg-white hover:bg-amber-50/40',   iconBg: 'bg-amber-100',   iconText: 'text-amber-700',   valueText: 'text-amber-700',   labelText: 'text-amber-600' },
+  const tones: Record<typeof tone, {
+    bg: string; iconGradient: string; iconShadow: string; valueText: string; labelText: string; glowHover: string;
+  }> = {
+    emerald: {
+      bg: 'bg-white',
+      iconGradient: 'from-emerald-500 to-teal-600',
+      iconShadow: 'shadow-emerald-500/30',
+      valueText: 'text-emerald-700',
+      labelText: 'text-emerald-600',
+      glowHover: 'hover:shadow-emerald-500/10',
+    },
+    red: {
+      bg: 'bg-white',
+      iconGradient: 'from-red-500 to-rose-600',
+      iconShadow: 'shadow-red-500/30',
+      valueText: 'text-red-700',
+      labelText: 'text-red-600',
+      glowHover: 'hover:shadow-red-500/10',
+    },
+    violet: {
+      bg: 'bg-white',
+      iconGradient: 'from-violet-500 to-purple-600',
+      iconShadow: 'shadow-violet-500/30',
+      valueText: 'text-violet-700',
+      labelText: 'text-violet-600',
+      glowHover: 'hover:shadow-violet-500/10',
+    },
+    amber: {
+      bg: 'bg-white',
+      iconGradient: 'from-amber-500 to-orange-600',
+      iconShadow: 'shadow-amber-500/30',
+      valueText: 'text-amber-700',
+      labelText: 'text-amber-600',
+      glowHover: 'hover:shadow-amber-500/10',
+    },
   }
   const t = tones[tone]
   return (
     <Link
       href={href}
-      className={`group flex flex-col p-3 sm:p-4 rounded-2xl ring-1 ring-zinc-200 hover:ring-zinc-300 active:scale-[0.98] transition-all duration-300 ${t.bg}`}
+      className={`lift-on-hover group relative flex flex-col p-3 sm:p-4 rounded-2xl ring-1 ring-zinc-200 hover:ring-zinc-300 hover:shadow-xl ${t.glowHover} active:scale-[0.98] active:translate-y-0 ${t.bg} overflow-hidden`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg ${t.iconBg} ${t.iconText}`}>
+      {/* Subtle gradient overlay top-right pour profondeur */}
+      <div className={`absolute -top-12 -right-12 w-24 h-24 rounded-full bg-gradient-to-br ${t.iconGradient} opacity-[0.06] blur-2xl pointer-events-none`} aria-hidden />
+
+      <div className="relative flex items-center justify-between gap-2">
+        <span className={`inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br ${t.iconGradient} text-white shadow-lg ${t.iconShadow}`}>
           {icon}
         </span>
-        <ArrowRight className="h-3.5 w-3.5 text-zinc-300 group-hover:text-zinc-600 group-hover:translate-x-0.5 transition-all" strokeWidth={2.5} />
+        <ArrowRight className="h-3.5 w-3.5 text-zinc-300 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition-all" strokeWidth={2.5} />
       </div>
-      <p className={`mt-2 sm:mt-3 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${t.labelText} truncate`}>
+      <p className={`relative mt-2 sm:mt-3 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${t.labelText} truncate`}>
         {label}
       </p>
-      <p className={`text-lg sm:text-2xl font-black tracking-[-0.02em] tabular-nums leading-none mt-1 ${t.valueText} truncate`}>
+      <p className={`relative text-xl sm:text-3xl font-black tracking-[-0.03em] tabular-nums leading-none mt-1 ${t.valueText} truncate`}>
         {value}
       </p>
-      <p className="text-[10px] sm:text-[11px] text-zinc-400 mt-0.5 truncate">{hint}</p>
+      <p className="relative text-[10px] sm:text-[11px] text-zinc-400 mt-1 truncate">{hint}</p>
     </Link>
   )
 }

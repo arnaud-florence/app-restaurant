@@ -134,19 +134,61 @@ function ChipIcon({
     rose:    'from-rose-500 to-pink-600',
     zinc:    'from-zinc-700 to-zinc-900',
   }
+  const shadows: Record<Tone, string> = {
+    emerald: 'shadow-emerald-500/40',
+    amber:   'shadow-amber-500/40',
+    violet:  'shadow-violet-500/40',
+    blue:    'shadow-blue-500/40',
+    red:     'shadow-red-500/40',
+    rose:    'shadow-rose-500/40',
+    zinc:    'shadow-zinc-900/30',
+  }
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-lg shadow-md shrink-0 transition-transform group-active:scale-90',
+        'inline-flex items-center justify-center rounded-lg shrink-0 transition-transform duration-300 group-active:scale-90 group-hover:scale-105',
         'w-7 h-7 md:w-6 md:h-6',
         active
-          ? 'bg-white text-zinc-900'
-          : `bg-gradient-to-br ${gradients[tone]} text-white`,
+          ? 'bg-white text-zinc-900 shadow-md'
+          : `bg-gradient-to-br ${gradients[tone]} text-white shadow-lg ${shadows[tone]}`,
       )}
       aria-hidden
     >
       <Icon className="h-4 w-4 md:h-3.5 md:w-3.5" strokeWidth={2.5} />
     </span>
+  )
+}
+
+/** Magic-line indicator : petit underline animé sous le chip actif (signature visuelle). */
+function ChipActiveIndicator({ tone }: { tone: Tone }) {
+  const colors: Record<Tone, string> = {
+    emerald: 'bg-emerald-500',
+    amber:   'bg-amber-500',
+    violet:  'bg-violet-500',
+    blue:    'bg-blue-500',
+    red:     'bg-red-500',
+    rose:    'bg-rose-500',
+    zinc:    'bg-zinc-900',
+  }
+  return (
+    <>
+      {/* Mobile : barre en bas → indicateur en HAUT du chip (pointe vers le haut/contenu) */}
+      <span
+        className={cn(
+          'md:hidden absolute -top-1.5 left-1/2 -translate-x-1/2 h-1 w-8 rounded-full shadow-lg',
+          colors[tone],
+        )}
+        aria-hidden
+      />
+      {/* Desktop : barre en haut → indicateur en BAS du chip (pointe vers le bas/contenu) */}
+      <span
+        className={cn(
+          'hidden md:block absolute -bottom-2 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full',
+          colors[tone],
+        )}
+        aria-hidden
+      />
+    </>
   )
 }
 
@@ -548,7 +590,7 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title="Accueil · Vue d'ensemble"
                   className={cn(
-                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'relative group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0 md:hover:-translate-y-0.5',
                     'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
@@ -562,6 +604,7 @@ export default function TopActionBar({
                     <ChipIcon Icon={Home} tone="emerald" active={active} />
                   )}
                   <span>Accueil</span>
+                  {active && <ChipActiveIndicator tone="emerald" />}
                 </Link>
               )
             })()}
@@ -630,6 +673,7 @@ export default function TopActionBar({
                     <ChipIcon Icon={PinIcon} tone={p.tone} active={active} />
                   )}
                   <span>{p.label}</span>
+                  {active && <ChipActiveIndicator tone={p.tone} />}
                 </Link>
               )
             })}
@@ -650,7 +694,7 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title={op.label}
                   className={cn(
-                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'relative group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0 md:hover:-translate-y-0.5',
                     'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
@@ -664,6 +708,7 @@ export default function TopActionBar({
                     <ChipIcon Icon={OpIcon} tone={op.tone} active={active} />
                   )}
                   <span>{op.label}</span>
+                  {active && <ChipActiveIndicator tone={op.tone} />}
                 </Link>
               )
             }) : chipsVisibles.map((cat, idx) => {
@@ -684,7 +729,7 @@ export default function TopActionBar({
                   aria-current={active ? 'page' : undefined}
                   title={shortcut ? `${cat.label} · ${shortcut}` : cat.label}
                   className={cn(
-                    'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                    'relative group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0 md:hover:-translate-y-0.5',
                     'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
                     isPending && 'animate-pulse',
                     cls,
@@ -698,6 +743,7 @@ export default function TopActionBar({
                     <ChipIcon Icon={CatIcon} tone={cat.tone as Tone} active={active} />
                   )}
                   <span>{cat.label}</span>
+                  {active && <ChipActiveIndicator tone={cat.tone as Tone} />}
                 </Link>
               )
             })}
