@@ -98,8 +98,8 @@ export default function PilotageClient({
   }), [actions])
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4 bg-[#FAFAFA] min-h-screen">
-      {/* Header premium */}
+    <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 bg-[#FAFAFA] min-h-screen">
+      {/* Header compact + actions inline */}
       <header className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
@@ -108,8 +108,24 @@ export default function PilotageClient({
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Stratégie · Live</p>
             <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Pilotage</h1>
-            <p className="text-xs text-zinc-500 mt-1">Tableau de bord gérant — alimenté en continu par les 15 agents IA.</p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">15 agents IA · {kpis.length} KPIs · {actions.length} actions · {objectifs.length} objectifs</p>
           </div>
+        </div>
+
+        {/* Actions principales — toujours visibles */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowActForm(true)}
+            className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition"
+          >
+            <Plus className="h-4 w-4" /> Action
+          </button>
+          <a
+            href="/admin/assistant"
+            className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-white border-2 border-emerald-300 text-emerald-700 text-sm font-bold hover:bg-emerald-50 active:scale-95 transition"
+          >
+            🤖 Assistant
+          </a>
         </div>
       </header>
 
@@ -136,51 +152,60 @@ export default function PilotageClient({
 
       {strategieExtras}
 
-      {/* ─── 10 KPIs ─────────────────────────────────────────────── */}
+      {/* ─── 10 KPIs (dense) ──────────────────────────────────────── */}
       <section>
-        <h2 className="font-semibold mb-3 flex items-center gap-2">
-          <Target className="h-5 w-5" /> Indicateurs clés — {format(parseISO(periode.debut), 'MMMM yyyy', { locale: fr })}
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" /> KPIs — {format(parseISO(periode.debut), 'MMM yyyy', { locale: fr })}
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
           {kpis.map(k => (
-            <Card key={k.code} className={cn('p-3 border-2', STATUT_BG[k.statut])}>
+            <button
+              key={k.code}
+              onClick={() => setShowObjForm({ kpi: k.code })}
+              className={cn(
+                'group p-2.5 rounded-xl border-2 text-left active:scale-95 transition',
+                STATUT_BG[k.statut],
+              )}
+              title="Définir objectif"
+            >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-500">{k.emoji} {k.label}</span>
-                <button
-                  onClick={() => setShowObjForm({ kpi: k.code })}
-                  className="text-zinc-400 hover:text-zinc-700"
-                  title="Définir objectif"
-                ><Target className="h-3.5 w-3.5" /></button>
+                <span className="text-[10px] text-zinc-500 truncate">{k.emoji} {k.label}</span>
+                <Target className="h-3 w-3 text-zinc-400 group-hover:text-zinc-700 shrink-0" />
               </div>
-              <div className={cn('text-xl font-bold', STATUT_TEXT[k.statut])}>
+              <div className={cn('text-lg font-black leading-tight', STATUT_TEXT[k.statut])}>
                 {formatValeur(k.valeur, k.unite)}
               </div>
-              {k.variation_pct != null && (
-                <div className={cn(
-                  'text-xs flex items-center gap-1 mt-1',
-                  k.variation_pct > 0 ? 'text-emerald-700' : k.variation_pct < 0 ? 'text-red-700' : 'text-zinc-500',
-                )}>
-                  {k.variation_pct > 0 ? <TrendingUp className="h-3 w-3" /> : k.variation_pct < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                  {k.variation_pct > 0 ? '+' : ''}{k.variation_pct} % vs N-1
-                </div>
-              )}
-              {k.cible != null && (
-                <div className="text-xs text-zinc-600 mt-1">
-                  Cible : {formatValeur(k.cible, k.unite)}
-                  {k.cible_atteinte_pct != null && <span className="ml-1 font-semibold">({k.cible_atteinte_pct}%)</span>}
-                </div>
-              )}
-            </Card>
+              <div className="flex items-center gap-2 mt-0.5 text-[10px]">
+                {k.variation_pct != null && (
+                  <span className={cn(
+                    'inline-flex items-center gap-0.5 font-bold',
+                    k.variation_pct > 0 ? 'text-emerald-700' : k.variation_pct < 0 ? 'text-red-700' : 'text-zinc-500',
+                  )}>
+                    {k.variation_pct > 0 ? <TrendingUp className="h-2.5 w-2.5" /> : k.variation_pct < 0 ? <TrendingDown className="h-2.5 w-2.5" /> : <Minus className="h-2.5 w-2.5" />}
+                    {k.variation_pct > 0 ? '+' : ''}{k.variation_pct}%
+                  </span>
+                )}
+                {k.cible != null && k.cible_atteinte_pct != null && (
+                  <span className="text-zinc-500 font-semibold">{k.cible_atteinte_pct}% cible</span>
+                )}
+              </div>
+            </button>
           ))}
         </div>
       </section>
 
-      {/* ─── Objectifs ───────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold flex items-center gap-2"><Target className="h-5 w-5" /> Objectifs définis</h2>
-          <Badge variant="outline">{objectifs.length}</Badge>
-        </div>
+      {/* ─── Objectifs (collapsible) ─────────────────────────────── */}
+      <details className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+        <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" /> Objectifs définis
+            <span className="text-[10px] text-zinc-400 font-normal normal-case tracking-normal">({objectifs.length})</span>
+          </h2>
+          <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+        </summary>
+        <div className="p-3 border-t border-zinc-100">
         {objectifs.length === 0 ? (
           <p className="text-sm text-zinc-500 italic">Aucun objectif défini. Cliquez sur 🎯 dans une carte KPI ci-dessus.</p>
         ) : (
@@ -218,14 +243,18 @@ export default function PilotageClient({
             </table>
           </Card>
         )}
-      </section>
+        </div>
+      </details>
 
       {/* ─── Plan d'action (kanban) ─────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold flex items-center gap-2"><ListTodo className="h-5 w-5" /> Plan d'action mensuel</h2>
-          <Button size="sm" onClick={() => setShowActForm(true)} className="gap-1">
-            <Plus className="h-4 w-4" /> Nouvelle action
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <ListTodo className="h-3.5 w-3.5" /> Plan d'action mensuel
+            <span className="text-[10px] text-zinc-400 font-normal normal-case tracking-normal">({actions.length})</span>
+          </h2>
+          <Button size="sm" onClick={() => setShowActForm(true)} className="gap-1 h-9 rounded-full">
+            <Plus className="h-4 w-4" /> Nouvelle
           </Button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -270,13 +299,16 @@ export default function PilotageClient({
         </div>
       </section>
 
-      {/* ─── Saisonnalité ────────────────────────────────────────── */}
-      <section>
-        <h2 className="font-semibold mb-3 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" /> Analyse saisonnière (12 derniers mois)
-        </h2>
-        <Card className="p-3">
-          <ResponsiveContainer width="100%" height={300}>
+      {/* ─── Saisonnalité (collapsible) ──────────────────────────── */}
+      <details className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+        <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" /> Analyse saisonnière (12 mois)
+          </h2>
+          <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+        </summary>
+        <div className="p-3 border-t border-zinc-100">
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={saisonnier}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="libelle" tick={{ fontSize: 11 }} />
@@ -294,8 +326,8 @@ export default function PilotageClient({
               <Bar yAxisId="right" dataKey="nb_couverts" name="Couverts" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
-      </section>
+        </div>
+      </details>
 
       </>)}
 
