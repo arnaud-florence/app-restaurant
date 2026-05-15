@@ -470,6 +470,20 @@ export default function TopActionBar({
               </button>
             </div>
 
+            {/* Lien "Vue d'ensemble" — page index toutes catégories */}
+            <Link
+              href="/admin/cat"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] transition"
+            >
+              <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/20 text-2xl shrink-0">🧭</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black tracking-tight leading-none">Vue d&apos;ensemble</p>
+                <p className="text-[11px] text-emerald-100 mt-0.5">Toutes les catégories en grand format</p>
+              </div>
+              <span className="text-xl">→</span>
+            </Link>
+
             {/* Barre de recherche sticky */}
             <div className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-3 py-2.5">
               <div className="relative">

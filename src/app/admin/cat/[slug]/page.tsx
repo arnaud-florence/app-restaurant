@@ -96,6 +96,27 @@ async function fetchCompteurs(slug: string): Promise<Record<string, Compteur>> {
         .eq('resolu', false).eq('urgence', 'rouge')
       result['/admin/pilotage'] = { count: alertes ?? 0, urgent: (alertes ?? 0) > 0, label: alertes ? 'alertes' : 'tout ok' }
     }
+
+    if (slug === 'finances') {
+      // CA du mois courant (commandes encaissées)
+      const monthStart = new Date()
+      monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+      const monthStartISO = monthStart.toISOString()
+      const [ca, releves] = await Promise.all([
+        sb.from('commandes').select('montant_total_ttc').eq('statut', 'encaisse')
+          .gte('created_at', monthStartISO),
+        sb.from('releves_energie').select('id', { count: 'exact', head: true })
+          .gte('date_releve', monthStart.toISOString().slice(0, 10)),
+      ])
+      const caTotal = (ca.data ?? []).reduce((s, c) => s + Number(c.montant_total_ttc ?? 0), 0)
+      result['/admin/finances'] = { count: Math.round(caTotal), label: 'CA mois (€)' }
+      result['/admin/energie']  = { count: releves.count ?? 0, label: 'relevés mois' }
+    }
+
+    if (slug === 'systeme') {
+      const { count: profils } = await sb.from('profils').select('id', { count: 'exact', head: true })
+      result['/admin/securite'] = { count: profils ?? 0, label: 'profils' }
+    }
   } catch (_e) {
     // Fail-safe : pas de compteurs en cas d'erreur DB, on rend la page sans badges.
   }
