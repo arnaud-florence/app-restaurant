@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { playDing } from '@/lib/service'
 import TopActionBar from '@/components/TopActionBar'
+import BackToCategoryButton from '@/components/BackToCategoryButton'
 import {
   type Canal, CANAUX, CANAL_INFO,
   type Employe, type Message, type InfoAffichage, type CompteRendu, type Materiel,
@@ -99,6 +100,7 @@ export default function EquipesClient({
     <div className="min-h-screen bg-zinc-50 text-zinc-900 pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
       <TopActionBar theme="light" profil={navProfil} />
+      <BackToCategoryButton theme="light" />
       {/* Header premium (mode clair) */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
+import BackToCategoryButton from '@/components/BackToCategoryButton'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -45,6 +46,7 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-zinc-100 pb-mobile-nav" data-ops-theme="dark">
       <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
+      <BackToCategoryButton theme="dark" />
       {children}
     </div>
   )

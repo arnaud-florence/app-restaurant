@@ -6,6 +6,7 @@ import { getProfile } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AdminNav from './AdminNav'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
+import BackToCategoryButton from '@/components/BackToCategoryButton'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -35,6 +36,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminNav profil={profil} />
       <div className="flex-1 min-w-0 pb-mobile-nav flex flex-col">
         <TopActionBar theme="light" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
+        <BackToCategoryButton theme="light" />
         <div className="flex-1 min-w-0">{children}</div>
       </div>
     </div>

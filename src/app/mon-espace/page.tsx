@@ -31,6 +31,7 @@ import ShiftsBriefingAlertes from './ShiftsBriefingAlertes'
 import PerformanceCongesMeteo from './PerformanceCongesMeteo'
 import NotificationsBell from '@/components/NotificationsBell'
 import TopActionBar from '@/components/TopActionBar'
+import BackToCategoryButton from '@/components/BackToCategoryButton'
 import { evaluerChallengesEmploye, partSurplusPondereeHeures } from '@/lib/challenges-evaluation'
 import { calculerMetrique, METRIQUE_LABEL, periodeMoisCourant } from '@/lib/challenges-metrics'
 import { leaderboardsPourEmploye, type ChallengeLeaderboard } from '@/lib/challenges-leaderboards'
@@ -380,6 +381,7 @@ export default async function MonEspacePage() {
     <div className="min-h-screen bg-[#FAFAFA] pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
       <TopActionBar theme="light" profil={navProfil} />
+      <BackToCategoryButton theme="light" />
 
       <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-3">
         {/* Header compact : avatar + identité + résumé inline + cloche + CTA principal */}
