@@ -263,14 +263,15 @@ export default async function CategoriePage({ params }: { params: { slug: string
           </section>
         ) : (
           <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {itemsVisibles.map(it => {
+            {itemsVisibles.map((it, idx) => {
               const compteur = compteurs[it.href]
               const hasImage = !!it.imageUrl
               return (
                 <Link
                   key={it.href}
                   href={it.href}
-                  className={`group relative flex flex-col overflow-hidden rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[180px] sm:min-h-[220px] ${
+                  style={{ ['--stagger' as any]: `${idx * 40}ms` }}
+                  className={`stagger-fadeup group relative flex flex-col overflow-hidden rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[180px] sm:min-h-[220px] ${
                     hasImage ? 'bg-zinc-900 border-zinc-200' : `${tone.cardBg} ${tone.cardBorder}`
                   } ${tone.cardHover} hover:shadow-xl`}
                 >

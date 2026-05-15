@@ -125,13 +125,14 @@ export default async function CatIndexPage() {
 
         {/* Grille de tuiles catégorie — mode photo gallery (image fond + overlay) */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {categoriesVisibles.map(cat => {
+          {categoriesVisibles.map((cat, idx) => {
             const tone = TONES[cat.tone]
             return (
               <Link
                 key={cat.slug}
                 href={`/admin/cat/${cat.slug}`}
-                className="group relative flex flex-col justify-end overflow-hidden rounded-2xl border-2 border-zinc-200 bg-zinc-900 active:scale-[0.96] hover:shadow-2xl transition-all min-h-[180px] sm:min-h-[220px] aspect-square sm:aspect-auto"
+                style={{ ['--stagger' as any]: `${idx * 50}ms` }}
+                className="stagger-fadeup group relative flex flex-col justify-end overflow-hidden rounded-2xl border-2 border-zinc-200 bg-zinc-900 active:scale-[0.96] hover:shadow-2xl transition-all min-h-[180px] sm:min-h-[220px] aspect-square sm:aspect-auto"
               >
                 {/* Image de fond (Unsplash) avec ken-burns zoom au hover */}
                 {cat.imageUrl ? (

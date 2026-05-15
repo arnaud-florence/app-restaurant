@@ -89,4 +89,29 @@
   @media (min-width: 768px) {
     .pb-mobile-nav { padding-bottom: 0; }
   }
+
+  /* Stagger fade-in pour les grilles de tuiles (cat + sous-modules).
+     Chaque enfant a son animation-delay calculé via inline style --stagger.
+     Désactivé si l'utilisateur a `prefers-reduced-motion: reduce`. */
+  @keyframes stagger-fadeup {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .stagger-fadeup {
+    opacity: 0;
+    animation: stagger-fadeup 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--stagger, 0ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stagger-fadeup {
+      animation: none;
+      opacity: 1;
+    }
+  }
 }
