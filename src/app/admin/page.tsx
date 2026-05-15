@@ -1,6 +1,6 @@
 // /admin — "Tableau de bord" gérant : sous-module de la catégorie Pilotage.
 // Vue command-center "10 secondes" : alertes urgentes + KPIs flash + suggestions.
-// Tout vient des agents IA, aucune donnée fictive.
+// Design haut de gamme aligné sur /admin/cat.
 
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -8,6 +8,7 @@ import { getProfile } from '@/lib/auth'
 import { AGENTS, type AgentId } from '@/lib/agents/types'
 import SectionKPIs from './pilotage/sections/SectionKPIs'
 import SectionSuggestions from './pilotage/sections/SectionSuggestions'
+import { Target, Sparkles, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 export const metadata = { title: 'Tableau de bord — Admin' }
 export const dynamic = 'force-dynamic'
@@ -29,113 +30,172 @@ export default async function AdminHome() {
   const nbJaune = alertes.filter(a => a.urgence === 'jaune').length
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-4">
-        {/* Header premium icon-glow — pattern catégorie */}
-        <header className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-2xl sm:text-3xl shadow-lg ring-4 ring-emerald-500/30 shrink-0">
-              📊
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                {bonjourSelonHeure()}{profil?.prenom ? `, ${profil.prenom}` : ''} · Pilotage
-              </p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">
-                Tableau de bord
-              </h1>
-              <p className="text-[11px] sm:text-xs text-zinc-500 mt-1 capitalize">
-                {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                {nbRouge > 0 && <span className="ml-2 text-red-700 font-bold normal-case">· {nbRouge} urgent{nbRouge > 1 ? 's' : ''}</span>}
-                {nbJaune > 0 && <span className="ml-2 text-amber-700 font-bold normal-case">· {nbJaune} à surveiller</span>}
-                {nbRouge === 0 && nbJaune === 0 && <span className="ml-2 text-emerald-700 font-bold normal-case">· tout est ok</span>}
-              </p>
-            </div>
+    <div className="min-h-screen bg-zinc-50">
+      {/* Dot pattern subtil cohérent avec /admin/cat */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8">
+        {/* ─── HERO HEADER premium ──────────────────────────────────── */}
+        <header className="flex items-start justify-between flex-wrap gap-4">
+          <div className="space-y-2 min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {bonjourSelonHeure()}{profil?.prenom ? `, ${profil.prenom}` : ''} · Pilotage
+            </p>
+            <h1 className="text-3xl sm:text-5xl font-black text-zinc-900 tracking-[-0.03em] leading-[0.95]">
+              Tableau de bord
+            </h1>
+            <p className="text-sm sm:text-base text-zinc-500 capitalize leading-relaxed">
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {nbRouge > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 text-red-700 font-bold normal-case">
+                  · <AlertTriangle className="h-3.5 w-3.5" strokeWidth={2.5} /> {nbRouge} urgent{nbRouge > 1 ? 's' : ''}
+                </span>
+              )}
+              {nbJaune > 0 && (
+                <span className="ml-2 inline-flex items-center text-amber-700 font-bold normal-case">
+                  · {nbJaune} à surveiller
+                </span>
+              )}
+              {nbRouge === 0 && nbJaune === 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 text-emerald-700 font-bold normal-case">
+                  · <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} /> tout est ok
+                </span>
+              )}
+            </p>
           </div>
 
-          {/* CTAs : accès rapide aux 2 outils Pilotage les plus utilisés */}
+          {/* CTAs premium avec icons Lucide + glow */}
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href="/admin/pilotage"
-              className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition shadow-lg shadow-zinc-900/20"
+              className="group inline-flex items-center gap-2 h-11 pl-3 pr-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition shadow-xl shadow-zinc-900/25 ring-1 ring-zinc-900/10"
             >
-              🎯 KPIs & Objectifs
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                <Target className="h-3.5 w-3.5" strokeWidth={2.5} />
+              </span>
+              <span>KPIs & Objectifs</span>
+              <ArrowRight className="h-3.5 w-3.5 opacity-70 group-hover:translate-x-0.5 transition" strokeWidth={2.5} />
             </Link>
             <Link
               href="/admin/assistant"
-              className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-white border-2 border-emerald-300 text-emerald-700 text-sm font-bold hover:bg-emerald-50 active:scale-95 transition"
+              className="group inline-flex items-center gap-2 h-11 pl-3 pr-4 rounded-full bg-white text-zinc-900 text-sm font-bold hover:bg-violet-50 active:scale-95 transition shadow-sm ring-1 ring-zinc-200 hover:ring-violet-300"
             >
-              🤖 Assistant IA
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/30">
+                <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
+              </span>
+              <span>Assistant IA</span>
             </Link>
           </div>
         </header>
 
-        {/* Alertes urgentes — liste compacte avec CTA inline (1 ligne par alerte, max 4) */}
-        <section>
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 px-1">
-            Actions à faire ({alertes.length})
-          </h2>
+        {/* ─── ALERTES URGENTES (premium card list) ────────────────── */}
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-[0.15em] text-zinc-400 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
+                Actions à faire
+                <span className="text-zinc-300">· {alertes.length}</span>
+              </h2>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Détectées par les 15 agents IA</p>
+            </div>
+          </div>
           {alertes.length > 0 ? (
-            <div className="rounded-2xl border-2 border-red-200 bg-white shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-3xl ring-1 ring-red-200 bg-white shadow-lg shadow-red-500/5">
               <ul className="divide-y divide-zinc-100">
                 {alertes.map(a => {
                   const def = AGENTS[a.agent_id as AgentId]
                   const urgent = a.urgence === 'rouge'
                   return (
-                    <li key={a.id} className="flex items-center gap-2 px-3 py-2.5">
-                      <span className="text-xl shrink-0" aria-hidden>{def?.emoji ?? '🤖'}</span>
+                    <li key={a.id} className="flex items-center gap-3 px-3.5 py-3 hover:bg-zinc-50/50 transition">
+                      <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl shadow-md text-xl shrink-0 ${
+                        urgent ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-red-500/30'
+                               : 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-amber-500/30'
+                      }`} aria-hidden>{def?.emoji ?? '🤖'}</span>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-bold truncate ${urgent ? 'text-red-900' : 'text-amber-900'}`}>
+                        <p className={`text-sm font-black truncate tracking-[-0.01em] ${urgent ? 'text-red-900' : 'text-amber-900'}`}>
                           {a.titre}
                         </p>
                         {a.message && (
-                          <p className="text-[11px] text-zinc-500 truncate">{a.message}</p>
+                          <p className="text-[11px] text-zinc-500 truncate mt-0.5">{a.message}</p>
                         )}
                       </div>
                       {a.action_url && a.action_label ? (
                         <Link
                           href={a.action_url}
-                          className={`shrink-0 inline-flex items-center h-9 px-3 rounded-full text-xs font-bold whitespace-nowrap active:scale-95 transition ${
+                          className={`shrink-0 group inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold whitespace-nowrap active:scale-95 transition shadow-lg ${
                             urgent
-                              ? 'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/30'
-                              : 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/30'
+                              ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-500/40'
+                              : 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/40'
                           }`}
                         >
-                          {a.action_label} →
+                          {a.action_label}
+                          <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition" strokeWidth={2.5} />
                         </Link>
                       ) : (
                         <Link
                           href="/admin/pilotage"
                           className="shrink-0 inline-flex items-center h-9 px-3 rounded-full text-xs font-bold whitespace-nowrap bg-zinc-100 text-zinc-700 hover:bg-zinc-200 active:scale-95 transition"
                         >
-                          Voir →
+                          Voir
                         </Link>
                       )}
                     </li>
                   )
                 })}
               </ul>
-              <div className="px-3 py-2 bg-zinc-50 border-t border-zinc-100">
-                <Link href="/admin/pilotage" className="text-xs font-bold text-zinc-700 hover:text-zinc-900">
-                  Voir toutes les alertes →
-                </Link>
-              </div>
+              <Link
+                href="/admin/pilotage"
+                className="group flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-t border-zinc-100 hover:bg-zinc-100/70 transition"
+              >
+                <span className="text-xs font-bold text-zinc-700 group-hover:text-zinc-900">Voir toutes les alertes</span>
+                <ArrowRight className="h-3.5 w-3.5 text-zinc-400 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition" strokeWidth={2.5} />
+              </Link>
             </div>
           ) : (
-            <div className="rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between">
-              <p className="text-sm font-bold text-emerald-900">✓ Aucune alerte — les 15 agents surveillent en continu</p>
-              <Link href="/admin/pilotage" className="text-xs font-bold text-emerald-700 hover:text-emerald-900 whitespace-nowrap">
-                Voir agents →
+            <div className="rounded-3xl ring-1 ring-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 shrink-0">
+                  <CheckCircle2 className="h-5 w-5" strokeWidth={2.5} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-emerald-900 tracking-[-0.01em]">Aucune alerte urgente</p>
+                  <p className="text-[11px] text-emerald-700">Les 15 agents surveillent en continu</p>
+                </div>
+              </div>
+              <Link
+                href="/admin/pilotage"
+                className="group inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 whitespace-nowrap shrink-0"
+              >
+                Voir agents
+                <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition" strokeWidth={2.5} />
               </Link>
             </div>
           )}
         </section>
 
-        {/* KPIs flash et suggestions — côte à côte sur desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <SectionKPIs />
-          <SectionSuggestions />
-        </div>
+        {/* ─── KPIs flash & suggestions (bento 2 cols) ─────────────── */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-xs font-black uppercase tracking-[0.15em] text-zinc-400 flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3" strokeWidth={2.5} />
+              Aperçu live
+            </h2>
+            <p className="text-[11px] text-zinc-400 mt-0.5">Indicateurs et suggestions du jour</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <SectionKPIs />
+            <SectionSuggestions />
+          </div>
+        </section>
       </main>
     </div>
   )
