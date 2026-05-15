@@ -440,6 +440,8 @@ const TABLE_STYLE_PREMIUM: Record<StatutTable, {
   },
 }
 
+type FiltreStatut = 'tous' | 'libre' | 'occupee' | 'a_encaisser'
+
 function PlanSalle({
   zones, cmdParTable, pretsParTable, onOuvrir,
 }: {
@@ -455,35 +457,164 @@ function PlanSalle({
     return () => clearInterval(i)
   }, [])
 
-  // Stats globales par zone
+  const [filtre, setFiltre] = useState<FiltreStatut>('tous')
+  const [compact, setCompact] = useState(false)
+  const [searchT, setSearchT] = useState('')
+
+  // Helper : calcule le statut effectif d'une table
+  function statutEffectif(t: Table): StatutTable {
+    const cmd = cmdParTable.get(t.numero)
+    return cmd?.statut === 'servi' ? 'a_encaisser' : cmd ? 'occupee' : t.statut
+  }
+
+  // Stats globales par zone (toujours sur toutes les tables, pas filtré)
   const zoneStats = useMemo(() => {
     const stats: Record<string, { libre: number; occupee: number; aEncaisser: number; total: number; couvertsOccupes: number; capaTotale: number }> = {}
     for (const [zone, tables] of zones) {
       const s = { libre: 0, occupee: 0, aEncaisser: 0, total: tables.length, couvertsOccupes: 0, capaTotale: 0 }
       for (const t of tables) {
         s.capaTotale += t.capacite
-        const cmd = cmdParTable.get(t.numero)
-        const statutEffectif = cmd?.statut === 'servi' ? 'a_encaisser' : cmd ? 'occupee' : t.statut
-        if (statutEffectif === 'libre') s.libre++
-        else if (statutEffectif === 'a_encaisser') {
-          s.aEncaisser++
-          s.couvertsOccupes += t.capacite
-        } else if (statutEffectif === 'occupee') {
-          s.occupee++
-          s.couvertsOccupes += t.capacite
-        }
+        const se = statutEffectif(t)
+        if (se === 'libre') s.libre++
+        else if (se === 'a_encaisser') { s.aEncaisser++; s.couvertsOccupes += t.capacite }
+        else if (se === 'occupee') { s.occupee++; s.couvertsOccupes += t.capacite }
       }
       stats[zone] = s
     }
     return stats
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones, cmdParTable])
 
+  // Stats globales de l'établissement (tous postes confondus, calculées en live)
+  const globalStats = useMemo(() => {
+    let caEnCours = 0
+    let nbCouvertsOccupes = 0
+    let nbTablesOuvertes = 0
+    let totalDureeMin = 0
+    let nbTablesAvecCmd = 0
+    let nbPretsAservir = 0
+    let nbTablesAEncaisser = 0
+    for (const [, ts] of zones) {
+      for (const t of ts) {
+        const cmd = cmdParTable.get(t.numero)
+        if (cmd) {
+          nbTablesAvecCmd++
+          const total = cmd.montant_total_ttc ?? cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+          caEnCours += total
+          nbCouvertsOccupes += t.capacite
+          if (cmd.statut !== 'encaisse' && cmd.statut !== 'annule') nbTablesOuvertes++
+          totalDureeMin += Math.max(0, Math.round((now - new Date(cmd.created_at).getTime()) / 60_000))
+          const se = statutEffectif(t)
+          if (se === 'a_encaisser') nbTablesAEncaisser++
+        }
+        nbPretsAservir += pretsParTable.get(t.numero) ?? 0
+      }
+    }
+    const ticketMoyen = nbTablesAvecCmd > 0 ? caEnCours / nbTablesAvecCmd : 0
+    const dureeMoy = nbTablesAvecCmd > 0 ? Math.round(totalDureeMin / nbTablesAvecCmd) : 0
+    return { caEnCours, nbCouvertsOccupes, nbTablesOuvertes, ticketMoyen, dureeMoy, nbPretsAservir, nbTablesAEncaisser }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones, cmdParTable, pretsParTable, now])
+
+  // Filtre les tables affichées
+  function shouldShow(t: Table): boolean {
+    if (searchT.trim() && !t.numero.toLowerCase().includes(searchT.toLowerCase().trim())) return false
+    if (filtre === 'tous') return true
+    return statutEffectif(t) === filtre
+  }
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
+      {/* ═══ Dashboard header — Stats du service en cours ═══ */}
+      <section className="mb-6 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-4 lg:p-5 shadow-2xl shadow-black/40 backdrop-blur">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Service en cours</p>
+            <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight">Plan de salle</h1>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            Live · MAJ auto
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+          <StatTile icon="💶" label="CA en cours"     value={fmtPrix(globalStats.caEnCours)} accent="emerald" />
+          <StatTile icon="🪑" label="Tables ouvertes" value={`${globalStats.nbTablesOuvertes}`} sub={`${globalStats.nbCouvertsOccupes} couverts`} accent="amber" />
+          <StatTile icon="🧾" label="Ticket moyen"    value={fmtPrix(globalStats.ticketMoyen)} accent="violet" />
+          <StatTile icon="⏱"  label="Durée moy."     value={`${globalStats.dureeMoy} min`} accent="blue" />
+          <StatTile icon="🔔" label="À servir"       value={`${globalStats.nbPretsAservir}`} accent="emerald" pulse={globalStats.nbPretsAservir > 0} />
+          <StatTile icon="💳" label="À encaisser"    value={`${globalStats.nbTablesAEncaisser}`} accent="rose" pulse={globalStats.nbTablesAEncaisser > 0} />
+        </div>
+      </section>
+
+      {/* ═══ Toolbar : filtres rapides + recherche + density toggle ═══ */}
+      <div className="sticky top-0 z-10 mb-5 -mx-3 px-3 py-2.5 bg-zinc-950/85 backdrop-blur-md border-y border-zinc-800">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtres statut */}
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-1">
+            {([
+              { k: 'tous',         lbl: 'Toutes',       dot: 'bg-zinc-400' },
+              { k: 'libre',        lbl: 'Libres',       dot: 'bg-emerald-400' },
+              { k: 'occupee',      lbl: 'Occupées',     dot: 'bg-amber-400' },
+              { k: 'a_encaisser',  lbl: 'À encaisser',  dot: 'bg-rose-400' },
+            ] as const).map(f => (
+              <button
+                key={f.k}
+                onClick={() => setFiltre(f.k)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-bold transition-all',
+                  filtre === f.k
+                    ? 'bg-white text-zinc-900 shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+              >
+                <span className={cn('w-1.5 h-1.5 rounded-full', f.dot, filtre === f.k && f.k === 'a_encaisser' && 'animate-pulse')}></span>
+                {f.lbl}
+              </button>
+            ))}
+          </div>
+
+          {/* Recherche numéro table */}
+          <div className="relative flex-1 min-w-[160px] max-w-[280px]">
+            <input
+              type="search"
+              value={searchT}
+              onChange={e => setSearchT(e.target.value)}
+              placeholder="N° table..."
+              className="w-full min-h-[36px] px-3 pr-8 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 outline-none text-xs"
+            />
+            {searchT && (
+              <button onClick={() => setSearchT('')} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs leading-none">×</button>
+            )}
+          </div>
+
+          {/* Toggle vue compacte */}
+          <button
+            onClick={() => setCompact(!compact)}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-bold border transition-all',
+              compact
+                ? 'bg-white text-zinc-900 border-white'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600',
+            )}
+            title={compact ? 'Vue détaillée' : 'Vue compacte'}
+          >
+            {compact ? '⊞ Détaillée' : '⊟ Compacte'}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-8">
       {zones.map(([zone, tables]) => {
         const s = zoneStats[zone]
+        const tablesFiltrees = tables.filter(shouldShow)
+        if (tablesFiltrees.length === 0) return null
         return (
-          <section key={zone}>
+          <section key={zone} className="animate-in fade-in duration-500">
             {/* Header zone — titre dramatique + pastilles stats */}
             <header className="mb-4 flex items-end justify-between flex-wrap gap-3 px-1">
               <div>
@@ -517,8 +648,13 @@ function PlanSalle({
               </div>
             </header>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {tables.map(t => {
+            <div className={cn(
+              'grid gap-4',
+              compact
+                ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10'
+                : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+            )}>
+              {tablesFiltrees.map(t => {
                 const cmd = cmdParTable.get(t.numero)
                 const nbPrets = pretsParTable.get(t.numero) ?? 0
                 const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
@@ -608,6 +744,41 @@ function PlanSalle({
           </section>
         )
       })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Tuile statistique pour le dashboard plan de salle ─────────────────
+function StatTile({
+  icon, label, value, sub, accent = 'zinc', pulse = false,
+}: {
+  icon: string
+  label: string
+  value: string | number
+  sub?: string
+  accent?: 'emerald' | 'amber' | 'rose' | 'blue' | 'violet' | 'zinc'
+  pulse?: boolean
+}) {
+  const ACCENTS: Record<string, { iconBg: string; valueText: string; border: string }> = {
+    emerald: { iconBg: 'bg-emerald-500/15 text-emerald-300', valueText: 'text-emerald-300', border: 'border-emerald-500/20' },
+    amber:   { iconBg: 'bg-amber-500/15 text-amber-300',     valueText: 'text-amber-200',   border: 'border-amber-500/20' },
+    rose:    { iconBg: 'bg-rose-500/15 text-rose-300',       valueText: 'text-rose-200',    border: 'border-rose-500/20' },
+    blue:    { iconBg: 'bg-blue-500/15 text-blue-300',       valueText: 'text-blue-200',    border: 'border-blue-500/20' },
+    violet:  { iconBg: 'bg-violet-500/15 text-violet-300',   valueText: 'text-violet-200',  border: 'border-violet-500/20' },
+    zinc:    { iconBg: 'bg-zinc-800 text-zinc-300',          valueText: 'text-zinc-100',    border: 'border-zinc-800' },
+  }
+  const a = ACCENTS[accent]
+  return (
+    <div className={cn('rounded-xl p-3 bg-zinc-900/50 border backdrop-blur-sm transition-all hover:scale-[1.02]', a.border, pulse && 'ring-2 ring-rose-500/30')}>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={cn('inline-flex items-center justify-center w-8 h-8 rounded-lg text-base', a.iconBg)}>{icon}</span>
+        <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold leading-tight">{label}</p>
+      </div>
+      <p className={cn('text-xl lg:text-2xl font-black tabular-nums leading-tight', a.valueText, pulse && 'animate-pulse')}>
+        {value}
+      </p>
+      {sub && <p className="text-[10px] text-zinc-500 mt-0.5">{sub}</p>}
     </div>
   )
 }
