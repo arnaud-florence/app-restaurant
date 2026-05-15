@@ -284,7 +284,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
                   <span className="inline-block w-1 h-1 rounded-full bg-white/80" />
                   Catégorie · {itemsVisibles.length} module{itemsVisibles.length > 1 ? 's' : ''}
                 </p>
-                <h1 className="text-3xl sm:text-5xl font-black tracking-[-0.03em] leading-[0.95] mt-1 drop-shadow-lg">
+                <h1 className="font-display italic text-4xl sm:text-6xl font-medium tracking-[-0.02em] leading-[0.95] mt-1 drop-shadow-2xl">
                   {cat.label}
                 </h1>
                 <p className="text-xs sm:text-sm text-white/90 mt-2 max-w-2xl leading-relaxed">{cat.pitch}</p>
@@ -341,11 +341,11 @@ export default async function CategoriePage({ params }: { params: { slug: string
                     </>
                   )}
 
-                  {/* Numéro éditorial top-left — style magazine restaurant */}
+                  {/* Numéro éditorial top-left — style magazine restaurant (Fraunces italic) */}
                   <span className={cn(
-                    'absolute top-4 left-4 font-serif italic text-2xl sm:text-3xl tabular-nums leading-none drop-shadow-lg z-10',
-                    hasImage ? 'text-white/90' : tone.cardLabel,
-                  )}>
+                    'absolute top-4 left-4 font-display italic text-3xl sm:text-4xl tabular-nums leading-none drop-shadow-2xl z-10',
+                    hasImage ? 'text-white/95' : tone.cardLabel,
+                  )} style={{ fontWeight: 500 }}>
                     {String(idx + 1).padStart(2, '0')}
                   </span>
 
@@ -379,7 +379,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
                           {compteur.label}
                         </p>
                       )}
-                      <h3 className="text-lg sm:text-xl font-black tracking-[-0.02em] leading-[1.1] drop-shadow-lg">
+                      <h3 className="font-display text-xl sm:text-2xl font-medium tracking-[-0.02em] leading-[1.1] drop-shadow-2xl">
                         {it.label}
                       </h3>
                       <p className="text-[11px] sm:text-xs text-white/85 line-clamp-2 leading-snug pt-0.5">
@@ -388,7 +388,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
                     </div>
                   ) : (
                     <div className="relative z-10 mt-auto p-4 sm:p-5 space-y-1.5">
-                      <h3 className={`text-lg sm:text-xl font-black tracking-[-0.02em] leading-[1.1] ${tone.cardLabel}`}>
+                      <h3 className={`font-display text-xl sm:text-2xl font-medium tracking-[-0.02em] leading-[1.1] ${tone.cardLabel}`}>
                         {it.label}
                       </h3>
                       {compteur?.label && (

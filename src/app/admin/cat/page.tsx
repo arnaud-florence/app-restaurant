@@ -114,7 +114,7 @@ export default async function CatIndexPage() {
               <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-white/80">
                 {bonjourSelonHeure()}{profil?.email ? ` · ${profil.email.split('@')[0]}` : ''}
               </p>
-              <h1 className="text-4xl sm:text-6xl font-black tracking-[-0.035em] leading-[0.9] drop-shadow-2xl">
+              <h1 className="font-display text-5xl sm:text-7xl font-medium tracking-[-0.03em] leading-[0.9] drop-shadow-2xl italic">
                 Tableau<br className="sm:hidden" /> de bord
               </h1>
               <p className="text-sm sm:text-base text-white/90 max-w-xl leading-relaxed">
@@ -193,8 +193,8 @@ export default async function CatIndexPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/0" aria-hidden />
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30" aria-hidden />
 
-                  {/* Numéro éditorial — top right, style magazine */}
-                  <span className="absolute top-4 right-4 text-white/90 font-serif italic text-2xl sm:text-3xl tracking-tight tabular-nums drop-shadow-lg z-10 leading-none">
+                  {/* Numéro éditorial — top right, style magazine (Fraunces italic) */}
+                  <span className="absolute top-4 right-4 text-white/95 font-display italic text-3xl sm:text-4xl tracking-tight tabular-nums drop-shadow-2xl z-10 leading-none" style={{ fontWeight: 500 }}>
                     {String(idx + 1).padStart(2, '0')}
                   </span>
 
@@ -207,7 +207,7 @@ export default async function CatIndexPage() {
                       {cat.items.length} module{cat.items.length > 1 ? 's' : ''}
                     </p>
                     <div className="flex items-end justify-between gap-2">
-                      <h3 className="text-xl sm:text-2xl font-black tracking-[-0.02em] leading-[1.05] drop-shadow-lg">
+                      <h3 className="font-display text-2xl sm:text-3xl font-medium tracking-[-0.02em] leading-[1.05] drop-shadow-lg">
                         {cat.label}
                       </h3>
                       <ArrowRight className="h-5 w-5 text-white/70 shrink-0 mb-1 group-hover:translate-x-1 group-hover:text-white transition-all duration-300" strokeWidth={1.75} />

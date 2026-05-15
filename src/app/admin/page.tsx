@@ -49,7 +49,7 @@ export default async function AdminHome() {
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               {bonjourSelonHeure()}{profil?.prenom ? `, ${profil.prenom}` : ''} · Pilotage
             </p>
-            <h1 className="text-3xl sm:text-5xl font-black text-zinc-900 tracking-[-0.03em] leading-[0.95]">
+            <h1 className="font-display italic text-4xl sm:text-6xl font-medium text-zinc-900 tracking-[-0.02em] leading-[0.95]">
               Tableau de bord
             </h1>
             <p className="text-sm sm:text-base text-zinc-500 capitalize leading-relaxed">

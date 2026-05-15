@@ -90,6 +90,17 @@
     .pb-mobile-nav { padding-bottom: 0; }
   }
 
+  /* Polices typographiques premium */
+  .font-display {
+    font-family: var(--font-display), 'Times New Roman', serif;
+    font-feature-settings: 'ss01', 'ss02', 'liga', 'kern';
+  }
+  .font-display-italic {
+    font-family: var(--font-display), 'Times New Roman', serif;
+    font-style: italic;
+    font-feature-settings: 'ss01', 'ss02', 'liga', 'kern';
+  }
+
   /* Stagger fade-in pour les grilles de tuiles (cat + sous-modules). */
   @keyframes stagger-fadeup {
     from {
