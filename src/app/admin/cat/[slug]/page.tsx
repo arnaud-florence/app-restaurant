@@ -7,18 +7,76 @@ import { notFound } from 'next/navigation'
 import { CATEGORIES, type Category } from '@/lib/navigation'
 import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
-import { ChevronRight } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-const TONES: Record<Category['tone'], { gradient: string; ring: string; chip: string; pitch: string }> = {
-  emerald: { gradient: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-500/30', chip: 'bg-emerald-100 text-emerald-900', pitch: 'text-emerald-700' },
-  amber:   { gradient: 'from-amber-500 to-orange-600',  ring: 'ring-amber-500/30',   chip: 'bg-amber-100 text-amber-900',    pitch: 'text-amber-700' },
-  violet:  { gradient: 'from-violet-500 to-purple-600', ring: 'ring-violet-500/30',  chip: 'bg-violet-100 text-violet-900',  pitch: 'text-violet-700' },
-  blue:    { gradient: 'from-blue-500 to-sky-600',      ring: 'ring-blue-500/30',    chip: 'bg-blue-100 text-blue-900',      pitch: 'text-blue-700' },
-  red:     { gradient: 'from-red-500 to-rose-600',      ring: 'ring-red-500/30',     chip: 'bg-red-100 text-red-900',        pitch: 'text-red-700' },
-  rose:    { gradient: 'from-rose-500 to-pink-600',     ring: 'ring-rose-500/30',    chip: 'bg-rose-100 text-rose-900',      pitch: 'text-rose-700' },
-  zinc:    { gradient: 'from-zinc-700 to-zinc-900',     ring: 'ring-zinc-500/30',    chip: 'bg-zinc-200 text-zinc-900',      pitch: 'text-zinc-700' },
+const TONES: Record<Category['tone'], {
+  gradient: string
+  ring: string
+  pitch: string
+  /** Card boutons : fond pastel + bordure + emoji gradient */
+  cardBg: string
+  cardBorder: string
+  cardHover: string
+  cardEmojiGradient: string
+  cardLabel: string
+}> = {
+  emerald: {
+    gradient: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-500/30', pitch: 'text-emerald-700',
+    cardBg: 'bg-gradient-to-br from-emerald-50 to-teal-50',
+    cardBorder: 'border-emerald-200',
+    cardHover: 'hover:border-emerald-400 hover:shadow-emerald-500/20',
+    cardEmojiGradient: 'from-emerald-500 to-teal-600',
+    cardLabel: 'text-emerald-900',
+  },
+  amber: {
+    gradient: 'from-amber-500 to-orange-600', ring: 'ring-amber-500/30', pitch: 'text-amber-700',
+    cardBg: 'bg-gradient-to-br from-amber-50 to-orange-50',
+    cardBorder: 'border-amber-200',
+    cardHover: 'hover:border-amber-400 hover:shadow-amber-500/20',
+    cardEmojiGradient: 'from-amber-500 to-orange-600',
+    cardLabel: 'text-amber-900',
+  },
+  violet: {
+    gradient: 'from-violet-500 to-purple-600', ring: 'ring-violet-500/30', pitch: 'text-violet-700',
+    cardBg: 'bg-gradient-to-br from-violet-50 to-purple-50',
+    cardBorder: 'border-violet-200',
+    cardHover: 'hover:border-violet-400 hover:shadow-violet-500/20',
+    cardEmojiGradient: 'from-violet-500 to-purple-600',
+    cardLabel: 'text-violet-900',
+  },
+  blue: {
+    gradient: 'from-blue-500 to-sky-600', ring: 'ring-blue-500/30', pitch: 'text-blue-700',
+    cardBg: 'bg-gradient-to-br from-blue-50 to-sky-50',
+    cardBorder: 'border-blue-200',
+    cardHover: 'hover:border-blue-400 hover:shadow-blue-500/20',
+    cardEmojiGradient: 'from-blue-500 to-sky-600',
+    cardLabel: 'text-blue-900',
+  },
+  red: {
+    gradient: 'from-red-500 to-rose-600', ring: 'ring-red-500/30', pitch: 'text-red-700',
+    cardBg: 'bg-gradient-to-br from-red-50 to-rose-50',
+    cardBorder: 'border-red-200',
+    cardHover: 'hover:border-red-400 hover:shadow-red-500/20',
+    cardEmojiGradient: 'from-red-500 to-rose-600',
+    cardLabel: 'text-red-900',
+  },
+  rose: {
+    gradient: 'from-rose-500 to-pink-600', ring: 'ring-rose-500/30', pitch: 'text-rose-700',
+    cardBg: 'bg-gradient-to-br from-rose-50 to-pink-50',
+    cardBorder: 'border-rose-200',
+    cardHover: 'hover:border-rose-400 hover:shadow-rose-500/20',
+    cardEmojiGradient: 'from-rose-500 to-pink-600',
+    cardLabel: 'text-rose-900',
+  },
+  zinc: {
+    gradient: 'from-zinc-700 to-zinc-900', ring: 'ring-zinc-500/30', pitch: 'text-zinc-700',
+    cardBg: 'bg-gradient-to-br from-zinc-50 to-zinc-100',
+    cardBorder: 'border-zinc-300',
+    cardHover: 'hover:border-zinc-500 hover:shadow-zinc-500/20',
+    cardEmojiGradient: 'from-zinc-700 to-zinc-900',
+    cardLabel: 'text-zinc-900',
+  },
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
@@ -59,7 +117,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
           </div>
         </header>
 
-        {/* Grille des sous-modules — cards tactiles */}
+        {/* Grille de BOUTONS tuile tactiles — emoji gros + label + description */}
         {itemsVisibles.length === 0 ? (
           <section className="rounded-2xl border-2 border-dashed border-zinc-300 bg-white p-8 text-center">
             <p className="text-4xl mb-2">🔒</p>
@@ -68,21 +126,22 @@ export default async function CategoriePage({ params }: { params: { slug: string
             </p>
           </section>
         ) : (
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {itemsVisibles.map(it => (
               <Link
                 key={it.href}
                 href={it.href}
-                className="group flex items-start gap-3 p-4 rounded-2xl border-2 border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-lg active:scale-[0.98] transition-all min-h-[88px]"
+                className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[140px] sm:min-h-[160px] ${tone.cardBg} ${tone.cardBorder} ${tone.cardHover} hover:shadow-xl`}
               >
-                <span className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br ${tone.gradient} text-white text-2xl shadow-md shrink-0`}>
+                <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-3xl sm:text-4xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
                   {it.emoji}
                 </span>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-black text-zinc-900 tracking-tight leading-tight">{it.label}</h3>
-                  <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{it.description}</p>
-                </div>
-                <ChevronRight className="h-5 w-5 text-zinc-300 group-hover:text-zinc-700 group-hover:translate-x-0.5 transition shrink-0 mt-1" />
+                <h3 className={`mt-3 text-sm sm:text-base font-black tracking-tight leading-tight ${tone.cardLabel}`}>
+                  {it.label}
+                </h3>
+                <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug">
+                  {it.description}
+                </p>
               </Link>
             ))}
           </section>
