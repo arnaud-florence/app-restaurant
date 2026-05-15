@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, Trophy, Save, X, ToggleLeft, ToggleRight, Loader2, Info, Sparkles } from 'lucide-react'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -75,30 +76,34 @@ export default function ChallengesAdminClient({
   }
 
   return (
-    <div className="p-4 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">
-            <Trophy className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Motivation équipe</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Challenges</h1>
-            <p className="text-xs text-zinc-500 mt-1">
-              Période courante : <strong>{periode.debut}</strong> → <strong>{periode.fin}</strong>.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={lancerPack} disabled={packPending} variant="outline" className="gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
-            {packPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Pack démarrage
-          </Button>
-          <Button onClick={() => setShowForm(true)} className="gap-1">
-            <Plus className="h-4 w-4" /> Nouveau challenge
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="amber"
+          subtitle="Équipe & formation"
+          title="Challenges"
+          description={`Objectifs équipe/individuel, primes, leaderboard. Période : ${periode.debut} → ${periode.fin}.`}
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button onClick={lancerPack} disabled={packPending} variant="outline" className="gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+                {packPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Pack démarrage
+              </Button>
+              <Button onClick={() => setShowForm(true)} className="gap-1">
+                <Plus className="h-4 w-4" /> Nouveau challenge
+              </Button>
+            </div>
+          }
+        />
 
       {/* Résultat pack démarrage */}
       {packResult && (
@@ -147,6 +152,7 @@ export default function ChallengesAdminClient({
           ))}
         </div>
       )}
+      </main>
     </div>
   )
 }

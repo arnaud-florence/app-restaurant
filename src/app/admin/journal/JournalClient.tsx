@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -42,26 +43,31 @@ export default function JournalClient({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">📔</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Journal de bord (6 mois)</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Journal</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="Entrées" value={String(analyses.total)} />
-            <KPI label="Score moyen" value={`${analyses.score_moyen}/5`} accent={analyses.score_moyen >= 3.5 ? 'vert' : analyses.score_moyen >= 2.5 ? 'zinc' : 'rouge'} />
-            <KPI label="Tendance" value={analyses.tendance === 'amelioration' ? '📈 Mieux' : analyses.tendance === 'degradation' ? '📉 Moins bien' : analyses.tendance === 'stable' ? '➡️ Stable' : '— Inconnu'}
-              accent={analyses.tendance === 'amelioration' ? 'vert' : analyses.tendance === 'degradation' ? 'rouge' : 'zinc'} />
-          </div>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4 space-y-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="amber"
+          subtitle="Pilotage"
+          title="Journal de bord"
+          description="Notes humeurs, photos joignables, analyses IA sur 6 mois."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="Entrées" value={String(analyses.total)} />
+              <KPI label="Score moyen" value={`${analyses.score_moyen}/5`} accent={analyses.score_moyen >= 3.5 ? 'vert' : analyses.score_moyen >= 2.5 ? 'zinc' : 'rouge'} />
+              <KPI label="Tendance" value={analyses.tendance === 'amelioration' ? '📈 Mieux' : analyses.tendance === 'degradation' ? '📉 Moins bien' : analyses.tendance === 'stable' ? '➡️ Stable' : '— Inconnu'}
+                accent={analyses.tendance === 'amelioration' ? 'vert' : analyses.tendance === 'degradation' ? 'rouge' : 'zinc'} />
+            </div>
+          }
+        />
+
         {/* Analyses */}
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700 mb-3">📊 Analyses corrélations 6 mois</h2>

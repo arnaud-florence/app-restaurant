@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, BookOpen, GraduationCap, Users, ExternalLink, Printer, RotateCcw } from 'lucide-react'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -53,30 +54,36 @@ export default function FormationAdminClient({
   const [, startTransition] = useTransition()
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-            <GraduationCap className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Équipe</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Formation</h1>
-            <p className="text-xs text-zinc-500 mt-1">Guides interactifs par poste, quiz, suivi des progressions.</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/admin/allergenes" className="text-sm text-zinc-600 hover:text-emerald-700 inline-flex items-center gap-1 underline">
-            🆘 Procédures urgence (Module 12)
-          </Link>
-          <Link href="/admin/formation/docs">
-            <Button variant="outline" className="gap-2">📚 Manuels</Button>
-          </Link>
-          <Link href="/formation" target="_blank">
-            <Button variant="outline" className="gap-2"><ExternalLink className="h-4 w-4" /> Vue employé</Button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Équipe & formation"
+          title="Formation"
+          description="Guides interactifs par poste, quiz QCM, simulations, certifications, suivi progressions."
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link href="/admin/allergenes" className="text-xs text-zinc-600 hover:text-emerald-700 inline-flex items-center gap-1 underline whitespace-nowrap">
+                🆘 Procédures urgence
+              </Link>
+              <Link href="/admin/formation/docs">
+                <Button variant="outline" className="gap-2">📚 Manuels</Button>
+              </Link>
+              <Link href="/formation" target="_blank">
+                <Button variant="outline" className="gap-2"><ExternalLink className="h-4 w-4" /> Vue employé</Button>
+              </Link>
+            </div>
+          }
+        />
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         <PillTab active={tab === 'guides'} onClick={() => setTab('guides')}>
@@ -140,6 +147,7 @@ export default function FormationAdminClient({
           onSaved={() => { setShowGuideForm(null); router.refresh() }}
         />
       )}
+      </main>
     </div>
   )
 }

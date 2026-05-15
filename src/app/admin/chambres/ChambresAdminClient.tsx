@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Bed, Plus, Trash2, Zap } from 'lucide-react'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { creerChambre, modifierChambre, supprimerChambre, seedChambresStarter } from './actions'
 import type { Chambre } from './page'
 
@@ -39,29 +40,35 @@ export default function ChambresAdminClient({ chambres }: { chambres: Chambre[] 
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6">
-      <header className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">
-            <Bed className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Hôtellerie</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Chambres d&apos;hôtes</h1>
-            <p className="text-xs text-zinc-500 mt-1">{chambres.length} chambre{chambres.length > 1 ? 's' : ''} configurée{chambres.length > 1 ? 's' : ''}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {chambres.length === 0 && (
-            <Button variant="outline" onClick={() => exec(async () => { await seedChambresStarter() })} className="gap-1">
-              <Zap className="h-4 w-4" /> 3 chambres starter
-            </Button>
-          )}
-          <Button onClick={() => setCreating(true)} className="gap-1">
-            <Plus className="h-4 w-4" /> Nouvelle chambre
-          </Button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Clientèle"
+          title="Chambres d'hôtes"
+          description={`${chambres.length} chambre${chambres.length > 1 ? 's' : ''} configurée${chambres.length > 1 ? 's' : ''} — calendrier multi-chambres, check-in/out, facture PDF, vidéo 360°.`}
+          actions={
+            <div className="flex gap-2">
+              {chambres.length === 0 && (
+                <Button variant="outline" onClick={() => exec(async () => { await seedChambresStarter() })} className="gap-1">
+                  <Zap className="h-4 w-4" /> 3 chambres starter
+                </Button>
+              )}
+              <Button onClick={() => setCreating(true)} className="gap-1">
+                <Plus className="h-4 w-4" /> Nouvelle chambre
+              </Button>
+            </div>
+          }
+        />
 
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
 
@@ -136,6 +143,7 @@ export default function ChambresAdminClient({ chambres }: { chambres: Chambre[] 
           </Card>
         </div>
       )}
+      </main>
     </div>
   )
 }

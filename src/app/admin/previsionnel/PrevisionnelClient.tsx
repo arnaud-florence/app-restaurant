@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts'
@@ -29,30 +30,36 @@ export default function PrevisionnelClient({ data }: { data: DataPrevisionnel })
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">🔮</span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Pilotage prédictif</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Prévisionnel</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <KPI label="CA prévu 7j" value={fmtPrix(totalCA)} />
-            <KPI label="Couverts 7j" value={String(totalCouverts)} />
-            <KPI label="Jours à risque" value={String(alertes)} accent={alertes > 0 ? 'orange' : 'vert'} />
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabBtn active={tab === 'previsions'}   onClick={() => setTab('previsions')}>📊 Prévisions 7j</TabBtn>
-          <TabBtn active={tab === 'meteo'}        onClick={() => setTab('meteo')}>🌤️ Météo ({data.releves.length})</TabBtn>
-          <TabBtn active={tab === 'correlations'} onClick={() => setTab('correlations')}>📈 Corrélations</TabBtn>
-        </div>
-      </header>
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-      <main className="max-w-7xl mx-auto p-4">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="blue"
+          subtitle="Pilotage"
+          title="Prévisionnel"
+          description="Météo, prévision CA 7 jours, corrélations, suggestions IA."
+          actions={
+            <div className="flex flex-wrap gap-2 text-sm">
+              <KPI label="CA 7j" value={fmtPrix(totalCA)} />
+              <KPI label="Couverts" value={String(totalCouverts)} />
+              <KPI label="Risque" value={String(alertes)} accent={alertes > 0 ? 'orange' : 'vert'} />
+            </div>
+          }
+        >
+          <div className="flex gap-1 overflow-x-auto">
+            <TabBtn active={tab === 'previsions'}   onClick={() => setTab('previsions')}>📊 Prévisions 7j</TabBtn>
+            <TabBtn active={tab === 'meteo'}        onClick={() => setTab('meteo')}>🌤️ Météo ({data.releves.length})</TabBtn>
+            <TabBtn active={tab === 'correlations'} onClick={() => setTab('correlations')}>📈 Corrélations</TabBtn>
+          </div>
+        </AdminPageHeader>
+
         {tab === 'previsions'   && <PrevisionsTab data={data} />}
         {tab === 'meteo'        && <MeteoTab data={data} onError={flashKo} onOk={flashOk} />}
         {tab === 'correlations' && <CorrelationsTab data={data} />}
