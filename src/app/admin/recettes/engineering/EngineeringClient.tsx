@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { fmtPrix, fmtPct } from '@/lib/foodCost'
+import { getRecettePhoto } from '@/lib/recettePhoto'
 import {
   type RecetteCalc, type ArticleVente, type RecetteEngineering, type Quadrant,
   calculerMatrice, suggestionPour,
@@ -270,8 +271,21 @@ function KPI({ label, value, icon }: { label: string; value: string; icon: strin
 
 // ─── Card recette dans un quadrant ───────────────────────────────────
 function RecetteCard({ r }: { r: RecetteEngineering }) {
+  const photoUrl = getRecettePhoto({
+    tag_destination: r.tag_destination,
+    categorie: r.categorie,
+    nom: r.nom,
+  })
   return (
-    <Card className="bg-background">
+    <Card className="bg-background overflow-hidden">
+      {/* Photo header (fallback Unsplash thématique) */}
+      <div className="relative aspect-[16/7] bg-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoUrl} alt={r.nom} loading="lazy" className="w-full h-full object-cover" />
+        <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 h-6 px-2 rounded-full bg-white/95 backdrop-blur text-zinc-900 text-[10px] font-black tabular-nums shadow">
+          {r.ventes} ventes
+        </span>
+      </div>
       <CardContent className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -281,9 +295,6 @@ function RecetteCard({ r }: { r: RecetteEngineering }) {
             </p>
             <p className="text-[11px] text-muted-foreground">{r.categorie}</p>
           </div>
-          <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-muted">
-            {r.ventes} ventes
-          </span>
         </div>
 
         <div className="grid grid-cols-3 gap-1.5 text-xs">

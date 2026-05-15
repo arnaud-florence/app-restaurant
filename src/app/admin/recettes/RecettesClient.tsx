@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { getRecettePhoto } from '@/lib/recettePhoto'
 import {
   synthese, fmtPrix, fmtPct, STATUT_FOOD_COST_STYLE,
 } from '@/lib/foodCost'
@@ -310,21 +311,21 @@ function RecetteCard({
 
   return (
     <Card className={cn('overflow-hidden flex flex-col', !r.actif && 'opacity-60')}>
-      {/* Photo */}
+      {/* Photo (fallback Unsplash thématique si aucune photo en DB) */}
       <div className="relative aspect-[16/9] bg-muted">
-        {r.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={r.photo_url}
-            alt={r.nom}
-            className="w-full h-full object-cover"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl text-muted-foreground/40">
-            {tag.emoji}
-          </div>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={getRecettePhoto({
+            photo_url: r.photo_url,
+            image_url: (r as any).image_url,
+            tag_destination: r.tag_destination,
+            categorie: r.categorie,
+            nom: r.nom,
+          })}
+          alt={r.nom}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
         <Badge className={cn('absolute top-2 left-2 border', tag.cls)}>
           {tag.emoji} {tag.label}
         </Badge>

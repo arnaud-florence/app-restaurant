@@ -16,6 +16,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { getRecettePhoto } from '@/lib/recettePhoto'
 
 export type ProduitCardData = {
   id: string
@@ -58,7 +59,13 @@ export default function ProduitCard({
   disabled?: boolean
 }) {
   const [imgError, setImgError] = useState(false)
-  const src = produit.image_url || produit.photo_url || null
+  // getRecettePhoto fournit un fallback Unsplash thématique par catégorie+tag
+  // si aucune photo n'est définie en DB → on a TOUJOURS une photo à afficher.
+  const src = getRecettePhoto({
+    photo_url: produit.photo_url,
+    image_url: produit.image_url,
+    tag_destination: produit.tag_destination,
+  })
   const fallback = FALLBACK_BY_DEST[produit.tag_destination] ?? { emoji: '🍽', bg: 'bg-zinc-900' }
   const badge = BADGE_BY_DEST[produit.tag_destination] ?? 'bg-zinc-700 text-white'
   const showImage = src && !imgError
