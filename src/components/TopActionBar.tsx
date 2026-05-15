@@ -207,30 +207,36 @@ export default function TopActionBar({
 
   const chipsVisibles = CHIPS_PRIMAIRES.filter(c => peutVoir(c.href))
 
-  const tones = theme === 'dark' ? TONES_DARK : TONES_LIGHT
+  // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
+  // Page light → barre sombre · Page dark → barre claire.
+  // Les chips utilisent donc le jeu de tones inversé.
+  const tones = theme === 'dark' ? TONES_LIGHT : TONES_DARK
 
   // Mobile : barre flottante remontée du bord bas (pouce confortable)
   // Desktop : static en haut (intégré au flux de la page)
   const wrapperCls = theme === 'dark'
     ? cn(
-        'fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-[#0D0D0D]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0D0D0D]/85 border-2 border-zinc-700 shadow-2xl',
-        'md:static md:inset-auto md:rounded-none md:bg-[#0D0D0D] md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:backdrop-blur-0',
+        // Page sombre → barre CLAIRE pour ressortir
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 border-zinc-300 shadow-[0_-8px_30px_rgba(255,255,255,0.15)]',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none',
       )
     : cn(
-        'fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 border-2 border-zinc-200 shadow-2xl',
-        'md:static md:inset-auto md:rounded-none md:bg-white md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:backdrop-blur-0',
+        // Page claire → barre SOMBRE pour ressortir
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 border-zinc-700 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none',
       )
 
-  // Bouton "☰ Modules" : ouvre le drawer
-  const plusBtnCls = theme === 'dark'
-    ? 'bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-500'
-    : 'bg-zinc-900 border-zinc-900 text-white hover:bg-zinc-800'
+  // Bouton "☰ Modules" : couleur accent emerald, ressort dans les 2 thèmes
+  const plusBtnCls = 'bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/30'
 
   return (
     <>
       <div className={wrapperCls}>
-        <div className="overflow-x-auto scrollbar-thin" style={{ scrollSnapType: 'x mandatory' }}>
-          <div className="flex items-center gap-2 px-2.5 py-2 md:py-1.5 min-w-max">
+        <div
+          className="overflow-x-auto scrollbar-thin"
+          style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+        >
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
             {chipsVisibles.map(it => {
               const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
               const cls = active ? tones[it.tone].active : tones[it.tone].base
@@ -241,11 +247,11 @@ export default function TopActionBar({
                   style={{ scrollSnapAlign: 'start' }}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                    'h-12 px-4 text-sm md:h-10 md:px-3.5 md:text-xs',
+                    'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
                     cls,
                   )}
                 >
-                  <span className="text-lg md:text-base leading-none" aria-hidden>{it.emoji}</span>
+                  <span className="text-xl md:text-base leading-none" aria-hidden>{it.emoji}</span>
                   <span>{it.label}</span>
                 </Link>
               )
@@ -257,7 +263,7 @@ export default function TopActionBar({
               onClick={() => setOpen(true)}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                'h-12 px-4 text-sm md:h-10 md:px-3.5 md:text-xs',
+                'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
                 plusBtnCls,
               )}
               aria-label="Tous les modules"
