@@ -80,15 +80,12 @@
     @apply min-w-full;
   }
 
-  /* Padding bas pour laisser place à la barre de nav fixe.
-     Mobile : bottom nav full-width.
-     Desktop : barre flottante bottom-center.
-     Dans les 2 cas il faut de l'espace pour ne pas masquer le dernier contenu. */
+  /* Padding bas pour laisser place à la TopActionBar en mode mobile (fixed bottom).
+     Sur desktop la barre passe en haut du contenu (static), donc pas de padding. */
   .pb-mobile-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
   }
   @media (min-width: 768px) {
-    /* Desktop : ~80px pour la barre flottante centrée (~60px hauteur + marge) */
-    .pb-mobile-nav { padding-bottom: 5rem; }
+    .pb-mobile-nav { padding-bottom: 0; }
   }
 }

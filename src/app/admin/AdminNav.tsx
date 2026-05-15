@@ -169,57 +169,16 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
   const BOTTOM_NAV = BOTTOM_NAV_ALL.filter(it => peutVoir(it.href))
 
   return (
-    <>      {/* Top bar mobile (titre courant + logo) */}
-      <header className="md:hidden sticky top-0 z-30 bg-white border-b flex items-center px-3 h-12">
-        <Building2 className="h-5 w-5 text-emerald-600" />
-        <div className="flex-1 text-center font-semibold truncate text-sm">
-          {groupesFiltres.flatMap(g => g.items).find(i => pathname === i.href || pathname?.startsWith(i.href + '/'))?.label ?? 'Admin'}
-        </div>
-        <NotificationsBell />
-      </header>
-
-      {/* Overlay mobile */}
+    <>
+      {/* Overlay mobile (utilisé si on rouvre la sidebar mobile via bouton custom) */}
       {open && (
         <div className="fixed inset-0 bg-black/40 z-50 md:hidden" onClick={() => setOpen(false)} />
       )}
 
-      {/* Bottom nav mobile — accessible au pouce */}
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t flex items-stretch"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        {BOTTOM_NAV.map(it => {
-          const active = pathname === it.href || pathname?.startsWith(it.href + '/')
-          return (
-            <Link
-              key={it.href}
-              href={it.href}
-              className={cn(
-                'flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5 font-semibold',
-                active ? 'text-emerald-700 bg-emerald-50' : 'text-zinc-600',
-              )}
-            >
-              <span className="text-2xl leading-none">{it.emoji}</span>
-              <span>{it.label}</span>
-            </Link>
-          )
-        })}
-        <button
-          onClick={() => setOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center min-h-[64px] py-1 text-[11px] gap-0.5 text-zinc-600"
-          aria-label="Plus de modules"
-        >
-          <Menu className="h-6 w-6" />
-          <span>Plus</span>
-        </button>
-      </nav>
-
-      {/* Sidebar */}
+      {/* Sidebar (desktop uniquement — masquée sur mobile car la TopActionBar fixed bottom prend le relais) */}
       <aside className={cn(
-        'bg-stone-900 text-stone-100 flex flex-col w-72 shrink-0 z-50 transition-transform',
+        'bg-stone-900 text-stone-100 flex flex-col w-72 shrink-0 z-50 transition-transform hidden md:flex',
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
-        'fixed inset-y-0 left-0',
-        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">
           <Link href="/admin/pilotage" className="flex items-center gap-2 font-bold" onClick={() => setOpen(false)}>

@@ -5,18 +5,24 @@
 import { getProfile } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import AdminNav from './AdminNav'
-import TopActionBar from '@/components/TopActionBar'
+import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const profil = await getProfile()
   if (!profil) redirect('/login')
+  const navProfil: TopActionBarProfil = {
+    email: profil.email,
+    role: profil.role,
+    poste: profil.poste,
+    custom_permissions: profil.custom_permissions,
+  }
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-stone-50">
       <AdminNav profil={profil} />
       <div className="flex-1 min-w-0 pb-mobile-nav flex flex-col">
-        <TopActionBar theme="light" variant="admin" />
+        <TopActionBar theme="light" profil={navProfil} />
         <div className="flex-1 min-w-0">{children}</div>
       </div>
     </div>

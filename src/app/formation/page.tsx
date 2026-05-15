@@ -74,7 +74,7 @@ export default async function FormationListPage() {
 
   return (
     <>
-      <TopActionBar theme="light" variant="admin" />
+      <TopActionBar theme="light" profil={navProfil} />
       {lockedEmployeId && (
         <div className="max-w-6xl mx-auto px-4 pt-4">
           <MonProfilFormation employeId={lockedEmployeId} />

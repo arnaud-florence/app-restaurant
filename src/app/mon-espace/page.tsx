@@ -379,7 +379,7 @@ export default async function MonEspacePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
-      <TopActionBar theme="light" variant="admin" />
+      <TopActionBar theme="light" profil={navProfil} />
 
       <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-3">
         {/* Header compact : avatar + identité + résumé inline + cloche + CTA principal */}

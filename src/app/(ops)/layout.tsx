@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import TopActionBar from '@/components/TopActionBar'
+import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
+import { getProfile } from '@/lib/auth'
 
 // Layout commun aux écrans de service (cuisine, bar, serveur).
-// Force le fond sombre #0D0D0D + texte clair pour l'usage tablette
-// en service. CLAUDE.md règle : "Boutons minimum 48px de hauteur pour
-// usage tablette" — appliqué via la classe `min-h-[48px]` sur les
-// composants Button (déjà fait via size="lg").
+// Force le fond sombre #0D0D0D + texte clair pour l'usage tablette en service.
+// La TopActionBar est rendue ici : fixed bottom sur mobile (zone du pouce),
+// static en haut sur desktop.
 
 export const metadata: Metadata = { robots: { index: false, follow: false } }
 export const viewport: Viewport = {
@@ -17,10 +17,23 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 }
 
-export default function OpsLayout({ children }: { children: React.ReactNode }) {
+export const dynamic = 'force-dynamic'
+
+export default async function OpsLayout({ children }: { children: React.ReactNode }) {
+  // Profil peut être null en mode kiosk (login non requis sur /serveur, /cuisine, etc.)
+  const profil = await getProfile()
+  const navProfil: TopActionBarProfil = profil
+    ? {
+        email: profil.email,
+        role: profil.role,
+        poste: profil.poste,
+        custom_permissions: profil.custom_permissions,
+      }
+    : null
+
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-zinc-100" data-ops-theme="dark">
-      <TopActionBar theme="dark" variant="ops" />
+    <div className="min-h-screen bg-[#0D0D0D] text-zinc-100 pb-mobile-nav" data-ops-theme="dark">
+      <TopActionBar theme="dark" profil={navProfil} />
       {children}
     </div>
   )
