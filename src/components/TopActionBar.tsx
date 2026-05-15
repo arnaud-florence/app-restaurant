@@ -14,8 +14,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut, Search, AlertTriangle } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Menu, X, LogOut, Search, AlertTriangle, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
@@ -232,8 +232,21 @@ export default function TopActionBar({
   initialFindingsRouges?: Finding[]
 }) {
   const pathname = usePathname() ?? '/'
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  /** Href de la chip cliquée, en attente que la navigation se complète. */
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  // Quand le pathname change, on est arrivés à destination : reset pending.
+  useEffect(() => { setPendingHref(null) }, [pathname])
+
+  // Sécurité : si la navigation prend > 8s, reset (sinon spinner bloqué).
+  useEffect(() => {
+    if (!pendingHref) return
+    const t = setTimeout(() => setPendingHref(null), 8000)
+    return () => clearTimeout(t)
+  }, [pendingHref])
 
   // ─── Badge alerte rouge : live via useLiveFindings ────────────────
   const { findings: findingsRouges } = useLiveFindings(initialFindingsRouges, {
@@ -325,6 +338,32 @@ export default function TopActionBar({
     }
   }
 
+  // ─── Raccourcis clavier Alt+1..9 (desktop only) ──────────────────────
+  // Permet au gérant en bureau de switcher entre chips en 1 touche.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore si focus dans un input/textarea/contenteditable
+      const tgt = e.target as HTMLElement | null
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+      // Alt+1..9 = chip d'index 0..8 ; Alt+0 = bouton Modules
+      if (e.key === '0') {
+        e.preventDefault()
+        setOpen(true)
+        return
+      }
+      const n = parseInt(e.key, 10)
+      if (!Number.isInteger(n) || n < 1 || n > 9) return
+      const chip = chipsVisibles[n - 1]
+      if (!chip) return
+      e.preventDefault()
+      setPendingHref(chip.href)
+      router.push(chip.href)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [chipsVisibles, router])
+
   // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
   // Page light → barre sombre · Page dark → barre claire.
   // Les chips utilisent donc le jeu de tones inversé.
@@ -356,24 +395,32 @@ export default function TopActionBar({
           style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
-            {chipsVisibles.map(it => {
+            {chipsVisibles.map((it, idx) => {
               const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
+              const isPending = pendingHref === it.href
               const cls = active ? tones[it.tone].active : tones[it.tone].base
+              const shortcut = idx < 9 ? `Alt+${idx + 1}` : undefined
               return (
                 <Link
                   key={it.href}
                   href={it.href}
                   ref={active ? activeChipRef : undefined}
-                  onClick={tapHaptic}
+                  onClick={() => { tapHaptic(); setPendingHref(it.href) }}
                   style={{ scrollSnapAlign: 'start' }}
                   aria-current={active ? 'page' : undefined}
+                  title={shortcut ? `${it.label} · ${shortcut}` : it.label}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                     'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
+                    isPending && 'animate-pulse',
                     cls,
                   )}
                 >
-                  <span className="text-xl md:text-base leading-none" aria-hidden>{it.emoji}</span>
+                  {isPending ? (
+                    <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
+                  ) : (
+                    <span className="text-xl md:text-base leading-none" aria-hidden>{it.emoji}</span>
+                  )}
                   <span>{it.label}</span>
                 </Link>
               )
