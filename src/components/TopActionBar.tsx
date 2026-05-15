@@ -148,34 +148,38 @@ const ALL_GROUPES: Group[] = [
   },
 ]
 
+// Chips sur barre CLAIRE (utilisés quand page = dark/ops, barre = bg-white)
+// Inactif : bg-zinc-50 pour ressortir du fond blanc de barre.
 const TONES_LIGHT: Record<Tone, { base: string; active: string }> = {
-  emerald: { base: 'border-zinc-200 text-zinc-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900',
-             active: 'bg-emerald-600 border-emerald-600 text-white' },
-  amber:   { base: 'border-zinc-200 text-zinc-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900',
-             active: 'bg-amber-500 border-amber-500 text-white' },
-  violet:  { base: 'border-zinc-200 text-zinc-700 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-900',
-             active: 'bg-violet-600 border-violet-600 text-white' },
-  blue:    { base: 'border-zinc-200 text-zinc-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900',
-             active: 'bg-blue-600 border-blue-600 text-white' },
-  red:     { base: 'border-zinc-200 text-zinc-700 hover:bg-red-50 hover:border-red-300 hover:text-red-900',
-             active: 'bg-red-600 border-red-600 text-white' },
-  zinc:    { base: 'border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300 hover:text-zinc-900',
-             active: 'bg-zinc-900 border-zinc-900 text-white' },
+  emerald: { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900',
+             active: 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/30' },
+  amber:   { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900',
+             active: 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/30' },
+  violet:  { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-violet-50 hover:border-violet-300 hover:text-violet-900',
+             active: 'bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-500/30' },
+  blue:    { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900',
+             active: 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/30' },
+  red:     { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-red-50 hover:border-red-300 hover:text-red-900',
+             active: 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/30' },
+  zinc:    { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300 hover:text-zinc-900',
+             active: 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-zinc-900/30' },
 }
 
+// Chips sur barre SOMBRE (utilisés quand page = light/admin, barre = bg-zinc-900)
+// Inactif : bg-zinc-800 pour ressortir du fond noir de barre.
 const TONES_DARK: Record<Tone, { base: string; active: string }> = {
-  emerald: { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-emerald-500/60 hover:text-emerald-300',
-             active: 'bg-emerald-600 border-emerald-500 text-white' },
-  amber:   { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-amber-500/60 hover:text-amber-300',
-             active: 'bg-amber-500 border-amber-400 text-zinc-900' },
-  violet:  { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-violet-500/60 hover:text-violet-300',
-             active: 'bg-violet-600 border-violet-500 text-white' },
-  blue:    { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-blue-500/60 hover:text-blue-300',
-             active: 'bg-blue-600 border-blue-500 text-white' },
-  red:     { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-red-500/60 hover:text-red-300',
-             active: 'bg-red-600 border-red-500 text-white' },
-  zinc:    { base: 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500 hover:text-white',
-             active: 'bg-white border-white text-zinc-900' },
+  emerald: { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-emerald-500/60 hover:text-emerald-300',
+             active: 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/40' },
+  amber:   { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-amber-500/60 hover:text-amber-300',
+             active: 'bg-amber-400 border-amber-300 text-zinc-900 shadow-lg shadow-amber-400/40' },
+  violet:  { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-violet-500/60 hover:text-violet-300',
+             active: 'bg-violet-500 border-violet-400 text-white shadow-lg shadow-violet-500/40' },
+  blue:    { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-blue-500/60 hover:text-blue-300',
+             active: 'bg-blue-500 border-blue-400 text-white shadow-lg shadow-blue-500/40' },
+  red:     { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-red-500/60 hover:text-red-300',
+             active: 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/40' },
+  zinc:    { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-zinc-500 hover:text-white',
+             active: 'bg-white border-white text-zinc-900 shadow-lg shadow-white/30' },
 }
 
 export default function TopActionBar({
