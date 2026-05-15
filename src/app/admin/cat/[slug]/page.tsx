@@ -218,37 +218,52 @@ export default async function CategoriePage({ params }: { params: { slug: string
   const autresCats = CATEGORIES.filter(c => c.slug !== cat.slug).slice(0, 8)
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-4">
-        {/* Header catégorie — bandeau photo immersif */}
-        <header className="relative overflow-hidden rounded-2xl bg-zinc-900 shadow-xl min-h-[140px] sm:min-h-[160px]">
-          {/* Image de fond Unsplash */}
+    <div className="min-h-screen bg-zinc-50">
+      {/* Subtle dot pattern background (cohérent avec /admin/cat) */}
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
+
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8">
+        {/* ─── HERO BANNER catégorie — full immersion photo ─────────── */}
+        <header className="relative overflow-hidden rounded-3xl bg-zinc-900 shadow-2xl ring-1 ring-zinc-200 min-h-[200px] sm:min-h-[280px]">
+          {/* Image fond + animation ken-burns lente */}
           {cat.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={cat.imageUrl}
               alt=""
               aria-hidden
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover scale-105"
             />
           ) : (
             <div className={`absolute inset-0 bg-gradient-to-br ${tone.gradient}`} aria-hidden />
           )}
-          {/* Overlay sombre pour lisibilité */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/30" aria-hidden />
+          {/* Overlay multi-couches premium */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/20" aria-hidden />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/30" aria-hidden />
 
-          {/* Contenu du header */}
-          <div className="relative z-10 flex items-center gap-3 sm:gap-4 p-4 sm:p-6 text-white">
-            <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.gradient} text-white text-3xl sm:text-4xl shadow-2xl ring-4 ring-white/30 shrink-0`}>
-              {cat.emoji}
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/80">
-                Catégorie · {itemsVisibles.length} module{itemsVisibles.length > 1 ? 's' : ''}
-              </p>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none mt-0.5 drop-shadow-lg">
-                {cat.label}
-              </h1>
-              <p className="text-xs sm:text-sm text-white/90 mt-1.5">{cat.pitch}</p>
+          {/* Contenu du header — placé en bas pour effet "movie poster" */}
+          <div className="relative z-10 h-full min-h-[200px] sm:min-h-[280px] flex flex-col justify-end p-5 sm:p-8 text-white">
+            <div className="flex items-end gap-3 sm:gap-4">
+              <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${tone.gradient} text-white text-3xl sm:text-5xl shadow-2xl ring-4 ring-white/30 shrink-0`}>
+                {cat.emoji}
+              </span>
+              <div className="min-w-0 pb-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80 flex items-center gap-1.5">
+                  <span className="inline-block w-1 h-1 rounded-full bg-white/80" />
+                  Catégorie · {itemsVisibles.length} module{itemsVisibles.length > 1 ? 's' : ''}
+                </p>
+                <h1 className="text-3xl sm:text-5xl font-black tracking-[-0.03em] leading-[0.95] mt-1 drop-shadow-lg">
+                  {cat.label}
+                </h1>
+                <p className="text-xs sm:text-sm text-white/90 mt-2 max-w-2xl leading-relaxed">{cat.pitch}</p>
+              </div>
             </div>
           </div>
         </header>
@@ -262,7 +277,16 @@ export default async function CategoriePage({ params }: { params: { slug: string
             </p>
           </section>
         ) : (
-          <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-[0.15em] text-zinc-400">
+                  Modules · {itemsVisibles.length}
+                </h2>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Clique sur un module pour l'ouvrir</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
             {itemsVisibles.map((it, idx) => {
               const compteur = compteurs[it.href]
               const hasImage = !!it.imageUrl
@@ -271,69 +295,72 @@ export default async function CategoriePage({ params }: { params: { slug: string
                   key={it.href}
                   href={it.href}
                   style={{ ['--stagger' as any]: `${idx * 40}ms` }}
-                  className={`stagger-fadeup group relative flex flex-col overflow-hidden rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[180px] sm:min-h-[220px] ${
-                    hasImage ? 'bg-zinc-900 border-zinc-200' : `${tone.cardBg} ${tone.cardBorder}`
-                  } ${tone.cardHover} hover:shadow-xl`}
+                  className={`stagger-fadeup group relative flex flex-col overflow-hidden rounded-3xl ring-1 ring-zinc-200 hover:ring-2 hover:ring-zinc-900/20 active:scale-[0.98] transition-all duration-300 min-h-[200px] sm:min-h-[240px] ${
+                    hasImage ? 'bg-zinc-900' : `${tone.cardBg}`
+                  } hover:shadow-2xl`}
                 >
-                  {/* Image de fond (photo Unsplash) */}
+                  {/* Image de fond (photo Unsplash) avec ken-burns lent au hover */}
                   {hasImage && (
                     <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={it.imageUrl}
                         alt=""
                         aria-hidden
                         loading="lazy"
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/15" aria-hidden />
+                      {/* Overlay multi-couche pour profondeur */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/0" aria-hidden />
+                      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/30" aria-hidden />
                     </>
                   )}
 
                   {/* Badge compteur en haut à droite */}
                   {compteur && (
                     <span
-                      className={`absolute top-2 right-2 inline-flex items-center gap-0.5 h-6 px-2 rounded-full text-[10px] font-black tabular-nums shadow-md z-10 ${
+                      className={`absolute top-3 right-3 inline-flex items-center gap-0.5 h-7 px-2.5 rounded-full text-[11px] font-black tabular-nums shadow-xl ring-1 z-10 ${
                         compteur.urgent
-                          ? 'bg-red-600 text-white shadow-red-500/40 animate-pulse'
-                          : 'bg-white text-zinc-900 border border-zinc-200'
+                          ? 'bg-red-600 text-white shadow-red-500/40 animate-pulse ring-red-400/50'
+                          : 'bg-white/95 backdrop-blur text-zinc-900 ring-black/5'
                       }`}
                     >
-                      {compteur.urgent && <span className="text-[8px]">🔴</span>}
+                      {compteur.urgent && <span className="text-[9px]">🔴</span>}
                       {compteur.count.toLocaleString('fr-FR')}
                     </span>
                   )}
 
-                  {/* Pastille emoji en haut à gauche (accent) */}
-                  <span className={`absolute top-2 left-2 inline-flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-xl sm:text-2xl shadow-lg z-10 group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                  {/* Pastille emoji en haut à gauche (accent gradient) */}
+                  <span className={`absolute top-3 left-3 inline-flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-2xl shadow-2xl z-10 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 ring-2 ring-white/40`}>
                     {it.emoji}
                   </span>
 
                   {/* Texte en bas (sur l'overlay si image, sinon centré) */}
                   {hasImage ? (
-                    <div className="relative z-10 mt-auto p-3 sm:p-4 text-white">
-                      <h3 className="text-sm sm:text-base font-black tracking-tight leading-tight drop-shadow-lg">
-                        {it.label}
-                      </h3>
+                    <div className="relative z-10 mt-auto p-3.5 sm:p-4 text-white space-y-1">
                       {compteur?.label && (
-                        <p className={`mt-0.5 text-[10px] font-bold uppercase tracking-widest ${compteur.urgent ? 'text-red-300' : 'text-white/80'}`}>
+                        <p className={`text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${compteur.urgent ? 'text-red-300' : 'text-white/75'}`}>
                           {compteur.label}
                         </p>
                       )}
-                      <p className="mt-1 text-[11px] sm:text-xs text-white/90 line-clamp-2 leading-snug">
+                      <h3 className="text-base sm:text-lg font-black tracking-[-0.02em] leading-tight drop-shadow-lg">
+                        {it.label}
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-white/85 line-clamp-2 leading-snug pt-0.5">
                         {it.description}
                       </p>
                     </div>
                   ) : (
-                    <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-5 pt-16">
-                      <h3 className={`text-sm sm:text-base font-black tracking-tight leading-tight ${tone.cardLabel}`}>
+                    <div className="relative z-10 flex flex-col items-center text-center p-4 sm:p-5 pt-16 space-y-1">
+                      <h3 className={`text-base sm:text-lg font-black tracking-[-0.02em] leading-tight ${tone.cardLabel}`}>
                         {it.label}
                       </h3>
                       {compteur?.label && (
-                        <p className={`mt-0.5 text-[10px] font-bold uppercase tracking-widest ${compteur.urgent ? 'text-red-700' : 'text-zinc-500'}`}>
+                        <p className={`text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] ${compteur.urgent ? 'text-red-700' : 'text-zinc-500'}`}>
                           {compteur.label}
                         </p>
                       )}
-                      <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug">
+                      <p className="text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug pt-0.5">
                         {it.description}
                       </p>
                     </div>
@@ -341,6 +368,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
                 </Link>
               )
             })}
+            </div>
           </section>
         )}
 
