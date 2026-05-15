@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab } from '@/components/ui/PillTab'
+import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -98,36 +99,39 @@ export default function PilotageClient({
   }), [actions])
 
   return (
-    <div className="p-3 sm:p-4 max-w-7xl mx-auto space-y-3 bg-[#FAFAFA] min-h-screen">
-      {/* Header compact + actions inline */}
-      <header className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
-            <BarChart3 className="h-5 w-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Stratégie · Live</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Pilotage</h1>
-            <p className="text-[11px] text-zinc-500 mt-0.5">15 agents IA · {kpis.length} KPIs · {actions.length} actions · {objectifs.length} objectifs</p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-zinc-50">
+      <div
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+        aria-hidden
+      />
 
-        {/* Actions principales — toujours visibles */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowActForm(true)}
-            className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition"
-          >
-            <Plus className="h-4 w-4" /> Action
-          </button>
-          <a
-            href="/admin/assistant"
-            className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-white border-2 border-emerald-300 text-emerald-700 text-sm font-bold hover:bg-emerald-50 active:scale-95 transition"
-          >
-            🤖 Assistant
-          </a>
-        </div>
-      </header>
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        <AdminPageHeader
+          accent="emerald"
+          subtitle="Pilotage · Live"
+          title="Pilotage"
+          description={`15 agents IA · ${kpis.length} KPIs · ${actions.length} actions · ${objectifs.length} objectifs.`}
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setShowActForm(true)}
+                className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold hover:bg-zinc-800 active:scale-95 transition shadow-lg shadow-zinc-900/20"
+              >
+                <Plus className="h-4 w-4" /> Action
+              </button>
+              <a
+                href="/admin/assistant"
+                className="inline-flex items-center gap-1.5 h-11 px-4 rounded-full bg-white text-zinc-900 text-sm font-bold hover:bg-violet-50 active:scale-95 transition shadow-sm ring-1 ring-zinc-200 hover:ring-violet-300"
+              >
+                🤖 Assistant
+              </a>
+            </div>
+          }
+        />
 
       {/* Onglets PillTab tactiles 44px */}
       <div className="flex gap-1.5">
@@ -351,6 +355,7 @@ export default function PilotageClient({
           onSaved={() => { setShowActForm(null); router.refresh() }}
         />
       )}
+      </main>
     </div>
   )
 }
