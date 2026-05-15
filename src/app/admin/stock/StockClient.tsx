@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 
 import {
   type Ingredient, type Mouvement,
@@ -149,27 +150,37 @@ export default function StockClient({
           </Card>
         )}
 
-        {/* Filtres */}
-        <Card>
-          <CardContent className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2">
-            <Input
-              type="search"
-              placeholder="🔍 Rechercher un ingrédient…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <Select value={filtreCat} onChange={e => setFiltreCat(e.target.value)} className="md:w-44">
-              <option value="">Toutes catégories</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </Select>
-            <Select value={filtreStock} onChange={e => setFiltreStock(e.target.value as 'tous' | 'rouge' | 'orange' | 'vert')} className="md:w-40">
-              <option value="tous">Tous stocks</option>
-              <option value="rouge">🔴 Épuisés</option>
-              <option value="orange">⚠ Faibles</option>
-              <option value="vert">✓ OK</option>
-            </Select>
-          </CardContent>
-        </Card>
+        {/* Toolbar premium tactile */}
+        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+          <Input
+            type="search"
+            placeholder="🔍 Rechercher un ingrédient..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-11 text-base"
+          />
+          {/* Catégories */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab active={filtreCat === ''} onClick={() => setFiltreCat('')}>
+              ✦ Toutes <PillCount n={ingredients.length} active={filtreCat === ''} />
+            </PillTab>
+            {categories.map(c => {
+              const n = ingredients.filter(i => i.categorie === c).length
+              return (
+                <PillTab key={c} active={filtreCat === c} onClick={() => setFiltreCat(c)}>
+                  {c} <PillCount n={n} active={filtreCat === c} />
+                </PillTab>
+              )
+            })}
+          </div>
+          {/* Stock status */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab small active={filtreStock === 'tous'}   onClick={() => setFiltreStock('tous')}>📦 Tout</PillTab>
+            <PillTab small active={filtreStock === 'rouge'}  onClick={() => setFiltreStock('rouge')}>🔴 Épuisés</PillTab>
+            <PillTab small active={filtreStock === 'orange'} onClick={() => setFiltreStock('orange')}>⚠ Faibles</PillTab>
+            <PillTab small active={filtreStock === 'vert'}   onClick={() => setFiltreStock('vert')}>✓ OK</PillTab>
+          </div>
+        </div>
 
         {/* Table ingrédients (mobile cards / desktop table) */}
         {filtered.length === 0 ? (

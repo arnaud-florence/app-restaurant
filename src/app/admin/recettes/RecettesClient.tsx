@@ -21,6 +21,7 @@ import { toggleRecetteActif, deleteRecette } from './actions'
 import RecetteFormModal from './RecetteFormModal'
 import { installerCatalogueDemarrage, seedCatalogueOnline } from '../setup/seed-actions'
 import { Loader2, Sparkles } from 'lucide-react'
+import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 
 export default function RecettesClient({
   initialRecettes, ingredients, readOnly = false,
@@ -184,11 +185,11 @@ export default function RecettesClient({
             <PillTab small active={filtreFC === 'orange'} onClick={() => setFiltreFC('orange')}>🟡 Surveiller</PillTab>
             <PillTab small active={filtreFC === 'rouge'}  onClick={() => setFiltreFC('rouge')}>🔴 Élevé</PillTab>
             <PillTab small active={filtreFC === 'alerte'} onClick={() => setFiltreFC('alerte')}>🚨 Alerte</PillTab>
-            <span className="w-px bg-zinc-300 mx-1"></span>
+            <PillDivider />
             <PillTab small active={filtreStatut === 'actifs'}   onClick={() => setFiltreStatut('actifs')}>✓ Actifs</PillTab>
             <PillTab small active={filtreStatut === 'tous'}     onClick={() => setFiltreStatut('tous')}>Tous</PillTab>
             <PillTab small active={filtreStatut === 'inactifs'} onClick={() => setFiltreStatut('inactifs')}>🚫 Inactifs</PillTab>
-            <span className="w-px bg-zinc-300 mx-1"></span>
+            <PillDivider />
             <PillTab small active={filtreOnline === 'tous'}    onClick={() => setFiltreOnline('tous')}>Tous</PillTab>
             <PillTab small active={filtreOnline === 'online'}  onClick={() => setFiltreOnline('online')}>🌐 En ligne</PillTab>
             <PillTab small active={filtreOnline === 'offline'} onClick={() => setFiltreOnline('offline')}>🚫 Hors ligne</PillTab>
@@ -283,40 +284,6 @@ function KPI({ label, value, tone, icon, pulse }: {
         <p className="text-2xl sm:text-3xl font-bold mt-1 tabular-nums">{value}</p>
       </CardContent>
     </Card>
-  )
-}
-
-// ─── PillTab : segmented control pill tactile (mobile/tablette) ─────────
-function PillTab({
-  active, onClick, children, small = false,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-  small?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full whitespace-nowrap font-bold border-2 transition-all shrink-0',
-        small ? 'px-3 min-h-[36px] text-xs' : 'px-4 min-h-[44px] text-sm',
-        active
-          ? 'bg-zinc-900 text-white border-zinc-900 shadow-md'
-          : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-400',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-function PillCount({ n, active }: { n: number; active: boolean }) {
-  return (
-    <span className={cn(
-      'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
-      active ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-500',
-    )}>{n}</span>
   )
 }
 

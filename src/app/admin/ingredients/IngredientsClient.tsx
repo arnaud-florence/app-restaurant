@@ -15,6 +15,7 @@ import {
 import { toggleIngredientActif, deleteIngredient } from './actions'
 import IngredientFormModal from './IngredientFormModal'
 import HistoriquePrixModal from './HistoriquePrixModal'
+import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 
 const fmtPrix = (n: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(n)
@@ -114,32 +115,42 @@ export default function IngredientsClient({ initial, readOnly = false }: { initi
           <KPI label="Épuisés"      value={stats.rouge}  tone="red"     icon="🔴" pulse={stats.rouge > 0} />
         </div>
 
-        {/* Filtres */}
-        <Card>
-          <CardContent className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-2">
-            <Input
-              type="search"
-              placeholder="🔍 Rechercher par nom ou catégorie…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <Select value={filtreCat} onChange={e => setFiltreCat(e.target.value)} className="md:w-44">
-              <option value="">Toutes catégories</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </Select>
-            <Select value={filtreStock} onChange={e => setFiltreStock(e.target.value as 'tous' | 'rouge' | 'orange' | 'vert')} className="md:w-40">
-              <option value="tous">Tous stocks</option>
-              <option value="rouge">🔴 Épuisés</option>
-              <option value="orange">⚠ Faibles</option>
-              <option value="vert">✓ OK</option>
-            </Select>
-            <Select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value as 'actifs' | 'inactifs' | 'tous')} className="md:w-40">
-              <option value="actifs">Actifs uniquement</option>
-              <option value="tous">Tous (actifs + inactifs)</option>
-              <option value="inactifs">Inactifs uniquement</option>
-            </Select>
-          </CardContent>
-        </Card>
+        {/* Toolbar premium tactile — recherche + 3 niveaux pills */}
+        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+          <Input
+            type="search"
+            placeholder="🔍 Rechercher un ingrédient..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-11 text-base"
+          />
+          {/* Niveau 1 : Catégorie (gros pills tactiles) */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab active={filtreCat === ''} onClick={() => setFiltreCat('')}>
+              ✦ Toutes <PillCount n={initial.length} active={filtreCat === ''} />
+            </PillTab>
+            {categories.map(c => {
+              const n = initial.filter(i => i.categorie === c).length
+              if (n === 0) return null
+              return (
+                <PillTab key={c} active={filtreCat === c} onClick={() => setFiltreCat(c)}>
+                  {c} <PillCount n={n} active={filtreCat === c} />
+                </PillTab>
+              )
+            })}
+          </div>
+          {/* Niveau 2 : Stock + Statut */}
+          <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
+            <PillTab small active={filtreStock === 'tous'}   onClick={() => setFiltreStock('tous')}>📦 Tout stock</PillTab>
+            <PillTab small active={filtreStock === 'rouge'}  onClick={() => setFiltreStock('rouge')}>🔴 Épuisés</PillTab>
+            <PillTab small active={filtreStock === 'orange'} onClick={() => setFiltreStock('orange')}>⚠ Faibles</PillTab>
+            <PillTab small active={filtreStock === 'vert'}   onClick={() => setFiltreStock('vert')}>✓ OK</PillTab>
+            <PillDivider />
+            <PillTab small active={filtreStatut === 'actifs'}   onClick={() => setFiltreStatut('actifs')}>✓ Actifs</PillTab>
+            <PillTab small active={filtreStatut === 'tous'}     onClick={() => setFiltreStatut('tous')}>Tous</PillTab>
+            <PillTab small active={filtreStatut === 'inactifs'} onClick={() => setFiltreStatut('inactifs')}>🚫 Inactifs</PillTab>
+          </div>
+        </div>
 
         {/* Liste — cards mobile / table desktop */}
         {filtered.length === 0 ? (
