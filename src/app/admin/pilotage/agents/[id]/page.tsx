@@ -48,16 +48,21 @@ export default async function AgentDrilldownPage({ params }: { params: { id: str
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <header className="space-y-1">
-        <Link href="/admin/pilotage" className="text-xs text-zinc-500 hover:text-zinc-900">← Retour au pilotage</Link>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <span>{def.emoji}</span>
-          <span>{def.nom}</span>
-        </h1>
-        <p className="text-sm text-zinc-600">{def.description}</p>
-        <p className="text-xs text-zinc-500">{def.scheduleHuman}</p>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6 bg-[#FAFAFA] min-h-screen">
+      {/* Header premium */}
+      <header className="space-y-3">
+        <Link href="/admin/pilotage" className="text-xs text-zinc-500 hover:text-zinc-900 inline-flex items-center gap-1">← Retour au pilotage</Link>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-2xl shadow-lg shadow-emerald-500/30 shrink-0">
+            {def.emoji}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Agent IA · Live</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">{def.nom}</h1>
+            <p className="text-xs text-zinc-500 mt-1">{def.description}</p>
+            <p className="text-[10px] text-zinc-400 mt-0.5">{def.scheduleHuman}</p>
+          </div>
+        </div>
       </header>
 
       {/* Compteurs urgence + bouton déclencher */}

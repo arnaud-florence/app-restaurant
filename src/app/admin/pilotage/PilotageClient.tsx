@@ -11,6 +11,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { PillTab } from '@/components/ui/PillTab'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -98,36 +99,28 @@ export default function PilotageClient({
 
   return (
     <div className="p-4 max-w-7xl mx-auto space-y-4 bg-[#FAFAFA] min-h-screen">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-emerald-600" /> Pilotage stratégique
-        </h1>
-        <p className="text-sm text-zinc-500">
-          Tableau de bord gérant — alimenté en continu par les 15 agents IA.
-        </p>
-      </div>
+      {/* Header premium */}
+      <header className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30 shrink-0">
+            <BarChart3 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Stratégie · Live</p>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Pilotage</h1>
+            <p className="text-xs text-zinc-500 mt-1">Tableau de bord gérant — alimenté en continu par les 15 agents IA.</p>
+          </div>
+        </div>
+      </header>
 
-      {/* Onglets */}
-      <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 shadow-sm">
-        <button
-          onClick={() => setVue('aujourdhui')}
-          className={cn(
-            'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-            vue === 'aujourdhui' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-600 hover:text-zinc-900',
-          )}
-        >
-          Aujourd'hui
-        </button>
-        <button
-          onClick={() => setVue('strategie')}
-          className={cn(
-            'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-            vue === 'strategie' ? 'bg-emerald-600 text-white shadow' : 'text-zinc-600 hover:text-zinc-900',
-          )}
-        >
-          Stratégie
-        </button>
+      {/* Onglets PillTab tactiles 44px */}
+      <div className="flex gap-1.5">
+        <PillTab active={vue === 'aujourdhui'} onClick={() => setVue('aujourdhui')}>
+          📅 Aujourd&apos;hui
+        </PillTab>
+        <PillTab active={vue === 'strategie'} onClick={() => setVue('strategie')}>
+          🎯 Stratégie
+        </PillTab>
       </div>
 
       {/* Onglet "Aujourd'hui" : 7 sections agents */}
