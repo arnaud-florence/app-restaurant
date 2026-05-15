@@ -57,11 +57,16 @@ export default function ReceptionClient({
   return (
     <div className="bg-[#0D0D0D] text-zinc-100 min-h-screen pb-32">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-400">Service — Réception</p>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">🛏 Réception</h1>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white text-xl shadow-lg shadow-blue-900/40">
+              🛏
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Service · Réception</p>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Réception</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <KPI label="Arrivées" value={arrivees.length} accent={arrivees.length > 0 ? 'blue' : 'default'} />
@@ -231,11 +236,15 @@ export default function ReceptionClient({
 }
 
 function KPI({ label, value, accent = 'default', pulse }: { label: string; value: string | number; accent?: 'default' | 'red' | 'blue'; pulse?: boolean }) {
-  const cls = { default: 'bg-zinc-800 text-zinc-100', red: 'bg-red-600 text-white', blue: 'bg-blue-500 text-white' }[accent]
+  const STYLES = {
+    default: 'bg-zinc-800/80 border-zinc-700 text-zinc-100',
+    red:     'bg-gradient-to-br from-rose-500/30 to-red-700/10 border-rose-500/40 text-rose-100 shadow-md shadow-rose-900/30',
+    blue:    'bg-gradient-to-br from-blue-500/30 to-blue-700/10 border-blue-500/40 text-blue-100 shadow-md shadow-blue-900/30',
+  }
   return (
-    <div className={cn('rounded-md px-3 py-1.5 text-center min-w-20', cls, pulse && 'animate-pulse')}>
-      <p className="text-[10px] uppercase tracking-wider opacity-80">{label}</p>
-      <p className="text-base font-bold tabular-nums leading-tight">{value}</p>
+    <div className={cn('rounded-xl border px-3 py-1.5 text-center min-w-20 backdrop-blur', STYLES[accent], pulse && 'animate-pulse')}>
+      <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
+      <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
     </div>
   )
 }
