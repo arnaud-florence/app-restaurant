@@ -21,6 +21,7 @@ import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
 import PushNotifSwitch from '@/components/PushNotifSwitch'
 import { useLiveFindings, type Finding } from '@/hooks/useLiveFindings'
+import { CATEGORIES, resolveActiveCategory, POSTE_PRIORITES_CATEGORIES, type Category } from '@/lib/navigation'
 
 export type TopActionBarTheme = 'light' | 'dark'
 
@@ -31,70 +32,9 @@ export type TopActionBarProfil = {
   custom_permissions: CustomPermissions | null
 } | null
 
-type Tone = 'emerald' | 'amber' | 'violet' | 'blue' | 'red' | 'zinc'
+type Tone = 'emerald' | 'amber' | 'violet' | 'blue' | 'red' | 'rose' | 'zinc'
 
-type Chip = { href: string; emoji: string; label: string; tone: Tone }
 type Group = { groupe: string; emoji: string; items: Array<{ href: string; label: string; emoji: string }> }
-
-// ─── Chips primaires (visibles dans la barre, scrollable horizontal) ───
-// Tous les écrans opérationnels + les 3 raccourcis admin les plus utilisés.
-const CHIPS_PRIMAIRES: Chip[] = [
-  // Mon profil (tonalité "soft" emerald)
-  { href: '/mon-espace',         emoji: '🏠', label: 'Accueil',   tone: 'emerald' },
-  // Pilotage stratégique
-  { href: '/admin/pilotage',     emoji: '📊', label: 'Pilotage',  tone: 'emerald' },
-  { href: '/admin/assistant',    emoji: '🤖', label: 'IA',        tone: 'violet' },
-  // Service en cours
-  { href: '/serveur',            emoji: '🍽',  label: 'Salle',     tone: 'blue' },
-  { href: '/caisse',             emoji: '💰', label: 'Caisse',    tone: 'amber' },
-  { href: '/cuisine',            emoji: '👨‍🍳', label: 'Cuisine',  tone: 'amber' },
-  { href: '/pizza',              emoji: '🍕', label: 'Pizza',     tone: 'red' },
-  { href: '/bar',                emoji: '🍷', label: 'Bar',       tone: 'violet' },
-  { href: '/emporter',           emoji: '🛒', label: 'Snack',     tone: 'emerald' },
-  { href: '/livreur',            emoji: '🛵', label: 'Livreur',   tone: 'emerald' },
-  { href: '/reception',          emoji: '🛎',  label: 'Réception', tone: 'blue' },
-  // Admin courant
-  { href: '/admin/stock',        emoji: '📦', label: 'Stock',     tone: 'blue' },
-  { href: '/admin/reservations', emoji: '📅', label: 'Résa',      tone: 'blue' },
-]
-
-// ─── Réordonnancement contextuel selon le poste ──────────────────────
-// Pour chaque poste, on définit les hrefs PRIORITAIRES qui seront placés
-// en début de barre. Les autres chips suivent dans leur ordre par défaut.
-// Ainsi un cuisinier voit "Cuisine/Pizza/Stock" en premier au lieu de
-// scroller jusqu'au milieu.
-const POSTE_PRIORITES: Record<string, string[]> = {
-  manager:        ['/admin/pilotage', '/admin/assistant', '/mon-espace', '/admin/stock', '/admin/reservations'],
-  gerant:         ['/admin/pilotage', '/admin/assistant', '/mon-espace', '/admin/stock', '/admin/reservations'],
-  cuisinier:      ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/assistant'],
-  cuisine:        ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/assistant'],
-  pizzaiolo:      ['/pizza', '/cuisine', '/admin/stock', '/mon-espace'],
-  second:         ['/cuisine', '/pizza', '/admin/stock', '/mon-espace', '/admin/pilotage'],
-  bar:            ['/bar', '/caisse', '/mon-espace', '/admin/assistant'],
-  barman:         ['/bar', '/caisse', '/mon-espace', '/admin/assistant'],
-  serveur:        ['/serveur', '/caisse', '/admin/reservations', '/mon-espace'],
-  salle:          ['/serveur', '/caisse', '/admin/reservations', '/mon-espace'],
-  receptionniste: ['/reception', '/admin/reservations', '/serveur', '/mon-espace'],
-  plonge:         ['/cuisine', '/mon-espace'],
-  extra:          ['/cuisine', '/mon-espace'],
-}
-
-/** Réordonne les chips selon les priorités du poste. */
-function reordonnerChipsParPoste(chips: Chip[], poste: string | null | undefined): Chip[] {
-  if (!poste) return chips
-  const priorites = POSTE_PRIORITES[poste]
-  if (!priorites || priorites.length === 0) return chips
-
-  const byHref = new Map(chips.map(c => [c.href, c]))
-  const prioritaires: Chip[] = []
-  const dejaVu = new Set<string>()
-  for (const href of priorites) {
-    const c = byHref.get(href)
-    if (c) { prioritaires.push(c); dejaVu.add(href) }
-  }
-  const reste = chips.filter(c => !dejaVu.has(c.href))
-  return [...prioritaires, ...reste]
-}
 
 // ─── Tous les modules pour le drawer "Plus" (filtré canAccess) ──────
 const ALL_GROUPES: Group[] = [
@@ -200,6 +140,8 @@ const TONES_LIGHT: Record<Tone, { base: string; active: string }> = {
              active: 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/30' },
   red:     { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-red-50 hover:border-red-300 hover:text-red-900',
              active: 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/30' },
+  rose:    { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-900',
+             active: 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30' },
   zinc:    { base: 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300 hover:text-zinc-900',
              active: 'bg-zinc-900 border-zinc-900 text-white shadow-lg shadow-zinc-900/30' },
 }
@@ -217,6 +159,8 @@ const TONES_DARK: Record<Tone, { base: string; active: string }> = {
              active: 'bg-blue-500 border-blue-400 text-white shadow-lg shadow-blue-500/40' },
   red:     { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-red-500/60 hover:text-red-300',
              active: 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/40' },
+  rose:    { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-rose-500/60 hover:text-rose-300',
+             active: 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/40' },
   zinc:    { base: 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 hover:border-zinc-500 hover:text-white',
              active: 'bg-white border-white text-zinc-900 shadow-lg shadow-white/30' },
 }
@@ -285,14 +229,27 @@ export default function TopActionBar({
       .filter(g => g.items.length > 0)
   }, [profil?.poste, profil?.custom_permissions, isManager, query])
 
-  // Chips visibles filtrés par permissions ET réordonnés selon le poste
-  const chipsVisibles = useMemo(
-    () => reordonnerChipsParPoste(
-      CHIPS_PRIMAIRES.filter(c => peutVoir(c.href)),
-      profil?.poste,
-    ),
-    [profil?.poste, profil?.custom_permissions, isManager],
-  )
+  // Catégories visibles filtrées (au moins 1 sous-module visible) et réordonnées par poste
+  const chipsVisibles = useMemo<Category[]>(() => {
+    const cats = CATEGORIES
+      .map(c => ({ ...c, items: c.items.filter(it => peutVoir(it.href)) }))
+      .filter(c => c.items.length > 0)
+
+    const priorites = profil?.poste ? POSTE_PRIORITES_CATEGORIES[profil.poste] : undefined
+    if (!priorites) return cats
+
+    const bySlug = new Map(cats.map(c => [c.slug, c]))
+    const prioritaires: Category[] = []
+    const dejaVu = new Set<string>()
+    for (const slug of priorites) {
+      const c = bySlug.get(slug)
+      if (c) { prioritaires.push(c); dejaVu.add(slug) }
+    }
+    return [...prioritaires, ...cats.filter(c => !dejaVu.has(c.slug))]
+  }, [profil?.poste, profil?.custom_permissions, isManager])
+
+  /** Catégorie active pour highlight de chip. */
+  const activeCategory = useMemo(() => resolveActiveCategory(pathname), [pathname])
 
   // ─── Auto-scroll : centre la chip active au montage et au changement ─
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -354,15 +311,18 @@ export default function TopActionBar({
       }
       const n = parseInt(e.key, 10)
       if (!Number.isInteger(n) || n < 1 || n > 9) return
-      const chip = chipsVisibles[n - 1]
-      if (!chip) return
+      const cat = chipsVisibles[n - 1]
+      if (!cat) return
+      const href = cat.slug === 'accueil'
+        ? (isManager ? '/admin/pilotage' : '/mon-espace')
+        : `/admin/cat/${cat.slug}`
       e.preventDefault()
-      setPendingHref(chip.href)
-      router.push(chip.href)
+      setPendingHref(href)
+      router.push(href)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [chipsVisibles, router])
+  }, [chipsVisibles, router, isManager])
 
   // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
   // Page light → barre sombre · Page dark → barre claire.
@@ -395,20 +355,26 @@ export default function TopActionBar({
           style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
         >
           <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
-            {chipsVisibles.map((it, idx) => {
-              const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
-              const isPending = pendingHref === it.href
-              const cls = active ? tones[it.tone].active : tones[it.tone].base
+            {chipsVisibles.map((cat, idx) => {
+              // Pour le chip "Accueil", manager pointe directement vers /admin/pilotage
+              // sinon vers /mon-espace. Les autres catégories pointent vers /admin/cat/<slug>.
+              const href = cat.slug === 'accueil'
+                ? (isManager ? '/admin/pilotage' : '/mon-espace')
+                : `/admin/cat/${cat.slug}`
+              const active = activeCategory?.slug === cat.slug
+                || (cat.slug === 'accueil' && (pathname === '/mon-espace' || pathname === '/admin' || pathname.startsWith('/admin/pilotage') || pathname.startsWith('/admin/assistant') || pathname.startsWith('/admin/journal') || pathname.startsWith('/admin/previsionnel')))
+              const isPending = pendingHref === href
+              const cls = active ? tones[cat.tone].active : tones[cat.tone].base
               const shortcut = idx < 9 ? `Alt+${idx + 1}` : undefined
               return (
                 <Link
-                  key={it.href}
-                  href={it.href}
+                  key={cat.slug}
+                  href={href}
                   ref={active ? activeChipRef : undefined}
-                  onClick={() => { tapHaptic(); setPendingHref(it.href) }}
+                  onClick={() => { tapHaptic(); setPendingHref(href) }}
                   style={{ scrollSnapAlign: 'start' }}
                   aria-current={active ? 'page' : undefined}
-                  title={shortcut ? `${it.label} · ${shortcut}` : it.label}
+                  title={shortcut ? `${cat.label} · ${shortcut}` : cat.label}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                     'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
@@ -419,9 +385,9 @@ export default function TopActionBar({
                   {isPending ? (
                     <Loader2 className="h-5 w-5 md:h-4 md:w-4 animate-spin" aria-hidden />
                   ) : (
-                    <span className="text-xl md:text-base leading-none" aria-hidden>{it.emoji}</span>
+                    <span className="text-xl md:text-base leading-none" aria-hidden>{cat.emoji}</span>
                   )}
-                  <span>{it.label}</span>
+                  <span>{cat.label}</span>
                 </Link>
               )
             })}
