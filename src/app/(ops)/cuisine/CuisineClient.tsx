@@ -173,16 +173,26 @@ export default function CuisineClient({
       {/* Bottom nav mobile (espace opérationnel — affichée aussi pour pizzaiolo
           maintenant que la pizza est un poste séparé avec sa propre route). */}
       <OpsBottomNav profil={navProfil} />
-      {/* Header sombre */}
-      <header className="sticky top-0 z-20 bg-zinc-900/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Header sombre premium */}
+      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              {role === 'pizzaiolo' ? 'Service — Pizzeria' : 'Service — Atelier'}
-            </p>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              {role === 'pizzaiolo' ? '🍕 Pizzaiolo' : '👨‍🍳 Cuisine'}
-            </h1>
+          <div className="flex items-center gap-3">
+            <span className={cn(
+              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-xl shadow-lg',
+              role === 'pizzaiolo'
+                ? 'bg-gradient-to-br from-red-500 to-red-700 shadow-red-900/40'
+                : 'bg-gradient-to-br from-amber-500 to-amber-700 shadow-amber-900/40',
+            )}>
+              {role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                {role === 'pizzaiolo' ? 'Service · Pizzeria' : 'Service · Atelier'}
+              </p>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">
+                {role === 'pizzaiolo' ? 'Pizzaiolo' : 'Cuisine'}
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
@@ -517,15 +527,15 @@ function KPI({ label, value, accent = 'default', pulse }: {
   accent?: 'default' | 'red' | 'orange'
   pulse?: boolean
 }) {
-  const cls = {
-    default: 'bg-zinc-800 text-zinc-100',
-    red:     'bg-red-600 text-white',
-    orange:  'bg-amber-500 text-white',
-  }[accent]
+  const STYLES = {
+    default: 'bg-zinc-800/80 border-zinc-700 text-zinc-100',
+    red:     'bg-gradient-to-br from-rose-500/30 to-red-700/10 border-rose-500/40 text-rose-100 shadow-md shadow-rose-900/30',
+    orange:  'bg-gradient-to-br from-amber-500/30 to-amber-700/10 border-amber-500/40 text-amber-100 shadow-md shadow-amber-900/30',
+  }
   return (
-    <div className={cn('rounded-md px-3 py-1.5 text-center min-w-20', cls, pulse && 'animate-pulse')}>
-      <p className="text-[10px] uppercase tracking-wider opacity-80">{label}</p>
-      <p className="text-base font-bold tabular-nums leading-tight">{value}</p>
+    <div className={cn('rounded-xl border px-3 py-1.5 text-center min-w-20 backdrop-blur', STYLES[accent], pulse && 'animate-pulse')}>
+      <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
+      <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
     </div>
   )
 }
