@@ -7,8 +7,101 @@ import { notFound } from 'next/navigation'
 import { CATEGORIES, type Category } from '@/lib/navigation'
 import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+
+// ─── Compteurs live par sous-module ─────────────────────────────────
+// Fetch des stats clés selon la catégorie active. Affiche un badge sur
+// la tuile : "12" pour un nombre simple, "🔴 3" si urgence détectée.
+
+type Compteur = { count: number; urgent?: boolean; label?: string }
+
+async function fetchCompteurs(slug: string): Promise<Record<string, Compteur>> {
+  const sb = await createClient()
+  const result: Record<string, Compteur> = {}
+  const today = new Date().toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+
+  try {
+    if (slug === 'service') {
+      const [enCours, resaJour] = await Promise.all([
+        sb.from('commandes').select('id', { count: 'exact', head: true })
+          .in('statut', ['en_attente', 'en_preparation', 'pret', 'servi']),
+        sb.from('reservations_tables').select('id', { count: 'exact', head: true })
+          .gte('date_resa', today).lt('date_resa', tomorrow),
+      ])
+      result['/serveur']            = { count: enCours.count ?? 0, label: 'en service' }
+      result['/caisse']             = { count: enCours.count ?? 0, label: 'à encaisser' }
+      result['/cuisine']            = { count: enCours.count ?? 0, label: 'en cours' }
+      result['/admin/reservations'] = { count: resaJour.count ?? 0, label: 'aujourd\'hui' }
+    }
+
+    if (slug === 'cuisine-stock') {
+      const [recettes, ingredients, ruptures, fournisseurs, boissons, allergenes] = await Promise.all([
+        sb.from('recettes').select('id', { count: 'exact', head: true }),
+        sb.from('ingredients').select('id', { count: 'exact', head: true }),
+        sb.from('ingredients').select('id', { count: 'exact', head: true }).lte('stock_actuel', 0),
+        sb.from('fournisseurs').select('id', { count: 'exact', head: true }),
+        sb.from('boissons').select('id', { count: 'exact', head: true }),
+        sb.from('allergenes').select('id', { count: 'exact', head: true }),
+      ])
+      const nbRuptures = ruptures.count ?? 0
+      result['/admin/recettes']     = { count: recettes.count ?? 0, label: 'recettes' }
+      result['/admin/ingredients']  = { count: ingredients.count ?? 0, label: 'ingrédients' }
+      result['/admin/stock']        = { count: nbRuptures, urgent: nbRuptures > 0, label: nbRuptures > 0 ? 'ruptures' : 'OK' }
+      result['/admin/fournisseurs'] = { count: fournisseurs.count ?? 0, label: 'partenaires' }
+      result['/admin/boissons']     = { count: boissons.count ?? 0, label: 'boissons' }
+      result['/admin/allergenes']   = { count: allergenes.count ?? 0, label: 'allergènes' }
+    }
+
+    if (slug === 'clientele') {
+      const [clients, resa, chambres, groupes, cadeaux] = await Promise.all([
+        sb.from('clients').select('id', { count: 'exact', head: true }),
+        sb.from('reservations_tables').select('id', { count: 'exact', head: true })
+          .gte('date_resa', today),
+        sb.from('chambres').select('id', { count: 'exact', head: true }),
+        sb.from('groupes').select('id', { count: 'exact', head: true }),
+        sb.from('cartes_cadeaux').select('id', { count: 'exact', head: true }).eq('statut', 'active'),
+      ])
+      result['/admin/clients']        = { count: clients.count ?? 0, label: 'clients' }
+      result['/admin/reservations']   = { count: resa.count ?? 0, label: 'à venir' }
+      result['/admin/chambres']       = { count: chambres.count ?? 0, label: 'chambres' }
+      result['/admin/groupes']        = { count: groupes.count ?? 0, label: 'groupes' }
+      result['/admin/cartes-cadeaux'] = { count: cadeaux.count ?? 0, label: 'actives' }
+    }
+
+    if (slug === 'equipe') {
+      const [employes, guides] = await Promise.all([
+        sb.from('employes').select('id', { count: 'exact', head: true }),
+        sb.from('guides_formation').select('id', { count: 'exact', head: true }).eq('actif', true),
+      ])
+      result['/admin/rh']        = { count: employes.count ?? 0, label: 'employés' }
+      result['/formation']       = { count: guides.count ?? 0, label: 'manuels' }
+      result['/admin/formation'] = { count: guides.count ?? 0, label: 'guides actifs' }
+    }
+
+    if (slug === 'conformite') {
+      const [ncs, equipements] = await Promise.all([
+        sb.from('non_conformites').select('id', { count: 'exact', head: true }).eq('statut', 'ouverte'),
+        sb.from('equipements').select('id', { count: 'exact', head: true }),
+      ])
+      const nbNC = ncs.count ?? 0
+      result['/admin/hygiene']     = { count: nbNC, urgent: nbNC > 0, label: nbNC > 0 ? 'NC ouvertes' : 'sain' }
+      result['/admin/maintenance'] = { count: equipements.count ?? 0, label: 'équipements' }
+    }
+
+    if (slug === 'accueil') {
+      const { count: alertes } = await sb.from('agent_findings').select('id', { count: 'exact', head: true })
+        .eq('resolu', false).eq('urgence', 'rouge')
+      result['/admin/pilotage'] = { count: alertes ?? 0, urgent: (alertes ?? 0) > 0, label: alertes ? 'alertes' : 'tout ok' }
+    }
+  } catch (_e) {
+    // Fail-safe : pas de compteurs en cas d'erreur DB, on rend la page sans badges.
+  }
+
+  return result
+}
 
 const TONES: Record<Category['tone'], {
   gradient: string
@@ -97,6 +190,9 @@ export default async function CategoriePage({ params }: { params: { slug: string
   const itemsVisibles = cat.items.filter(it => peutVoir(it.href))
   const tone = TONES[cat.tone]
 
+  // Compteurs live par sous-module (selon la catégorie)
+  const compteurs = await fetchCompteurs(params.slug)
+
   // Autres catégories pour la nav rapide en bas
   const autresCats = CATEGORIES.filter(c => c.slug !== cat.slug).slice(0, 8)
 
@@ -127,23 +223,44 @@ export default async function CategoriePage({ params }: { params: { slug: string
           </section>
         ) : (
           <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {itemsVisibles.map(it => (
-              <Link
-                key={it.href}
-                href={it.href}
-                className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[140px] sm:min-h-[160px] ${tone.cardBg} ${tone.cardBorder} ${tone.cardHover} hover:shadow-xl`}
-              >
-                <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-3xl sm:text-4xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
-                  {it.emoji}
-                </span>
-                <h3 className={`mt-3 text-sm sm:text-base font-black tracking-tight leading-tight ${tone.cardLabel}`}>
-                  {it.label}
-                </h3>
-                <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug">
-                  {it.description}
-                </p>
-              </Link>
-            ))}
+            {itemsVisibles.map(it => {
+              const compteur = compteurs[it.href]
+              return (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[140px] sm:min-h-[170px] ${tone.cardBg} ${tone.cardBorder} ${tone.cardHover} hover:shadow-xl`}
+                >
+                  {/* Badge compteur en haut à droite */}
+                  {compteur && (
+                    <span
+                      className={`absolute top-2 right-2 inline-flex items-center gap-0.5 h-6 px-2 rounded-full text-[10px] font-black tabular-nums shadow-md ${
+                        compteur.urgent
+                          ? 'bg-red-600 text-white shadow-red-500/40 animate-pulse'
+                          : 'bg-white text-zinc-900 border border-zinc-200'
+                      }`}
+                    >
+                      {compteur.urgent && <span className="text-[8px]">🔴</span>}
+                      {compteur.count.toLocaleString('fr-FR')}
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.cardEmojiGradient} text-white text-3xl sm:text-4xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                    {it.emoji}
+                  </span>
+                  <h3 className={`mt-3 text-sm sm:text-base font-black tracking-tight leading-tight ${tone.cardLabel}`}>
+                    {it.label}
+                  </h3>
+                  {compteur?.label && (
+                    <p className={`mt-0.5 text-[10px] font-bold uppercase tracking-widest ${compteur.urgent ? 'text-red-700' : 'text-zinc-500'}`}>
+                      {compteur.label}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug">
+                    {it.description}
+                  </p>
+                </Link>
+              )
+            })}
           </section>
         )}
 
