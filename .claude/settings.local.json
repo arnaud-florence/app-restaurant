@@ -33,7 +33,8 @@
       "Bash(grep -v \"^$\")",
       "Bash(rm -f /tmp/full_env /tmp/prod_env)",
       "Bash(export SECRET=$\\(grep \"^CRON_SECRET=\" .env.local)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "WebFetch(domain:www.carigel.com)"
     ]
   }
 }

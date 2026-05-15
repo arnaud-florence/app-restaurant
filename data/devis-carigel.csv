@@ -1,0 +1,147 @@
+categorie_carigel,nom,unite,conditionnement,marque_souhaitee,code_fournisseur,prix_ht_eur,allergenes,dlc_jours,stock_min,notes
+Viande,Filet de bœuf,kg,Frais découpe,Origine France,,,,,2,Pour plats signature
+Viande,Steak haché 15% MG,kg,Surgelé portions 150g,,,,,180,8,Burger et plats
+Viande,Magret de canard,kg,Frais sous vide,Sud-Ouest,,,,,2,
+Viande,Poulet fermier entier,kg,Frais,Label Rouge,,,,,2,
+Viande,Filet de poulet,kg,Frais,Label Rouge,,,,,2,
+Viande,Jambon blanc supérieur,kg,Bloc 4-5kg,,,,lait,15,2,À découper sur place
+Viande,Lardons fumés,kg,Sachet 1kg,,,,,30,2,
+Viande,Bavette d'aloyau,kg,Frais sous vide,Origine France,,,,7,2,
+Viande,Entrecôte,kg,Frais sous vide,Origine France,,,,7,2,
+Viande,Cuisse de canard confite,pièce,Bocal 4/4,,,,,365,5,Plat signature
+Mer,Filet de saumon frais,kg,Sans peau sans arêtes,Norvège ou Écosse,,,,3,3,
+Mer,Saumon fumé tranché,kg,Sous vide,,,,poisson,21,1,
+Mer,Crevettes décortiquées,kg,Surgelées calibre 30/40,,,,crustacés,365,2,
+Mer,Filet de cabillaud,kg,Surgelé,,,,poisson,365,2,
+Mer,Filet de bar,kg,Frais,,,,poisson,3,2,
+Mer,Noix de Saint-Jacques,kg,Surgelées sans corail,,,,mollusques,365,2,
+Mer,Calamars en anneaux,kg,Surgelés,,,,mollusques,365,2,
+Mer,Moules de bouchot,kg,Frais saison,,,,mollusques,5,5,
+Mer,Truite fumée,kg,Sous vide,,,,poisson,21,1,
+Crèmerie,Beurre doux plaquette 250g,kg,Plaquettes 250g,AOP Charentes-Poitou,,,lait,90,2,
+Crèmerie,Beurre demi-sel,kg,Plaquettes 250g,AOP Charentes-Poitou,,,lait,90,1,
+Crèmerie,Crème fraîche 30% MG,L,UHT 1L,,,,lait,60,5,
+Crèmerie,Crème liquide 30% MG,L,UHT 1L,,,,lait,90,3,
+Crèmerie,Mascarpone,kg,Pot 1kg,,,,lait,30,2,
+Crèmerie,Mozzarella di Bufala AOP,kg,Boules 125g sachet 1kg,,,,lait,21,3,Pizza et caprese
+Crèmerie,Mozzarella standard,kg,Bloc 1kg,,,,lait,30,5,Pour pizzas
+Crèmerie,Parmesan Reggiano râpé,kg,Sachet 1kg,Parmigiano Reggiano 24 mois,,,lait,90,1,
+Crèmerie,Parmesan en bloc,kg,Bloc 1kg,Parmigiano Reggiano 24 mois,,,lait,180,1,À râper sur place
+Crèmerie,Chèvre frais bûche,kg,Bûche 1kg,,,,lait,21,2,
+Crèmerie,Œufs plein air L,pièce,Plateau 30,Code 1 ou 0,,,œufs,28,200,
+Crèmerie,Œufs liquides pasteurisés,L,Brique 1L,,,,œufs,180,3,Pâtisserie
+Crèmerie,Yaourt nature seau,kg,Seau 5kg,,,,lait,30,2,
+Crèmerie,Lait entier UHT,L,Brique 1L,,,,lait,180,10,
+Crèmerie,Lait demi-écrémé UHT,L,Brique 1L,,,,lait,180,10,Pour café
+Légumes,Pommes de terre Bintje,kg,Sac 25kg lavées brossées calibre 50/70,,,,,30,30,
+Légumes,Frites pré-cuites surgelées 9x9,kg,Carton 2.5kg,,,,,365,20,
+Légumes,Oignon jaune,kg,Sac 10kg,,,,,30,10,
+Légumes,Oignon rouge,kg,Sac 5kg,,,,,30,5,
+Légumes,Ail frais,kg,Filet 5kg,,,,,60,2,
+Légumes,Ail surgelé en cubes,kg,Sachet 1kg,,,,,365,1,Dépannage
+Légumes,Tomate ronde catégorie I,kg,Cageot 6kg,,,,,7,10,
+Légumes,Tomate cerise,kg,Barquette 250g x 24,,,,,7,5,
+Légumes,Tomate San Marzano pelée,kg,Boîte 4/4 ou 5/1,,,,,1095,10,Conserve italienne
+Légumes,Courgette,kg,Caisse 5kg,,,,,7,8,
+Légumes,Aubergine,kg,Caisse 5kg,,,,,7,8,
+Légumes,Poivron rouge,kg,Cageot 5kg,,,,,7,5,
+Légumes,Poivron jaune,kg,Cageot 5kg,,,,,7,3,
+Légumes,Champignons de Paris frais,kg,Barquette 500g,,,,,7,5,
+Légumes,Salade mesclun pré-lavée,kg,Sachet 1kg 4ᵉ gamme,,,,,7,3,
+Légumes,Roquette,kg,Sachet 500g 4ᵉ gamme,,,,,7,2,
+Légumes,Salade verte Batavia,pièce,Carton 12 pièces,,,,,7,12,
+Légumes,Carottes,kg,Sac 5kg lavées,,,,,21,5,
+Légumes,Mix légumes surgelés,kg,Sachet 2.5kg,,,,,365,5,
+Pain & Viennoiserie,Pain burger sésame artisanal,pièce,Sachet 24,,,,gluten|sésame,5,100,Diamètre 12cm
+Pain & Viennoiserie,Pain burger brioché,pièce,Sachet 24,,,,gluten|œufs|lait,5,50,
+Pain & Viennoiserie,Ciabatta individuelle,pièce,Sachet 12,,,,gluten,5,50,
+Pain & Viennoiserie,Baguette tradition,pièce,Surgelée à cuire,,,,gluten,180,100,Cuisson sur place
+Pain & Viennoiserie,Pâton baguette surgelé,pièce,Carton 50,,,,gluten,180,100,À cuire matin
+Pain & Viennoiserie,Croissants pur beurre,pièce,Carton 100 surgelés,,,,gluten|lait|œufs,180,80,
+Pain & Viennoiserie,Pains au chocolat,pièce,Carton 100 surgelés,,,,gluten|lait|œufs|soja,180,50,
+Dessert & Glace,Glace vanille bourbon,L,Bac 5L,,,,lait|œufs,365,15,
+Dessert & Glace,Glace chocolat noir,L,Bac 5L,,,,lait|soja,365,10,
+Dessert & Glace,Glace fraise,L,Bac 5L,,,,lait,365,5,
+Dessert & Glace,Sorbet citron,L,Bac 5L,,,,,365,5,
+Dessert & Glace,Sorbet framboise,L,Bac 5L,,,,,365,3,
+Dessert & Glace,Tiramisu individuel,pièce,Carton 12 verrines,,,,lait|œufs|gluten,21,30,Ou base mascarpone si fait sur place
+Dessert & Glace,Fondant chocolat individuel,pièce,Carton 48 surgelés,,,,lait|œufs|gluten,365,50,À cuire à la commande
+Dessert & Glace,Crème brûlée portion,pièce,Carton 12,,,,lait|œufs,21,30,
+Dessert & Glace,Gâteau au chocolat entier,pièce,Surgelé,,,,lait|œufs|gluten,365,5,À portionner
+Épicerie,Farine T55,kg,Sac 25kg,,,,gluten,365,25,
+Épicerie,Farine T00 italienne pizza,kg,Sac 25kg,Caputo ou équivalent,,,gluten,365,25,
+Épicerie,Farine T65 Bio,kg,Sac 5kg,,,,gluten,365,5,
+Épicerie,Levure boulangère fraîche,kg,Bloc 500g,,,,gluten,30,2,
+Épicerie,Sucre semoule,kg,Sac 5kg,,,,,1095,10,
+Épicerie,Sucre cassonade,kg,Sac 1kg,,,,,1095,3,
+Épicerie,Sel fin de table,kg,Sac 5kg,,,,,1825,5,
+Épicerie,Sel gros marin,kg,Sac 1kg,,,,,1825,2,
+Épicerie,Poivre noir moulu,kg,Sachet 500g,,,,,365,1,
+Épicerie,Poivre noir grains,kg,Sachet 500g,,,,,1095,1,
+Épicerie,Mélange épices grill steakhouse,kg,Sachet 500g,,,,,365,1,
+Épicerie,Huile d'olive extra vierge,L,Bidon 5L,AOC France ou Italie,,,,540,10,
+Épicerie,Huile de tournesol friture,L,Bidon 10L,,,,,365,30,
+Épicerie,Vinaigre balsamique Modène,L,Bouteille 1L,,,,,1825,3,
+Épicerie,Vinaigre de vin rouge,L,Bouteille 1L,,,,,1825,2,
+Épicerie,Sauce tomate cuisinée,L,Brique 1L ou bocal 4/4,,,,,365,8,
+Épicerie,Sauce béchamel UHT,L,Brique 1L,,,,lait|gluten,365,5,
+Épicerie,Ketchup portions individuelles 20g,pièce,Carton 250,,,,,365,250,Pour livraison
+Épicerie,Mayonnaise portions 20g,pièce,Carton 250,,,,œufs|moutarde,365,250,Pour livraison
+Épicerie,Moutarde Dijon portion,pièce,Carton 250,,,,moutarde,365,150,
+Épicerie,Moutarde Dijon pot 1kg,kg,Pot 1kg,,,,moutarde,540,2,
+Épicerie,Mayonnaise pot 2.5kg,kg,Seau 2.5kg,,,,œufs|moutarde,180,3,
+Épicerie,Cornichons,kg,Bocal 2kg,,,,,540,2,
+Épicerie,Câpres,kg,Bocal 1kg,,,,,540,1,
+Épicerie,Olives noires dénoyautées,kg,Bocal 1kg,,,,,540,3,
+Épicerie,Olives vertes farcies,kg,Bocal 1kg,,,,,540,2,
+Épicerie,Pignons de pin,kg,Sachet 500g,,,,fruits à coque,365,1,
+Épicerie,Pesto vert au basilic,kg,Bocal 1kg,,,,fruits à coque|lait,540,2,
+Épicerie,Pâte à pizza surgelée 30cm,pièce,Carton 50,,,,gluten,365,50,Diamètre 30cm
+Épicerie,Spaghetti,kg,Boîte 5kg,De Cecco ou équivalent,,,gluten,1095,20,
+Épicerie,Tagliatelle,kg,Boîte 5kg,De Cecco ou équivalent,,,gluten,1095,10,
+Épicerie,Penne,kg,Boîte 5kg,De Cecco ou équivalent,,,gluten,1095,10,
+Épicerie,Riz Arborio risotto,kg,Sac 5kg,,,,,1095,5,
+Épicerie,Lentilles vertes du Puy,kg,Sachet 5kg,,,,,1095,3,
+Épicerie,Tomates pelées entières,kg,Boîte 4/4,,,,,1095,15,
+Épicerie,Concentré de tomate,kg,Boîte 4/4,,,,,1095,2,
+Épicerie,Bouillon de volaille en poudre,kg,Boîte 1kg,,,,céleri|gluten,720,1,
+Épicerie,Bouillon de bœuf en poudre,kg,Boîte 1kg,,,,céleri|gluten,720,1,
+Épicerie,Fond brun pour sauce,kg,Boîte 1kg,,,,céleri|gluten,720,1,
+Épicerie,Café grain torréfaction maison,kg,Sachet 1kg,,,,,365,15,Mélange espresso
+Épicerie,Sucre dosettes individuelles,pièce,Carton 1000,,,,,1095,1000,
+Épicerie,Chocolat dosettes individuelles,pièce,Carton 500,,,,lait|soja,365,300,
+Épicerie,Cacao en poudre amer,kg,Sachet 1kg,,,,lait,540,1,Pâtisserie
+Épicerie,Biscuits boudoirs,kg,Sachet 1kg,,,,gluten|œufs|lait,180,3,Tiramisu
+Boissons,Coca-Cola 33cl canette,pièce,Carton 24,,,,,365,400,
+Boissons,Coca Zero 33cl canette,pièce,Carton 24,,,,,365,200,
+Boissons,Eau Évian 50cl,pièce,Carton 24,,,,,365,200,
+Boissons,Eau Perrier 33cl,pièce,Carton 24,,,,,365,150,
+Boissons,Jus d'orange 1L,L,Brique 1L,Marque fournisseur,,,,180,15,
+Boissons,Sirop bar grenadine,L,Bouteille 1L,,,,,1095,5,
+Boissons,Sirop bar menthe,L,Bouteille 1L,,,,,1095,5,
+Boissons,Sirop bar citron,L,Bouteille 1L,,,,,1095,5,
+Non Alimentaire,Boîte carton à emporter 1 part,pièce,Carton 250,,,,,,300,Pour livraison/snacking
+Non Alimentaire,Boîte carton à emporter 2 parts,pièce,Carton 250,,,,,,150,
+Non Alimentaire,Boîte pizza 33cm,pièce,Carton 100,,,,,,300,
+Non Alimentaire,Boîte pizza 40cm,pièce,Carton 100,,,,,,100,
+Non Alimentaire,Sachet papier kraft brun,pièce,Lot 1000,,,,,,500,Boulangerie snack
+Non Alimentaire,Serviettes papier 2 plis blanches,paquet,Paquet 100,,,,,,10,
+Non Alimentaire,Fourchette plastique réutilisable,pièce,Sachet 100,,,,,,300,Norme jetable interdit
+Non Alimentaire,Cuillère plastique réutilisable,pièce,Sachet 100,,,,,,200,
+Non Alimentaire,Couteau plastique réutilisable,pièce,Sachet 100,,,,,,200,
+Non Alimentaire,Gobelet carton 25cl,pièce,Lot 1000,,,,,,300,À emporter
+Non Alimentaire,Couvercle gobelet carton 25cl,pièce,Lot 1000,,,,,,300,
+Non Alimentaire,Film alimentaire 30cm x 300m,rouleau,Carton 6 rouleaux,,,,,,2,
+Non Alimentaire,Papier sulfurisé,rouleau,Carton 6 rouleaux,,,,,,2,
+Non Alimentaire,Aluminium ménager 30cm x 200m,rouleau,Carton 6 rouleaux,,,,,,2,
+Non Alimentaire,Sacs poubelle 100L noirs,rouleau,Carton 5 rouleaux x 20,,,,,,3,
+Non Alimentaire,Sacs poubelle 30L blancs cuisine,rouleau,Carton 5 rouleaux x 50,,,,,,3,
+Non Alimentaire,Produit vaisselle pro,L,Bidon 5L,,,,,,2,
+Non Alimentaire,Dégraissant cuisine pro,L,Bidon 5L,,,,,,3,
+Non Alimentaire,Nettoyant sol pro,L,Bidon 5L,,,,,,2,
+Non Alimentaire,Désinfectant surfaces alimentaire HACCP,L,Bidon 5L,Norme HACCP,,,,,2,
+Non Alimentaire,Essuie-tout pro rouleaux,rouleau,Carton 6 rouleaux,,,,,,3,
+Non Alimentaire,Gants jetables vinyle taille M,boîte 100,Carton 10 boîtes,,,,,,5,
+Non Alimentaire,Gants jetables vinyle taille L,boîte 100,Carton 10 boîtes,,,,,,5,
+Non Alimentaire,Charlottes jetables blanches,paquet 100,Carton 10 paquets,,,,,,1,
+Non Alimentaire,Tabliers jetables PE blancs,paquet 50,Carton 10 paquets,,,,,,1,
