@@ -90,12 +90,17 @@ export default function StockClient({
   return (
     <div className="min-h-screen bg-muted/40">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-background border-b" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Inventaire & mouvements</p>
-              <h1 className="text-xl sm:text-2xl font-bold">📦 Stocks</h1>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white text-xl shadow-lg shadow-blue-500/30 shrink-0">
+                📦
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Inventaire & mouvements</p>
+                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Stocks</h1>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => { setIngredientCourant(null); setActionOpen('entree') }} variant="default" size="sm">

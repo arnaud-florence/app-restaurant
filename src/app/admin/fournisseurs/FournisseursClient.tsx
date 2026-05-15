@@ -131,12 +131,17 @@ export default function FournisseursClient({
   return (
     <div className="min-h-screen bg-muted/40">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-background border-b" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Achats</p>
-              <h1 className="text-xl sm:text-2xl font-bold">🚚 Fournisseurs</h1>
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-xl shadow-lg shadow-indigo-500/30 shrink-0">
+                🚚
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Achats</p>
+                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Fournisseurs</h1>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={autoGenerer} variant="outline" size="sm" title="Génère un brouillon par fournisseur depuis les ingrédients sous le seuil minimum">

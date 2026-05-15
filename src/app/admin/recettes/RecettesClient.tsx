@@ -104,13 +104,18 @@ export default function RecettesClient({
 
   return (
     <div className="min-h-screen bg-muted/40">
-      {/* Header sticky */}
-      <header className="sticky top-0 z-20 bg-background border-b" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Header sticky premium */}
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Carte & food cost</p>
-              <h1 className="text-xl sm:text-2xl font-bold">📖 Recettes</h1>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl shadow-lg shadow-amber-500/30 shrink-0">
+                📖
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">Carte & food cost</p>
+                <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Recettes</h1>
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Link href="/admin/recettes/engineering">
