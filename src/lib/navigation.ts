@@ -18,6 +18,9 @@ export type Category = {
   /** Sous-titre / pitch affiché dans la page catégorie. */
   pitch: string
   tone: CategoryTone
+  /** URL Unsplash thématique pour la photo de fond des tuiles (mode photo).
+   *  Fallback emoji + gradient si absent. */
+  imageUrl?: string
   items: SubModule[]
 }
 
@@ -31,6 +34,7 @@ export const CATEGORIES: Category[] = [
     label: 'Pilotage',
     pitch: 'Tableau de bord stratégique et personnel.',
     tone: 'emerald',
+    imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/mon-espace',         emoji: '🏠', label: 'Mon espace',       description: 'Tableau de bord personnel : pointage, paie, planning, challenges.' },
       { href: '/admin',              emoji: '📊', label: 'Tableau de bord',  description: 'Vue manager : alertes urgentes, KPIs flash, accès rapide.' },
@@ -46,6 +50,7 @@ export const CATEGORIES: Category[] = [
     label: 'Service',
     pitch: 'Tous les écrans temps réel de service.',
     tone: 'blue',
+    imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/serveur',         emoji: '🍽',   label: 'Salle / Serveur',  description: 'Plan de salle + prise de commande + encaissement.' },
       { href: '/caisse',          emoji: '💰',   label: 'Caisse',           description: 'Dashboard live, ouverture/clôture session, rapport Z.' },
@@ -64,6 +69,7 @@ export const CATEGORIES: Category[] = [
     label: 'Cuisine & stock',
     pitch: 'Fiches techniques, achats et inventaires.',
     tone: 'amber',
+    imageUrl: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/recettes',         emoji: '👨‍🍳', label: 'Recettes',         description: 'Food cost, allergènes, fiches techniques.' },
       { href: '/admin/plats-du-jour',    emoji: '✨',  label: 'Plats du jour',    description: 'Carte du jour, suggestions IA selon stock.' },
@@ -81,6 +87,7 @@ export const CATEGORIES: Category[] = [
     label: 'Clientèle',
     pitch: 'CRM, fidélité, réservations, marketing.',
     tone: 'rose',
+    imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/reservations',     emoji: '📅', label: 'Réservations',    description: 'Tables, terrasse, chambres, événementiel.' },
       { href: '/admin/chambres',         emoji: '🛏',  label: 'Chambres',        description: 'Calendrier multi-chambres, check-in, facture PDF.' },
@@ -100,6 +107,7 @@ export const CATEGORIES: Category[] = [
     label: 'Équipe & formation',
     pitch: 'RH, formation, communication, challenges.',
     tone: 'violet',
+    imageUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/rh',         emoji: '👥', label: 'Ressources humaines', description: 'Fiches, planning, paie, pourboires, congés.' },
       { href: '/equipes',          emoji: '💬', label: 'Chat équipe',         description: 'Messagerie interne 5 canaux, CR, matériel.' },
@@ -114,6 +122,7 @@ export const CATEGORIES: Category[] = [
     label: 'Finances',
     pitch: 'P&L, trésorerie, énergie, simulations.',
     tone: 'emerald',
+    imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/finances', emoji: '💰', label: 'Finances / TVA',    description: 'P&L live, trésorerie 30/60/90j, simulateurs.' },
       { href: '/admin/economie', emoji: '🧮', label: 'Centre économique', description: 'Point mort, marges, surplus, redistribution.' },
@@ -126,6 +135,7 @@ export const CATEGORIES: Category[] = [
     label: 'Conformité',
     pitch: 'Hygiène, légal, sécurité, environnement.',
     tone: 'red',
+    imageUrl: 'https://images.unsplash.com/photo-1581578017093-cd30fce4eeb7?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/hygiene',     emoji: '🧴', label: 'Hygiène / HACCP', description: 'CCP, températures, lots/DLC, checklists, NC.' },
       { href: '/admin/dechets',     emoji: '🗑',  label: 'Déchets (AGEC)',  description: 'Pesées, gaspillage €, BSD, rapport annuel.' },
@@ -139,6 +149,7 @@ export const CATEGORIES: Category[] = [
     label: 'Système',
     pitch: 'Configuration, sécurité, accès, sauvegardes.',
     tone: 'zinc',
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/setup',    emoji: '⚙️', label: 'Configuration', description: 'Setup wizard, info établissement, intégrations.' },
       { href: '/admin/securite', emoji: '🔐', label: 'Sécurité',      description: 'RBAC, 2FA, audit, connexions, sauvegardes.' },

@@ -220,16 +220,35 @@ export default async function CategoriePage({ params }: { params: { slug: string
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <main className="max-w-7xl mx-auto p-3 sm:p-4 space-y-4">
-        {/* Header catégorie premium */}
-        <header className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.gradient} text-white text-3xl shadow-lg ${tone.ring} ring-4 shrink-0`}>
+        {/* Header catégorie — bandeau photo immersif */}
+        <header className="relative overflow-hidden rounded-2xl bg-zinc-900 shadow-xl min-h-[140px] sm:min-h-[160px]">
+          {/* Image de fond Unsplash */}
+          {cat.imageUrl ? (
+            <img
+              src={cat.imageUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className={`absolute inset-0 bg-gradient-to-br ${tone.gradient}`} aria-hidden />
+          )}
+          {/* Overlay sombre pour lisibilité */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/30" aria-hidden />
+
+          {/* Contenu du header */}
+          <div className="relative z-10 flex items-center gap-3 sm:gap-4 p-4 sm:p-6 text-white">
+            <span className={`inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${tone.gradient} text-white text-3xl sm:text-4xl shadow-2xl ring-4 ring-white/30 shrink-0`}>
               {cat.emoji}
             </span>
             <div className="min-w-0">
-              <p className={`text-[10px] font-bold uppercase tracking-widest ${tone.pitch}`}>Catégorie · {itemsVisibles.length} module{itemsVisibles.length > 1 ? 's' : ''}</p>
-              <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">{cat.label}</h1>
-              <p className="text-xs sm:text-sm text-zinc-500 mt-1.5">{cat.pitch}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/80">
+                Catégorie · {itemsVisibles.length} module{itemsVisibles.length > 1 ? 's' : ''}
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-none mt-0.5 drop-shadow-lg">
+                {cat.label}
+              </h1>
+              <p className="text-xs sm:text-sm text-white/90 mt-1.5">{cat.pitch}</p>
             </div>
           </div>
         </header>

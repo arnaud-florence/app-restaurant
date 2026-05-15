@@ -123,7 +123,7 @@ export default async function CatIndexPage() {
           </div>
         </header>
 
-        {/* Grille de tuiles catégorie — grandes (cat-level) */}
+        {/* Grille de tuiles catégorie — mode photo gallery (image fond + overlay) */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {categoriesVisibles.map(cat => {
             const tone = TONES[cat.tone]
@@ -131,24 +131,46 @@ export default async function CatIndexPage() {
               <Link
                 key={cat.slug}
                 href={`/admin/cat/${cat.slug}`}
-                className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl border-2 active:scale-[0.96] transition-all min-h-[170px] sm:min-h-[200px] ${tone.cardBg} ${tone.cardBorder} ${tone.cardHover} hover:shadow-2xl`}
+                className="group relative flex flex-col justify-end overflow-hidden rounded-2xl border-2 border-zinc-200 bg-zinc-900 active:scale-[0.96] hover:shadow-2xl transition-all min-h-[180px] sm:min-h-[220px] aspect-square sm:aspect-auto"
               >
-                {/* Badge nb sous-modules */}
-                <span className="absolute top-2 right-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-white text-zinc-900 text-[10px] font-black tabular-nums shadow-md border border-zinc-200">
+                {/* Image de fond (Unsplash) avec ken-burns zoom au hover */}
+                {cat.imageUrl ? (
+                  <img
+                    src={cat.imageUrl}
+                    alt=""
+                    aria-hidden
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                ) : (
+                  <div className={`absolute inset-0 bg-gradient-to-br ${tone.emojiGradient}`} aria-hidden />
+                )}
+
+                {/* Overlay sombre dégradé pour lisibilité du texte */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" aria-hidden />
+
+                {/* Badge nb sous-modules en haut à droite */}
+                <span className="absolute top-2.5 right-2.5 inline-flex items-center justify-center min-w-[26px] h-7 px-2.5 rounded-full bg-white/95 backdrop-blur text-zinc-900 text-[11px] font-black tabular-nums shadow-lg z-10">
                   {cat.items.length}
                 </span>
-                <span className={`inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${tone.emojiGradient} text-white text-4xl sm:text-5xl shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+
+                {/* Pastille emoji en haut à gauche (petit accent) */}
+                <span className={`absolute top-2.5 left-2.5 inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br ${tone.emojiGradient} text-white text-xl shadow-lg z-10 group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
                   {cat.emoji}
                 </span>
-                <h3 className={`mt-3 text-base sm:text-lg font-black tracking-tight leading-tight ${tone.labelColor}`}>
-                  {cat.label}
-                </h3>
-                <p className={`mt-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest ${tone.pitchColor}`}>
-                  {cat.items.length} module{cat.items.length > 1 ? 's' : ''}
-                </p>
-                <p className="mt-1 text-[11px] sm:text-xs text-zinc-600 line-clamp-2 leading-snug">
-                  {cat.pitch}
-                </p>
+
+                {/* Texte en bas (sur l'overlay) */}
+                <div className="relative z-10 p-3 sm:p-4 text-white">
+                  <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-white/80">
+                    {cat.items.length} module{cat.items.length > 1 ? 's' : ''}
+                  </p>
+                  <h3 className="mt-0.5 text-lg sm:text-xl font-black tracking-tight leading-tight drop-shadow-lg">
+                    {cat.label}
+                  </h3>
+                  <p className="mt-1 text-[11px] sm:text-xs text-white/90 line-clamp-2 leading-snug">
+                    {cat.pitch}
+                  </p>
+                </div>
               </Link>
             )
           })}

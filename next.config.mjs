@@ -14,6 +14,13 @@ const nextConfig = {
     '/admin/formation/docs': ['./docs/formation/**/*.md'],
     '/admin/formation/docs/[slug]': ['./docs/formation/**/*.md'],
   },
+  // Autorise les images Unsplash en CDN pour les visuels de catégorie.
+  // Si on veut self-host plus tard, déplacer dans /public/images/ et changer les URLs.
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/**' },
+    ],
+  },
 }
 
 export default nextConfig
