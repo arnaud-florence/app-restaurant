@@ -12,14 +12,15 @@
 // Remplace OpsBottomNav (qui était fixed en bas) et la bottom nav mobile
 // de AdminNav. Un seul point de navigation, en haut, identique partout.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, LogOut } from 'lucide-react'
+import { Menu, X, LogOut, Search, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
 import PushNotifSwitch from '@/components/PushNotifSwitch'
+import { useLiveFindings, type Finding } from '@/hooks/useLiveFindings'
 
 export type TopActionBarTheme = 'light' | 'dark'
 
@@ -185,14 +186,24 @@ const TONES_DARK: Record<Tone, { base: string; active: string }> = {
 export default function TopActionBar({
   theme = 'light',
   profil = null,
+  initialFindingsRouges = [],
 }: {
   theme?: TopActionBarTheme
   profil?: TopActionBarProfil
+  /** Findings urgence='rouge' non résolus, fetché server-side, pour le badge live. */
+  initialFindingsRouges?: Finding[]
 }) {
   const pathname = usePathname() ?? '/'
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
-  // Ferme le drawer sur Échap
+  // ─── Badge alerte rouge : live via useLiveFindings ────────────────
+  const { findings: findingsRouges } = useLiveFindings(initialFindingsRouges, {
+    urgences: ['rouge'],
+  })
+  const nbAlertesRouges = findingsRouges.length
+
+  // ─── Ferme le drawer sur Échap ────────────────────────────────────
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
@@ -200,16 +211,42 @@ export default function TopActionBar({
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  // Permissions : pas de profil = anon (kiosk) → seuls les ops sont visibles dans le drawer.
+  // Reset la query de recherche quand le drawer se ferme
+  useEffect(() => { if (!open) setQuery('') }, [open])
+
+  // ─── Permissions ──────────────────────────────────────────────────
   const isManager = profil?.role === 'manager'
   const peutVoir = (href: string) =>
     isManager || canAccess(profil?.poste, href, profil?.custom_permissions ?? null)
 
-  const groupesFiltres = ALL_GROUPES
-    .map(g => ({ ...g, items: g.items.filter(i => peutVoir(i.href)) }))
-    .filter(g => g.items.length > 0)
+  // Drawer : filtré par permissions + par query de recherche
+  const groupesFiltres = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return ALL_GROUPES
+      .map(g => ({
+        ...g,
+        items: g.items.filter(i => {
+          if (!peutVoir(i.href)) return false
+          if (!q) return true
+          return i.label.toLowerCase().includes(q) || g.groupe.toLowerCase().includes(q)
+        }),
+      }))
+      .filter(g => g.items.length > 0)
+  }, [profil?.poste, profil?.custom_permissions, isManager, query])
 
   const chipsVisibles = CHIPS_PRIMAIRES.filter(c => peutVoir(c.href))
+
+  // ─── Auto-scroll : centre la chip active au montage et au changement ─
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const activeChipRef = useRef<HTMLAnchorElement>(null)
+  useEffect(() => {
+    if (!activeChipRef.current || !scrollContainerRef.current) return
+    activeChipRef.current.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    })
+  }, [pathname])
 
   // INVERSION du thème pour la barre : forte distinction visuelle avec le fond de page.
   // Page light → barre sombre · Page dark → barre claire.
@@ -221,13 +258,13 @@ export default function TopActionBar({
   const wrapperCls = theme === 'dark'
     ? cn(
         // Page sombre → barre CLAIRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 border-zinc-300 shadow-[0_-8px_30px_rgba(255,255,255,0.15)]',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none',
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-white border-2 border-zinc-300 shadow-[0_-8px_30px_rgba(255,255,255,0.15)] overflow-hidden',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible',
       )
     : cn(
         // Page claire → barre SOMBRE pour ressortir
-        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 border-zinc-700 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]',
-        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none',
+        'fixed bottom-3 inset-x-3 z-30 rounded-3xl bg-zinc-900 border-2 border-zinc-700 shadow-[0_-8px_30px_rgba(0,0,0,0.25)] overflow-hidden',
+        'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible',
       )
 
   // Bouton "☰ Modules" : couleur accent emerald, ressort dans les 2 thèmes
@@ -237,6 +274,7 @@ export default function TopActionBar({
     <>
       <div className={wrapperCls}>
         <div
+          ref={scrollContainerRef}
           className="overflow-x-auto scrollbar-thin"
           style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
         >
@@ -248,7 +286,9 @@ export default function TopActionBar({
                 <Link
                   key={it.href}
                   href={it.href}
+                  ref={active ? activeChipRef : undefined}
                   style={{ scrollSnapAlign: 'start' }}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                     'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
@@ -261,22 +301,56 @@ export default function TopActionBar({
               )
             })}
 
-            {/* Bouton "☰ Modules" — ouvre le drawer complet */}
+            {/* Bouton "☰ Modules" — ouvre le drawer complet, avec badge alerte rouge live */}
             <button
               type="button"
               onClick={() => setOpen(true)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
+                'relative inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                 'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
                 plusBtnCls,
               )}
-              aria-label="Tous les modules"
+              aria-label={`Tous les modules${nbAlertesRouges > 0 ? ` — ${nbAlertesRouges} alerte${nbAlertesRouges > 1 ? 's' : ''} urgente${nbAlertesRouges > 1 ? 's' : ''}` : ''}`}
             >
               <Menu className="h-5 w-5 md:h-4 md:w-4" />
               <span>Modules</span>
+              {nbAlertesRouges > 0 && (
+                <>
+                  <span
+                    className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-600 border-2 border-white text-white text-[10px] font-black tabular-nums shadow-lg shadow-red-600/40"
+                    aria-hidden
+                  >
+                    {nbAlertesRouges > 9 ? '9+' : nbAlertesRouges}
+                  </span>
+                  <span
+                    className="absolute -top-1.5 -right-1.5 inline-flex w-5 h-5 rounded-full bg-red-500 animate-ping opacity-60"
+                    aria-hidden
+                  />
+                </>
+              )}
             </button>
           </div>
         </div>
+
+        {/* Gradient fade aux bords — indique qu'il y a plus à scroller (mobile uniquement) */}
+        <div
+          className={cn(
+            'md:hidden pointer-events-none absolute inset-y-0 left-0 w-6 rounded-l-3xl',
+            theme === 'dark'
+              ? 'bg-gradient-to-r from-white to-transparent'
+              : 'bg-gradient-to-r from-zinc-900 to-transparent',
+          )}
+          aria-hidden
+        />
+        <div
+          className={cn(
+            'md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 rounded-r-3xl',
+            theme === 'dark'
+              ? 'bg-gradient-to-l from-white to-transparent'
+              : 'bg-gradient-to-l from-zinc-900 to-transparent',
+          )}
+          aria-hidden
+        />
       </div>
 
       {/* ─── Drawer modules ──────────────────────────────────────── */}
@@ -289,8 +363,8 @@ export default function TopActionBar({
           />
           <aside className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-md bg-white shadow-2xl flex flex-col overflow-hidden">
             {/* Header du drawer */}
-            <div className="bg-zinc-900 text-white px-4 py-3 flex items-center justify-between">
-              <div className="min-w-0">
+            <div className="bg-zinc-900 text-white px-4 py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Navigation complète</p>
                 <h2 className="text-base font-black tracking-tight leading-none mt-0.5">Tous les modules</h2>
                 {profil && (
@@ -301,19 +375,55 @@ export default function TopActionBar({
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-2 -mr-1 hover:bg-white/10 rounded-full active:scale-95 transition"
+                className="p-2 hover:bg-white/10 rounded-full active:scale-95 transition shrink-0"
                 aria-label="Fermer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
+            {/* Barre de recherche sticky */}
+            <div className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-3 py-2.5">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Chercher un module… (ex: stock, TVA, allergènes)"
+                  className="w-full h-11 pl-10 pr-9 rounded-full border-2 border-zinc-200 bg-zinc-50 text-sm font-medium placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
+                  autoFocus
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-zinc-200 active:scale-95 transition"
+                    aria-label="Effacer la recherche"
+                  >
+                    <X className="h-3.5 w-3.5 text-zinc-600" />
+                  </button>
+                )}
+              </div>
+              {nbAlertesRouges > 0 && !query && (
+                <p className="mt-2 px-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-red-700">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {nbAlertesRouges} alerte{nbAlertesRouges > 1 ? 's' : ''} urgente{nbAlertesRouges > 1 ? 's' : ''} non résolue{nbAlertesRouges > 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+
             {/* Contenu scrollable : groupes */}
             <nav className="flex-1 overflow-y-auto p-3 space-y-4">
               {groupesFiltres.length === 0 ? (
-                <p className="text-sm text-zinc-500 italic text-center py-8">
-                  Aucun module disponible pour ton poste.
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2">{query ? '🔍' : '🔒'}</p>
+                  <p className="text-sm text-zinc-500 italic">
+                    {query
+                      ? <>Aucun module ne correspond à <span className="font-bold text-zinc-700">«&nbsp;{query}&nbsp;»</span>.</>
+                      : 'Aucun module disponible pour ton poste.'}
+                  </p>
+                </div>
               ) : groupesFiltres.map(g => (
                 <div key={g.groupe}>
                   <h3 className="px-1 mb-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">

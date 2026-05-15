@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
 import { getProfile } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 
 // Layout commun aux écrans de service (cuisine, bar, serveur).
 // Force le fond sombre #0D0D0D + texte clair pour l'usage tablette en service.
@@ -31,9 +32,19 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
       }
     : null
 
+  // Findings urgence='rouge' non résolus pour le badge live dans TopActionBar.
+  const supabase = await createClient()
+  const { data: findingsRouges } = await supabase
+    .from('agent_findings')
+    .select('id, agent_id, urgence, titre, message, action_label, action_url, created_at')
+    .eq('resolu', false)
+    .eq('urgence', 'rouge')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-zinc-100 pb-mobile-nav" data-ops-theme="dark">
-      <TopActionBar theme="dark" profil={navProfil} />
+      <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
       {children}
     </div>
   )
