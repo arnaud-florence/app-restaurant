@@ -38,13 +38,14 @@ export default function ClientsClient({ data }: { data: DataClients }) {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="sticky top-0 z-20 bg-white border-b border-zinc-200">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900">← Accueil</Link>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">CRM & fidélité</p>
-              <h1 className="text-2xl font-bold">🤝 Clients</h1>
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
+            <span className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xl shadow-lg shadow-violet-500/30 shrink-0">🤝</span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">CRM & fidélité</p>
+              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Clients</h1>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
