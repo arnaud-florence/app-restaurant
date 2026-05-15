@@ -694,70 +694,151 @@ export default function TopActionBar({
               )}
             </div>
 
-            {/* Contenu scrollable : groupes */}
+            {/* Contenu scrollable — 2 modes selon query */}
             <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-              {groupesFiltres.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-3xl mb-2">{query ? '🔍' : '🔒'}</p>
-                  <p className="text-sm text-zinc-500 italic">
-                    {query
-                      ? <>Aucun module ne correspond à <span className="font-bold text-zinc-700">«&nbsp;{query}&nbsp;»</span>.</>
-                      : 'Aucun module disponible pour ton poste.'}
-                  </p>
-                </div>
-              ) : groupesFiltres.map(g => (
-                <div key={g.groupe}>
-                  <h3 className="px-1 mb-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-                    <span className="text-base">{g.emoji}</span>
-                    {g.groupe}
-                    <span className="text-zinc-300 font-normal">· {g.items.length}</span>
-                  </h3>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {g.items.map(it => {
-                      const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
-                      const pinnedThis = isPinned(it.href)
-                      const pinDisabled = !pinnedThis && nbPinned >= MAX_PINNED
-                      return (
-                        <div key={it.href} className="relative">
-                          <Link
-                            href={it.href}
-                            onClick={() => setOpen(false)}
-                            className={cn(
-                              'flex items-center gap-2 rounded-xl px-2.5 py-2.5 pr-8 text-xs font-bold min-h-[44px] border-2 active:scale-95 transition',
-                              active
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                                : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
-                            )}
-                          >
-                            <span className="text-lg leading-none shrink-0">{it.emoji}</span>
-                            <span className="truncate">{it.label}</span>
-                          </Link>
-                          {/* Bouton étoile pin/unpin */}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); if (!pinDisabled) togglePin(it.href) }}
-                            disabled={pinDisabled}
-                            aria-label={pinnedThis ? `Désépingler ${it.label}` : `Épingler ${it.label}`}
-                            title={pinDisabled ? `Max ${MAX_PINNED} épinglés` : (pinnedThis ? 'Désépingler' : 'Épingler dans la barre')}
-                            className={cn(
-                              'absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition',
-                              pinnedThis
-                                ? 'text-amber-500 hover:bg-amber-100'
-                                : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50',
-                              pinDisabled && 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-300',
-                            )}
-                          >
-                            <Star className={cn('h-4 w-4', pinnedThis && 'fill-current')} aria-hidden />
-                          </button>
-                        </div>
-                      )
-                    })}
+              {query ? (
+                // ── MODE RECHERCHE : résultats flat (sous-modules qui matchent) ──
+                (() => {
+                  const flatResults = groupesFiltres.flatMap(g => g.items.map(it => ({ ...it, groupe: g.groupe, groupeEmoji: g.emoji })))
+                  if (flatResults.length === 0) {
+                    return (
+                      <div className="text-center py-8">
+                        <p className="text-3xl mb-2">🔍</p>
+                        <p className="text-sm text-zinc-500 italic">
+                          Aucun module ne correspond à <span className="font-bold text-zinc-700">«&nbsp;{query}&nbsp;»</span>.
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div>
+                      <h3 className="px-1 mb-2 text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                        Résultats · {flatResults.length}
+                      </h3>
+                      <div className="space-y-1.5">
+                        {flatResults.map(it => {
+                          const active = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href + '/'))
+                          const pinnedThis = isPinned(it.href)
+                          const pinDisabled = !pinnedThis && nbPinned >= MAX_PINNED
+                          return (
+                            <div key={it.href} className="relative">
+                              <Link
+                                href={it.href}
+                                onClick={() => setOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-3 rounded-xl px-3 py-3 pr-12 text-sm font-bold min-h-[52px] border-2 active:scale-[0.98] transition',
+                                  active
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                                    : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
+                                )}
+                              >
+                                <span className="text-xl leading-none shrink-0">{it.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="truncate">{it.label}</p>
+                                  <p className="text-[10px] text-zinc-400 font-normal truncate">{it.groupeEmoji} {it.groupe}</p>
+                                </div>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); if (!pinDisabled) togglePin(it.href) }}
+                                disabled={pinDisabled}
+                                aria-label={pinnedThis ? `Désépingler ${it.label}` : `Épingler ${it.label}`}
+                                className={cn(
+                                  'absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition',
+                                  pinnedThis
+                                    ? 'text-amber-500 hover:bg-amber-100'
+                                    : 'text-zinc-300 hover:text-amber-500 hover:bg-amber-50',
+                                  pinDisabled && 'opacity-40 cursor-not-allowed',
+                                )}
+                              >
+                                <Star className={cn('h-4 w-4', pinnedThis && 'fill-current')} aria-hidden />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()
+              ) : (
+                // ── MODE PAR DÉFAUT (query vide) : chips catégories + épingles ──
+                <>
+                  {/* Mes épingles (si > 0) */}
+                  {pinnedItems.filter(p => peutVoir(p.href)).length > 0 && (
+                    <div>
+                      <h3 className="px-1 mb-1.5 text-[10px] font-black uppercase tracking-widest text-amber-700 flex items-center gap-1.5">
+                        <Star className="h-3.5 w-3.5 fill-current" />
+                        Mes épingles · {pinnedItems.filter(p => peutVoir(p.href)).length}
+                      </h3>
+                      <div className="space-y-1.5">
+                        {pinnedItems.filter(p => peutVoir(p.href)).map(p => (
+                          <div key={p.href} className="relative">
+                            <Link
+                              href={p.href}
+                              onClick={() => setOpen(false)}
+                              className="flex items-center gap-3 rounded-xl px-3 py-2.5 pr-12 text-sm font-bold min-h-[48px] border-2 border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-400 active:scale-[0.98] transition"
+                            >
+                              <span className="text-xl leading-none shrink-0">{p.emoji}</span>
+                              <span className="truncate">{p.label}</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); togglePin(p.href) }}
+                              aria-label={`Désépingler ${p.label}`}
+                              title="Désépingler"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-8 h-8 rounded-full text-amber-600 hover:bg-amber-200 active:scale-90 transition"
+                            >
+                              <Star className="h-4 w-4 fill-current" aria-hidden />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Catégories en tuiles colorées — raccourci vers /admin/cat/<slug> */}
+                  <div>
+                    <h3 className="px-1 mb-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                      Catégories · {groupesFiltres.length}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {CATEGORIES
+                        .filter(c => c.items.some(it => peutVoir(it.href)))
+                        .map(cat => {
+                          const slug = cat.slug
+                          const itemsVisibles = cat.items.filter(it => peutVoir(it.href)).length
+                          const active = pathname === `/admin/cat/${slug}` || pathname.startsWith(`/admin/cat/${slug}/`)
+                          const tone = tones[cat.tone as Tone]
+                          return (
+                            <Link
+                              key={slug}
+                              href={`/admin/cat/${slug}`}
+                              onClick={() => setOpen(false)}
+                              className={cn(
+                                'group flex items-center gap-2.5 rounded-xl px-3 py-3 text-xs font-bold min-h-[56px] border-2 active:scale-[0.97] transition',
+                                active
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                                  : 'bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300',
+                              )}
+                            >
+                              <span className="text-2xl leading-none shrink-0">{cat.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-black tracking-tight truncate">{cat.label}</p>
+                                <p className="text-[10px] text-zinc-500 font-normal">{itemsVisibles} module{itemsVisibles > 1 ? 's' : ''}</p>
+                              </div>
+                            </Link>
+                          )
+                        })}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 italic mt-2 px-1">
+                      Tape un nom dans la barre ci-dessus pour chercher directement un sous-module.
+                    </p>
                   </div>
-                </div>
-              ))}
+                </>
+              )}
 
               {/* Notifications push (si profil) */}
-              {profil && (
+              {profil && !query && (
                 <div className="pt-2">
                   <PushNotifSwitch />
                 </div>
