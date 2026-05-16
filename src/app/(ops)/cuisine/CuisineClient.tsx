@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -170,38 +171,38 @@ export default function CuisineClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      {/* Bottom nav mobile (espace opérationnel — affichée aussi pour pizzaiolo
-          maintenant que la pizza est un poste séparé avec sa propre route). */}
       <OpsBottomNav profil={navProfil} />
-      {/* Header sombre premium */}
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
+      {/* ═══ HEADER POS UNIFIÉ (style /serveur) ═══ */}
+      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        {/* Mobile : 2 lignes */}
+        <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center gap-1.5">
             <span className={cn(
-              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-xl shadow-lg',
+              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-lg shadow-md shrink-0',
               role === 'pizzaiolo'
-                ? 'bg-gradient-to-br from-red-500 to-red-700 shadow-red-900/40'
-                : 'bg-gradient-to-br from-amber-500 to-amber-700 shadow-amber-900/40',
+                ? 'bg-gradient-to-br from-red-500 to-red-700'
+                : 'bg-gradient-to-br from-amber-500 to-amber-700',
             )}>
               {role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
             </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                {role === 'pizzaiolo' ? 'Service · Pizzeria' : 'Service · Atelier'}
-              </p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">
-                {role === 'pizzaiolo' ? 'Pizzaiolo' : 'Cuisine'}
-              </h1>
-            </div>
+            <span className="flex-1 inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-red-500/15 text-red-200 ring-1 ring-red-500/30 text-xs font-black tabular-nums">
+              <span className="text-sm">🔔</span>
+              <span>{nbEnAttente} en attente</span>
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
+              <span className="text-sm">⏱</span>{tempsMoyen.toFixed(0)}m
+            </span>
+            <Link
+              href="/caisse"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0"
+              aria-label="Caisse"
+            >💰</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
-            <KPI label="Temps moyen" value={`${tempsMoyen.toFixed(0)} min`} accent={tempsMoyen > 15 ? 'red' : tempsMoyen > 10 ? 'orange' : 'default'} />
+          <div className="flex items-center gap-1.5">
             {!audioReadyRef.current && (
               <button
                 onClick={activerSon}
-                className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"
-                title="Active le son pour les nouvelles commandes (limitation navigateur)"
+                className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700"
               >
                 🔔 Activer son
               </button>
@@ -209,16 +210,82 @@ export default function CuisineClient({
             <button
               onClick={toggleAutoPrint}
               className={cn(
-                'text-xs px-3 py-2 rounded-md border transition-colors',
+                'flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl text-xs font-black transition-colors',
                 autoPrint
-                  ? 'bg-emerald-600 border-emerald-500 text-white'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-zinc-800 text-zinc-300 border border-zinc-700',
               )}
-              title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
             >
-              🖨 Auto-impression : {autoPrint ? 'ON' : 'OFF'}
+              🖨 {autoPrint ? 'Auto ON' : 'Auto OFF'}
             </button>
           </div>
+        </div>
+
+        {/* Desktop : 1 ligne unique uniforme */}
+        <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className={cn(
+              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-xl shadow-md',
+              role === 'pizzaiolo'
+                ? 'bg-gradient-to-br from-red-500 to-red-700'
+                : 'bg-gradient-to-br from-amber-500 to-amber-700',
+            )}>
+              {role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
+            </span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 leading-none">Service</p>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">
+                {role === 'pizzaiolo' ? 'Pizzaiolo' : 'Cuisine'}
+              </h1>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 shrink-0">
+            <span className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              nbEnAttente > 0
+                ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse'
+                : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
+            )}>
+              <span className="text-base">🔔</span>{nbEnAttente} en attente
+            </span>
+            <span className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              tempsMoyen > 15 ? 'bg-red-500/15 text-red-200 ring-red-500/30'
+                : tempsMoyen > 10 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30'
+                : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
+            )}>
+              <span className="text-base">⏱</span>{tempsMoyen.toFixed(0)} min
+            </span>
+          </div>
+          <div className="flex-1 min-w-2" />
+          {!audioReadyRef.current && (
+            <button
+              onClick={activerSon}
+              className="inline-flex items-center gap-2 px-2.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 shrink-0"
+              title="Active le son pour les nouvelles commandes"
+            >
+              🔔 Activer son
+            </button>
+          )}
+          <button
+            onClick={toggleAutoPrint}
+            className={cn(
+              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl text-xs font-black transition-colors shrink-0',
+              autoPrint
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700',
+            )}
+            title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
+          >
+            🖨 Auto : {autoPrint ? 'ON' : 'OFF'}
+          </button>
+          <Link
+            href="/caisse"
+            className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
+          >
+            <span className="text-lg">💰</span>
+            <span>Caisse</span>
+          </Link>
         </div>
       </header>
 
@@ -243,32 +310,22 @@ export default function CuisineClient({
         />
       </div>
 
-      {/* Cuisine et Pizza sont 2 postes séparés : on n'affiche QUE la colonne du rôle */}
-      <main className="flex-1 grid grid-cols-1 gap-px bg-zinc-800">
-        {role === 'pizzaiolo' ? (
-          <Colonne
-            tag="PIZZA"
-            icone="🍕"
-            articles={articlesParColonne.PIZZA}
-            now={now}
-            onTransition={transition}
-          />
-        ) : (
-          <Colonne
-            tag="CUISINE"
-            icone="👨‍🍳"
-            articles={articlesParColonne.CUISINE}
-            now={now}
-            onTransition={transition}
-          />
-        )}
+      {/* ═══ GRID CASES style agenda (comme tables du plan serveur) ═══ */}
+      <main className="flex-1 p-3 sm:p-4">
+        <ColonneAgenda
+          tag={role === 'pizzaiolo' ? 'PIZZA' : 'CUISINE'}
+          icone={role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
+          articles={role === 'pizzaiolo' ? articlesParColonne.PIZZA : articlesParColonne.CUISINE}
+          now={now}
+          onTransition={transition}
+        />
       </main>
     </div>
   )
 }
 
-// ─── Colonne (CUISINE ou PIZZA) ──────────────────────────────────────
-function Colonne({
+// ─── Colonne agenda (CUISINE ou PIZZA) — grid cases pleine largeur ──
+function ColonneAgenda({
   tag, icone, articles, now, onTransition,
 }: {
   tag: ColonneTag
@@ -277,36 +334,70 @@ function Colonne({
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
 }) {
+  // Groupe les commandes par créneau horaire (15 min) pour l'affichage agenda
+  const groupesParCreneau = useMemo(() => {
+    const groupes = new Map<string, typeof articles>()
+    for (const item of articles) {
+      const tagDuTicket = item.articles[0]?.tag_destination
+      const creneauTag = tagDuTicket ? item.commande.creneaux_par_tag?.[tagDuTicket] : null
+      const creneauIso = creneauTag ?? item.commande.creneau_retrait ?? item.commande.created_at
+      const d = new Date(creneauIso)
+      // Arrondir à la tranche de 15 min
+      const min = d.getMinutes()
+      const roundedMin = Math.floor(min / 15) * 15
+      d.setMinutes(roundedMin, 0, 0)
+      const key = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      const arr = groupes.get(key) ?? []
+      arr.push(item)
+      groupes.set(key, arr)
+    }
+    return Array.from(groupes.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [articles])
+
+  if (articles.length === 0) {
+    return (
+      <div className="bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-800 py-20 px-6 text-center">
+        <p className="text-6xl mb-3">{icone}</p>
+        <p className="text-base font-bold text-zinc-300">Aucune commande {tag.toLowerCase()} en attente</p>
+        <p className="text-xs text-zinc-500 mt-1">Les commandes s'affichent ici dès qu'elles arrivent.</p>
+      </div>
+    )
+  }
+
   return (
-    <section className="bg-[#0D0D0D] flex flex-col min-h-[60vh]">
-      <div className="sticky top-[calc(env(safe-area-inset-top,0px)+72px)] z-10 px-4 py-2 bg-zinc-900/90 backdrop-blur border-b border-zinc-800 flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <span className="text-2xl">{icone}</span>
-          <span>{tag}</span>
-        </h2>
-        <span className="text-xs text-zinc-400 tabular-nums">
-          {articles.length} ticket{articles.length > 1 ? 's' : ''}
-        </span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {articles.length === 0 ? (
-          <div className="text-center text-zinc-500 py-12">
-            <p className="text-5xl mb-2">{icone}</p>
-            <p className="text-sm">Aucun ticket {tag.toLowerCase()} en attente</p>
+    <div className="space-y-4">
+      {groupesParCreneau.map(([creneau, items]) => (
+        <section key={creneau} className="space-y-2">
+          {/* Header créneau horaire — colonne heure pleine largeur */}
+          <header className="flex items-center gap-3 px-1">
+            <div className="inline-flex items-center gap-2 px-3 h-9 rounded-xl bg-zinc-900 ring-1 ring-zinc-700 text-white text-sm font-black tabular-nums shrink-0">
+              <span className="text-base">⏱</span>
+              <span>{creneau}</span>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-r from-zinc-700 to-transparent" />
+            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 shrink-0">
+              {items.length} ticket{items.length > 1 ? 's' : ''}
+            </span>
+          </header>
+
+          {/* Grid cases commandes (plein largeur, comme tables du plan) */}
+          <div className={cn(
+            'grid gap-2 sm:gap-3 lg:gap-4',
+            'grid-cols-[repeat(auto-fit,minmax(280px,1fr))] sm:grid-cols-[repeat(auto-fit,minmax(320px,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(360px,1fr))]',
+          )}>
+            {items.map(({ commande, articles: arts }) => (
+              <Ticket
+                key={commande.id}
+                commande={commande}
+                articles={arts}
+                now={now}
+                onTransition={onTransition}
+              />
+            ))}
           </div>
-        ) : (
-          articles.map(({ commande, articles: arts }) => (
-            <Ticket
-              key={commande.id}
-              commande={commande}
-              articles={arts}
-              now={now}
-              onTransition={onTransition}
-            />
-          ))
-        )}
-      </div>
-    </section>
+        </section>
+      ))}
+    </div>
   )
 }
 
