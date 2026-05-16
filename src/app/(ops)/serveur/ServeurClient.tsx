@@ -266,7 +266,7 @@ export default function ServeurClient({
   const [modalActif, setModalActif] = useState<null | 'a_servir' | 'a_encaisser'>(null)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="min-h-screen flex flex-col">
       {/* ═══ BARRE DE NAVIGATION FULL-WIDTH ═══ */}
       <header className="shrink-0 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
@@ -405,8 +405,8 @@ export default function ServeurClient({
         <AppelsServeurBanner serveurId={serveurId || null} />
       </header>
 
-      {/* ═══ PLAN DE TABLES — 100% width, prend toute la hauteur restante ═══ */}
-      <main className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4">
+      {/* ═══ PLAN DE TABLES — full-width, scroll naturel ═══ */}
+      <main className="flex-1 p-3 sm:p-4">
         <PlanSalle
           zones={zones}
           cmdParTable={cmdParTable}
@@ -725,9 +725,9 @@ function PlanSalle({
   }, [zones, cmdParTable, filtre, searchT])
 
   return (
-    <div className="h-full flex flex-col min-h-0 gap-2">
+    <div className="flex flex-col gap-2">
       {/* ═══ Toolbar pro : tabs zones + filtres + recherche ═══ */}
-      <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 overflow-x-auto whitespace-nowrap">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto whitespace-nowrap">
         {/* Tabs zones (visible si > 1) */}
         {zones.length > 1 && (
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-0.5 sm:p-1 shrink-0">
@@ -811,7 +811,7 @@ function PlanSalle({
       ) : (
         <div
           className={cn(
-            'flex-1 min-h-0 overflow-y-auto scroll-visible-dark grid gap-2 sm:gap-3 lg:gap-4 content-start pr-1',
+            'grid gap-2 sm:gap-3 lg:gap-4 content-start',
             'grid-cols-[repeat(auto-fit,minmax(105px,1fr))] sm:grid-cols-[repeat(auto-fit,minmax(140px,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]',
             'auto-rows-[105px] sm:auto-rows-[140px] lg:auto-rows-[150px]',
           )}
