@@ -43,10 +43,15 @@ export type AgendaCreneauxColonnesProps<T> = {
   date?: Date
   /** Pas en minutes (défaut: 15) */
   stepMinutes?: number
-  /** Heure de début (défaut: 11h) */
+  /** Heure de début (défaut: 11h) — IGNORÉ si startFromNow=true */
   startHour?: number
   /** Heure de fin (défaut: 23h) */
   endHour?: number
+  /** Si true (défaut), l'agenda commence à l'heure courante (- bufferMinutesBefore)
+   *  pour ne pas afficher d'heures inutiles. À désactiver pour un planning prévisionnel. */
+  startFromNow?: boolean
+  /** Minutes de buffer avant maintenant si startFromNow=true (défaut: 30) */
+  bufferMinutesBefore?: number
   /** Largeur d'une colonne (défaut: 280px) */
   columnWidth?: number
   /** Largeur fixe colonne "hors créneau" (défaut: 320px) */
@@ -108,6 +113,8 @@ export default function AgendaCreneauxColonnes<T>({
   now = new Date(),
   horsCreneauPosition = 'after',
   horsCreneauLabel = '⏸ Hors créneau',
+  startFromNow = true,
+  bufferMinutesBefore = 30,
 }: AgendaCreneauxColonnesProps<T>) {
   const accentCls = ACCENT_CLS[accent]
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -115,32 +122,58 @@ export default function AgendaCreneauxColonnes<T>({
   // Ref vers la colonne "commande la plus proche de maintenant" (= cible scroll auto)
   const cibleScrollRef = useRef<HTMLDivElement | null>(null)
 
+  // Stabilité : on régénère les colonnes au max toutes les 5 min (pas à chaque tick).
+  // Évite de re-rendre tout l'agenda quand le parent ticke now chaque seconde.
+  const nowMinuteForColumns = Math.floor(now.getTime() / (5 * 60_000)) * (5 * 60_000)
+
   // ─── Construction des colonnes (créneaux du jour) ──────────────────
+  // Si startFromNow : on démarre à (now - bufferMinutesBefore) aligné sur la tranche.
+  //   Ex: à 15h10 avec buffer=30 et step=15 → colonnes 14:45, 15:00, 15:15, ...
+  // Sinon : on respecte startHour fixe (mode planning).
+  // Les commandes dont le créneau est antérieur à la 1ère colonne tombent
+  // dans `horsCreneau` (= en retard / à traiter en priorité).
+  const baseStartMs = useMemo(() => {
+    if (!startFromNow) {
+      const base = new Date(date)
+      base.setHours(startHour, 0, 0, 0)
+      return base.getTime()
+    }
+    const start = new Date(now)
+    start.setMinutes(start.getMinutes() - bufferMinutesBefore, 0, 0)
+    const aligned = floorToStep(start, stepMinutes)
+    return aligned.getTime()
+  }, [date, startHour, startFromNow, bufferMinutesBefore, nowMinuteForColumns, stepMinutes])
+
   const colonnes = useMemo(() => {
     const cols: { key: string; date: Date; label: string }[] = []
-    const base = new Date(date)
-    base.setHours(startHour, 0, 0, 0)
+    const cur = new Date(baseStartMs)
     const fin = new Date(date)
     fin.setHours(endHour, 0, 0, 0)
-    const cur = new Date(base)
     while (cur.getTime() <= fin.getTime()) {
       cols.push({ key: dateKey(cur), date: new Date(cur), label: formatHHMM(cur) })
       cur.setMinutes(cur.getMinutes() + stepMinutes)
     }
     return cols
-  }, [date, startHour, endHour, stepMinutes])
+  }, [baseStartMs, date, endHour, stepMinutes])
 
   // ─── Bucket items par créneau ──────────────────────────────────────
+  // Les commandes avec créneau < baseStartMs (= en retard) tombent dans horsCreneau.
+  // Les commandes avec créneau > endHour tombent aussi dans horsCreneau.
+  const finOfDayMs = useMemo(() => {
+    const d = new Date(date)
+    d.setHours(endHour, 0, 0, 0)
+    return d.getTime()
+  }, [date, endHour])
   const { bucketsParCreneau, horsCreneau } = useMemo(() => {
     const map = new Map<string, T[]>()
     const hors: T[] = []
     for (const it of items) {
       if (!it.creneauISO) { hors.push(it.data); continue }
       const d = new Date(it.creneauISO)
-      // Aligner sur la tranche pour matcher la colonne
       const aligned = floorToStep(d, stepMinutes)
-      // Si hors plage horaire visible → hors créneau
-      if (aligned.getHours() < startHour || aligned.getHours() > endHour) {
+      const alignedMs = aligned.getTime()
+      // Hors plage visible : avant la 1ère colonne (retard) ou après fin de journée
+      if (alignedMs < baseStartMs || alignedMs > finOfDayMs) {
         hors.push(it.data); continue
       }
       const k = dateKey(aligned)
@@ -149,7 +182,7 @@ export default function AgendaCreneauxColonnes<T>({
       map.set(k, arr)
     }
     return { bucketsParCreneau: map, horsCreneau: hors }
-  }, [items, stepMinutes, startHour, endHour])
+  }, [items, stepMinutes, baseStartMs, finOfDayMs])
 
   // ─── Cible scroll : colonne avec commandes la plus proche de maintenant ───
   // RÈGLE : si "maintenant" (14:00) n'a pas de commande mais qu'une commande
