@@ -138,6 +138,19 @@ export default function ServeurClient({
     return m
   }, [commandes])
 
+  // Stats globales pour le header POS (CA en cours, tables ouvertes)
+  const serveurStats = useMemo(() => {
+    let caEnCours = 0
+    let nbTables = 0
+    for (const c of commandes) {
+      if (c.statut !== 'encaisse' && c.statut !== 'annule') {
+        nbTables++
+        caEnCours += c.montant_total_ttc ?? c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+      }
+    }
+    return { caEnCours, nbTables }
+  }, [commandes])
+
   function flashOk(m: string) { setSuccess(m); setErreur(''); setTimeout(() => setSuccess(''), 1800) }
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
 
@@ -251,84 +264,136 @@ export default function ServeurClient({
   const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
 
   return (
-    <div className="min-h-screen flex flex-col pb-mobile-nav">
-      {/* Header premium */}
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-lg shadow-indigo-900/40">
-              🪑
-            </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Service · Salle</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Serveur</h1>
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* ═══ HEADER ultra-compact POS pro (h-14) ═══ */}
+      <header className="shrink-0 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-lg shadow-md shrink-0">🪑</span>
+            <div className="hidden sm:block min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 leading-none">Service salle</p>
+              <h1 className="font-display italic text-lg font-medium text-white tracking-[-0.02em] leading-none mt-0.5 truncate">Plan de table</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Stats inline header (CA, Tables, À servir, À encaisser) */}
+          <div className="hidden md:flex items-center gap-1.5 text-xs">
+            <HeaderStat icon="💶" value={fmtPrix(serveurStats.caEnCours)} label="CA" tone="emerald" />
+            <HeaderStat icon="🪑" value={String(serveurStats.nbTables)} label="Tables" tone="amber" />
+            <HeaderStat icon="🔔" value={String(nbArticlesPrets)} label="À servir" tone="emerald" pulse={nbArticlesPrets > 0} />
+            <HeaderStat icon="💳" value={String(aEncaisser.length)} label="À encais." tone="rose" pulse={aEncaisser.length > 0} />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
             <select
               value={serveurId}
               onChange={e => setServeurId(e.target.value)}
-              className="text-base px-3 h-12 sm:h-10 sm:text-sm rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100"
+              className="text-xs px-2 h-9 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100 max-w-[140px]"
             >
-              <option value="">— Choisir serveur —</option>
+              <option value="">— Serveur —</option>
               {employes.map(e => (
-                <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
+                <option key={e.id} value={e.id}>{e.prenom} {e.nom[0]}.</option>
               ))}
             </select>
-            <Link href="/caisse" className="text-base sm:text-sm px-4 h-12 sm:h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold whitespace-nowrap">
+            <Link href="/caisse" className="text-xs px-3 h-9 inline-flex items-center rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold whitespace-nowrap">
               💰 Caisse
             </Link>
           </div>
         </div>
         <AppelsServeurBanner serveurId={serveurId || null} />
-
-        {/* Tabs */}
-        <div className="px-4 pb-2 flex gap-1 overflow-x-auto">
-          <TabButton active={tab === 'plan'} onClick={() => setTab('plan')}>
-            🪑 Plan de salle
-          </TabButton>
-          <TabButton active={tab === 'a_servir'} onClick={() => setTab('a_servir')}>
-            🔔 À servir
-            {nbArticlesPrets > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold animate-pulse">
-                {nbArticlesPrets}
-              </span>
-            )}
-          </TabButton>
-          <TabButton active={tab === 'a_encaisser'} onClick={() => setTab('a_encaisser')}>
-            💰 À encaisser
-            {aEncaisser.length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">
-                {aEncaisser.length}
-              </span>
-            )}
-          </TabButton>
-        </div>
       </header>
 
-      {/* Contenu de l'onglet */}
-      <main className="flex-1 p-4 space-y-4">
-        <TachesSequentielles poste="serveur" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
-        {tab === 'plan' && (
+      {/* ═══ LAYOUT POS COCKPIT : 2 colonnes desktop, stack mobile ═══ */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] overflow-hidden">
+        {/* COLONNE GAUCHE : Plan de salle (scrolle indépendamment) */}
+        <section className="overflow-y-auto p-3 sm:p-4 lg:border-r lg:border-zinc-800">
           <PlanSalle
             zones={zones}
             cmdParTable={cmdParTable}
             pretsParTable={pretsParTable}
             onOuvrir={ouvrirTable}
           />
-        )}
+        </section>
+
+        {/* COLONNE DROITE : Activité (À servir + À encaisser empilés, scrolle indépendamment) */}
+        <aside className="hidden lg:flex flex-col overflow-hidden bg-zinc-950">
+          {/* Section À SERVIR (top half) */}
+          <div className="flex-1 flex flex-col overflow-hidden border-b border-zinc-800">
+            <header className="shrink-0 px-4 py-2.5 bg-zinc-900/80 backdrop-blur flex items-center justify-between border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🔔</span>
+                <h2 className="font-display italic text-base font-medium text-white tracking-tight">À servir</h2>
+                {nbArticlesPrets > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-black tabular-nums animate-pulse">
+                    {nbArticlesPrets}
+                  </span>
+                )}
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">Live</span>
+            </header>
+            <div className="flex-1 overflow-y-auto p-3">
+              <ListeAServir
+                commandes={cmdsAvecPrets}
+                onMarquerServi={marquerServi}
+                onMarquerToutServi={marquerToutServi}
+              />
+            </div>
+          </div>
+
+          {/* Section À ENCAISSER (bottom half) */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <header className="shrink-0 px-4 py-2.5 bg-zinc-900/80 backdrop-blur flex items-center justify-between border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💳</span>
+                <h2 className="font-display italic text-base font-medium text-white tracking-tight">À encaisser</h2>
+                {aEncaisser.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-black tabular-nums animate-pulse">
+                    {aEncaisser.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-400">Live</span>
+            </header>
+            <div className="flex-1 overflow-y-auto p-3">
+              <ListeAEncaisser
+                commandes={aEncaisser}
+                onEncaisser={c => setEncaisserCmd(c)}
+              />
+            </div>
+          </div>
+        </aside>
+
+        {/* MOBILE/TABLET : Tabs flottants bottom pour switcher Plan/Servir/Encaisser */}
+        <div className="lg:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 bg-zinc-900/95 backdrop-blur-md rounded-full p-1 shadow-2xl border border-zinc-700">
+          <TabButton active={tab === 'plan'} onClick={() => setTab('plan')}>🪑 Plan</TabButton>
+          <TabButton active={tab === 'a_servir'} onClick={() => setTab('a_servir')}>
+            🔔
+            {nbArticlesPrets > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-500 text-white text-[9px] font-bold animate-pulse">
+                {nbArticlesPrets}
+              </span>
+            )}
+          </TabButton>
+          <TabButton active={tab === 'a_encaisser'} onClick={() => setTab('a_encaisser')}>
+            💳
+            {aEncaisser.length > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold animate-pulse">
+                {aEncaisser.length}
+              </span>
+            )}
+          </TabButton>
+        </div>
+
+        {/* Mobile : afficher liste à servir / à encaisser en plein écran selon tab */}
         {tab === 'a_servir' && (
-          <ListeAServir
-            commandes={cmdsAvecPrets}
-            onMarquerServi={marquerServi}
-            onMarquerToutServi={marquerToutServi}
-          />
+          <div className="lg:hidden fixed inset-0 z-30 bg-zinc-950 overflow-y-auto p-3 pt-20 pb-24">
+            <ListeAServir commandes={cmdsAvecPrets} onMarquerServi={marquerServi} onMarquerToutServi={marquerToutServi} />
+          </div>
         )}
         {tab === 'a_encaisser' && (
-          <ListeAEncaisser
-            commandes={aEncaisser}
-            onEncaisser={c => setEncaisserCmd(c)}
-          />
+          <div className="lg:hidden fixed inset-0 z-30 bg-zinc-950 overflow-y-auto p-3 pt-20 pb-24">
+            <ListeAEncaisser commandes={aEncaisser} onEncaisser={c => setEncaisserCmd(c)} />
+          </div>
         )}
       </main>
 
@@ -399,6 +464,34 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     >
       {children}
     </button>
+  )
+}
+
+// ─── Header Stat pill ─ Mini KPI tactile pour le header POS ─────────
+function HeaderStat({ icon, value, label, tone, pulse }: {
+  icon: string; value: string; label: string
+  tone: 'emerald' | 'amber' | 'rose' | 'blue' | 'violet'
+  pulse?: boolean
+}) {
+  const tones: Record<typeof tone, string> = {
+    emerald: 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30',
+    amber:   'bg-amber-500/15 text-amber-200 ring-amber-500/30',
+    rose:    'bg-rose-500/15 text-rose-200 ring-rose-500/30',
+    blue:    'bg-blue-500/15 text-blue-200 ring-blue-500/30',
+    violet:  'bg-violet-500/15 text-violet-200 ring-violet-500/30',
+  }
+  return (
+    <div className={cn(
+      'inline-flex items-center gap-1.5 px-2.5 h-9 rounded-lg ring-1 backdrop-blur whitespace-nowrap',
+      tones[tone],
+      pulse && 'animate-pulse',
+    )}>
+      <span className="text-sm" aria-hidden>{icon}</span>
+      <div className="flex items-baseline gap-1">
+        <span className="text-sm font-black tabular-nums leading-none">{value}</span>
+        <span className="text-[9px] uppercase tracking-wider font-bold opacity-70 leading-none">{label}</span>
+      </div>
+    </div>
   )
 }
 
