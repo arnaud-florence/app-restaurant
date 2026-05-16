@@ -324,7 +324,7 @@ export default function CuisineClient({
   )
 }
 
-// ─── Colonne agenda (CUISINE ou PIZZA) — grid cases pleine largeur ──
+// ─── Cuisine = Flux FIFO horizontal (gauche → droite, ordre arrivée) ──
 function ColonneAgenda({
   tag, icone, articles, now, onTransition,
 }: {
@@ -334,25 +334,13 @@ function ColonneAgenda({
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
 }) {
-  // Groupe les commandes par créneau horaire (15 min) pour l'affichage agenda
-  const groupesParCreneau = useMemo(() => {
-    const groupes = new Map<string, typeof articles>()
-    for (const item of articles) {
-      const tagDuTicket = item.articles[0]?.tag_destination
-      const creneauTag = tagDuTicket ? item.commande.creneaux_par_tag?.[tagDuTicket] : null
-      const creneauIso = creneauTag ?? item.commande.creneau_retrait ?? item.commande.created_at
-      const d = new Date(creneauIso)
-      // Arrondir à la tranche de 15 min
-      const min = d.getMinutes()
-      const roundedMin = Math.floor(min / 15) * 15
-      d.setMinutes(roundedMin, 0, 0)
-      const key = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-      const arr = groupes.get(key) ?? []
-      arr.push(item)
-      groupes.set(key, arr)
-    }
-    return Array.from(groupes.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [articles])
+  // Tri par created_at croissant (FIFO : plus ancien à gauche, plus récent à droite)
+  const ordered = useMemo(
+    () => [...articles].sort(
+      (a, b) => new Date(a.commande.created_at).getTime() - new Date(b.commande.created_at).getTime(),
+    ),
+    [articles],
+  )
 
   if (articles.length === 0) {
     return (
@@ -365,38 +353,53 @@ function ColonneAgenda({
   }
 
   return (
-    <div className="space-y-4">
-      {groupesParCreneau.map(([creneau, items]) => (
-        <section key={creneau} className="space-y-2">
-          {/* Header créneau horaire — colonne heure pleine largeur */}
-          <header className="flex items-center gap-3 px-1">
-            <div className="inline-flex items-center gap-2 px-3 h-9 rounded-xl bg-zinc-900 ring-1 ring-zinc-700 text-white text-sm font-black tabular-nums shrink-0">
-              <span className="text-base">⏱</span>
-              <span>{creneau}</span>
-            </div>
-            <div className="flex-1 h-px bg-gradient-to-r from-zinc-700 to-transparent" />
-            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 shrink-0">
-              {items.length} ticket{items.length > 1 ? 's' : ''}
-            </span>
-          </header>
+    <div className="space-y-2">
+      {/* Bandeau de flux : indique l'ordre de traitement */}
+      <header className="flex items-center gap-2 px-1 mb-2">
+        <span className="inline-flex items-center gap-2 px-3 h-9 rounded-xl bg-zinc-900 ring-1 ring-zinc-700 text-white text-sm font-black shrink-0">
+          <span className="text-base">{icone}</span>
+          <span>Flux FIFO · gauche → droite</span>
+        </span>
+        <div className="flex-1 h-px bg-gradient-to-r from-zinc-700 to-transparent" />
+        <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 shrink-0">
+          {ordered.length} ticket{ordered.length > 1 ? 's' : ''}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 h-7 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-black tabular-nums shrink-0">
+          <span>1er →</span>
+          <span className="text-base">→</span>
+          <span>← dernier</span>
+        </span>
+      </header>
 
-          {/* Grid cases commandes (plein largeur, comme tables du plan) */}
-          <div className={cn(
-            'grid gap-2 sm:gap-3 lg:gap-4',
-            'grid-cols-[repeat(auto-fit,minmax(280px,1fr))] sm:grid-cols-[repeat(auto-fit,minmax(320px,1fr))] lg:grid-cols-[repeat(auto-fit,minmax(360px,1fr))]',
-          )}>
-            {items.map(({ commande, articles: arts }) => (
+      {/* Flux horizontal : tickets côte à côte par ordre d'arrivée */}
+      <div
+        className="overflow-x-auto scroll-visible-dark pb-2"
+        style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="flex items-stretch gap-3 lg:gap-4 min-w-max">
+          {ordered.map(({ commande, articles: arts }, idx) => (
+            <div
+              key={commande.id}
+              className="w-[280px] sm:w-[320px] lg:w-[360px] shrink-0 relative"
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              {/* Numéro d'ordre dans le flux (1er = le plus ancien) */}
+              <span className={cn(
+                'absolute -top-2 -left-2 z-10 inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-full text-sm font-black tabular-nums shadow-lg ring-2 ring-zinc-950',
+                idx === 0 ? 'bg-emerald-500 text-white animate-pulse' : 'bg-zinc-800 text-zinc-300',
+              )}>
+                {idx + 1}
+              </span>
               <Ticket
-                key={commande.id}
                 commande={commande}
                 articles={arts}
                 now={now}
                 onTransition={onTransition}
               />
-            ))}
-          </div>
-        </section>
-      ))}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
