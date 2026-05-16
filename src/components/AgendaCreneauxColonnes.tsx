@@ -106,6 +106,8 @@ export default function AgendaCreneauxColonnes<T>({
   const accentCls = ACCENT_CLS[accent]
   const scrollerRef = useRef<HTMLDivElement | null>(null)
   const nowColRef = useRef<HTMLDivElement | null>(null)
+  // Ref vers la colonne "commande la plus proche de maintenant" (= cible scroll auto)
+  const cibleScrollRef = useRef<HTMLDivElement | null>(null)
 
   // ─── Construction des colonnes (créneaux du jour) ──────────────────
   const colonnes = useMemo(() => {
@@ -143,13 +145,34 @@ export default function AgendaCreneauxColonnes<T>({
     return { bucketsParCreneau: map, horsCreneau: hors }
   }, [items, stepMinutes, startHour, endHour])
 
-  // ─── Auto-scroll sur la colonne "maintenant" au montage ────────────
+  // ─── Cible scroll : colonne avec commandes la plus proche de maintenant ───
+  // RÈGLE : si "maintenant" (14:00) n'a pas de commande mais qu'une commande
+  // existe à 14:30 et une autre à 15:45, on scrolle sur 14:30 (la plus proche).
+  // Si toutes les commandes sont passées, on scrolle sur la plus récente.
+  // Si aucune commande dans l'agenda → fallback sur "maintenant".
+  const cibleScrollKey = useMemo(() => {
+    const colsAvecItems = colonnes.filter(c => (bucketsParCreneau.get(c.key)?.length ?? 0) > 0)
+    if (colsAvecItems.length === 0) return null
+    const nowMs = now.getTime()
+    // Plus petit |col.date - now|
+    let best = colsAvecItems[0]
+    let bestDiff = Math.abs(best.date.getTime() - nowMs)
+    for (const c of colsAvecItems) {
+      const d = Math.abs(c.date.getTime() - nowMs)
+      if (d < bestDiff) { best = c; bestDiff = d }
+    }
+    return best.key
+  }, [colonnes, bucketsParCreneau, now])
+
+  // ─── Auto-scroll sur la cible (commande la plus proche, pas tranche vide) ───
   useEffect(() => {
-    if (!scrollerRef.current || !nowColRef.current) return
+    if (!scrollerRef.current) return
+    const target = cibleScrollRef.current ?? nowColRef.current
+    if (!target) return
     // Centre approximatif : laisse 1 colonne de marge à gauche
-    const left = nowColRef.current.offsetLeft - columnWidth
+    const left = target.offsetLeft - columnWidth
     scrollerRef.current.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
-  }, [columnWidth])
+  }, [columnWidth, cibleScrollKey])
 
   // ─── Empty state ───────────────────────────────────────────────────
   if (items.length === 0) {
@@ -170,13 +193,17 @@ export default function AgendaCreneauxColonnes<T>({
         {colonnes.map((col, idx) => {
           const items = bucketsParCreneau.get(col.key) ?? []
           const isNow = col.key === nowKey
+          const isCible = col.key === cibleScrollKey
           const isHourMark = col.date.getMinutes() === 0
+          // Une seule ref par colonne ; priorité à la cible (vu qu'on scroll dessus)
+          const colRef = isCible ? cibleScrollRef : isNow ? nowColRef : null
           return (
             <div
               key={col.key}
-              ref={isNow ? nowColRef : null}
+              ref={colRef}
               className={cn(
                 'shrink-0 flex flex-col border-r border-zinc-800/60',
+                isCible && !isNow && cn(accentCls.bg, 'ring-2 ring-inset', accentCls.ring),
                 isNow && 'bg-zinc-900/40',
               )}
               style={{ width: columnWidth, scrollSnapAlign: 'start' }}
@@ -184,30 +211,35 @@ export default function AgendaCreneauxColonnes<T>({
               {/* Header colonne */}
               <div className={cn(
                 'sticky top-0 z-10 px-2 py-2 border-b backdrop-blur',
-                isNow
+                isCible
                   ? cn('border-b-2', accentCls.bg, accentCls.ring, 'ring-1 ring-inset')
-                  : isHourMark
-                    ? 'border-zinc-700 bg-zinc-900/95'
-                    : 'border-zinc-800/60 bg-zinc-950/80',
+                  : isNow
+                    ? cn('border-b-2', 'bg-zinc-800/80', 'ring-1 ring-inset ring-zinc-600')
+                    : isHourMark
+                      ? 'border-zinc-700 bg-zinc-900/95'
+                      : 'border-zinc-800/60 bg-zinc-950/80',
               )}>
                 <div className="flex items-center justify-between gap-2">
                   <p className={cn(
                     'font-display italic tracking-tight tabular-nums',
                     isHourMark ? 'text-lg font-bold' : 'text-sm font-medium',
-                    isNow ? accentCls.text : 'text-zinc-300',
+                    isCible ? accentCls.text : isNow ? 'text-zinc-200' : 'text-zinc-300',
                   )}>
                     {col.label}
                   </p>
                   {items.length > 0 && (
                     <span className={cn(
                       'inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[10px] font-black tabular-nums',
-                      isNow ? cn(accentCls.bar, 'text-white') : 'bg-zinc-700 text-zinc-200',
+                      isCible ? cn(accentCls.bar, 'text-white') : 'bg-zinc-700 text-zinc-200',
                     )}>
                       {items.length}
                     </span>
                   )}
                   {isNow && (
                     <span className={cn('flex h-2 w-2 rounded-full animate-pulse', accentCls.bar)} aria-label="Maintenant" />
+                  )}
+                  {isCible && !isNow && (
+                    <span className={cn('text-[9px] font-black uppercase tracking-widest', accentCls.text)} title="Prochaine commande">↓</span>
                   )}
                 </div>
               </div>
