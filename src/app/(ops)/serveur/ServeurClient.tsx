@@ -625,13 +625,27 @@ function PlanSalle({
     return statutEffectif(t) === filtre
   }
 
+  // Concatène toutes les tables de toutes les zones (ou juste la zone active mobile)
+  const allTablesFiltered = useMemo(() => {
+    const list: Array<Table & { __zone: string }> = []
+    for (const [zone, tables] of zones) {
+      // Mobile : ne montrer que la zone active. Desktop : toutes
+      const tablesAaffilcher = tables.filter(shouldShow)
+      for (const t of tablesAaffilcher) {
+        list.push({ ...t, __zone: zone })
+      }
+    }
+    return list
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones, cmdParTable, filtre, searchT])
+
   return (
-    <div className="h-full flex flex-col min-h-0">
-      {/* ═══ Toolbar tout-en-un compact : zones + filtres + recherche ═══ */}
-      <div className="shrink-0 mb-2 flex items-center gap-1.5 flex-wrap">
-        {/* Tabs zones (si > 1) */}
+    <div className="h-full flex flex-col min-h-0 gap-2">
+      {/* ═══ Toolbar pro : tabs zones + filtres + recherche ═══ */}
+      <div className="shrink-0 flex items-center gap-2 flex-wrap">
+        {/* Tabs zones (visible si > 1) */}
         {zones.length > 1 && (
-          <div className="flex gap-1 lg:hidden">
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-1">
             {zones.map(([zone, ts]) => {
               const s = zoneStats[zone]
               const isActive = activeZone === zone
@@ -641,15 +655,15 @@ function PlanSalle({
                   key={zone}
                   onClick={() => setActiveZone(zone)}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold whitespace-nowrap border transition-all',
+                    'inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-xs font-bold whitespace-nowrap transition-all',
                     isActive
-                      ? 'bg-white text-zinc-900 border-white'
-                      : 'bg-zinc-900 text-zinc-300 border-zinc-800',
+                      ? 'bg-white text-zinc-900 shadow-md'
+                      : 'text-zinc-400 hover:text-zinc-200',
                   )}
                 >
-                  <span className="text-xs" aria-hidden>{zoneIcon}</span>
+                  <span className="text-sm" aria-hidden>{zoneIcon}</span>
                   <span className="capitalize">{zone}</span>
-                  <span className="text-[10px] opacity-70">{ts.length}</span>
+                  <span className="text-[10px] opacity-70 tabular-nums">({ts.length})</span>
                   {s.aEncaisser > 0 && (
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
                   )}
@@ -660,98 +674,68 @@ function PlanSalle({
         )}
 
         {/* Filtres statut */}
-        <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-full p-0.5">
+        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-1">
           {([
             { k: 'tous',         lbl: 'Toutes',  dot: 'bg-zinc-400' },
             { k: 'libre',        lbl: 'Libres',  dot: 'bg-emerald-400' },
             { k: 'occupee',      lbl: 'Occ.',    dot: 'bg-amber-400' },
-            { k: 'a_encaisser',  lbl: 'À enc.',  dot: 'bg-rose-400' },
+            { k: 'a_encaisser',  lbl: 'Encais.', dot: 'bg-rose-400' },
           ] as const).map(f => (
             <button
               key={f.k}
               onClick={() => setFiltre(f.k)}
               className={cn(
-                'inline-flex items-center gap-1 px-2.5 h-7 rounded-full text-[11px] font-bold transition-all',
+                'inline-flex items-center gap-1.5 px-3 h-9 rounded-full text-xs font-bold transition-all',
                 filtre === f.k
-                  ? 'bg-white text-zinc-900 shadow-sm'
+                  ? 'bg-white text-zinc-900 shadow-md'
                   : 'text-zinc-400 hover:text-zinc-200',
               )}
             >
-              <span className={cn('w-1 h-1 rounded-full', f.dot, filtre === f.k && f.k === 'a_encaisser' && 'animate-pulse')}></span>
+              <span className={cn('w-1.5 h-1.5 rounded-full', f.dot, filtre === f.k && f.k === 'a_encaisser' && 'animate-pulse')}></span>
               {f.lbl}
             </button>
           ))}
         </div>
+
+        <div className="flex-1" />
 
         {/* Recherche */}
         <input
           type="search"
           value={searchT}
           onChange={e => setSearchT(e.target.value)}
-          placeholder="N° table..."
-          className="flex-1 min-w-[90px] max-w-[200px] h-8 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-[11px]"
+          placeholder="N° table"
+          className="w-[140px] h-9 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-xs"
         />
-
-        {/* Toggle compact */}
-        <button
-          onClick={() => setCompact(!compact)}
-          className={cn(
-            'inline-flex items-center justify-center w-8 h-8 rounded-full text-xs border transition-all shrink-0',
-            compact
-              ? 'bg-white text-zinc-900 border-white'
-              : 'bg-zinc-900 text-zinc-400 border-zinc-800',
-          )}
-          title={compact ? 'Vue détaillée' : 'Vue compacte'}
-        >
-          {compact ? '⊞' : '⊟'}
-        </button>
       </div>
 
-      {/* Container zones : flex-1 pour remplir toute la hauteur sans scroll */}
-      <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
-      {zones.map(([zone, tables]) => {
-        const s = zoneStats[zone]
-        const tablesFiltrees = tables.filter(shouldShow)
-        if (tablesFiltrees.length === 0) return null
-        return (
-          <section key={zone} className={cn(
-            'flex-1 min-h-0 flex flex-col animate-in fade-in duration-500',
-            zones.length > 1 && activeZone !== zone && 'hidden lg:flex',
-          )}>
-            {/* Header zone ULTRA-COMPACT */}
-            <header className="hidden lg:flex shrink-0 mb-2 items-center justify-between gap-2 px-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-base" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
-                <h2 className="text-sm font-black capitalize text-white tracking-tight">{zone}</h2>
-                <span className="text-[10px] text-zinc-500">{s.couvertsOccupes}/{s.capaTotale} couverts</span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] font-bold">
-                {s.libre > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-emerald-500/15 text-emerald-300">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400"></span>{s.libre}
-                  </span>
-                )}
-                {s.occupee > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-amber-500/15 text-amber-300">
-                    <span className="w-1 h-1 rounded-full bg-amber-400"></span>{s.occupee}
-                  </span>
-                )}
-                {s.aEncaisser > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-rose-500/20 text-rose-200">
-                    <span className="w-1 h-1 rounded-full bg-rose-400 animate-pulse"></span>{s.aEncaisser}
-                  </span>
-                )}
-              </div>
-            </header>
-
-            {/* Grid REMPLIT toute la hauteur — auto-rows-fr pour rows égales étirées */}
-            <div className={cn(
-              'flex-1 min-h-0 grid gap-2 lg:gap-3 auto-rows-fr',
-              compact
-                ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'
-                : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-            )}>
-              {tablesFiltrees.map(t => {
+      {/* ═══ PLAN DE SALLE — UN SEUL GRAND GRID AUTO-FIT qui remplit toute la viewport ═══ */}
+      {allTablesFiltered.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
+          <div className="text-center">
+            <p className="text-4xl mb-2">🔍</p>
+            <p className="font-bold">Aucune table ne correspond aux filtres</p>
+            <button
+              onClick={() => { setFiltre('tous'); setSearchT('') }}
+              className="mt-3 px-4 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold"
+            >
+              Réinitialiser
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="flex-1 min-h-0 grid gap-3 lg:gap-4 overflow-hidden auto-rows-fr"
+          style={{
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          }}
+        >
+          {/* Itère TOUTES les tables (toutes zones combinées) en 1 seul grid */}
+          {zones.flatMap(([zone, tables]) => {
+            const tablesFiltrees = tables.filter(shouldShow)
+            // Sur mobile (sm-) : ne montrer que la zone active si plusieurs zones
+            const hideOnMobile = zones.length > 1 && activeZone !== zone
+            return tablesFiltrees.map(t => {
                 const cmd = cmdParTable.get(t.numero)
                 const nbPrets = pretsParTable.get(t.numero) ?? 0
                 const statutEffectif: StatutTable = cmd?.statut === 'servi' ? 'a_encaisser'
@@ -776,6 +760,7 @@ function PlanSalle({
                       'hover:-translate-y-0.5 active:scale-[0.97]',
                       sty.card, sty.shadow,
                       statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/40',
+                      hideOnMobile && 'hidden lg:flex',
                     )}
                   >
                     {/* Badge plats prêts en top-right */}
@@ -872,12 +857,10 @@ function PlanSalle({
                     )}
                   </button>
                 )
-              })}
-            </div>
-          </section>
-        )
-      })}
-      </div>
+              })
+          })}
+        </div>
+      )}
     </div>
   )
 }
