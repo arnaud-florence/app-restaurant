@@ -557,10 +557,12 @@ export default function TopActionBar({
       <div className={wrapperCls}>
         <div
           ref={scrollContainerRef}
-          className="overflow-x-auto scrollbar-thin"
+          className="overflow-x-auto md:overflow-x-auto overflow-y-auto md:overflow-y-visible scrollbar-thin max-h-[180px] md:max-h-none"
           style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
         >
-          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 min-w-max">
+          {/* Mobile : flex-wrap permet aux chips de passer sur plusieurs lignes
+              avec scroll vertical. Desktop : min-w-max + nowrap + scroll horizontal. */}
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 md:py-1.5 flex-wrap md:flex-nowrap md:min-w-max">
             {/* Chip "Accueil" spéciale — toujours en premier, pointe vers la vue d'ensemble */}
             {(() => {
               const href = '/admin/cat'
