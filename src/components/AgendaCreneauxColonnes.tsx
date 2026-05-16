@@ -57,6 +57,10 @@ export type AgendaCreneauxColonnesProps<T> = {
   emptyMessage?: string
   /** Maintenant (pour scroll auto + highlight) */
   now?: Date
+  /** Position de la colonne "hors créneau" : avant ou après les colonnes d'heures */
+  horsCreneauPosition?: 'before' | 'after'
+  /** Label affiché en header de la colonne hors créneau (défaut: '⏸ Hors créneau') */
+  horsCreneauLabel?: string
 }
 
 const ACCENT_CLS: Record<NonNullable<AgendaCreneauxColonnesProps<unknown>['accent']>, {
@@ -102,6 +106,8 @@ export default function AgendaCreneauxColonnes<T>({
   accent = 'emerald',
   emptyMessage = 'Aucune commande dans l\'agenda',
   now = new Date(),
+  horsCreneauPosition = 'after',
+  horsCreneauLabel = '⏸ Hors créneau',
 }: AgendaCreneauxColonnesProps<T>) {
   const accentCls = ACCENT_CLS[accent]
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -172,14 +178,22 @@ export default function AgendaCreneauxColonnes<T>({
   //   - nouvelle commande arrive sur un créneau plus proche → re-scroll
   //   - commande de la cible actuelle est servie → re-scroll sur la suivante
   //   - le temps avance et la "plus proche" change → re-scroll
+  //
+  // Cas spécial : si AUCUNE commande dans les colonnes horaires mais qu'il
+  // y a des items "hors créneau" en début (position='before', ex: pizza salle),
+  // on scrolle à 0 pour les rendre visibles immédiatement.
   useEffect(() => {
     if (!scrollerRef.current) return
+    if (cibleScrollKey === null && horsCreneau.length > 0 && horsCreneauPosition === 'before') {
+      scrollerRef.current.scrollTo({ left: 0, behavior: 'smooth' })
+      return
+    }
     const target = cibleScrollRef.current ?? nowColRef.current
     if (!target) return
     // Centre approximatif : laisse 1 colonne de marge à gauche
     const left = target.offsetLeft - columnWidth
     scrollerRef.current.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
-  }, [columnWidth, cibleScrollKey])
+  }, [columnWidth, cibleScrollKey, horsCreneau.length, horsCreneauPosition])
 
   // ─── Empty state ───────────────────────────────────────────────────
   if (items.length === 0) {
@@ -194,9 +208,44 @@ export default function AgendaCreneauxColonnes<T>({
   const nowStep = floorToStep(now, stepMinutes)
   const nowKey = dateKey(nowStep)
 
+  // ─── Bloc "Hors créneau" (réutilisé en début OU en fin selon horsCreneauPosition) ───
+  const horsCreneauBlock = horsCreneau.length > 0 ? (
+    <div
+      key="hors-creneau-col"
+      className={cn(
+        'shrink-0 flex flex-col bg-zinc-900/40 ring-2 ring-inset ring-amber-500/40',
+        horsCreneauPosition === 'before' ? 'border-r-4 border-amber-500/60' : 'border-l-2 border-zinc-700',
+      )}
+      style={{ width: horsCreneauWidth, scrollSnapAlign: 'start' }}
+    >
+      <div className={cn(
+        'sticky top-0 z-10 px-3 py-2 border-b backdrop-blur',
+        horsCreneauPosition === 'before' ? 'border-amber-500/50 bg-amber-950/60' : 'border-zinc-700 bg-zinc-900/95',
+      )}>
+        <div className="flex items-center justify-between gap-2">
+          <p className={cn(
+            'text-xs font-black uppercase tracking-widest',
+            horsCreneauPosition === 'before' ? 'text-amber-200' : 'text-zinc-400',
+          )}>{horsCreneauLabel}</p>
+          <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black tabular-nums">
+            {horsCreneau.length}
+          </span>
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col gap-2 p-2 min-h-[200px]">
+        {horsCreneau.map((data, i) => (
+          <div key={`hors-${i}`}>
+            {renderItem(data, i)}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null
+
   return (
     <div ref={scrollerRef} className="overflow-x-auto scroll-visible-dark" style={{ scrollSnapType: 'x mandatory' }}>
       <div className="flex items-stretch min-w-max">
+        {horsCreneauPosition === 'before' && horsCreneauBlock}
         {colonnes.map((col, idx) => {
           const items = bucketsParCreneau.get(col.key) ?? []
           const isNow = col.key === nowKey
@@ -269,29 +318,7 @@ export default function AgendaCreneauxColonnes<T>({
           )
         })}
 
-        {/* Colonne "Hors créneau" en queue */}
-        {horsCreneau.length > 0 && (
-          <div
-            className="shrink-0 flex flex-col border-l-2 border-zinc-700 bg-zinc-900/30"
-            style={{ width: horsCreneauWidth, scrollSnapAlign: 'start' }}
-          >
-            <div className="sticky top-0 z-10 px-3 py-2 border-b border-zinc-700 bg-zinc-900/95 backdrop-blur">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-400">⏸ Hors créneau</p>
-                <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black tabular-nums">
-                  {horsCreneau.length}
-                </span>
-              </div>
-            </div>
-            <div className="flex-1 flex flex-col gap-2 p-2 min-h-[200px]">
-              {horsCreneau.map((data, i) => (
-                <div key={`hors-${i}`}>
-                  {renderItem(data, i)}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {horsCreneauPosition === 'after' && horsCreneauBlock}
       </div>
     </div>
   )
