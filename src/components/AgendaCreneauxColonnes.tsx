@@ -222,9 +222,12 @@ export default function AgendaCreneauxColonnes<T>({
   }, [colonnes, bucketsParCreneau, nowMinuteMs])
 
   // ─── Auto-scroll sur la cible (commande la plus proche, pas tranche vide) ───
-  // Se déclenche AU MONTAGE + à CHAQUE CHANGEMENT DE CIBLE :
-  //   - nouvelle commande arrive sur un créneau plus proche → re-scroll
-  //   - commande de la cible actuelle est servie → re-scroll sur la suivante
+  // Se déclenche AU MONTAGE + à chaque changement de :
+  //   - cibleScrollKey : nouvelle commande sur un créneau plus proche, ou
+  //     commande de la cible servie → suivante
+  //   - items.length : NOUVELLE commande arrive (salle / comptoir / online),
+  //     même si la cible reste la 1ère colonne → re-scroll pour garantir
+  //     que la commande est visible
   //   - le temps avance et la "plus proche" change → re-scroll
   //
   // Cas spécial : si AUCUNE commande dans les colonnes horaires mais qu'il
@@ -241,7 +244,7 @@ export default function AgendaCreneauxColonnes<T>({
     // Centre approximatif : laisse 1 colonne de marge à gauche
     const left = target.offsetLeft - columnWidth
     scrollerRef.current.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
-  }, [columnWidth, cibleScrollKey, horsCreneau.length, horsCreneauPosition])
+  }, [columnWidth, cibleScrollKey, horsCreneau.length, horsCreneauPosition, items.length])
 
   // ─── Empty state ───────────────────────────────────────────────────
   if (items.length === 0) {
