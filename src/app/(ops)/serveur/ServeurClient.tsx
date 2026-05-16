@@ -263,75 +263,131 @@ export default function ServeurClient({
 
   const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
 
+  const [modalActif, setModalActif] = useState<null | 'a_servir' | 'a_encaisser'>(null)
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* ═══ HEADER ultra-compact POS pro (h-14) ═══ */}
+      {/* ═══ BARRE DE NAVIGATION FULL-WIDTH avec TOUS les boutons ═══ */}
       <header className="shrink-0 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-lg shadow-md shrink-0">🪑</span>
-            <div className="hidden sm:block min-w-0">
+        <div className="px-3 sm:px-4 py-2.5 flex items-center gap-2 flex-wrap">
+          {/* Logo + titre */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-md">🪑</span>
+            <div className="hidden sm:block">
               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 leading-none">Service salle</p>
-              <h1 className="font-display italic text-lg font-medium text-white tracking-[-0.02em] leading-none mt-0.5 truncate">Plan de table</h1>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Plan de table</h1>
             </div>
           </div>
 
-          {/* Stats inline header (CA, Tables, À servir, À encaisser) */}
-          <div className="hidden md:flex items-center gap-1.5 text-xs">
+          <div className="hidden md:block w-px h-9 bg-zinc-800 mx-1" aria-hidden />
+
+          {/* Stats inline */}
+          <div className="hidden md:flex items-center gap-1.5">
             <HeaderStat icon="💶" value={fmtPrix(serveurStats.caEnCours)} label="CA" tone="emerald" />
             <HeaderStat icon="🪑" value={String(serveurStats.nbTables)} label="Tables" tone="amber" />
-            <HeaderStat icon="🔔" value={String(nbArticlesPrets)} label="À servir" tone="emerald" pulse={nbArticlesPrets > 0} />
-            <HeaderStat icon="💳" value={String(aEncaisser.length)} label="À encais." tone="rose" pulse={aEncaisser.length > 0} />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex-1" />
+
+          {/* Boutons d'action principaux : À servir + À encaisser + Caisse */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setModalActif('a_servir')}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 h-11 rounded-lg font-black text-sm transition-all active:scale-95 shadow-lg',
+                nbArticlesPrets > 0
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/40 animate-pulse'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
+              )}
+            >
+              <span className="text-lg">🔔</span>
+              <span className="hidden sm:inline">À servir</span>
+              <span className={cn(
+                'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
+                nbArticlesPrets > 0 ? 'bg-white text-emerald-700' : 'bg-zinc-700 text-zinc-400',
+              )}>
+                {nbArticlesPrets}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setModalActif('a_encaisser')}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 h-11 rounded-lg font-black text-sm transition-all active:scale-95 shadow-lg',
+                aEncaisser.length > 0
+                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/40 animate-pulse'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
+              )}
+            >
+              <span className="text-lg">💳</span>
+              <span className="hidden sm:inline">À encaisser</span>
+              <span className={cn(
+                'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
+                aEncaisser.length > 0 ? 'bg-white text-rose-700' : 'bg-zinc-700 text-zinc-400',
+              )}>
+                {aEncaisser.length}
+              </span>
+            </button>
+
+            <div className="hidden md:block w-px h-9 bg-zinc-800 mx-1" aria-hidden />
+
+            {/* Serveur select */}
             <select
               value={serveurId}
               onChange={e => setServeurId(e.target.value)}
-              className="text-xs px-2 h-9 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-100 max-w-[140px]"
+              className="text-xs px-3 h-11 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold max-w-[160px]"
             >
               <option value="">— Serveur —</option>
               {employes.map(e => (
                 <option key={e.id} value={e.id}>{e.prenom} {e.nom[0]}.</option>
               ))}
             </select>
-            <Link href="/caisse" className="text-xs px-3 h-9 inline-flex items-center rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold whitespace-nowrap">
-              💰 Caisse
+
+            <Link
+              href="/caisse"
+              className="inline-flex items-center gap-1.5 px-4 h-11 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap"
+            >
+              💰 <span className="hidden sm:inline">Caisse</span>
             </Link>
           </div>
         </div>
         <AppelsServeurBanner serveurId={serveurId || null} />
       </header>
 
-      {/* ═══ LAYOUT POS COCKPIT : 2 colonnes desktop, stack mobile ═══ */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] overflow-hidden min-h-0">
-        {/* COLONNE GAUCHE : Plan de salle (toute la hauteur, pas de scroll global) */}
-        <section className="overflow-hidden flex flex-col p-3 sm:p-4 lg:border-r lg:border-zinc-800 min-h-0">
-          <PlanSalle
-            zones={zones}
-            cmdParTable={cmdParTable}
-            pretsParTable={pretsParTable}
-            onOuvrir={ouvrirTable}
-          />
-        </section>
+      {/* ═══ PLAN DE TABLES — 100% width, prend toute la hauteur restante ═══ */}
+      <main className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4">
+        <PlanSalle
+          zones={zones}
+          cmdParTable={cmdParTable}
+          pretsParTable={pretsParTable}
+          onOuvrir={ouvrirTable}
+        />
+      </main>
 
-        {/* COLONNE DROITE : Activité (À servir + À encaisser empilés, scrolle indépendamment) */}
-        <aside className="hidden lg:flex flex-col overflow-hidden bg-zinc-950">
-          {/* Section À SERVIR (top half) */}
-          <div className="flex-1 flex flex-col overflow-hidden border-b border-zinc-800">
-            <header className="shrink-0 px-4 py-2.5 bg-zinc-900/80 backdrop-blur flex items-center justify-between border-b border-zinc-800">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🔔</span>
-                <h2 className="font-display italic text-base font-medium text-white tracking-tight">À servir</h2>
+      {/* ═══ MODAL À SERVIR (full-screen overlay) ═══ */}
+      {modalActif === 'a_servir' && (
+        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <header className="shrink-0 px-5 py-4 bg-emerald-500/10 border-b border-emerald-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔔</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Live</p>
+                  <h2 className="font-display italic text-2xl font-medium text-white tracking-tight">À servir</h2>
+                </div>
                 {nbArticlesPrets > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-black tabular-nums animate-pulse">
+                  <span className="inline-flex items-center justify-center min-w-7 h-7 px-2.5 rounded-full bg-emerald-500 text-white text-sm font-black tabular-nums animate-pulse">
                     {nbArticlesPrets}
                   </span>
                 )}
               </div>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">Live</span>
+              <button
+                onClick={() => setModalActif(null)}
+                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
+                aria-label="Fermer"
+              >✕</button>
             </header>
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-4">
               <ListeAServir
                 commandes={cmdsAvecPrets}
                 onMarquerServi={marquerServi}
@@ -339,63 +395,41 @@ export default function ServeurClient({
               />
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Section À ENCAISSER (bottom half) */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <header className="shrink-0 px-4 py-2.5 bg-zinc-900/80 backdrop-blur flex items-center justify-between border-b border-zinc-800">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">💳</span>
-                <h2 className="font-display italic text-base font-medium text-white tracking-tight">À encaisser</h2>
+      {/* ═══ MODAL À ENCAISSER (full-screen overlay) ═══ */}
+      {modalActif === 'a_encaisser' && (
+        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <header className="shrink-0 px-5 py-4 bg-rose-500/10 border-b border-rose-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">💳</span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">Live</p>
+                  <h2 className="font-display italic text-2xl font-medium text-white tracking-tight">À encaisser</h2>
+                </div>
                 {aEncaisser.length > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-black tabular-nums animate-pulse">
+                  <span className="inline-flex items-center justify-center min-w-7 h-7 px-2.5 rounded-full bg-rose-600 text-white text-sm font-black tabular-nums animate-pulse">
                     {aEncaisser.length}
                   </span>
                 )}
               </div>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-400">Live</span>
+              <button
+                onClick={() => setModalActif(null)}
+                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
+                aria-label="Fermer"
+              >✕</button>
             </header>
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-4">
               <ListeAEncaisser
                 commandes={aEncaisser}
-                onEncaisser={c => setEncaisserCmd(c)}
+                onEncaisser={c => { setEncaisserCmd(c); setModalActif(null) }}
               />
             </div>
           </div>
-        </aside>
-
-        {/* MOBILE/TABLET : Tabs flottants bottom pour switcher Plan/Servir/Encaisser */}
-        <div className="lg:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 bg-zinc-900/95 backdrop-blur-md rounded-full p-1 shadow-2xl border border-zinc-700">
-          <TabButton active={tab === 'plan'} onClick={() => setTab('plan')}>🪑 Plan</TabButton>
-          <TabButton active={tab === 'a_servir'} onClick={() => setTab('a_servir')}>
-            🔔
-            {nbArticlesPrets > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-emerald-500 text-white text-[9px] font-bold animate-pulse">
-                {nbArticlesPrets}
-              </span>
-            )}
-          </TabButton>
-          <TabButton active={tab === 'a_encaisser'} onClick={() => setTab('a_encaisser')}>
-            💳
-            {aEncaisser.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold animate-pulse">
-                {aEncaisser.length}
-              </span>
-            )}
-          </TabButton>
         </div>
-
-        {/* Mobile : afficher liste à servir / à encaisser en plein écran selon tab */}
-        {tab === 'a_servir' && (
-          <div className="lg:hidden fixed inset-0 z-30 bg-zinc-950 overflow-y-auto p-3 pt-20 pb-24">
-            <ListeAServir commandes={cmdsAvecPrets} onMarquerServi={marquerServi} onMarquerToutServi={marquerToutServi} />
-          </div>
-        )}
-        {tab === 'a_encaisser' && (
-          <div className="lg:hidden fixed inset-0 z-30 bg-zinc-950 overflow-y-auto p-3 pt-20 pb-24">
-            <ListeAEncaisser commandes={aEncaisser} onEncaisser={c => setEncaisserCmd(c)} />
-          </div>
-        )}
-      </main>
+      )}
 
       {/* Toasts */}
       {erreur && (
