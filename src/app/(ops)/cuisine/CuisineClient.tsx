@@ -674,10 +674,8 @@ function PizzaAgenda({
         accent="red"
         now={new Date(now)}
         columnWidth={300}
-        // Commandes salle (sans créneau retrait) → à servir au plus vite,
-        // donc colonne dédiée en PREMIER (à gauche) avant les colonnes horaires.
-        horsCreneauPosition="before"
-        horsCreneauLabel="🍽 Salle · immédiat"
+        // Commandes salle (sans créneau) + retards → placées dans la 1ère colonne
+        // (= heure actuelle) par le composant directement. Plus de colonne séparée.
         emptyMessage="Aucune commande pizza dans l'agenda."
       />
     </div>

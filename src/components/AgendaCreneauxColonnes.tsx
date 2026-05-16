@@ -114,7 +114,7 @@ export default function AgendaCreneauxColonnes<T>({
   horsCreneauPosition = 'after',
   horsCreneauLabel = '⏸ Hors créneau',
   startFromNow = true,
-  bufferMinutesBefore = 30,
+  bufferMinutesBefore = 0,
 }: AgendaCreneauxColonnesProps<T>) {
   const accentCls = ACCENT_CLS[accent]
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -157,32 +157,47 @@ export default function AgendaCreneauxColonnes<T>({
   }, [baseStartMs, date, endHour, stepMinutes])
 
   // ─── Bucket items par créneau ──────────────────────────────────────
-  // Les commandes avec créneau < baseStartMs (= en retard) tombent dans horsCreneau.
-  // Les commandes avec créneau > endHour tombent aussi dans horsCreneau.
+  // RÈGLE :
+  // - Item sans créneau (salle / comptoir) → 1ère colonne (= maintenant)
+  //   pour traitement immédiat, plus de colonne 'Hors créneau' séparée.
+  // - Item avec créneau passé (en retard) → 1ère colonne (= maintenant)
+  //   pour rattraper le retard.
+  // - Item avec créneau futur ≤ fin de journée → colonne correspondante.
+  // - Item avec créneau au-delà de la fin → horsCreneau (rare, ex: J+1).
   const finOfDayMs = useMemo(() => {
     const d = new Date(date)
     d.setHours(endHour, 0, 0, 0)
     return d.getTime()
   }, [date, endHour])
+  const firstColKey = useMemo(() => {
+    const d = new Date(baseStartMs)
+    return dateKey(d)
+  }, [baseStartMs])
   const { bucketsParCreneau, horsCreneau } = useMemo(() => {
     const map = new Map<string, T[]>()
     const hors: T[] = []
+    const putInFirst = (data: T) => {
+      const arr = map.get(firstColKey) ?? []
+      arr.push(data)
+      map.set(firstColKey, arr)
+    }
     for (const it of items) {
-      if (!it.creneauISO) { hors.push(it.data); continue }
+      // Pas de créneau → directement dans la 1ère colonne
+      if (!it.creneauISO) { putInFirst(it.data); continue }
       const d = new Date(it.creneauISO)
       const aligned = floorToStep(d, stepMinutes)
       const alignedMs = aligned.getTime()
-      // Hors plage visible : avant la 1ère colonne (retard) ou après fin de journée
-      if (alignedMs < baseStartMs || alignedMs > finOfDayMs) {
-        hors.push(it.data); continue
-      }
+      // En retard (créneau passé) → 1ère colonne pour traitement immédiat
+      if (alignedMs < baseStartMs) { putInFirst(it.data); continue }
+      // Au-delà de la fin de journée (rare) → horsCreneau
+      if (alignedMs > finOfDayMs) { hors.push(it.data); continue }
       const k = dateKey(aligned)
       const arr = map.get(k) ?? []
       arr.push(it.data)
       map.set(k, arr)
     }
     return { bucketsParCreneau: map, horsCreneau: hors }
-  }, [items, stepMinutes, baseStartMs, finOfDayMs])
+  }, [items, stepMinutes, baseStartMs, finOfDayMs, firstColKey])
 
   // ─── Cible scroll : colonne avec commandes la plus proche de maintenant ───
   // RÈGLE : si "maintenant" (14:00) n'a pas de commande mais qu'une commande
@@ -282,6 +297,7 @@ export default function AgendaCreneauxColonnes<T>({
         {colonnes.map((col, idx) => {
           const items = bucketsParCreneau.get(col.key) ?? []
           const isNow = col.key === nowKey
+          const isFirst = col.key === firstColKey
           const isCible = col.key === cibleScrollKey
           const isHourMark = col.date.getMinutes() === 0
           // Une seule ref par colonne ; priorité à la cible (vu qu'on scroll dessus)
@@ -309,25 +325,35 @@ export default function AgendaCreneauxColonnes<T>({
                       : 'border-zinc-800/60 bg-zinc-950/80',
               )}>
                 <div className="flex items-center justify-between gap-2">
-                  <p className={cn(
-                    'font-display italic tracking-tight tabular-nums',
-                    isHourMark ? 'text-lg font-bold' : 'text-sm font-medium',
-                    isCible ? accentCls.text : isNow ? 'text-zinc-200' : 'text-zinc-300',
-                  )}>
-                    {col.label}
-                  </p>
+                  <div className="flex items-baseline gap-1.5 min-w-0">
+                    <p className={cn(
+                      'font-display italic tracking-tight tabular-nums',
+                      isHourMark ? 'text-lg font-bold' : 'text-sm font-medium',
+                      isCible ? accentCls.text : isNow ? 'text-zinc-200' : 'text-zinc-300',
+                    )}>
+                      {col.label}
+                    </p>
+                    {isFirst && (
+                      <span className={cn(
+                        'text-[8px] font-black uppercase tracking-[0.18em] px-1.5 py-0.5 rounded',
+                        accentCls.bar, 'text-white',
+                      )}>
+                        Maintenant
+                      </span>
+                    )}
+                  </div>
                   {items.length > 0 && (
                     <span className={cn(
                       'inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[10px] font-black tabular-nums',
-                      isCible ? cn(accentCls.bar, 'text-white') : 'bg-zinc-700 text-zinc-200',
+                      isCible || isFirst ? cn(accentCls.bar, 'text-white') : 'bg-zinc-700 text-zinc-200',
                     )}>
                       {items.length}
                     </span>
                   )}
-                  {isNow && (
+                  {isNow && !isFirst && (
                     <span className={cn('flex h-2 w-2 rounded-full animate-pulse', accentCls.bar)} aria-label="Maintenant" />
                   )}
-                  {isCible && !isNow && (
+                  {isCible && !isNow && !isFirst && (
                     <span className={cn('text-[9px] font-black uppercase tracking-widest', accentCls.text)} title="Prochaine commande">↓</span>
                   )}
                 </div>
