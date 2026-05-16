@@ -150,21 +150,28 @@ export default function AgendaCreneauxColonnes<T>({
   // existe à 14:30 et une autre à 15:45, on scrolle sur 14:30 (la plus proche).
   // Si toutes les commandes sont passées, on scrolle sur la plus récente.
   // Si aucune commande dans l'agenda → fallback sur "maintenant".
+  //
+  // OPTIM : on arrondit `now` à la minute pour ne pas recalculer (et re-scroller)
+  // toutes les secondes quand les parents tickent now chaque seconde.
+  const nowMinuteMs = Math.floor(now.getTime() / 60_000) * 60_000
   const cibleScrollKey = useMemo(() => {
     const colsAvecItems = colonnes.filter(c => (bucketsParCreneau.get(c.key)?.length ?? 0) > 0)
     if (colsAvecItems.length === 0) return null
-    const nowMs = now.getTime()
     // Plus petit |col.date - now|
     let best = colsAvecItems[0]
-    let bestDiff = Math.abs(best.date.getTime() - nowMs)
+    let bestDiff = Math.abs(best.date.getTime() - nowMinuteMs)
     for (const c of colsAvecItems) {
-      const d = Math.abs(c.date.getTime() - nowMs)
+      const d = Math.abs(c.date.getTime() - nowMinuteMs)
       if (d < bestDiff) { best = c; bestDiff = d }
     }
     return best.key
-  }, [colonnes, bucketsParCreneau, now])
+  }, [colonnes, bucketsParCreneau, nowMinuteMs])
 
   // ─── Auto-scroll sur la cible (commande la plus proche, pas tranche vide) ───
+  // Se déclenche AU MONTAGE + à CHAQUE CHANGEMENT DE CIBLE :
+  //   - nouvelle commande arrive sur un créneau plus proche → re-scroll
+  //   - commande de la cible actuelle est servie → re-scroll sur la suivante
+  //   - le temps avance et la "plus proche" change → re-scroll
   useEffect(() => {
     if (!scrollerRef.current) return
     const target = cibleScrollRef.current ?? nowColRef.current
