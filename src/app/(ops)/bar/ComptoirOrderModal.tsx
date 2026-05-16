@@ -630,61 +630,68 @@ function PanierContent({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {panier.length === 0 ? (
-          <p className="text-zinc-500 italic text-center py-8 text-sm">
-            Clique sur les recettes pour les ajouter.
-          </p>
-        ) : panier.map(p => (
-          <div key={p.recette_id} className="rounded-md bg-zinc-900 border border-zinc-800 p-2">
-            <p className="text-sm font-medium">{p.recette_nom}</p>
-            <div className="flex items-center justify-between mt-1.5">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => modifier(p.recette_id, -1)}
-                  className="w-9 h-9 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-lg active:scale-95"
-                >−</button>
-                <span className="w-9 text-center font-bold tabular-nums">{p.quantite}</span>
-                <button
-                  onClick={() => modifier(p.recette_id, +1)}
-                  className="w-9 h-9 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-lg active:scale-95"
-                >+</button>
+      {/* ═══ ZONE SCROLLABLE UNIQUE : articles + erreur + sélecteurs jour/créneaux ═══
+          Avant : articles scrollait seul, sélecteurs en flex-shrink-0 → poussaient
+          le bouton "Envoyer" hors écran avec plusieurs articles + plusieurs tags.
+          Maintenant : tout scroll ensemble, seul le bouton "Envoyer" reste fixe en bas. */}
+      <div className="flex-1 overflow-y-auto min-h-0 scroll-visible-dark">
+        <div className="p-3 space-y-2">
+          {panier.length === 0 ? (
+            <p className="text-zinc-500 italic text-center py-8 text-sm">
+              Clique sur les recettes pour les ajouter.
+            </p>
+          ) : panier.map(p => (
+            <div key={p.recette_id} className="rounded-md bg-zinc-900 border border-zinc-800 p-2">
+              <p className="text-sm font-medium">{p.recette_nom}</p>
+              <div className="flex items-center justify-between mt-1.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => modifier(p.recette_id, -1)}
+                    className="w-9 h-9 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-lg active:scale-95"
+                  >−</button>
+                  <span className="w-9 text-center font-bold tabular-nums">{p.quantite}</span>
+                  <button
+                    onClick={() => modifier(p.recette_id, +1)}
+                    className="w-9 h-9 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-lg active:scale-95"
+                  >+</button>
+                </div>
+                <span className="text-sm tabular-nums text-zinc-400">
+                  {fmtPrix(p.prix_unitaire_ht * p.quantite)}
+                </span>
               </div>
-              <span className="text-sm tabular-nums text-zinc-400">
-                {fmtPrix(p.prix_unitaire_ht * p.quantite)}
-              </span>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {erreur && (
-        <div className="px-4 py-2 bg-red-900/30 border-t border-red-800 text-red-300 text-sm">⚠️ {erreur}</div>
-      )}
-
-      {/* Sélecteur date + slot par tag — desktop uniquement (mobile = bande en haut du modal) */}
-      {tagsAReserver.length > 0 && (
-        <div className="border-t border-zinc-800 flex-shrink-0">
-          <SelecteurDate
-            datesDispo={datesDispo}
-            dateChoisie={dateChoisie}
-            setDateChoisie={setDateChoisie}
-          />
-          {tagsAReserver.map(tag => (
-            <SelecteurSlotTag
-              key={tag}
-              tag={tag}
-              slots={slotsParTag[tag] ?? []}
-              slotChoisi={creneauxParTag[tag] ?? null}
-              setSlotChoisi={iso => setSlotPourTag(tag, iso)}
-              loading={!!loadingParTag[tag]}
-              isToday={isToday}
-            />
           ))}
         </div>
-      )}
 
-      <div className="p-3 border-t border-zinc-800 space-y-2 flex-shrink-0">
+        {erreur && (
+          <div className="px-4 py-2 bg-red-900/30 border-y border-red-800 text-red-300 text-sm">⚠️ {erreur}</div>
+        )}
+
+        {/* Sélecteur date + slot par tag — desktop uniquement (mobile = bande en haut du modal) */}
+        {tagsAReserver.length > 0 && (
+          <div className="border-t border-zinc-800">
+            <SelecteurDate
+              datesDispo={datesDispo}
+              dateChoisie={dateChoisie}
+              setDateChoisie={setDateChoisie}
+            />
+            {tagsAReserver.map(tag => (
+              <SelecteurSlotTag
+                key={tag}
+                tag={tag}
+                slots={slotsParTag[tag] ?? []}
+                slotChoisi={creneauxParTag[tag] ?? null}
+                setSlotChoisi={iso => setSlotPourTag(tag, iso)}
+                loading={!!loadingParTag[tag]}
+                isToday={isToday}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ FOOTER STICKY : bouton Envoyer toujours visible ═══ */}
+      <div className="p-3 border-t-2 border-zinc-800 space-y-2 flex-shrink-0 bg-zinc-950 shadow-[0_-8px_20px_rgba(0,0,0,0.5)]">
         <button
           onClick={envoyer}
           disabled={isPending || panier.length === 0}
