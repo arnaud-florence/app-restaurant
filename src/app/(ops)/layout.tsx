@@ -44,10 +44,25 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
     .limit(50)
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-zinc-100 pb-mobile-nav" data-ops-theme="dark">
-      <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
-      <BackToCategoryButton theme="dark" />
-      {children}
+    <div
+      className="h-[100dvh] flex flex-col bg-[#0D0D0D] text-zinc-100 overflow-hidden"
+      data-ops-theme="dark"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px))' }}
+    >
+      {/* Sur mobile la TopActionBar est fixed-bottom (hors flow).
+          Sur desktop elle est static au top — on la met en shrink-0 dans le flex. */}
+      <div className="hidden md:block shrink-0">
+        <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
+        <BackToCategoryButton theme="dark" />
+      </div>
+      <div className="md:hidden">
+        <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
+      </div>
+      {/* Children prend tout l'espace restant — sur mobile on réserve 6.5rem
+          en bas pour la TopActionBar fixed bottom (hors flow). */}
+      <main className="flex-1 min-h-0 overflow-hidden pb-[6.5rem] md:pb-0">
+        {children}
+      </main>
     </div>
   )
 }

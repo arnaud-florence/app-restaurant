@@ -264,7 +264,7 @@ export default function ServeurClient({
   const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* ═══ HEADER ultra-compact POS pro (h-14) ═══ */}
       <header className="shrink-0 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2">
@@ -304,9 +304,9 @@ export default function ServeurClient({
       </header>
 
       {/* ═══ LAYOUT POS COCKPIT : 2 colonnes desktop, stack mobile ═══ */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] overflow-hidden">
-        {/* COLONNE GAUCHE : Plan de salle (scrolle indépendamment) */}
-        <section className="overflow-y-auto p-3 sm:p-4 lg:border-r lg:border-zinc-800">
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] overflow-hidden min-h-0">
+        {/* COLONNE GAUCHE : Plan de salle (toute la hauteur, pas de scroll global) */}
+        <section className="overflow-hidden flex flex-col p-3 sm:p-4 lg:border-r lg:border-zinc-800 min-h-0">
           <PlanSalle
             zones={zones}
             cmdParTable={cmdParTable}
@@ -626,180 +626,118 @@ function PlanSalle({
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* ═══ MOBILE — Dashboard ultra-compact (3 chips en row) ═══ */}
-      <section className="lg:hidden mb-3 rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 px-3 py-2.5 shadow-lg">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <h1 className="text-base font-black text-white tracking-tight flex items-center gap-1.5">
-            <span aria-hidden>📊</span>Plan de salle
-          </h1>
-          <span className="relative flex h-1.5 w-1.5" title="Live">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <MiniChip icon="💶" value={fmtPrix(globalStats.caEnCours)} label="CA"           accent="emerald" />
-          <MiniChip icon="🪑" value={`${globalStats.nbTablesOuvertes}`} label="Tables"   accent="amber" />
-          <MiniChip icon="💳" value={`${globalStats.nbTablesAEncaisser}`} label="À enc." accent="rose" pulse={globalStats.nbTablesAEncaisser > 0} />
-        </div>
-      </section>
-
-      {/* ═══ DESKTOP — Dashboard header complet (6 tuiles) ═══ */}
-      <section className="hidden lg:block mb-6 rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 p-5 shadow-2xl shadow-black/40 backdrop-blur">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Service en cours</p>
-            <h1 className="text-3xl font-black text-white tracking-tight">Plan de salle</h1>
+    <div className="h-full flex flex-col min-h-0">
+      {/* ═══ Toolbar tout-en-un compact : zones + filtres + recherche ═══ */}
+      <div className="shrink-0 mb-2 flex items-center gap-1.5 flex-wrap">
+        {/* Tabs zones (si > 1) */}
+        {zones.length > 1 && (
+          <div className="flex gap-1 lg:hidden">
+            {zones.map(([zone, ts]) => {
+              const s = zoneStats[zone]
+              const isActive = activeZone === zone
+              const zoneIcon = zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'
+              return (
+                <button
+                  key={zone}
+                  onClick={() => setActiveZone(zone)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold whitespace-nowrap border transition-all',
+                    isActive
+                      ? 'bg-white text-zinc-900 border-white'
+                      : 'bg-zinc-900 text-zinc-300 border-zinc-800',
+                  )}
+                >
+                  <span className="text-xs" aria-hidden>{zoneIcon}</span>
+                  <span className="capitalize">{zone}</span>
+                  <span className="text-[10px] opacity-70">{ts.length}</span>
+                  {s.aEncaisser > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                  )}
+                </button>
+              )
+            })}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            Live · MAJ auto
-          </div>
+        )}
+
+        {/* Filtres statut */}
+        <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-full p-0.5">
+          {([
+            { k: 'tous',         lbl: 'Toutes',  dot: 'bg-zinc-400' },
+            { k: 'libre',        lbl: 'Libres',  dot: 'bg-emerald-400' },
+            { k: 'occupee',      lbl: 'Occ.',    dot: 'bg-amber-400' },
+            { k: 'a_encaisser',  lbl: 'À enc.',  dot: 'bg-rose-400' },
+          ] as const).map(f => (
+            <button
+              key={f.k}
+              onClick={() => setFiltre(f.k)}
+              className={cn(
+                'inline-flex items-center gap-1 px-2.5 h-7 rounded-full text-[11px] font-bold transition-all',
+                filtre === f.k
+                  ? 'bg-white text-zinc-900 shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200',
+              )}
+            >
+              <span className={cn('w-1 h-1 rounded-full', f.dot, filtre === f.k && f.k === 'a_encaisser' && 'animate-pulse')}></span>
+              {f.lbl}
+            </button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
-          <StatTile icon="💶" label="CA en cours"     value={fmtPrix(globalStats.caEnCours)} accent="emerald" />
-          <StatTile icon="🪑" label="Tables ouvertes" value={`${globalStats.nbTablesOuvertes}`} sub={`${globalStats.nbCouvertsOccupes} couverts`} accent="amber" />
-          <StatTile icon="🧾" label="Ticket moyen"    value={fmtPrix(globalStats.ticketMoyen)} accent="violet" />
-          <StatTile icon="⏱"  label="Durée moy."     value={`${globalStats.dureeMoy} min`} accent="blue" />
-          <StatTile icon="🔔" label="À servir"       value={`${globalStats.nbPretsAservir}`} accent="emerald" pulse={globalStats.nbPretsAservir > 0} />
-          <StatTile icon="💳" label="À encaisser"    value={`${globalStats.nbTablesAEncaisser}`} accent="rose" pulse={globalStats.nbTablesAEncaisser > 0} />
-        </div>
-      </section>
+        {/* Recherche */}
+        <input
+          type="search"
+          value={searchT}
+          onChange={e => setSearchT(e.target.value)}
+          placeholder="N° table..."
+          className="flex-1 min-w-[90px] max-w-[200px] h-8 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-[11px]"
+        />
 
-      {/* ═══ MOBILE — Tabs zones horizontales scrollables ═══ */}
-      {zones.length > 1 && (
-        <div className="lg:hidden mb-3 flex gap-1.5 overflow-x-auto -mx-3 px-3 pb-1 snap-x snap-mandatory">
-          {zones.map(([zone, ts]) => {
-            const s = zoneStats[zone]
-            const isActive = activeZone === zone
-            const zoneIcon = zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'
-            return (
-              <button
-                key={zone}
-                onClick={() => setActiveZone(zone)}
-                className={cn(
-                  'snap-start inline-flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-full text-sm font-bold whitespace-nowrap border-2 transition-all',
-                  isActive
-                    ? 'bg-white text-zinc-900 border-white shadow-lg'
-                    : 'bg-zinc-900 text-zinc-300 border-zinc-800',
-                )}
-              >
-                <span className="text-base" aria-hidden>{zoneIcon}</span>
-                <span className="capitalize">{zone}</span>
-                <span className={cn(
-                  'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
-                  isActive ? 'bg-zinc-900 text-white' : 'bg-zinc-800 text-zinc-500',
-                )}>{ts.length}</span>
-                {s.aEncaisser > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" aria-label={`${s.aEncaisser} à encaisser`}></span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ═══ Toolbar : filtres rapides + recherche + density toggle ═══ */}
-      <div className="sticky top-0 z-10 mb-4 -mx-3 px-3 py-2 bg-zinc-950/90 backdrop-blur-md border-y border-zinc-800">
-        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto lg:flex-wrap">
-          {/* Filtres statut */}
-          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full p-1">
-            {([
-              { k: 'tous',         lbl: 'Toutes',       dot: 'bg-zinc-400' },
-              { k: 'libre',        lbl: 'Libres',       dot: 'bg-emerald-400' },
-              { k: 'occupee',      lbl: 'Occupées',     dot: 'bg-amber-400' },
-              { k: 'a_encaisser',  lbl: 'À encaisser',  dot: 'bg-rose-400' },
-            ] as const).map(f => (
-              <button
-                key={f.k}
-                onClick={() => setFiltre(f.k)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-bold transition-all',
-                  filtre === f.k
-                    ? 'bg-white text-zinc-900 shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200',
-                )}
-              >
-                <span className={cn('w-1.5 h-1.5 rounded-full', f.dot, filtre === f.k && f.k === 'a_encaisser' && 'animate-pulse')}></span>
-                {f.lbl}
-              </button>
-            ))}
-          </div>
-
-          {/* Recherche numéro table */}
-          <div className="relative flex-1 min-w-[160px] max-w-[280px]">
-            <input
-              type="search"
-              value={searchT}
-              onChange={e => setSearchT(e.target.value)}
-              placeholder="N° table..."
-              className="w-full min-h-[36px] px-3 pr-8 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 outline-none text-xs"
-            />
-            {searchT && (
-              <button onClick={() => setSearchT('')} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs leading-none">×</button>
-            )}
-          </div>
-
-          {/* Toggle vue compacte */}
-          <button
-            onClick={() => setCompact(!compact)}
-            className={cn(
-              'inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-xs font-bold border transition-all',
-              compact
-                ? 'bg-white text-zinc-900 border-white'
-                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600',
-            )}
-            title={compact ? 'Vue détaillée' : 'Vue compacte'}
-          >
-            {compact ? '⊞ Détaillée' : '⊟ Compacte'}
-          </button>
-        </div>
+        {/* Toggle compact */}
+        <button
+          onClick={() => setCompact(!compact)}
+          className={cn(
+            'inline-flex items-center justify-center w-8 h-8 rounded-full text-xs border transition-all shrink-0',
+            compact
+              ? 'bg-white text-zinc-900 border-white'
+              : 'bg-zinc-900 text-zinc-400 border-zinc-800',
+          )}
+          title={compact ? 'Vue détaillée' : 'Vue compacte'}
+        >
+          {compact ? '⊞' : '⊟'}
+        </button>
       </div>
 
-      <div className="space-y-8">
+      <div className="flex-1 overflow-y-auto space-y-3">
       {zones.map(([zone, tables]) => {
         const s = zoneStats[zone]
         const tablesFiltrees = tables.filter(shouldShow)
         if (tablesFiltrees.length === 0) return null
-        // Sur mobile : cacher si pas la zone active. Sur desktop : tout afficher.
         return (
           <section key={zone} className={cn(
             'animate-in fade-in duration-500',
             zones.length > 1 && activeZone !== zone && 'hidden lg:block',
           )}>
-            {/* Header zone — titre dramatique + pastilles stats (caché sur mobile, géré par tabs) */}
-            <header className="hidden lg:flex mb-4 items-end justify-between flex-wrap gap-3 px-1">
-              <div>
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
-                  <h2 className="text-3xl font-black capitalize text-white tracking-tight">{zone}</h2>
-                </div>
-                <p className="text-xs text-zinc-500 mt-0.5 ml-12">
-                  {s.couvertsOccupes}/{s.capaTotale} couverts · {s.total} table{s.total > 1 ? 's' : ''}
-                </p>
+            {/* Header zone ULTRA-COMPACT : juste un mini badge avec nom + stats inline */}
+            <header className="hidden lg:flex mb-2 items-center justify-between gap-2 px-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
+                <h2 className="text-sm font-black capitalize text-white tracking-tight">{zone}</h2>
+                <span className="text-[10px] text-zinc-500">{s.couvertsOccupes}/{s.capaTotale} couverts</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-semibold">
+              <div className="flex items-center gap-1 text-[10px] font-bold">
                 {s.libre > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    {s.libre} libre{s.libre > 1 ? 's' : ''}
+                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-emerald-500/15 text-emerald-300">
+                    <span className="w-1 h-1 rounded-full bg-emerald-400"></span>{s.libre}
                   </span>
                 )}
                 {s.occupee > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                    {s.occupee} occupée{s.occupee > 1 ? 's' : ''}
+                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-amber-500/15 text-amber-300">
+                    <span className="w-1 h-1 rounded-full bg-amber-400"></span>{s.occupee}
                   </span>
                 )}
                 {s.aEncaisser > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/15 text-rose-200 border border-rose-500/40 shadow-md shadow-rose-900/30">
-                    <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
-                    {s.aEncaisser} à encaisser
+                  <span className="inline-flex items-center gap-1 px-2 h-5 rounded-full bg-rose-500/20 text-rose-200">
+                    <span className="w-1 h-1 rounded-full bg-rose-400 animate-pulse"></span>{s.aEncaisser}
                   </span>
                 )}
               </div>
