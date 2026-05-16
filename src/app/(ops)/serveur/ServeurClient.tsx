@@ -267,89 +267,91 @@ export default function ServeurClient({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* ═══ BARRE DE NAVIGATION FULL-WIDTH avec TOUS les boutons ═══ */}
+      {/* ═══ BARRE DE NAVIGATION FULL-WIDTH — UNE SEULE LIGNE COMPACTE ═══ */}
       <header className="shrink-0 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-3 sm:px-4 py-2.5 flex items-center gap-2 flex-wrap">
-          {/* Logo + titre */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-md">🪑</span>
-            <div className="hidden sm:block">
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 leading-none">Service salle</p>
+        {/* 1 SEULE rangée — tous les éléments même hauteur h-10, même design rounded-xl */}
+        <div className="px-3 h-14 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+          {/* Logo (carré tactile uniforme) */}
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-md">🪑</span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 leading-none">Service</p>
               <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Plan de table</h1>
             </div>
           </div>
 
-          <div className="hidden md:block w-px h-9 bg-zinc-800 mx-1" aria-hidden />
-
-          {/* Stats inline */}
-          <div className="hidden md:flex items-center gap-1.5">
-            <HeaderStat icon="💶" value={fmtPrix(serveurStats.caEnCours)} label="CA" tone="emerald" />
-            <HeaderStat icon="🪑" value={String(serveurStats.nbTables)} label="Tables" tone="amber" />
+          {/* Stats CA · Tables — chips uniformes */}
+          <div className="hidden md:inline-flex items-center gap-1.5 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+              <span className="text-base">💶</span>{fmtPrix(serveurStats.caEnCours)}
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+              <span className="text-base">🪑</span>{serveurStats.nbTables}
+            </span>
           </div>
 
-          <div className="flex-1" />
+          {/* Spacer */}
+          <div className="flex-1 min-w-2" />
 
-          {/* Boutons d'action principaux : À servir + À encaisser + Caisse */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setModalActif('a_servir')}
-              className={cn(
-                'inline-flex items-center gap-2 px-4 h-11 rounded-lg font-black text-sm transition-all active:scale-95 shadow-lg',
-                nbArticlesPrets > 0
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/40 animate-pulse'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
-              )}
-            >
-              <span className="text-lg">🔔</span>
-              <span className="hidden sm:inline">À servir</span>
-              <span className={cn(
-                'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
-                nbArticlesPrets > 0 ? 'bg-white text-emerald-700' : 'bg-zinc-700 text-zinc-400',
-              )}>
-                {nbArticlesPrets}
-              </span>
-            </button>
+          {/* Boutons d'action — TOUS h-11 rounded-xl design uniforme */}
+          <button
+            onClick={() => setModalActif('a_servir')}
+            className={cn(
+              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
+              nbArticlesPrets > 0
+                ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/40 animate-pulse'
+                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
+            )}
+          >
+            <span className="text-lg">🔔</span>
+            <span className="hidden sm:inline">À servir</span>
+            <span className={cn(
+              'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
+              nbArticlesPrets > 0 ? 'bg-white text-emerald-700' : 'bg-zinc-700 text-zinc-400',
+            )}>
+              {nbArticlesPrets}
+            </span>
+          </button>
 
-            <button
-              onClick={() => setModalActif('a_encaisser')}
-              className={cn(
-                'inline-flex items-center gap-2 px-4 h-11 rounded-lg font-black text-sm transition-all active:scale-95 shadow-lg',
-                aEncaisser.length > 0
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/40 animate-pulse'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
-              )}
-            >
-              <span className="text-lg">💳</span>
-              <span className="hidden sm:inline">À encaisser</span>
-              <span className={cn(
-                'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
-                aEncaisser.length > 0 ? 'bg-white text-rose-700' : 'bg-zinc-700 text-zinc-400',
-              )}>
-                {aEncaisser.length}
-              </span>
-            </button>
+          <button
+            onClick={() => setModalActif('a_encaisser')}
+            className={cn(
+              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
+              aEncaisser.length > 0
+                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/40 animate-pulse'
+                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
+            )}
+          >
+            <span className="text-lg">💳</span>
+            <span className="hidden sm:inline">À encaisser</span>
+            <span className={cn(
+              'inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs font-black tabular-nums',
+              aEncaisser.length > 0 ? 'bg-white text-rose-700' : 'bg-zinc-700 text-zinc-400',
+            )}>
+              {aEncaisser.length}
+            </span>
+          </button>
 
-            <div className="hidden md:block w-px h-9 bg-zinc-800 mx-1" aria-hidden />
+          {/* Serveur select — même style */}
+          <select
+            value={serveurId}
+            onChange={e => setServeurId(e.target.value)}
+            className="text-xs px-2.5 h-10 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 font-black max-w-[160px] shrink-0"
+          >
+            <option value="">— Serveur —</option>
+            {employes.map(e => (
+              <option key={e.id} value={e.id}>{e.prenom} {e.nom[0]}.</option>
+            ))}
+          </select>
 
-            {/* Serveur select */}
-            <select
-              value={serveurId}
-              onChange={e => setServeurId(e.target.value)}
-              className="text-xs px-3 h-11 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold max-w-[160px]"
-            >
-              <option value="">— Serveur —</option>
-              {employes.map(e => (
-                <option key={e.id} value={e.id}>{e.prenom} {e.nom[0]}.</option>
-              ))}
-            </select>
-
-            <Link
-              href="/caisse"
-              className="inline-flex items-center gap-1.5 px-4 h-11 rounded-lg bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap"
-            >
-              💰 <span className="hidden sm:inline">Caisse</span>
-            </Link>
-          </div>
+          {/* Bouton Caisse — même style */}
+          <Link
+            href="/caisse"
+            className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
+          >
+            <span className="text-lg">💰</span>
+            <span className="hidden sm:inline">Caisse</span>
+          </Link>
         </div>
         <AppelsServeurBanner serveurId={serveurId || null} />
       </header>
@@ -743,7 +745,7 @@ function PlanSalle({
         />
       </div>
 
-      {/* ═══ PLAN DE SALLE — UN SEUL GRAND GRID AUTO-FIT qui remplit toute la viewport ═══ */}
+      {/* ═══ PLAN DE SALLE — Grid auto-fit avec tables TAILLE FIXE confortable + scroll si débord ═══ */}
       {allTablesFiltered.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
           <div className="text-center">
@@ -759,9 +761,10 @@ function PlanSalle({
         </div>
       ) : (
         <div
-          className="flex-1 min-h-0 grid gap-3 lg:gap-4 overflow-hidden auto-rows-fr"
+          className="flex-1 min-h-0 overflow-y-auto grid gap-3 lg:gap-4 content-start"
           style={{
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gridAutoRows: '150px',
           }}
         >
           {/* Itère TOUTES les tables (toutes zones combinées) en 1 seul grid */}

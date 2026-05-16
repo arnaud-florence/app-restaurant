@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
-import BackToCategoryButton from '@/components/BackToCategoryButton'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -50,10 +49,10 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px))' }}
     >
       {/* Sur mobile la TopActionBar est fixed-bottom (hors flow).
-          Sur desktop elle est static au top — on la met en shrink-0 dans le flex. */}
+          Sur desktop elle est static au top — on la met en shrink-0 dans le flex.
+          BackToCategoryButton CACHÉ en mode ops (service intense = fullscreen). */}
       <div className="hidden md:block shrink-0">
         <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
-        <BackToCategoryButton theme="dark" />
       </div>
       <div className="md:hidden">
         <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
