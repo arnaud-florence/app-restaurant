@@ -72,31 +72,71 @@ export default function CaisseClient({
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav bg-[#0D0D0D]">
       <OpsBottomNav profil={navProfil} />
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-lg shadow-emerald-900/40">
-              💰
+      {/* ═══ HEADER POS UNIFIÉ ═══ */}
+      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-lg shadow-md shrink-0">💰</span>
+            <span className={cn(
+              'flex-1 inline-flex items-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              resume ? 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30' : 'bg-zinc-800 text-zinc-400 ring-zinc-700',
+            )}>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className={cn('absolute inline-flex h-full w-full rounded-full', resume ? 'bg-emerald-400 opacity-75 animate-ping' : 'bg-zinc-500')}></span>
+                <span className={cn('relative inline-flex rounded-full h-1.5 w-1.5', resume ? 'bg-emerald-500' : 'bg-zinc-500')}></span>
+              </span>
+              {resume ? 'Session ouverte' : 'Fermée'}
             </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Service · Z-report</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Caisse</h1>
-            </div>
             {resume && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold ml-1">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                </span>
-                Ouverte
+              <span className="inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black tabular-nums shrink-0">
+                {fmtPrix(Number(resume.session.ca_attendu ?? 0))}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/serveur" className="text-sm px-3 h-10 inline-flex items-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 transition-colors">
-              ← Salle
-            </Link>
+          <div className="flex items-center gap-1.5">
+            <Link href="/serveur" className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700">← Salle</Link>
+            {resume && (
+              <button onClick={() => setShowCloture(true)} className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-red-600 text-white text-xs font-black shadow-lg shadow-red-500/30">
+                🔒 Clôturer
+              </button>
+            )}
           </div>
+        </div>
+        <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-md">💰</span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 leading-none">Service · Z-report</p>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Caisse</h1>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 shrink-0">
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black whitespace-nowrap',
+              resume ? 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30' : 'bg-zinc-800 text-zinc-400 ring-zinc-700')}>
+              <span className="relative flex h-2 w-2">
+                <span className={cn('absolute inline-flex h-full w-full rounded-full', resume ? 'bg-emerald-400 opacity-75 animate-ping' : 'bg-zinc-500')}></span>
+                <span className={cn('relative inline-flex rounded-full h-2 w-2', resume ? 'bg-emerald-500' : 'bg-zinc-500')}></span>
+              </span>
+              {resume ? 'Session ouverte' : 'Fermée'}
+            </span>
+            {resume && (
+              <>
+                <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black tabular-nums whitespace-nowrap">
+                  CA <span className="text-emerald-600">{fmtPrix(Number(resume.session.ca_attendu ?? 0))}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-800 text-zinc-200 ring-1 ring-zinc-700 text-xs font-black tabular-nums whitespace-nowrap">
+                  💵 Fond <span className="text-emerald-300">{fmtPrix(Number(resume.session.fond_initial ?? 0))}</span>
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex-1 min-w-2" />
+          <Link href="/serveur" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 transition-colors shrink-0">← Salle</Link>
+          {resume && (
+            <button onClick={() => setShowCloture(true)} className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-lg shadow-red-500/30 transition-all active:scale-95 whitespace-nowrap shrink-0">
+              🔒 Clôturer session
+            </button>
+          )}
         </div>
       </header>
 

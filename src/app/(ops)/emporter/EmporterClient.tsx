@@ -6,7 +6,9 @@
 // Actions : Prendre en prep → Prêt → Retiré par client.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import AgendaCreneauxColonnes from '@/components/AgendaCreneauxColonnes'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix, playDing, STATUT_ARTICLE_LABEL } from '@/lib/service'
@@ -219,37 +221,60 @@ export default function EmporterClient({
     <div className="min-h-screen flex flex-col pb-mobile-nav bg-zinc-950">
       <OpsBottomNav profil={navProfil} />
 
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-lg shadow-emerald-900/40">
-              🥪
-            </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Service · Snack & Emporter</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Snack</h1>
-            </div>
+      {/* ═══ HEADER POS UNIFIÉ ═══ */}
+      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-lg shadow-md shrink-0">🥪</span>
+            <span className={cn(
+              'flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums',
+              nbEnAttente > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
+            )}>🔔 {nbEnAttente}</span>
+            <span className={cn('inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums shrink-0',
+              nbPretRetrait > 0 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>📦 {nbPretRetrait}</span>
+            <Link href="/caisse" className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-lg shadow-lg shrink-0">💰</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
-            <KPI label="Prêtes" value={nbPretRetrait} accent={nbPretRetrait > 0 ? 'orange' : 'default'} />
+          <div className="flex items-center gap-1.5">
             {!audioReadyRef.current && (
-              <button onClick={activerSon} className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700">
-                🔔 Activer son
-              </button>
+              <button onClick={activerSon} className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700">🔔 Activer son</button>
             )}
             <button
               onClick={toggleAutoPrint}
-              className={cn(
-                'text-xs px-3 py-2 rounded-md border transition-colors',
-                autoPrint
-                  ? 'bg-emerald-600 border-emerald-500 text-white'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-              )}
-            >
-              🖨 Auto : {autoPrint ? 'ON' : 'OFF'}
-            </button>
+              className={cn('flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl text-xs font-black transition-colors',
+                autoPrint ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-zinc-800 text-zinc-300 border border-zinc-700')}
+            >🖨 Auto {autoPrint ? 'ON' : 'OFF'}</button>
           </div>
+        </div>
+        <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-md">🥪</span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 leading-none">Service · Snack</p>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Emporter</h1>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 shrink-0">
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              nbEnAttente > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>
+              <span className="text-base">🔔</span>{nbEnAttente} en attente
+            </span>
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              nbPretRetrait > 0 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>
+              <span className="text-base">📦</span>{nbPretRetrait} prêtes
+            </span>
+          </div>
+          <div className="flex-1 min-w-2" />
+          {!audioReadyRef.current && (
+            <button onClick={activerSon} className="inline-flex items-center gap-2 px-2.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 shrink-0">🔔 Activer son</button>
+          )}
+          <button
+            onClick={toggleAutoPrint}
+            className={cn('inline-flex items-center gap-2 px-2.5 h-10 rounded-xl text-xs font-black transition-colors shrink-0',
+              autoPrint ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')}
+          >🖨 Auto : {autoPrint ? 'ON' : 'OFF'}</button>
+          <Link href="/caisse" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
+            <span className="text-lg">💰</span><span>Caisse</span>
+          </Link>
         </div>
       </header>
 
@@ -264,67 +289,72 @@ export default function EmporterClient({
       </div>
 
       <main className="flex-1 p-3 space-y-6 pb-32">
-        {/* ─── Section 1 : Commandes ONLINE (site web) ─── */}
+        {/* ─── Section 1 : Commandes ONLINE — AGENDA COLONNES 15min ─── */}
         <section>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-2 px-1">
-            🌐 ONLINE — site web ({commandesOnline.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {commandesOnline.length === 0 ? (
-              <div className="col-span-full text-center text-zinc-500 py-8 border border-dashed border-zinc-800 rounded-md">
-                <p className="text-3xl mb-1">📭</p>
-                <p className="text-sm">Aucune commande online en cours.</p>
-              </div>
-            ) : (
-              commandesOnline.map(c => (
-                <CommandeOnlineCard
-                  key={c.id}
-                  commande={c}
-                  now={now}
-                  onAvancer={avancer}
-                />
-              ))
-            )}
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30">🌐</span>
+              <h2 className="font-display italic text-base text-white tracking-tight">
+                Online <span className="text-zinc-500">·</span> agenda 15 min
+              </h2>
+              <span className="inline-flex items-center px-2 h-6 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-black tabular-nums">
+                {commandesOnline.length}
+              </span>
+            </div>
+            <p className="hidden sm:block text-[10px] uppercase tracking-widest text-zinc-500">⟵ Scroll horizontal ⟶</p>
           </div>
+          <AgendaCreneauxColonnes
+            items={commandesOnline.map(c => ({ creneauISO: c.creneau_retrait, data: c }))}
+            renderItem={(c) => (
+              <CommandeOnlineCard
+                key={c.id}
+                commande={c}
+                now={now}
+                onAvancer={avancer}
+              />
+            )}
+            accent="emerald"
+            now={new Date(now)}
+            emptyMessage="Aucune commande online en cours."
+          />
         </section>
 
-        {/* ─── Section 2 : Commandes COMPTOIR snack (vue agenda par créneau) ─── */}
+        {/* ─── Section 2 : SNACK COMPTOIR — AGENDA COLONNES 15min ─── */}
         <section>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-amber-400 mb-2 px-1">
-            🛒 SNACK COMPTOIR — agenda ({commandesComptoirSnack.length})
-          </h2>
-          {commandesComptoirSnack.length === 0 ? (
-            <div className="text-center text-zinc-500 py-8 border border-dashed border-zinc-800 rounded-md">
-              <p className="text-3xl mb-1">🛒</p>
-              <p className="text-sm">Aucune commande snack en cours.</p>
-              <p className="text-xs mt-1">Clique sur « + Nouvelle commande » pour en créer une.</p>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30">🛒</span>
+              <h2 className="font-display italic text-base text-white tracking-tight">
+                Snack comptoir <span className="text-zinc-500">·</span> agenda 15 min
+              </h2>
+              <span className="inline-flex items-center px-2 h-6 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-black tabular-nums">
+                {commandesComptoirSnack.length}
+              </span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {commandesParCreneau.map(group => (
-                <div key={group.label} className="rounded-lg border border-zinc-800 bg-zinc-950/50">
-                  <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60 rounded-t-lg">
-                    <p className="text-sm font-bold text-amber-300 tabular-nums">
-                      🕒 {group.label}
-                    </p>
-                    <span className="text-[11px] text-zinc-500">
-                      {group.commandes.length} cmd{group.commandes.length > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {group.commandes.map(c => (
-                      <CommandeComptoirCard
-                        key={c.id}
-                        commande={c}
-                        onAvancer={avancerComptoir}
-                        onEncaisser={() => setEncaisserCmd(c)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            <p className="hidden sm:block text-[10px] uppercase tracking-widest text-zinc-500">⟵ Scroll horizontal ⟶</p>
+          </div>
+          <AgendaCreneauxColonnes
+            items={commandesComptoirSnack.map(c => {
+              // Multi-zones : prendre le créneau le plus proche dans creneaux_par_tag, sinon creneau_retrait
+              const tagsCreneaux = c.creneaux_par_tag ?? {}
+              const isos = Object.values(tagsCreneaux).filter((v): v is string => !!v)
+              const minIso = isos.length > 0
+                ? isos.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0]
+                : c.creneau_retrait
+              return { creneauISO: minIso, data: c }
+            })}
+            renderItem={(c) => (
+              <CommandeComptoirCard
+                key={c.id}
+                commande={c}
+                onAvancer={avancerComptoir}
+                onEncaisser={() => setEncaisserCmd(c)}
+              />
+            )}
+            accent="amber"
+            now={new Date(now)}
+            emptyMessage="Aucune commande snack en cours. Clique « + Nouvelle commande »."
+          />
         </section>
       </main>
 

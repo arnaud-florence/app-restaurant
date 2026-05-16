@@ -1,9 +1,11 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import AgendaCreneauxColonnes from '@/components/AgendaCreneauxColonnes'
 import type { CommandeLivreur } from './page'
 import { marquerEnLivraison, marquerLivree, envoyerEmailRetard } from './actions'
 
@@ -122,123 +124,98 @@ export default function LivreurClient({
 
   return (
     <div className="bg-[#0D0D0D] text-zinc-100 min-h-screen pb-32">
-      {/* Header */}
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-xl shadow-lg shadow-violet-900/40">
-              🛵
+      {/* ═══ HEADER POS UNIFIÉ ═══ */}
+      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-lg shadow-md shrink-0">🛵</span>
+            <span className={cn(
+              'flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums',
+              aLivrer.length > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
+            )}>📦 {aLivrer.length} à livrer</span>
+            <span className="inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-blue-500/15 text-blue-200 ring-1 ring-blue-500/30 text-xs font-black tabular-nums shrink-0">🛵 {enTournee.length}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums">✓ {livrees.length}</span>
+            <span className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black tabular-nums">
+              💰 {fmtPrix(caJour)}
             </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Service · Livraisons</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Livreur</h1>
+            {adressesTournee.length > 0 && (
+              <a href={mapsMultiPointsUrl(adressesTournee)} target="_blank" rel="noopener" className="inline-flex items-center gap-1 px-2.5 h-10 rounded-xl bg-blue-600 text-white text-xs font-black shadow-lg shadow-blue-500/30 shrink-0">
+                📍 Maps
+              </a>
+            )}
+          </div>
+        </div>
+        <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-xl shadow-md">🛵</span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-400 leading-none">Service</p>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Livraisons</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <KPI label="À livrer" value={aLivrer.length} accent={aLivrer.length > 0 ? 'red' : 'default'} pulse={aLivrer.length > 0} />
-            <KPI label="En tournée" value={enTournee.length} accent={enTournee.length > 0 ? 'default' : 'default'} />
-            <KPI label="En cuisine" value={enCuisine.length} />
-            <KPI label="Livrées" value={livrees.length} />
-            <KPI label="CA jour" value={fmtPrix(caJour)} />
+          <div className="inline-flex items-center gap-1.5 shrink-0">
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              aLivrer.length > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>
+              <span className="text-base">📦</span>{aLivrer.length} à livrer
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-blue-500/15 text-blue-200 ring-1 ring-blue-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+              <span className="text-base">🛵</span>{enTournee.length} en tournée
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700 text-xs font-black tabular-nums whitespace-nowrap">
+              <span className="text-base">🍳</span>{enCuisine.length} prep.
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+              <span className="text-base">✓</span>{livrees.length} livrées
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black tabular-nums whitespace-nowrap">
+              💰 CA <span className="text-emerald-600">{fmtPrix(caJour)}</span>
+            </span>
           </div>
+          <div className="flex-1 min-w-2" />
+          {adressesTournee.length > 0 && (
+            <a href={mapsMultiPointsUrl(adressesTournee)} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-lg shadow-blue-500/30 transition-all active:scale-95 whitespace-nowrap shrink-0">
+              📍 Itinéraire Maps · {adressesTournee.length} arrêts
+            </a>
+          )}
+          <Link href="/caisse" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
+            <span className="text-lg">💰</span><span>Caisse</span>
+          </Link>
         </div>
       </header>
 
       <main className="p-3 space-y-4">
-        {/* Lien Maps multi-points pour toute la tournée du jour */}
-        {adressesTournee.length > 0 && (
-          <a
-            href={mapsMultiPointsUrl(adressesTournee)}
-            target="_blank"
-            rel="noopener"
-            className="block rounded-lg bg-blue-950/60 border border-blue-700 px-3 py-2.5 hover:bg-blue-900/60 transition-colors"
-          >
-            <p className="text-[10px] uppercase tracking-wider font-bold text-blue-300 opacity-80">
-              📍 Itinéraire Google Maps — {adressesTournee.length} arrêt{adressesTournee.length > 1 ? 's' : ''}
-            </p>
-            <p className="text-sm font-medium text-blue-100">Tap pour voir la tournée optimisée</p>
-          </a>
-        )}
-
-        {/* À LIVRER (priorité) */}
+        {/* À LIVRER — AGENDA COLONNES 15min (priorité) */}
         <section>
-          <h2 className="text-violet-400 font-bold text-sm uppercase tracking-wider mb-2 px-1">
-            🛵 À livrer maintenant ({aLivrer.length})
-          </h2>
-          {aLivrer.length === 0 ? (
-            <p className="text-zinc-500 italic text-sm px-2">Aucune commande prête à livrer pour l'instant.</p>
-          ) : (
-            <div className="space-y-2">
-              {aLivrer.map(c => {
-                const sty = STATUT_INFO[c.statut] ?? { label: c.statut, cls: 'bg-zinc-600 text-white', ordre: 0 }
-                const creneauTime = c.creneau_retrait ? new Date(c.creneau_retrait).getTime() : null
-                const minutesRest = creneauTime ? Math.round((creneauTime - now) / 60_000) : null
-                const urgent = minutesRest !== null && minutesRest < 15
-                return (
-                  <article key={c.id} className={cn('rounded-lg border-2 p-3 space-y-2', urgent ? 'border-red-500 bg-red-950/30 animate-pulse' : 'border-violet-700 bg-zinc-900')}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-bold text-white text-lg">{c.client_nom ?? 'Client'}</p>
-                        <p className="text-xs text-zinc-400">#{c.numero}</p>
-                      </div>
-                      <span className={cn('text-[10px] px-2 py-1 rounded font-bold uppercase', sty.cls)}>{sty.label}</span>
-                    </div>
-
-                    {c.creneau_retrait && (
-                      <div className={cn('rounded px-2 py-1 text-sm font-bold flex items-center justify-between', urgent ? 'bg-red-600 text-white' : 'bg-violet-600/30 text-violet-200 border border-violet-700')}>
-                        <span>
-                          🕒 Heure prévue : {new Date(c.creneau_retrait).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {minutesRest !== null && (
-                          <span className="tabular-nums">
-                            {minutesRest < 0 ? `+${Math.abs(minutesRest)} min de retard` : `${minutesRest} min`}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Adresse de livraison — info la plus critique pour le livreur */}
-                    {c.adresse_livraison && (
-                      <a
-                        href={`https://maps.google.com/maps?q=${encodeURIComponent(c.adresse_livraison)}`}
-                        target="_blank"
-                        rel="noopener"
-                        className="block rounded bg-emerald-950/60 border border-emerald-800 px-2 py-1.5 text-emerald-100 hover:bg-emerald-900/60 transition-colors"
-                      >
-                        <p className="text-[10px] uppercase tracking-wider font-bold opacity-70">📍 Adresse — tap pour Maps</p>
-                        <p className="text-sm font-medium leading-tight">{c.adresse_livraison}</p>
-                      </a>
-                    )}
-
-                    {/* Coordonnées client */}
-                    <div className="space-y-1 text-xs">
-                      {c.client_telephone && (
-                        <a href={`tel:${c.client_telephone}`} className="block text-blue-400 underline">
-                          📞 Appeler {c.client_telephone}
-                        </a>
-                      )}
-                      {c.client_email && <p className="text-zinc-400">📧 {c.client_email}</p>}
-                      {c.notes && <p className="text-amber-300 italic">📝 {c.notes}</p>}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
-                      <span className="text-xs text-zinc-400">Montant</span>
-                      <span className="font-bold text-lg tabular-nums">{fmtPrix(Number(c.montant_total_ttc ?? 0))}</span>
-                    </div>
-
-                    {/* Bouton principal : marquer parti en livraison */}
-                    <button
-                      onClick={() => handlePartir(c.id)}
-                      disabled={pending}
-                      className="w-full h-12 rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wide transition-colors"
-                    >
-                      🛵 Partir en livraison
-                    </button>
-                  </article>
-                )
-              })}
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-500/15 text-violet-300 ring-1 ring-violet-500/30">🛵</span>
+              <h2 className="font-display italic text-base text-white tracking-tight">
+                À livrer <span className="text-zinc-500">·</span> agenda 15 min
+              </h2>
+              <span className="inline-flex items-center px-2 h-6 rounded-full bg-violet-500/15 text-violet-300 text-[10px] font-black tabular-nums">
+                {aLivrer.length}
+              </span>
             </div>
-          )}
+            <p className="hidden sm:block text-[10px] uppercase tracking-widest text-zinc-500">⟵ Scroll horizontal ⟶</p>
+          </div>
+          <AgendaCreneauxColonnes
+            items={aLivrer.map(c => ({ creneauISO: c.creneau_retrait, data: c }))}
+            renderItem={(c) => (
+              <CartelivrAgenda
+                key={c.id}
+                c={c}
+                now={now}
+                pending={pending}
+                onPartir={handlePartir}
+              />
+            )}
+            accent="violet"
+            now={new Date(now)}
+            columnWidth={300}
+            emptyMessage="Aucune commande prête à livrer pour l'instant."
+          />
         </section>
 
         {/* EN TOURNÉE (commandes parties chez le client) */}
@@ -366,5 +343,75 @@ function KPI({ label, value, accent = 'default', pulse }: { label: string; value
       <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
       <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
     </div>
+  )
+}
+
+// ─── Carte livraison en colonne d'agenda (cellule compacte) ────────
+function CartelivrAgenda({
+  c, now, pending, onPartir,
+}: {
+  c: CommandeLivreur
+  now: number
+  pending: boolean
+  onPartir: (id: string) => void
+}) {
+  const sty = STATUT_INFO[c.statut] ?? { label: c.statut, cls: 'bg-zinc-600 text-white', ordre: 0 }
+  const creneauTime = c.creneau_retrait ? new Date(c.creneau_retrait).getTime() : null
+  const minutesRest = creneauTime ? Math.round((creneauTime - now) / 60_000) : null
+  const urgent = minutesRest !== null && minutesRest < 15
+  return (
+    <article className={cn(
+      'rounded-xl border-2 p-2.5 space-y-2 transition-all hover:shadow-lg',
+      urgent ? 'border-red-500 bg-red-950/30 animate-pulse shadow-red-900/40' : 'border-violet-700 bg-zinc-900',
+    )}>
+      <div className="flex items-start justify-between gap-1.5">
+        <div className="min-w-0 flex-1">
+          <p className="font-display italic text-base font-medium text-white truncate">{c.client_nom ?? 'Client'}</p>
+          <p className="text-[10px] text-zinc-500 tabular-nums">#{c.numero}</p>
+        </div>
+        <span className={cn('text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider whitespace-nowrap', sty.cls)}>{sty.label}</span>
+      </div>
+
+      {minutesRest !== null && (
+        <div className={cn(
+          'rounded-lg px-2 py-1 text-xs font-black tabular-nums text-center',
+          urgent ? 'bg-red-600 text-white' : 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40',
+        )}>
+          {minutesRest < 0 ? `⚠ +${Math.abs(minutesRest)}min retard` : `🕒 dans ${minutesRest}min`}
+        </div>
+      )}
+
+      {c.adresse_livraison && (
+        <a
+          href={`https://maps.google.com/maps?q=${encodeURIComponent(c.adresse_livraison)}`}
+          target="_blank"
+          rel="noopener"
+          className="block rounded-lg bg-emerald-950/60 border border-emerald-800/60 px-2 py-1.5 hover:bg-emerald-900/60 transition-colors"
+        >
+          <p className="text-[9px] uppercase tracking-wider font-black opacity-70 text-emerald-300">📍 Maps</p>
+          <p className="text-xs font-medium leading-tight text-emerald-100 line-clamp-2">{c.adresse_livraison}</p>
+        </a>
+      )}
+
+      <div className="space-y-0.5 text-[10px]">
+        {c.client_telephone && (
+          <a href={`tel:${c.client_telephone}`} className="block text-blue-400 underline truncate">📞 {c.client_telephone}</a>
+        )}
+        {c.notes && <p className="text-amber-300 italic truncate" title={c.notes}>📝 {c.notes}</p>}
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
+        <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Total</span>
+        <span className="font-display italic text-base font-medium tabular-nums text-white">{fmtPrix(Number(c.montant_total_ttc ?? 0))}</span>
+      </div>
+
+      <button
+        onClick={() => onPartir(c.id)}
+        disabled={pending}
+        className="w-full h-10 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider transition-colors active:scale-95"
+      >
+        🛵 Partir
+      </button>
+    </article>
   )
 }

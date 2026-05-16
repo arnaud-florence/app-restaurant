@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -154,38 +155,61 @@ export default function BarClient({
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
       <OpsBottomNav profil={navProfil} />
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-zinc-900/95 to-zinc-950/95 backdrop-blur border-b border-zinc-800" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-xl shadow-lg shadow-violet-900/40">
-              🍷
+      {/* ═══ HEADER POS UNIFIÉ (style /serveur /cuisine) ═══ */}
+      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-lg shadow-md shrink-0">🍷</span>
+            <span className={cn(
+              'flex-1 inline-flex items-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums',
+              nbEnAttente > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
+            )}><span className="text-sm">🔔</span>{nbEnAttente} en attente</span>
+            <span className="inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
+              <span className="text-sm">⏱</span>{tempsMoyen.toFixed(0)}m
             </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Service · Bar</p>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none mt-0.5">Bar</h1>
-            </div>
+            <Link href="/caisse" className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0" aria-label="Caisse">💰</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <KPI label="En attente" value={nbEnAttente} accent={nbEnAttente > 0 ? 'red' : 'default'} pulse={nbEnAttente > 0} />
-            <KPI label="Temps moyen" value={`${tempsMoyen.toFixed(0)} min`} accent={tempsMoyen > 15 ? 'red' : tempsMoyen > 10 ? 'orange' : 'default'} />
+          <div className="flex items-center gap-1.5">
             {!audioReadyRef.current && (
-              <button onClick={activerSon} className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700">
-                🔔 Activer son
-              </button>
+              <button onClick={activerSon} className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700">🔔 Activer son</button>
             )}
             <button
               onClick={toggleAutoPrint}
-              className={cn(
-                'text-xs px-3 py-2 rounded-md border transition-colors',
-                autoPrint
-                  ? 'bg-emerald-600 border-emerald-500 text-white'
-                  : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-              )}
-              title="Imprime automatiquement le bon dès qu'une nouvelle commande arrive"
-            >
-              🖨 Auto : {autoPrint ? 'ON' : 'OFF'}
-            </button>
+              className={cn('flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl text-xs font-black transition-colors',
+                autoPrint ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-zinc-800 text-zinc-300 border border-zinc-700')}
+            >🖨 {autoPrint ? 'Auto ON' : 'Auto OFF'}</button>
           </div>
+        </div>
+        <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-xl shadow-md">🍷</span>
+            <div className="hidden lg:block">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-400 leading-none">Service</p>
+              <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Bar</h1>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1.5 shrink-0">
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              nbEnAttente > 0 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>
+              <span className="text-base">🔔</span>{nbEnAttente} en attente
+            </span>
+            <span className={cn('inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              tempsMoyen > 15 ? 'bg-red-500/15 text-red-200 ring-red-500/30' : tempsMoyen > 10 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>
+              <span className="text-base">⏱</span>{tempsMoyen.toFixed(0)} min
+            </span>
+          </div>
+          <div className="flex-1 min-w-2" />
+          {!audioReadyRef.current && (
+            <button onClick={activerSon} className="inline-flex items-center gap-2 px-2.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 shrink-0">🔔 Activer son</button>
+          )}
+          <button
+            onClick={toggleAutoPrint}
+            className={cn('inline-flex items-center gap-2 px-2.5 h-10 rounded-xl text-xs font-black transition-colors shrink-0',
+              autoPrint ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')}
+          >🖨 Auto : {autoPrint ? 'ON' : 'OFF'}</button>
+          <Link href="/caisse" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
+            <span className="text-lg">💰</span><span>Caisse</span>
+          </Link>
         </div>
       </header>
 
