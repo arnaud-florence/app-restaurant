@@ -52,6 +52,8 @@ export default function EmporterClient({
   const audioReadyRef = useRef(false)
   const [autoPrint, setAutoPrint] = useState(false)
   const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
+  // Filtre source affiché dans l'agenda partagé : 'all' (défaut) | 'online' | 'comptoir'
+  const [filtreSrc, setFiltreSrc] = useState<'all' | 'online' | 'comptoir'>('all')
 
   useEffect(() => {
     try { setAutoPrint(localStorage.getItem('emporter_auto_print') === '1') } catch { /* ignore */ }
@@ -181,6 +183,28 @@ export default function EmporterClient({
   const nbEnAttente = commandesOnline.filter(c => c.statut === 'en_attente').length
   const nbPretRetrait = commandesOnline.filter(c => c.statut === 'pret_pour_retrait').length
 
+  // ─── AGENDA PARTAGÉ : online + comptoir fusionnés ─────────────────
+  // Chaque item porte sa source pour que le renderItem choisisse le bon composant
+  // et que le badge couleur soit visible (🌐 emerald online / 🛒 violet comptoir).
+  const agendaItems = useMemo(() => {
+    type Item = { creneauISO: string | null | undefined; data: CommandeService }
+    const online: Item[] = commandesOnline.map(c => ({ creneauISO: c.creneau_retrait, data: c }))
+    const comptoir: Item[] = commandesComptoirSnack.map(c => {
+      // Multi-zones : prendre le créneau le plus proche dans creneaux_par_tag, sinon creneau_retrait
+      const tagsCreneaux = c.creneaux_par_tag ?? {}
+      const isos = Object.values(tagsCreneaux).filter((v): v is string => !!v)
+      const minIso = isos.length > 0
+        ? isos.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0]
+        : c.creneau_retrait
+      return { creneauISO: minIso, data: c }
+    })
+    if (filtreSrc === 'online') return online
+    if (filtreSrc === 'comptoir') return comptoir
+    return [...online, ...comptoir]
+  }, [commandesOnline, commandesComptoirSnack, filtreSrc])
+
+  const nbTotal = commandesOnline.length + commandesComptoirSnack.length
+
   // Callbacks stables pour le modal Comptoir → évite re-render à chaque tick d'horloge.
   // Le state `now` ticke chaque seconde pour les compteurs des cartes ONLINE,
   // mais le modal n'a pas besoin d'être re-render à chaque tick.
@@ -288,72 +312,89 @@ export default function EmporterClient({
         <TachesSequentielles poste="caisse_snacking" employeId={widgetEmployeId} initialDone={widgetInitialDone} theme="dark" />
       </div>
 
-      <main className="flex-1 p-3 space-y-6 pb-32">
-        {/* ─── Section 1 : Commandes ONLINE — AGENDA COLONNES 15min ─── */}
+      <main className="flex-1 p-3 space-y-3 pb-32">
+        {/* ═══ AGENDA UNIQUE PARTAGÉ (online + comptoir) ═══
+            Filtres source via tabs au-dessus. Chaque ticket porte son badge
+            couleur (🌐 emerald online / 🛒 violet comptoir) pour distinction. */}
         <section>
-          <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center justify-between mb-2 px-1 gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30">🌐</span>
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-zinc-800 text-zinc-100 ring-1 ring-zinc-700">🗓</span>
               <h2 className="font-display italic text-base text-white tracking-tight">
-                Online <span className="text-zinc-500">·</span> agenda 15 min
+                Agenda <span className="text-zinc-500">·</span> 15 min
               </h2>
-              <span className="inline-flex items-center px-2 h-6 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-black tabular-nums">
-                {commandesOnline.length}
+              <span className="inline-flex items-center px-2 h-6 rounded-full bg-zinc-800 text-zinc-200 text-[10px] font-black tabular-nums">
+                {nbTotal}
               </span>
             </div>
-            <p className="hidden sm:block text-[10px] uppercase tracking-widest text-zinc-500">⟵ Scroll horizontal ⟶</p>
-          </div>
-          <AgendaCreneauxColonnes
-            items={commandesOnline.map(c => ({ creneauISO: c.creneau_retrait, data: c }))}
-            renderItem={(c) => (
-              <CommandeOnlineCard
-                key={c.id}
-                commande={c}
-                now={now}
-                onAvancer={avancer}
-              />
-            )}
-            accent="emerald"
-            now={new Date(now)}
-            emptyMessage="Aucune commande online en cours."
-          />
-        </section>
-
-        {/* ─── Section 2 : SNACK COMPTOIR — AGENDA COLONNES 15min ─── */}
-        <section>
-          <div className="flex items-center justify-between mb-2 px-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30">🛒</span>
-              <h2 className="font-display italic text-base text-white tracking-tight">
-                Snack comptoir <span className="text-zinc-500">·</span> agenda 15 min
-              </h2>
-              <span className="inline-flex items-center px-2 h-6 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-black tabular-nums">
-                {commandesComptoirSnack.length}
-              </span>
+            {/* TABS filtre source */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-900 ring-1 ring-zinc-800">
+              <button
+                onClick={() => setFiltreSrc('all')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-black transition-all tabular-nums',
+                  filtreSrc === 'all'
+                    ? 'bg-zinc-100 text-zinc-900 shadow'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+              >
+                <span>Toutes</span>
+                <span className="text-[10px] opacity-70">{nbTotal}</span>
+              </button>
+              <button
+                onClick={() => setFiltreSrc('online')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-black transition-all tabular-nums',
+                  filtreSrc === 'online'
+                    ? 'bg-emerald-500 text-white shadow shadow-emerald-500/30'
+                    : 'text-emerald-300 hover:text-emerald-200',
+                )}
+              >
+                <span>🌐 Online</span>
+                <span className="text-[10px] opacity-80">{commandesOnline.length}</span>
+              </button>
+              <button
+                onClick={() => setFiltreSrc('comptoir')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-black transition-all tabular-nums',
+                  filtreSrc === 'comptoir'
+                    ? 'bg-violet-500 text-white shadow shadow-violet-500/30'
+                    : 'text-violet-300 hover:text-violet-200',
+                )}
+              >
+                <span>🛒 Comptoir</span>
+                <span className="text-[10px] opacity-80">{commandesComptoirSnack.length}</span>
+              </button>
             </div>
-            <p className="hidden sm:block text-[10px] uppercase tracking-widest text-zinc-500">⟵ Scroll horizontal ⟶</p>
+            <p className="hidden lg:block text-[10px] uppercase tracking-widest text-zinc-500 ml-auto">⟵ Scroll horizontal ⟶</p>
           </div>
           <AgendaCreneauxColonnes
-            items={commandesComptoirSnack.map(c => {
-              // Multi-zones : prendre le créneau le plus proche dans creneaux_par_tag, sinon creneau_retrait
-              const tagsCreneaux = c.creneaux_par_tag ?? {}
-              const isos = Object.values(tagsCreneaux).filter((v): v is string => !!v)
-              const minIso = isos.length > 0
-                ? isos.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0]
-                : c.creneau_retrait
-              return { creneauISO: minIso, data: c }
-            })}
+            items={agendaItems}
             renderItem={(c) => (
-              <CommandeComptoirCard
-                key={c.id}
-                commande={c}
-                onAvancer={avancerComptoir}
-                onEncaisser={() => setEncaisserCmd(c)}
-              />
+              c.source === 'ONLINE' ? (
+                <CommandeOnlineCard
+                  key={c.id}
+                  commande={c}
+                  now={now}
+                  onAvancer={avancer}
+                />
+              ) : (
+                <CommandeComptoirCard
+                  key={c.id}
+                  commande={c}
+                  onAvancer={avancerComptoir}
+                  onEncaisser={() => setEncaisserCmd(c)}
+                />
+              )
             )}
-            accent="amber"
+            // Accent neutre/zinc en mode "toutes", couleur source si filtré
+            accent={filtreSrc === 'online' ? 'emerald' : filtreSrc === 'comptoir' ? 'violet' : 'emerald'}
             now={new Date(now)}
-            emptyMessage="Aucune commande snack en cours. Clique « + Nouvelle commande »."
+            emptyMessage={
+              filtreSrc === 'online' ? 'Aucune commande online en cours.'
+              : filtreSrc === 'comptoir' ? 'Aucune commande snack comptoir.'
+              : 'Aucune commande dans l\'agenda. Clique « + Nouvelle commande ».'
+            }
           />
         </section>
       </main>
