@@ -558,7 +558,7 @@ function PlanSalle({
   }, [])
 
   const [filtre, setFiltre] = useState<FiltreStatut>('tous')
-  const [compact, setCompact] = useState(false)
+  const [compact, setCompact] = useState(true) // POS pro : ultra-dense par défaut
   const [searchT, setSearchT] = useState('')
   // Mobile : tab zone active (sur desktop toutes les zones s'affichent)
   const [activeZone, setActiveZone] = useState<string>(zones[0]?.[0] ?? '')
@@ -769,68 +769,83 @@ function PlanSalle({
                     key={t.id}
                     onClick={() => onOuvrir(t)}
                     className={cn(
-                      'relative min-h-[120px] lg:min-h-[180px] rounded-xl lg:rounded-2xl border transition-all duration-300',
+                      'relative rounded-lg border transition-all duration-200',
                       'flex flex-col items-stretch overflow-hidden text-left',
-                      'hover:-translate-y-0.5 lg:hover:-translate-y-1 active:scale-[0.98]',
+                      'hover:-translate-y-0.5 active:scale-[0.97]',
+                      compact ? 'min-h-[80px] lg:min-h-[90px]' : 'min-h-[120px] lg:min-h-[160px] rounded-xl',
                       sty.card, sty.shadow,
-                      statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/30',
+                      statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/40',
                     )}
                   >
-                    {/* Badge plats prêts en top-right (glow vert) */}
+                    {/* Badge plats prêts en top-right */}
                     {nbPrets > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-8 h-8 px-2.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-lg shadow-emerald-500/50 z-10 ring-2 ring-zinc-950">
-                        🔔 {nbPrets}
+                      <span className="absolute -top-1.5 -right-1.5 min-w-6 h-6 px-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-[10px] font-black flex items-center justify-center shadow-lg shadow-emerald-500/50 z-10 ring-2 ring-zinc-950 animate-pulse">
+                        🔔{nbPrets}
                       </span>
                     )}
 
-                    {/* Top : numéro de table en grand + capacité subtile */}
-                    <div className="px-3 lg:px-4 pt-3 lg:pt-4 pb-1.5 lg:pb-2 flex items-start justify-between">
-                      <div>
-                        <p className="text-[9px] lg:text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Table</p>
-                        <p className={cn('text-4xl lg:text-5xl font-black leading-none mt-0.5 tabular-nums', sty.numero)}>{t.numero}</p>
-                      </div>
-                      <span className="inline-flex items-center gap-0.5 lg:gap-1 text-[10px] lg:text-[11px] font-bold text-zinc-300 bg-zinc-900/60 px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full border border-zinc-800 backdrop-blur-sm">
-                        <span aria-hidden>👥</span>{t.capacite}
-                      </span>
-                    </div>
-
-                    {/* Badge statut */}
-                    <div className="px-3 lg:px-4 pb-1.5 lg:pb-2">
-                      <span className={cn(
-                        'inline-flex items-center text-[9px] lg:text-[10px] font-bold uppercase tracking-wider px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full',
-                        sty.badge,
-                      )}>
-                        {sty.label}
-                      </span>
-                    </div>
-
-                    {/* Ligne accent (séparateur coloré) */}
-                    <div className={cn('h-px mx-3 lg:mx-4', sty.accent)}></div>
-
-                    {/* Footer : infos commande ou état vide */}
-                    {cmd ? (
-                      <div className="px-3 lg:px-4 py-2 lg:py-3 space-y-0.5 lg:space-y-1.5">
-                        <div className="flex items-center justify-between text-[10px] lg:text-[11px] text-zinc-300 tabular-nums">
-                          <span className={cn(
-                            'inline-flex items-center gap-0.5 lg:gap-1 font-semibold',
-                            dureeUrgent ? 'text-red-300' : '',
-                          )}>
-                            <span aria-hidden>⏱</span>
-                            <span>{dureeMin}m</span>
-                            {dureeUrgent && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
-                          </span>
-                          <span className="text-zinc-400 hidden lg:inline">{cmd.articles.length} art.</span>
-                        </div>
-                        {totalCmd > 0 && (
-                          <p className="text-base lg:text-xl font-black text-white tabular-nums">
-                            {fmtPrix(totalCmd)}
-                          </p>
+                    {compact ? (
+                      /* MODE COMPACT POS — Numéro géant centré + total bottom */
+                      <div className="flex-1 flex flex-col items-center justify-center px-1.5 py-1.5 relative">
+                        {/* Statut indicator dot top-left */}
+                        <span className={cn('absolute top-1 left-1 w-1.5 h-1.5 rounded-full', sty.accent.replace('bg-gradient-to-r ', 'bg-').split(' ')[0], statutEffectif === 'a_encaisser' && 'animate-pulse')}></span>
+                        {/* Capacité top-right (subtile) */}
+                        <span className="absolute top-1 right-1 text-[9px] text-zinc-400 font-bold tabular-nums">{t.capacite}p</span>
+                        {/* Numéro géant */}
+                        <p className={cn('text-3xl sm:text-4xl font-black leading-none tabular-nums', sty.numero)}>{t.numero}</p>
+                        {/* Total + durée en bas (si commande) */}
+                        {cmd && totalCmd > 0 && (
+                          <div className="mt-1 flex items-center gap-1 text-[10px] font-black text-white tabular-nums">
+                            <span>{fmtPrix(totalCmd)}</span>
+                            {dureeMin !== null && (
+                              <span className={cn('text-[9px] font-bold', dureeUrgent ? 'text-red-300' : 'text-zinc-400')}>
+                                · {dureeMin}m
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
-                      <div className="px-3 lg:px-4 py-2 lg:py-3 flex-1 flex items-end">
-                        <p className="text-[9px] lg:text-[10px] text-zinc-500 italic hidden lg:block">Tap pour ouvrir une commande</p>
-                      </div>
+                      <>
+                        {/* MODE DÉTAILLÉ (l'ancien layout) */}
+                        <div className="px-3 lg:px-4 pt-3 lg:pt-4 pb-1.5 lg:pb-2 flex items-start justify-between">
+                          <div>
+                            <p className="text-[9px] lg:text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Table</p>
+                            <p className={cn('text-4xl lg:text-5xl font-black leading-none mt-0.5 tabular-nums', sty.numero)}>{t.numero}</p>
+                          </div>
+                          <span className="inline-flex items-center gap-0.5 lg:gap-1 text-[10px] lg:text-[11px] font-bold text-zinc-300 bg-zinc-900/60 px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full border border-zinc-800 backdrop-blur-sm">
+                            <span aria-hidden>👥</span>{t.capacite}
+                          </span>
+                        </div>
+                        <div className="px-3 lg:px-4 pb-1.5 lg:pb-2">
+                          <span className={cn(
+                            'inline-flex items-center text-[9px] lg:text-[10px] font-bold uppercase tracking-wider px-2 lg:px-2.5 py-0.5 lg:py-1 rounded-full',
+                            sty.badge,
+                          )}>
+                            {sty.label}
+                          </span>
+                        </div>
+                        <div className={cn('h-px mx-3 lg:mx-4', sty.accent)}></div>
+                        {cmd ? (
+                          <div className="px-3 lg:px-4 py-2 lg:py-3 space-y-0.5 lg:space-y-1.5">
+                            <div className="flex items-center justify-between text-[10px] lg:text-[11px] text-zinc-300 tabular-nums">
+                              <span className={cn('inline-flex items-center gap-0.5 lg:gap-1 font-semibold', dureeUrgent && 'text-red-300')}>
+                                <span aria-hidden>⏱</span>
+                                <span>{dureeMin}m</span>
+                                {dureeUrgent && <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>}
+                              </span>
+                              <span className="text-zinc-400 hidden lg:inline">{cmd.articles.length} art.</span>
+                            </div>
+                            {totalCmd > 0 && (
+                              <p className="text-base lg:text-xl font-black text-white tabular-nums">{fmtPrix(totalCmd)}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="px-3 lg:px-4 py-2 lg:py-3 flex-1 flex items-end">
+                            <p className="text-[9px] lg:text-[10px] text-zinc-500 italic hidden lg:block">Tap pour ouvrir</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </button>
                 )
@@ -916,92 +931,68 @@ function ListeAServir({
 }) {
   if (commandes.length === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 py-16 px-6 text-center shadow-lg">
-        <p className="text-6xl mb-3" aria-hidden>✨</p>
-        <p className="text-base font-bold text-zinc-200">Tout est sous contrôle</p>
-        <p className="text-sm mt-1 text-zinc-500">Aucun plat prêt à servir pour le moment.</p>
-        <p className="text-xs mt-3 text-zinc-600">La cuisine et le bar marquent les plats « prêts ».<br/>Tu les retrouveras ici dès qu&apos;un est terminé.</p>
+      <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 py-6 px-4 text-center">
+        <p className="text-3xl mb-1.5" aria-hidden>✨</p>
+        <p className="text-xs font-bold text-zinc-300">Tout est sous contrôle</p>
+        <p className="text-[10px] mt-0.5 text-zinc-500">Aucun plat prêt à servir.</p>
       </div>
     )
   }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
+    <div className="space-y-2">
       {commandes.map(c => {
         const articlesPrets = c.articles.filter(a => a.statut === 'pret')
-        const autresArticles = c.articles.filter(a => a.statut !== 'pret')
         return (
-          <div key={c.id} className="rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/70 via-zinc-900 to-zinc-950 overflow-hidden shadow-lg shadow-emerald-900/20 hover:-translate-y-0.5 transition-all">
-            {/* Header */}
-            <div className="px-3.5 py-2.5 bg-emerald-500/15 border-b border-emerald-500/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold">
-                  {c.numero_table ? `🪑 T${c.numero_table}` : c.numero}
-                </span>
-                <span className="text-xs text-zinc-300">{c.numero}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
+          <div key={c.id} className="rounded-lg border border-emerald-500/40 bg-emerald-950/30 overflow-hidden">
+            {/* Header table ULTRA-COMPACT */}
+            <div className="px-2.5 py-1.5 bg-emerald-500/15 border-b border-emerald-500/20 flex items-center justify-between">
+              <span className="text-sm font-black text-white tabular-nums">
+                🪑 T{c.numero_table ?? '?'}
+              </span>
+              <div className="flex items-center gap-1">
                 <a
                   href={`/print/bons/${c.id}`}
                   target="_blank"
                   rel="noopener"
-                  className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
-                  title="Réimprimer les bons de préparation"
+                  className="text-[10px] h-5 w-5 inline-flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                  title="Réimprimer"
                 >🖨</a>
-                <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full bg-emerald-400 text-emerald-950 text-xs font-bold animate-pulse">
-                  {articlesPrets.length} prêt{articlesPrets.length > 1 ? 's' : ''}
+                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-emerald-400 text-emerald-950 text-[10px] font-black animate-pulse">
+                  {articlesPrets.length}
                 </span>
               </div>
             </div>
 
-            {/* Articles prêts */}
-            <ul className="px-3 py-2 divide-y divide-zinc-800">
+            {/* Articles prêts ULTRA-COMPACT */}
+            <ul className="divide-y divide-zinc-800/50">
               {articlesPrets.map(a => (
-                <li key={a.id} className="py-2 flex items-center justify-between gap-2">
+                <li key={a.id} className="px-2.5 py-1.5 flex items-center justify-between gap-1.5">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm">
+                    <p className="text-xs font-semibold truncate text-zinc-100">
                       <span className="text-emerald-400 font-bold tabular-nums">×{a.quantite}</span> {a.recette_nom}
                     </p>
                     {a.commentaire && (
-                      <p className="text-[11px] text-amber-300 italic mt-0.5">⚠ {a.commentaire}</p>
+                      <p className="text-[10px] text-amber-300 italic truncate">⚠ {a.commentaire}</p>
                     )}
                   </div>
                   <button
                     onClick={() => onMarquerServi(a.id)}
-                    className="min-h-[44px] px-3 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors active:scale-95"
+                    className="h-8 px-2.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-black text-[11px] transition-colors active:scale-95 whitespace-nowrap shrink-0"
                   >
-                    ✓ Servi
+                    ✓
                   </button>
                 </li>
               ))}
             </ul>
 
-            {/* Autres articles (en cours / déjà servis) — informatif */}
-            {autresArticles.length > 0 && (
-              <div className="px-3 pb-2 pt-1 border-t border-zinc-800 text-[11px] text-zinc-500 space-y-0.5">
-                {autresArticles.map(a => {
-                  const sta = STATUT_ARTICLE_LABEL[a.statut]
-                  return (
-                    <p key={a.id}>
-                      <span className="opacity-60">×{a.quantite} {a.recette_nom}</span>
-                      <span className={cn('ml-1.5 px-1.5 py-0.5 rounded text-[9px]', sta.bg, sta.text)}>
-                        {sta.emoji} {sta.label}
-                      </span>
-                    </p>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Action globale */}
+            {/* Action globale si > 1 article */}
             {articlesPrets.length > 1 && (
-              <div className="px-3 pb-3 pt-1 border-t border-zinc-800">
-                <button
-                  onClick={() => onMarquerToutServi(c)}
-                  className="w-full min-h-[48px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold uppercase tracking-wider text-sm transition-colors active:scale-[0.97]"
-                >
-                  ✓ Tout marquer servi ({articlesPrets.length})
-                </button>
-              </div>
+              <button
+                onClick={() => onMarquerToutServi(c)}
+                className="w-full h-8 bg-emerald-500/80 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-[10px] transition-colors active:scale-[0.98] border-t border-emerald-400/30"
+              >
+                ✓ Tout servi ({articlesPrets.length})
+              </button>
             )}
           </div>
         )
@@ -1019,54 +1010,56 @@ function ListeAEncaisser({
 }) {
   if (commandes.length === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 py-16 px-6 text-center shadow-lg">
-        <p className="text-6xl mb-3" aria-hidden>✨</p>
-        <p className="text-base font-bold text-zinc-200">Tout est encaissé</p>
-        <p className="text-sm mt-1 text-zinc-500">Aucune commande à encaisser pour le moment.</p>
+      <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 py-6 px-4 text-center">
+        <p className="text-3xl mb-1.5" aria-hidden>✨</p>
+        <p className="text-xs font-bold text-zinc-300">Tout est encaissé</p>
+        <p className="text-[10px] mt-0.5 text-zinc-500">Aucune commande à encaisser.</p>
       </div>
     )
   }
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4">
+    <div className="space-y-2">
       {commandes.map(c => {
         const total = c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
         return (
-          <div key={c.id} className="rounded-2xl border border-rose-500/40 bg-gradient-to-br from-rose-950/70 via-zinc-900 to-zinc-950 overflow-hidden shadow-lg shadow-rose-900/20 hover:-translate-y-0.5 transition-all">
-            <div className="px-3.5 py-2.5 bg-rose-500/15 border-b border-rose-500/20 flex items-center justify-between">
-              <span className="text-sm font-bold">
-                {c.numero_table ? `T${c.numero_table}` : c.numero}
+          <div key={c.id} className="rounded-lg border border-rose-500/40 bg-rose-950/30 overflow-hidden">
+            {/* Header ULTRA-COMPACT */}
+            <div className="px-2.5 py-1.5 bg-rose-500/15 border-b border-rose-500/20 flex items-center justify-between">
+              <span className="text-sm font-black text-white tabular-nums">
+                🪑 T{c.numero_table ?? '?'}
               </span>
               <div className="flex items-center gap-1.5">
+                <span className="text-sm font-black text-white tabular-nums">{fmtPrix(total)}</span>
                 <a
                   href={`/print/ticket/${c.id}`}
                   target="_blank"
                   rel="noopener"
-                  className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
-                  title="Aperçu du ticket client (avant règlement)"
-                >🖨 Note</a>
-                <span className="text-xs text-zinc-300">{c.numero}</span>
+                  className="text-[10px] h-5 w-5 inline-flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                  title="Aperçu ticket"
+                >🖨</a>
               </div>
             </div>
-            <ul className="px-3 py-2 divide-y divide-zinc-800">
-              {c.articles.map(a => (
-                <li key={a.id} className="py-1.5 flex justify-between gap-2 text-sm">
-                  <span><b>×{a.quantite}</b> {a.recette_nom}</span>
-                  <span className="text-zinc-400 tabular-nums">{fmtPrix(a.quantite * a.prix_unitaire_ht)}</span>
+
+            {/* Articles compacts (1 ligne max 2-3) */}
+            <ul className="px-2.5 py-1 divide-y divide-zinc-800/50">
+              {c.articles.slice(0, 3).map(a => (
+                <li key={a.id} className="py-1 flex justify-between gap-1 text-[11px]">
+                  <span className="truncate"><b>×{a.quantite}</b> {a.recette_nom}</span>
+                  <span className="text-zinc-400 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)}</span>
                 </li>
               ))}
+              {c.articles.length > 3 && (
+                <li className="py-1 text-[10px] text-zinc-500 italic">+ {c.articles.length - 3} autres…</li>
+              )}
             </ul>
-            <div className="px-3 pb-3 pt-2 border-t border-zinc-800 flex items-center justify-between">
-              <span className="text-xs text-zinc-400">Total HT</span>
-              <span className="font-bold tabular-nums">{fmtPrix(total)}</span>
-            </div>
-            <div className="px-3 pb-3">
-              <button
-                onClick={() => onEncaisser(c)}
-                className="w-full min-h-[48px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold uppercase tracking-wider transition-colors active:scale-[0.97]"
-              >
-                💰 Encaisser
-              </button>
-            </div>
+
+            {/* Bouton encaisser ULTRA-COMPACT */}
+            <button
+              onClick={() => onEncaisser(c)}
+              className="w-full h-9 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-xs transition-colors active:scale-[0.98] border-t border-emerald-400/30"
+            >
+              💰 Encaisser
+            </button>
           </div>
         )
       })}
