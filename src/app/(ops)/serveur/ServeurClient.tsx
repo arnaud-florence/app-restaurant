@@ -707,18 +707,19 @@ function PlanSalle({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3">
+      {/* Container zones : flex-1 pour remplir toute la hauteur sans scroll */}
+      <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
       {zones.map(([zone, tables]) => {
         const s = zoneStats[zone]
         const tablesFiltrees = tables.filter(shouldShow)
         if (tablesFiltrees.length === 0) return null
         return (
           <section key={zone} className={cn(
-            'animate-in fade-in duration-500',
-            zones.length > 1 && activeZone !== zone && 'hidden lg:block',
+            'flex-1 min-h-0 flex flex-col animate-in fade-in duration-500',
+            zones.length > 1 && activeZone !== zone && 'hidden lg:flex',
           )}>
-            {/* Header zone ULTRA-COMPACT : juste un mini badge avec nom + stats inline */}
-            <header className="hidden lg:flex mb-2 items-center justify-between gap-2 px-0.5">
+            {/* Header zone ULTRA-COMPACT */}
+            <header className="hidden lg:flex shrink-0 mb-2 items-center justify-between gap-2 px-0.5">
               <div className="flex items-center gap-2">
                 <span className="text-base" aria-hidden>{zone === 'salle' ? '🏠' : zone === 'terrasse' ? '☀️' : '📍'}</span>
                 <h2 className="text-sm font-black capitalize text-white tracking-tight">{zone}</h2>
@@ -743,11 +744,12 @@ function PlanSalle({
               </div>
             </header>
 
+            {/* Grid REMPLIT toute la hauteur — auto-rows-fr pour rows égales étirées */}
             <div className={cn(
-              'grid gap-2 lg:gap-4',
+              'flex-1 min-h-0 grid gap-2 lg:gap-3 auto-rows-fr',
               compact
-                ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10'
-                : 'grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+                ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'
+                : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
             )}>
               {tablesFiltrees.map(t => {
                 const cmd = cmdParTable.get(t.numero)
@@ -769,40 +771,61 @@ function PlanSalle({
                     key={t.id}
                     onClick={() => onOuvrir(t)}
                     className={cn(
-                      'relative rounded-lg border transition-all duration-200',
+                      'relative rounded-xl border transition-all duration-200 h-full w-full',
                       'flex flex-col items-stretch overflow-hidden text-left',
                       'hover:-translate-y-0.5 active:scale-[0.97]',
-                      compact ? 'min-h-[80px] lg:min-h-[90px]' : 'min-h-[120px] lg:min-h-[160px] rounded-xl',
                       sty.card, sty.shadow,
                       statutEffectif === 'a_encaisser' && 'ring-2 ring-rose-500/40',
                     )}
                   >
                     {/* Badge plats prêts en top-right */}
                     {nbPrets > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 min-w-6 h-6 px-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-[10px] font-black flex items-center justify-center shadow-lg shadow-emerald-500/50 z-10 ring-2 ring-zinc-950 animate-pulse">
+                      <span className="absolute -top-1.5 -right-1.5 min-w-7 h-7 px-1.5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-xs font-black flex items-center justify-center shadow-lg shadow-emerald-500/50 z-10 ring-2 ring-zinc-950 animate-pulse">
                         🔔{nbPrets}
                       </span>
                     )}
 
                     {compact ? (
-                      /* MODE COMPACT POS — Numéro géant centré + total bottom */
-                      <div className="flex-1 flex flex-col items-center justify-center px-1.5 py-1.5 relative">
-                        {/* Statut indicator dot top-left */}
-                        <span className={cn('absolute top-1 left-1 w-1.5 h-1.5 rounded-full', sty.accent.replace('bg-gradient-to-r ', 'bg-').split(' ')[0], statutEffectif === 'a_encaisser' && 'animate-pulse')}></span>
-                        {/* Capacité top-right (subtile) */}
-                        <span className="absolute top-1 right-1 text-[9px] text-zinc-400 font-bold tabular-nums">{t.capacite}p</span>
-                        {/* Numéro géant */}
-                        <p className={cn('text-3xl sm:text-4xl font-black leading-none tabular-nums', sty.numero)}>{t.numero}</p>
-                        {/* Total + durée en bas (si commande) */}
-                        {cmd && totalCmd > 0 && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] font-black text-white tabular-nums">
-                            <span>{fmtPrix(totalCmd)}</span>
+                      /* MODE COMPACT POS — remplit toute la cellule, numéro géant qui s'adapte */
+                      <div className="h-full w-full flex flex-col items-center justify-between px-2 py-2 relative">
+                        {/* Top : capacité + statut dot */}
+                        <div className="self-stretch flex items-center justify-between">
+                          <span className={cn(
+                            'w-2 h-2 rounded-full shrink-0',
+                            statutEffectif === 'libre' ? 'bg-emerald-400'
+                              : statutEffectif === 'occupee' ? 'bg-amber-400'
+                              : statutEffectif === 'a_encaisser' ? 'bg-rose-400 animate-pulse'
+                              : 'bg-zinc-500',
+                          )}></span>
+                          <span className="text-[10px] text-zinc-400 font-black tabular-nums">{t.capacite}p</span>
+                        </div>
+
+                        {/* Centre : numéro géant qui prend tout l'espace */}
+                        <div className="flex-1 w-full flex items-center justify-center">
+                          <p className={cn('font-black leading-none tabular-nums text-center', sty.numero,
+                            'text-[clamp(2rem,6vw,4.5rem)]'
+                          )}>
+                            {t.numero}
+                          </p>
+                        </div>
+
+                        {/* Bottom : total + durée si commande */}
+                        {cmd && totalCmd > 0 ? (
+                          <div className="self-stretch flex items-center justify-between gap-1 text-xs font-black text-white tabular-nums">
+                            <span className="truncate">{fmtPrix(totalCmd)}</span>
                             {dureeMin !== null && (
-                              <span className={cn('text-[9px] font-bold', dureeUrgent ? 'text-red-300' : 'text-zinc-400')}>
-                                · {dureeMin}m
+                              <span className={cn('text-[10px] font-bold shrink-0', dureeUrgent ? 'text-red-300' : 'text-zinc-400')}>
+                                {dureeMin}m
                               </span>
                             )}
                           </div>
+                        ) : (
+                          <span className={cn(
+                            'self-stretch text-center text-[10px] font-black uppercase tracking-wider',
+                            statutEffectif === 'libre' ? 'text-emerald-400' : 'text-zinc-500',
+                          )}>
+                            {statutEffectif === 'libre' ? 'Libre' : 'Réservée'}
+                          </span>
                         )}
                       </div>
                     ) : (
