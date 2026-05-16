@@ -12,6 +12,7 @@ import {
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
 import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import AgendaCreneauxColonnes from '@/components/AgendaCreneauxColonnes'
 import TachesDuJourWidget from '@/components/TachesDuJourWidget'
 import TachesSequentielles from '@/components/TachesSequentielles'
 import type { PosteWidget } from '@/lib/taches-du-jour'
@@ -310,15 +311,27 @@ export default function CuisineClient({
         />
       </div>
 
-      {/* ═══ GRID CASES style agenda (comme tables du plan serveur) ═══ */}
+      {/* ═══ MODE D'AFFICHAGE ═══
+          - Cuisinier : FIFO horizontal (gauche → droite, ordre arrivée)
+          - Pizzaiolo : AGENDA colonnes 15min (créneaux retrait)
+          Justification : la pizza traite beaucoup d'emporter/livraison
+          avec créneaux précis. La cuisine traite surtout du sur place. */}
       <main className="flex-1 p-3 sm:p-4">
-        <ColonneAgenda
-          tag={role === 'pizzaiolo' ? 'PIZZA' : 'CUISINE'}
-          icone={role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
-          articles={role === 'pizzaiolo' ? articlesParColonne.PIZZA : articlesParColonne.CUISINE}
-          now={now}
-          onTransition={transition}
-        />
+        {role === 'pizzaiolo' ? (
+          <PizzaAgenda
+            articles={articlesParColonne.PIZZA}
+            now={now}
+            onTransition={transition}
+          />
+        ) : (
+          <ColonneAgenda
+            tag="CUISINE"
+            icone="👨‍🍳"
+            articles={articlesParColonne.CUISINE}
+            now={now}
+            onTransition={transition}
+          />
+        )}
       </main>
     </div>
   )
@@ -610,6 +623,59 @@ function Ticket({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── PizzaAgenda = AGENDA colonnes 15min (mode pizzaiolo) ────────────
+// Comme emporter/livreur : tickets placés sous leur créneau de retrait.
+// Les commandes sans créneau (sur place / comptoir) → colonne "Hors créneau".
+function PizzaAgenda({
+  articles, now, onTransition,
+}: {
+  articles: Array<{ commande: CommandeService; articles: CommandeService['articles'] }>
+  now: number
+  onTransition: (id: string, nouveau: StatutArticle) => void
+}) {
+  if (articles.length === 0) {
+    return (
+      <div className="bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-800 py-20 px-6 text-center">
+        <p className="text-6xl mb-3">🍕</p>
+        <p className="text-base font-bold text-zinc-300">Aucune commande pizza en attente</p>
+        <p className="text-xs text-zinc-500 mt-1">Les commandes s'affichent ici dès qu'elles arrivent.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      <header className="flex items-center gap-2 px-1 mb-2">
+        <span className="inline-flex items-center gap-2 px-3 h-9 rounded-xl bg-zinc-900 ring-1 ring-zinc-700 text-white text-sm font-black shrink-0">
+          <span className="text-base">🍕</span>
+          <span>Agenda · colonnes 15 min</span>
+        </span>
+        <div className="flex-1 h-px bg-gradient-to-r from-zinc-700 to-transparent" />
+        <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 shrink-0">
+          {articles.length} ticket{articles.length > 1 ? 's' : ''}
+        </span>
+        <span className="hidden sm:inline-flex items-center gap-1 px-2 h-7 rounded-full bg-red-500/15 text-red-300 text-[10px] font-black tabular-nums shrink-0">
+          ⟵ Scroll horizontal ⟶
+        </span>
+      </header>
+      <AgendaCreneauxColonnes
+        items={articles.map(a => ({ creneauISO: a.commande.creneau_retrait, data: a }))}
+        renderItem={({ commande, articles: arts }) => (
+          <Ticket
+            commande={commande}
+            articles={arts}
+            now={now}
+            onTransition={onTransition}
+          />
+        )}
+        accent="red"
+        now={new Date(now)}
+        columnWidth={300}
+        emptyMessage="Aucune commande pizza dans l'agenda."
+      />
     </div>
   )
 }
