@@ -48,17 +48,14 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
       data-ops-theme="dark"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px))' }}
     >
-      {/* Sur mobile la TopActionBar est fixed-bottom (hors flow).
-          Sur desktop elle est static au top — on la met en shrink-0 dans le flex.
-          BackToCategoryButton CACHÉ en mode ops (service intense = fullscreen). */}
-      <div className="hidden md:block shrink-0">
-        <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
-      </div>
+      {/* Mode SERVICE INTENSE : la TopActionBar n'est rendue QUE sur mobile (fixed bottom)
+          pour permettre la nav rapide au pouce. Sur desktop, AUCUNE barre du layout :
+          le header propre à chaque page ops est la SEULE barre de navigation.
+          BackToCategoryButton supprimé pour la même raison. */}
       <div className="md:hidden">
         <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
       </div>
-      {/* Children prend tout l'espace restant — sur mobile on réserve 6.5rem
-          en bas pour la TopActionBar fixed bottom (hors flow). */}
+      {/* Children prend TOUT l'espace — sur mobile pb-[6.5rem] pour la barre fixed-bottom. */}
       <main className="flex-1 min-h-0 overflow-hidden pb-[6.5rem] md:pb-0">
         {children}
       </main>

@@ -83,18 +83,14 @@ export default async function ServeurPage() {
   })
 
   return (
-    <>
-      <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['commercial', 'strategique', 'serveur_rt']} />
-      <ServeurClient
-        initialCommandes={commandes}
-        tables={tables}
-        recettes={recettes}
-        employes={employes}
-        navProfil={navProfil}
-        widgetEmployeId={employeId}
-        widgetInitialDone={initialDone}
-      />
-    </>
+    <ServeurClient
+      initialCommandes={commandes}
+      tables={tables}
+      recettes={recettes}
+      employes={employes}
+      navProfil={navProfil}
+      widgetEmployeId={employeId}
+      widgetInitialDone={initialDone}
+    />
   )
 }

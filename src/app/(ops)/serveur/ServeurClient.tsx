@@ -761,7 +761,7 @@ function PlanSalle({
         </div>
       ) : (
         <div
-          className="flex-1 min-h-0 overflow-y-auto grid gap-3 lg:gap-4 content-start"
+          className="flex-1 min-h-0 overflow-y-auto scroll-visible-dark grid gap-3 lg:gap-4 content-start pr-1"
           style={{
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gridAutoRows: '150px',
