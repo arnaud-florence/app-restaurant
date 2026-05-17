@@ -301,6 +301,19 @@ export async function heartbeatBorne(input: { borne_id: string; user_agent?: str
   return { ok: true }
 }
 
+// ─── Config fidélité (lecture seule pour la borne) ────────────────────
+export async function getConfigFideliteBorne() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('parametres')
+    .select('cle, valeur')
+    .in('cle', ['fidelite.points_par_euro', 'fidelite.points_par_euro_remise'])
+  const map = new Map((data ?? []).map(r => [r.cle as string, (r.valeur as string) ?? '']))
+  return {
+    points_par_euro:        Number(map.get('fidelite.points_par_euro') ?? 1),
+    points_par_euro_remise: Number(map.get('fidelite.points_par_euro_remise') ?? 100),
+  }
+}
+
 // ─── Fidélité : recherche client par téléphone (saisie borne) ──────────
 // On normalise le téléphone (retire espaces / points / tirets) pour matching tolérant.
 export type ClientFidelite = {

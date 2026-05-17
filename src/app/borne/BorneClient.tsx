@@ -7,7 +7,7 @@ import { getPaymentProvider, type PaymentProvider, type PaymentResult } from '@/
 import {
   creerCommandeBorne, marquerBornePayee, annulerCommandeBorne,
   incrementerEchecsNFC, heartbeatBorne, logBorneEvenement,
-  chercherClientFideliteParTel, creerClientFideliteBorne,
+  chercherClientFideliteParTel, creerClientFideliteBorne, getConfigFideliteBorne,
   type PanierBorneItem, type ClientFidelite,
 } from './actions'
 import QRCode from 'qrcode'
@@ -72,6 +72,10 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const [prenomClient, setPrenomClient] = useState<string>('')
   // Compte fidélité — null si client a skippé / pas trouvé
   const [clientFidelite, setClientFidelite] = useState<ClientFidelite | null>(null)
+  // Config fidélité (points_par_euro_remise = combien de pts pour 1 € de remise)
+  const [configFid, setConfigFid] = useState<{ points_par_euro_remise: number; points_par_euro: number }>({
+    points_par_euro_remise: 100, points_par_euro: 1,
+  })
 
   // ─── Init provider de paiement + heartbeat ───────────────────────────
   useEffect(() => {
@@ -79,6 +83,9 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     getPaymentProvider().then(p => {
       if (active) setProvider(p)
     })
+    getConfigFideliteBorne().then(c => {
+      if (active) setConfigFid(c)
+    }).catch(() => { /* ignore, défaut OK */ })
     return () => { active = false }
   }, [])
 
@@ -307,6 +314,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           totalTTC={totalTTC}
           clientFidelite={clientFidelite}
           prenomClient={prenomClient}
+          configFid={configFid}
           onTrouve={(c) => {
             setClientFidelite(c)
             // Si l'utilisateur n'a pas saisi de prénom, on prend celui du compte
@@ -873,11 +881,12 @@ function EcranPrenom({
 // ÉCRAN 1.9 — COMPTE FIDÉLITÉ (saisie téléphone)
 // ═══════════════════════════════════════════════════════════════════════
 function EcranFidelite({
-  totalTTC, clientFidelite, prenomClient, onTrouve, onContinuer, onIgnorer, onRetour,
+  totalTTC, clientFidelite, prenomClient, configFid, onTrouve, onContinuer, onIgnorer, onRetour,
 }: {
   totalTTC: number
   clientFidelite: ClientFidelite | null
   prenomClient: string  // pour préfill création compte
+  configFid: { points_par_euro_remise: number; points_par_euro: number }
   onTrouve: (c: ClientFidelite) => void
   onContinuer: () => void
   onIgnorer: () => void
@@ -955,12 +964,37 @@ function EcranFidelite({
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-amber-300 font-black">Points cumulés</p>
                   <p className="font-display italic text-5xl tabular-nums text-amber-400">{clientFidelite.points_fidelite}</p>
+                  {(() => {
+                    // Équivalent € utilisable (max remise possible) :
+                    // - capé à la valeur totale des points (points/points_par_euro_remise)
+                    // - capé à totalTTC (on ne paie pas moins que 0)
+                    // - capé aux points dispo (suffisants pour atteindre cette remise)
+                    const ratio = Math.max(1, configFid.points_par_euro_remise)
+                    const equivalentMax = clientFidelite.points_fidelite / ratio
+                    const utilisable = Math.min(equivalentMax, totalTTC)
+                    if (utilisable < 0.5) return null
+                    return (
+                      <p className="text-xs text-amber-200 mt-1">
+                        ≈ <span className="font-black tabular-nums">{fmtPrix(utilisable)}</span> utilisables sur cette commande
+                      </p>
+                    )
+                  })()}
                 </div>
                 <p className="text-xs text-zinc-400">Visites : {clientFidelite.nb_visites}</p>
               </div>
-              <p className="text-sm text-emerald-300 mt-6">
-                ✓ Cette commande sera créditée sur votre compte
+
+              {/* Crédit attendu sur cette commande */}
+              <p className="text-sm text-emerald-300 mt-4">
+                ✓ Vous gagnerez <strong className="tabular-nums">{Math.floor(totalTTC * Math.max(1, configFid.points_par_euro))}</strong> points sur cette commande
               </p>
+
+              {/* Note utilisation des points (modes de paiement) */}
+              {clientFidelite.points_fidelite >= configFid.points_par_euro_remise && (
+                <div className="mt-3 rounded-xl bg-blue-500/10 border border-blue-500/40 px-3 py-2.5 text-xs text-blue-200 text-left">
+                  💡 <strong>Utiliser mes points ?</strong><br />
+                  Au paiement <strong>au comptoir</strong>, dis au caissier que tu veux utiliser tes points. Il appliquera la remise dans la caisse.
+                </div>
+              )}
               <button
                 onClick={onContinuer}
                 className="w-full h-16 mt-6 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-base shadow-lg shadow-emerald-500/30 active:scale-95"
