@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { fmtPrix, playDing } from '@/lib/service'
 import { marquerBornePayee, annulerCommandeBorne } from '@/app/borne/actions'
+import PinManagerModal from '@/components/PinManagerModal'
 
 type CommandeBorne = {
   id: string
@@ -33,6 +34,12 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
   const [now, setNow] = useState(() => Date.now())
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
+  // PIN gate : on stocke l'action à exécuter une fois le PIN validé
+  const [pinAction, setPinAction] = useState<
+    | { type: 'encaisser'; cmd: CommandeBorne }
+    | { type: 'refuser'; cmd: CommandeBorne }
+    | null
+  >(null)
 
   useEffect(() => {
     setCommandes(initial)
@@ -69,29 +76,30 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
     playDing()
   }
 
-  async function encaisser(c: CommandeBorne) {
-    if (!confirm(`Encaisser la commande #${c.numero?.slice(-4)} (${fmtPrix(c.montant_total_ttc)}) ?\n\nLa commande partira automatiquement en cuisine.`)) return
-    try {
-      await marquerBornePayee({ commande_id: c.id, payment_intent_id: null, via: 'comptoir' })
-      router.refresh()
-    } catch (e) {
-      alert('Erreur : ' + (e instanceof Error ? e.message : String(e)))
-    }
-  }
+  // Les actions sont déclenchées APRÈS validation du PIN manager
+  function encaisser(c: CommandeBorne) { setPinAction({ type: 'encaisser', cmd: c }) }
+  function refuser(c: CommandeBorne)   { setPinAction({ type: 'refuser', cmd: c }) }
 
-  async function refuser(c: CommandeBorne) {
-    if (!confirm(`Annuler la commande #${c.numero?.slice(-4)} ?`)) return
+  async function executerActionApresPin(employeNom: string) {
+    if (!pinAction) return
+    const { type, cmd } = pinAction
+    setPinAction(null)
     try {
-      await annulerCommandeBorne({ commande_id: c.id, raison: 'manuel', borne_id: c.borne_id ?? undefined })
+      if (type === 'encaisser') {
+        await marquerBornePayee({ commande_id: cmd.id, payment_intent_id: null, via: 'comptoir' })
+      } else {
+        await annulerCommandeBorne({ commande_id: cmd.id, raison: 'manuel', borne_id: cmd.borne_id ?? undefined })
+      }
       router.refresh()
     } catch (e) {
-      alert('Erreur : ' + (e instanceof Error ? e.message : String(e)))
+      alert(`Erreur (${employeNom}) : ` + (e instanceof Error ? e.message : String(e)))
     }
   }
 
   if (commandes.length === 0) return null
 
   return (
+    <>
     <section className="rounded-2xl border-2 border-red-500/60 bg-gradient-to-br from-red-950/40 to-zinc-900 p-4 space-y-3 animate-pulse-slow">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
@@ -164,5 +172,21 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
         })}
       </div>
     </section>
+
+    {/* Modal PIN manager : gate sur Encaisser / Annuler ─────────────── */}
+    <PinManagerModal
+      open={pinAction !== null}
+      title={
+        pinAction?.type === 'encaisser'
+          ? `Encaisser #${pinAction.cmd.numero?.slice(-4)}`
+          : pinAction?.type === 'refuser'
+            ? `Annuler #${pinAction.cmd.numero?.slice(-4)}`
+            : ''
+      }
+      subtitle={pinAction ? fmtPrix(pinAction.cmd.montant_total_ttc) : undefined}
+      onValid={executerActionApresPin}
+      onClose={() => setPinAction(null)}
+    />
+    </>
   )
 }
