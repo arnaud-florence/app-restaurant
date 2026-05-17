@@ -6,14 +6,19 @@ export const dynamic = 'force-dynamic'
 export default async function BornePage() {
   const supabase = await createClient()
 
-  // Catalogue borne : uniquement les recettes actives.
-  // Les "boissons" sont stockées comme recettes avec tag_destination='BAR'
-  // dans l'app actuelle (cf. ComptoirOrderModal). commande_articles n'a
-  // qu'une FK recette_id, donc on ne peut pas vendre une ligne 'boissons'.
+  // Catalogue borne : self-service rapide.
+  // Inclus :
+  //   - SNACKING (sandwichs, salades, frites, tacos, burgers, menus)
+  //   - PIZZA (toutes)
+  //   - BAR mais UNIQUEMENT categorie='Boissons' (soft, eau, bière, jus, café)
+  // Exclus : Vins / Cocktails / Spiritueux / Apéritifs / Digestifs (vente
+  // au comptoir avec conseil seulement, pas en self-service).
+  // Cuisine traditionnelle (CUISINE) exclue (commandes table uniquement).
   const { data: recettesData } = await supabase
     .from('recettes')
     .select('id, nom, categorie, tag_destination, prix_vente_ht, image_url, photo_url, favori')
     .eq('actif', true)
+    .or('tag_destination.in.(SNACKING,PIZZA),and(tag_destination.eq.BAR,categorie.eq.Boissons)')
     .order('categorie')
     .order('nom')
 
