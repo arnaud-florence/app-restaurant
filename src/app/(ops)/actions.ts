@@ -627,14 +627,20 @@ export async function avancerCommandeComptoir(input: unknown) {
   const p = statutComptoirSchema.parse(input)
   const supabase = await createClient()
   const { data: cmd } = await supabase.from('commandes')
-    .select('source, statut').eq('id', p.commande_id).maybeSingle()
+    .select('source, statut, mode_paiement').eq('id', p.commande_id).maybeSingle()
   if (!cmd) throw new Error('Commande introuvable')
   if (cmd.source === 'ONLINE') throw new Error('Utilisez marquerStatutCommandeOnline pour ONLINE')
   if (cmd.statut === 'encaisse' || cmd.statut === 'annule') {
     throw new Error('Commande terminée — modification impossible')
   }
+  // CAS SPÉCIAL : commande pré-payée (BORNE/SNACK comptoir) qui passe à 'servi'
+  // = "Donné au client". Pas besoin d'étape encaissement après → on clôt
+  // directement en 'encaisse' pour faire disparaître la carte de l'agenda.
+  const statutCible = (p.nouveau_statut === 'servi' && cmd.mode_paiement)
+    ? 'encaisse'
+    : p.nouveau_statut
   const { error } = await supabase.from('commandes')
-    .update({ statut: p.nouveau_statut })
+    .update({ statut: statutCible })
     .eq('id', p.commande_id)
   if (error) throw new Error(error.message)
   revalidatePath('/emporter')
