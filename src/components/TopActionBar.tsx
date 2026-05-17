@@ -265,8 +265,9 @@ const ALL_GROUPES: Group[] = [
   {
     groupe: 'Système', emoji: '⚙️',
     items: [
-      { href: '/admin/setup',    label: 'Configuration', emoji: '⚙️' },
-      { href: '/admin/securite', label: 'Sécurité',      emoji: '🔐' },
+      { href: '/admin/setup',     label: 'Configuration',  emoji: '⚙️' },
+      { href: '/admin/securite',  label: 'Sécurité',       emoji: '🔐' },
+      { href: '/admin/borne',     label: 'Borne kiosk',    emoji: '🛍' },
     ],
   },
 ]
