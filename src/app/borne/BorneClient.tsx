@@ -814,7 +814,8 @@ function EcranPrenom({
         <StepBadge courant={1} total={4} />
         <p className="text-2xl sm:text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
       </header>
-      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-2">
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex flex-col items-center px-4 sm:px-6 py-2">
         <h2 className="font-display italic text-3xl sm:text-5xl text-center text-white mt-2">Votre prénom ?</h2>
         <p className="text-center text-zinc-400 text-sm sm:text-base mt-2 max-w-md">
           Pour qu&apos;on puisse vous appeler quand votre commande est prête. <span className="text-zinc-500 italic">Facultatif.</span>
@@ -871,6 +872,7 @@ function EcranPrenom({
           >
             Suivant →
           </button>
+        </div>
         </div>
       </main>
     </div>
@@ -1253,7 +1255,8 @@ function EcranNFC({
           ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
         </span>
       </header>
-      <main className="flex-1 flex flex-col items-center justify-center px-6">
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex flex-col items-center justify-center px-6 py-6">
         {/* Montant */}
         <p className="font-display italic text-5xl sm:text-7xl font-medium tabular-nums text-white drop-shadow-lg">
           {fmtPrix(totalTTC)}
@@ -1282,6 +1285,7 @@ function EcranNFC({
         {provider.environment === 'mock' && (
           <p className="text-amber-300 text-xs mt-6 italic">⚠ Mode démo (mock NFC) — paiement simulé en 2,5 s</p>
         )}
+        </div>
       </main>
     </div>
   )
@@ -1329,30 +1333,32 @@ function EcranComptoir({
           ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
         </span>
       </header>
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-6">
-        {prenom && (
-          <p className="font-display italic text-3xl sm:text-4xl text-blue-100 mb-2">Bonjour {prenom} 👋</p>
-        )}
-        <p className="font-display italic text-2xl sm:text-3xl text-blue-200 mb-4">Rendez-vous à la caisse</p>
-        <p className="text-zinc-400 mb-8 max-w-md">Présentez ce numéro au comptoir pour régler votre commande (carte ou espèces).</p>
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex flex-col items-center justify-center text-center px-6 py-6">
+          {prenom && (
+            <p className="font-display italic text-3xl sm:text-4xl text-blue-100 mb-2">Bonjour {prenom} 👋</p>
+          )}
+          <p className="font-display italic text-2xl sm:text-3xl text-blue-200 mb-4">Rendez-vous à la caisse</p>
+          <p className="text-zinc-400 mb-8 max-w-md">Présentez ce numéro au comptoir pour régler votre commande (carte ou espèces).</p>
 
-        <div className="bg-white rounded-3xl px-8 py-6 shadow-2xl">
-          <p className="text-zinc-500 text-xs uppercase tracking-widest font-black">
-            {prenom ? `Numéro de ${prenom}` : 'Votre numéro de commande'}
-          </p>
-          <p className="font-display italic text-7xl sm:text-9xl font-bold tabular-nums text-zinc-900 leading-tight">
-            #{commande.numero?.slice(-4)}
-          </p>
-        </div>
-
-        {qrUrl && (
-          <div className="bg-white rounded-2xl p-3 mt-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrUrl} alt="QR code" className="w-40 h-40 sm:w-52 sm:h-52" />
+          <div className="bg-white rounded-3xl px-8 py-6 shadow-2xl">
+            <p className="text-zinc-500 text-xs uppercase tracking-widest font-black">
+              {prenom ? `Numéro de ${prenom}` : 'Votre numéro de commande'}
+            </p>
+            <p className="font-display italic text-7xl sm:text-9xl font-bold tabular-nums text-zinc-900 leading-tight">
+              #{commande.numero?.slice(-4)}
+            </p>
           </div>
-        )}
 
-        <p className="text-blue-200 mt-6 font-display italic text-xl tabular-nums">{fmtPrix(totalTTC)}</p>
+          {qrUrl && (
+            <div className="bg-white rounded-2xl p-3 mt-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrUrl} alt="QR code" className="w-40 h-40 sm:w-52 sm:h-52" />
+            </div>
+          )}
+
+          <p className="text-blue-200 mt-6 font-display italic text-xl tabular-nums">{fmtPrix(totalTTC)}</p>
+        </div>
       </main>
     </div>
   )
@@ -1383,41 +1389,44 @@ function EcranSucces({
   }, [onTermine])
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950 to-zinc-950 relative overflow-hidden">
-      {/* Confettis */}
-      {confettis.map((c, i) => (
-        <span
-          key={i}
-          className="absolute top-[-20px] w-2 h-3 rounded-sm"
-          style={{
-            left: `${c.x}%`,
-            backgroundColor: c.color,
-            animation: `borneConfetti ${c.dur}s linear ${c.delay}s infinite`,
-          }}
-        />
-      ))}
+    <div className="flex-1 overflow-y-auto scroll-visible-dark bg-gradient-to-br from-emerald-950 to-zinc-950 relative">
+      {/* Confettis (positionnés absolu sur tout l'écran) */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        {confettis.map((c, i) => (
+          <span
+            key={i}
+            className="absolute top-[-20px] w-2 h-3 rounded-sm"
+            style={{
+              left: `${c.x}%`,
+              backgroundColor: c.color,
+              animation: `borneConfetti ${c.dur}s linear ${c.delay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
       <style jsx>{`
         @keyframes borneConfetti {
           0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
           100% { transform: translateY(110vh) rotate(720deg); opacity: 0.4; }
         }
       `}</style>
-
-      <span className="text-9xl mb-6 animate-bounce">✅</span>
-      <h2 className="font-display italic text-5xl sm:text-6xl font-medium text-white text-center">
-        Merci {prenom ? prenom : ''} !
-      </h2>
-      <p className="text-emerald-200 mt-4 text-xl text-center max-w-md">
-        Votre commande est en préparation.
-        {prenom && <span className="block text-sm opacity-80 mt-2">On vous appelle dès qu&apos;elle est prête.</span>}
-      </p>
-      <div className="bg-white rounded-3xl px-10 py-6 mt-8 shadow-2xl">
-        <p className="text-zinc-500 text-xs uppercase tracking-widest font-black text-center">Numéro</p>
-        <p className="font-display italic text-7xl font-bold tabular-nums text-emerald-600 leading-tight">#{commande.numero?.slice(-4)}</p>
+      <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
+        <span className="text-7xl sm:text-9xl mb-6 animate-bounce">✅</span>
+        <h2 className="font-display italic text-4xl sm:text-6xl font-medium text-white text-center">
+          Merci {prenom ? prenom : ''} !
+        </h2>
+        <p className="text-emerald-200 mt-4 text-lg sm:text-xl text-center max-w-md">
+          Votre commande est en préparation.
+          {prenom && <span className="block text-sm opacity-80 mt-2">On vous appelle dès qu&apos;elle est prête.</span>}
+        </p>
+        <div className="bg-white rounded-3xl px-8 sm:px-10 py-5 sm:py-6 mt-8 shadow-2xl">
+          <p className="text-zinc-500 text-xs uppercase tracking-widest font-black text-center">Numéro</p>
+          <p className="font-display italic text-6xl sm:text-7xl font-bold tabular-nums text-emerald-600 leading-tight">#{commande.numero?.slice(-4)}</p>
+        </div>
+        <button onClick={onTermine} className="mt-8 h-14 px-8 rounded-xl bg-zinc-800/80 backdrop-blur text-white font-black uppercase tracking-wider">
+          Terminer
+        </button>
       </div>
-      <button onClick={onTermine} className="mt-10 h-14 px-8 rounded-xl bg-zinc-800/80 backdrop-blur text-white font-black uppercase tracking-wider">
-        Terminer
-      </button>
     </div>
   )
 }
@@ -1434,23 +1443,25 @@ function EcranEchec({
   onAnnuler: () => void
 }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-zinc-950 to-red-950 p-6">
-      <span className="text-8xl mb-6">😕</span>
-      <h2 className="font-display italic text-4xl sm:text-5xl font-medium text-white text-center">Paiement non abouti</h2>
-      <p className="text-zinc-400 mt-3 text-center max-w-md">Pas de panique — vous pouvez réessayer ou choisir de payer au comptoir.</p>
-      <p className="font-display italic text-3xl tabular-nums text-white mt-6">{fmtPrix(totalTTC)}</p>
+    <div className="flex-1 overflow-y-auto scroll-visible-dark bg-gradient-to-br from-zinc-950 to-red-950">
+      <div className="min-h-full flex flex-col items-center justify-center p-6 py-8">
+        <span className="text-7xl sm:text-8xl mb-6">😕</span>
+        <h2 className="font-display italic text-3xl sm:text-5xl font-medium text-white text-center">Paiement non abouti</h2>
+        <p className="text-zinc-400 mt-3 text-center max-w-md text-sm sm:text-base">Pas de panique — vous pouvez réessayer ou choisir de payer au comptoir.</p>
+        <p className="font-display italic text-2xl sm:text-3xl tabular-nums text-white mt-6">{fmtPrix(totalTTC)}</p>
 
-      <div className="mt-10 flex flex-col sm:flex-row gap-3 w-full max-w-md">
-        <button onClick={onReessayer} className="flex-1 h-14 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider shadow-lg shadow-emerald-500/30 active:scale-95">
-          Réessayer NFC
-        </button>
-        <button onClick={onComptoir} className="flex-1 h-14 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black uppercase tracking-wider shadow-lg shadow-blue-500/30 active:scale-95">
-          Payer au comptoir
+        <div className="mt-8 flex flex-col sm:flex-row gap-3 w-full max-w-md">
+          <button onClick={onReessayer} className="flex-1 h-14 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider shadow-lg shadow-emerald-500/30 active:scale-95">
+            Réessayer NFC
+          </button>
+          <button onClick={onComptoir} className="flex-1 h-14 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black uppercase tracking-wider shadow-lg shadow-blue-500/30 active:scale-95">
+            Payer au comptoir
+          </button>
+        </div>
+        <button onClick={onAnnuler} className="mt-4 text-zinc-500 hover:text-zinc-300 text-sm underline">
+          Annuler la commande
         </button>
       </div>
-      <button onClick={onAnnuler} className="mt-4 text-zinc-500 hover:text-zinc-300 text-sm underline">
-        Annuler la commande
-      </button>
     </div>
   )
 }
