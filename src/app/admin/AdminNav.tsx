@@ -10,6 +10,7 @@ import {
   Calendar, Building2, Truck, Sparkles, Settings, Tv, GraduationCap,
   AlertTriangle, FileText, Trash2, Zap, NotebookPen, CloudSun, Wrench,
   Store, BookOpen, Trophy, Calculator, ChevronDown, ChevronRight, Home, Star,
+  ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
@@ -93,6 +94,7 @@ const GROUPES: Group[] = [
     items: [
       { href: '/admin/setup',        label: 'Configuration',       icon: Settings },
       { href: '/admin/securite',     label: 'Sécurité',            icon: ShieldCheck },
+      { href: '/admin/borne',        label: 'Borne kiosk',         icon: ShoppingBag },
     ],
   },
 ]
