@@ -316,6 +316,45 @@ function normaliserTel(t: string): string {
   return t.replace(/[\s.\-()]/g, '')
 }
 
+// Crée un compte fidélité minimal depuis la borne (prénom + téléphone).
+// Le nom est rempli avec le prénom (placeholder modifiable côté admin).
+export async function creerClientFideliteBorne(input: {
+  prenom: string
+  telephone: string
+}): Promise<ClientFidelite> {
+  const tel = normaliserTel(input.telephone)
+  if (tel.length < 9) throw new Error('Numéro invalide')
+  const prenom = input.prenom.trim()
+  if (!prenom) throw new Error('Prénom requis')
+  const supabase = await createClient()
+
+  // Si déjà existant : on retourne celui-là (idempotent)
+  const existant = await chercherClientFideliteParTel(tel)
+  if (existant) return existant
+
+  const { data, error } = await supabase
+    .from('clients')
+    .insert({
+      prenom,
+      nom: prenom, // placeholder, NOT NULL — modifiable côté admin
+      telephone: tel,
+      points_fidelite: 0,
+      niveau_fidelite: 'standard',
+      nb_visites: 0,
+    })
+    .select('id, prenom, nom, telephone, points_fidelite, niveau_fidelite, nb_visites')
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Erreur création compte')
+  return {
+    id: data.id as string,
+    prenom: (data.prenom as string) ?? null,
+    nom: (data.nom as string) ?? null,
+    points_fidelite: Number(data.points_fidelite ?? 0),
+    niveau_fidelite: (data.niveau_fidelite as string) ?? 'standard',
+    nb_visites: Number(data.nb_visites ?? 0),
+  }
+}
+
 export async function chercherClientFideliteParTel(telephone: string): Promise<ClientFidelite | null> {
   const tel = normaliserTel(telephone)
   if (tel.length < 9) return null // FR minimum

@@ -7,7 +7,7 @@ import { getPaymentProvider, type PaymentProvider, type PaymentResult } from '@/
 import {
   creerCommandeBorne, marquerBornePayee, annulerCommandeBorne,
   incrementerEchecsNFC, heartbeatBorne, logBorneEvenement,
-  chercherClientFideliteParTel,
+  chercherClientFideliteParTel, creerClientFideliteBorne,
   type PanierBorneItem, type ClientFidelite,
 } from './actions'
 import QRCode from 'qrcode'
@@ -306,6 +306,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         <EcranFidelite
           totalTTC={totalTTC}
           clientFidelite={clientFidelite}
+          prenomClient={prenomClient}
           onTrouve={(c) => {
             setClientFidelite(c)
             // Si l'utilisateur n'a pas saisi de prénom, on prend celui du compte
@@ -688,6 +689,28 @@ function PanierContenu({
   )
 }
 
+// ─── Indicateur de progression d'étape (haut écran) ──────────────────
+function StepBadge({ courant, total }: { courant: number; total: number }) {
+  return (
+    <div className="inline-flex items-center gap-2 h-10 px-3 rounded-xl bg-zinc-900 ring-1 ring-zinc-800">
+      <div className="flex gap-1">
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            className={cn(
+              'h-1.5 rounded-full transition-all',
+              i < courant ? 'w-3 bg-emerald-500' : i === courant ? 'w-6 bg-emerald-400' : 'w-3 bg-zinc-700',
+            )}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] uppercase tracking-widest font-black text-zinc-400 tabular-nums">
+        {courant + 1}/{total}
+      </span>
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // ÉCRAN 1.5 — SUR PLACE OU À EMPORTER
 // ═══════════════════════════════════════════════════════════════════════
@@ -701,11 +724,12 @@ function EcranConsommation({
 }) {
   return (
     <div className="flex-1 flex flex-col">
-      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
-        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+      <header className="shrink-0 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
           ← Modifier
         </button>
-        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+        <StepBadge courant={0} total={4} />
+        <p className="text-2xl sm:text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
       </header>
       <main className="flex-1 overflow-y-auto scroll-visible-dark">
         <div className="min-h-full flex items-center justify-center p-4 sm:p-10">
@@ -775,11 +799,12 @@ function EcranPrenom({
   }
   return (
     <div className="flex-1 flex flex-col">
-      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
-        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+      <header className="shrink-0 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
           ← Retour
         </button>
-        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+        <StepBadge courant={1} total={4} />
+        <p className="text-2xl sm:text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
       </header>
       <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-2">
         <h2 className="font-display italic text-3xl sm:text-5xl text-center text-white mt-2">Votre prénom ?</h2>
@@ -848,10 +873,11 @@ function EcranPrenom({
 // ÉCRAN 1.9 — COMPTE FIDÉLITÉ (saisie téléphone)
 // ═══════════════════════════════════════════════════════════════════════
 function EcranFidelite({
-  totalTTC, clientFidelite, onTrouve, onContinuer, onIgnorer, onRetour,
+  totalTTC, clientFidelite, prenomClient, onTrouve, onContinuer, onIgnorer, onRetour,
 }: {
   totalTTC: number
   clientFidelite: ClientFidelite | null
+  prenomClient: string  // pour préfill création compte
   onTrouve: (c: ClientFidelite) => void
   onContinuer: () => void
   onIgnorer: () => void
@@ -860,23 +886,42 @@ function EcranFidelite({
   const [tel, setTel] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Si pas trouvé → propose création (true = "non trouvé pour ce tel")
+  const [proposerCreation, setProposerCreation] = useState(false)
 
   function tap(d: string) {
-    if (d === '⌫') { setTel(prev => prev.slice(0, -1)); setErr(null); return }
+    if (d === '⌫') { setTel(prev => prev.slice(0, -1)); setErr(null); setProposerCreation(false); return }
     if (tel.length >= 12) return
     setTel(prev => prev + d)
     setErr(null)
+    setProposerCreation(false)
   }
 
   async function rechercher() {
     if (tel.length < 9) { setErr('Numéro trop court'); return }
-    setBusy(true); setErr(null)
+    setBusy(true); setErr(null); setProposerCreation(false)
     try {
       const c = await chercherClientFideliteParTel(tel)
       if (c) onTrouve(c)
-      else setErr('Aucun compte trouvé pour ce numéro')
+      else setProposerCreation(true)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Erreur')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function creerCompte() {
+    if (!prenomClient.trim()) {
+      setErr('Prénom requis pour créer le compte (étape précédente)')
+      return
+    }
+    setBusy(true); setErr(null)
+    try {
+      const c = await creerClientFideliteBorne({ prenom: prenomClient, telephone: tel })
+      onTrouve(c)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erreur création')
     } finally {
       setBusy(false)
     }
@@ -888,11 +933,12 @@ function EcranFidelite({
     const emoji = niveauEmoji[clientFidelite.niveau_fidelite.toLowerCase()] ?? '⭐'
     return (
       <div className="flex-1 flex flex-col">
-        <header className="shrink-0 px-6 py-4 flex items-center justify-between">
-          <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+        <header className="shrink-0 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+          <button onClick={onRetour} className="inline-flex items-center gap-2 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
             ← Retour
           </button>
-          <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+          <StepBadge courant={2} total={4} />
+          <p className="text-2xl sm:text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
         </header>
         <main className="flex-1 overflow-y-auto scroll-visible-dark">
           <div className="min-h-full flex items-center justify-center p-4 sm:p-10">
@@ -931,11 +977,12 @@ function EcranFidelite({
   // Sinon : saisie téléphone
   return (
     <div className="flex-1 flex flex-col">
-      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
-        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+      <header className="shrink-0 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
           ← Retour
         </button>
-        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+        <StepBadge courant={2} total={4} />
+        <p className="text-2xl sm:text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
       </header>
       <main className="flex-1 overflow-y-auto scroll-visible-dark">
         <div className="min-h-full flex flex-col items-center p-4 sm:p-6 py-3">
@@ -956,6 +1003,30 @@ function EcranFidelite({
               </p>
             </div>
             {err && <p className="text-red-400 text-sm font-bold mt-2 text-center">{err}</p>}
+            {/* Proposition de création si pas trouvé */}
+            {proposerCreation && !err && (
+              <div className="mt-3 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 p-3 sm:p-4 text-center space-y-2">
+                <p className="text-amber-300 font-bold text-sm">📭 Aucun compte pour ce numéro</p>
+                {prenomClient ? (
+                  <>
+                    <p className="text-zinc-300 text-xs">
+                      Créer un compte fidélité pour <strong className="text-amber-300">{prenomClient}</strong> avec ce numéro ?
+                    </p>
+                    <button
+                      onClick={creerCompte}
+                      disabled={busy}
+                      className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-black uppercase tracking-wider text-xs shadow disabled:opacity-50 active:scale-95"
+                    >
+                      {busy ? '⏳ Création…' : '🎁 Créer mon compte fidélité'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-zinc-400 text-xs italic">
+                    Reviens en arrière pour saisir un prénom afin de créer un compte.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Clavier numérique */}
@@ -1020,10 +1091,11 @@ function EcranChoixPaiement({
 }) {
   return (
     <div className="flex-1 flex flex-col">
-      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
-        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
-          ← Modifier la commande
+      <header className="shrink-0 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+          ← <span className="hidden sm:inline">Modifier</span>
         </button>
+        <StepBadge courant={3} total={4} />
         <div className="text-right">
           <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{nbArticles} article{nbArticles > 1 ? 's' : ''}</p>
           <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
