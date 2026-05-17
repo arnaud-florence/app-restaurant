@@ -18,6 +18,7 @@ type Produit = {
   nom: string
   categorie: string
   tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
+  description: string | null
   prix_vente_ht: number
   image_url: string | null
   favori: boolean
@@ -59,6 +60,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const [panier, setPanier] = useState<LignePanier[]>([])
   // null = écran "choisis ta catégorie" en grand / sinon = grille produits de la cat
   const [cat, setCat] = useState<string | null>(null)
+  // null = aucune fiche produit ouverte / sinon = fiche détaillée d'un produit
+  const [ficheProduit, setFicheProduit] = useState<Produit | null>(null)
   const [provider, setProvider] = useState<PaymentProvider | null>(null)
   const [commande, setCommande] = useState<{ id: string; numero: string; expire_at: string | null } | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -115,15 +118,19 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   )
   const nbArticles = useMemo(() => panier.reduce((s, l) => s + l.quantite, 0), [panier])
 
-  const ajouter = useCallback((p: Produit) => {
+  // ─── Actions panier ──────────────────────────────────────────────────
+  // ajouter(p, qty?) : ajoute qty (défaut +1) à p. Si déjà au panier → cumul.
+  const ajouter = useCallback((p: Produit, qty: number = 1) => {
+    if (qty <= 0) return
     setPanier(prev => {
       const exist = prev.find(l => l.produit.id === p.id)
-      if (exist) return prev.map(l => l.produit.id === p.id ? { ...l, quantite: l.quantite + 1 } : l)
-      return [...prev, { produit: p, quantite: 1 }]
+      if (exist) return prev.map(l => l.produit.id === p.id ? { ...l, quantite: l.quantite + qty } : l)
+      return [...prev, { produit: p, quantite: qty }]
     })
-    void logBorneEvenement({ borne_id: borneId, type: 'panier_ajout', details: { produit_id: p.id, nom: p.nom } })
+    void logBorneEvenement({ borne_id: borneId, type: 'panier_ajout', details: { produit_id: p.id, nom: p.nom, qty } })
   }, [borneId])
 
+  // retirer(p) : décrémente de 1, supprime si quantité tombe à 0
   const retirer = useCallback((p: Produit) => {
     setPanier(prev => {
       const exist = prev.find(l => l.produit.id === p.id)
@@ -133,10 +140,29 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     })
   }, [])
 
+  // setQuantite(p, qty) : remplace la quantité d'un produit (utilisé dans la fiche)
+  const setQuantite = useCallback((p: Produit, qty: number) => {
+    if (qty <= 0) { setPanier(prev => prev.filter(l => l.produit.id !== p.id)); return }
+    setPanier(prev => {
+      const exist = prev.find(l => l.produit.id === p.id)
+      if (exist) return prev.map(l => l.produit.id === p.id ? { ...l, quantite: qty } : l)
+      return [...prev, { produit: p, quantite: qty }]
+    })
+  }, [])
+
+  // supprimer(p) : retire complètement la ligne du panier (bouton 🗑)
+  const supprimer = useCallback((p: Produit) => {
+    setPanier(prev => prev.filter(l => l.produit.id !== p.id))
+    void logBorneEvenement({ borne_id: borneId, type: 'panier_retire', details: { produit_id: p.id, nom: p.nom } })
+  }, [borneId])
+
   const viderPanier = useCallback(() => {
     setPanier([])
     void logBorneEvenement({ borne_id: borneId, type: 'panier_vide' })
   }, [borneId])
+
+  // Tap sur un produit du catalogue → ouvre la fiche détaillée (style McDo)
+  const ouvrirFiche = useCallback((p: Produit) => setFicheProduit(p), [])
 
   // ─── Création commande + lancement paiement ──────────────────────────
   const allerCaisse = useCallback(() => {
@@ -229,10 +255,27 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           panier={panier}
           nbArticles={nbArticles}
           totalTTC={totalTTC}
+          onOuvrirFiche={ouvrirFiche}
           onAjouter={ajouter}
           onRetirer={retirer}
+          onSupprimer={supprimer}
           onVider={viderPanier}
           onAllerCaisse={allerCaisse}
+        />
+      )}
+
+      {/* Modal fiche produit (McDo-style) — superposée sur le catalogue */}
+      {ficheProduit && (
+        <FicheProduitModal
+          produit={ficheProduit}
+          quantiteActuelle={panier.find(l => l.produit.id === ficheProduit.id)?.quantite ?? 0}
+          onClose={() => setFicheProduit(null)}
+          onAjouter={(qty) => {
+            // Si déjà au panier : on remplace la quantité (pas cumul) car
+            // la fiche s'ouvre avec la valeur actuelle.
+            setQuantite(ficheProduit, qty)
+            setFicheProduit(null)
+          }}
         />
       )}
       {etape === 'consommation' && (
@@ -321,7 +364,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
 // ═══════════════════════════════════════════════════════════════════════
 function EcranCatalogue({
   produitsFiltres, categoriesAvecMeta, cat, setCat, panier, nbArticles, totalTTC,
-  onAjouter, onRetirer, onVider, onAllerCaisse,
+  onOuvrirFiche, onAjouter, onRetirer, onSupprimer, onVider, onAllerCaisse,
 }: {
   produitsFiltres: Produit[]
   categoriesAvecMeta: Array<{ nom: string; count: number; firstImage: string | null; firstProduit: Produit }>
@@ -330,8 +373,10 @@ function EcranCatalogue({
   panier: LignePanier[]
   nbArticles: number
   totalTTC: number
-  onAjouter: (p: Produit) => void
+  onOuvrirFiche: (p: Produit) => void
+  onAjouter: (p: Produit, qty?: number) => void
   onRetirer: (p: Produit) => void
+  onSupprimer: (p: Produit) => void
   onVider: () => void
   onAllerCaisse: () => void
 }) {
@@ -426,7 +471,7 @@ function EcranCatalogue({
                 return (
                   <button
                     key={p.id}
-                    onClick={() => onAjouter(p)}
+                    onClick={() => onOuvrirFiche(p)}
                     className={cn(
                       'group relative rounded-2xl bg-zinc-900 border-2 overflow-hidden text-left transition-all active:scale-95',
                       enPanier > 0 ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-zinc-800 hover:border-zinc-600',
@@ -473,15 +518,31 @@ function EcranCatalogue({
             {panier.length === 0 ? (
               <p className="text-center text-zinc-600 italic mt-12 text-sm">Tapez sur un produit pour l&apos;ajouter</p>
             ) : panier.map(l => (
-              <div key={l.produit.id} className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
-                <p className="text-sm font-medium text-white line-clamp-1">{l.produit.nom}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => onRetirer(l.produit)} className="w-9 h-9 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-xl">−</button>
-                    <span className="w-9 text-center font-black tabular-nums">{l.quantite}</span>
-                    <button onClick={() => onAjouter(l.produit)} className="w-9 h-9 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-xl">+</button>
+              <div key={l.produit.id} className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 flex gap-2.5">
+                {/* Miniature */}
+                {l.produit.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={l.produit.image_url} alt={l.produit.nom} className="w-14 h-14 rounded-lg object-cover bg-zinc-950 shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-zinc-800 flex items-center justify-center text-2xl shrink-0">🍽</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-1">
+                    <p className="text-sm font-medium text-white line-clamp-2 leading-tight">{l.produit.nom}</p>
+                    <button
+                      onClick={() => onSupprimer(l.produit)}
+                      className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white text-sm shrink-0 transition-colors active:scale-90"
+                      title="Supprimer du panier"
+                    >🗑</button>
                   </div>
-                  <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + TVA))}</p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => onRetirer(l.produit)} className="w-8 h-8 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">−</button>
+                      <span className="w-7 text-center font-black tabular-nums text-sm">{l.quantite}</span>
+                      <button onClick={() => onAjouter(l.produit, 1)} className="w-8 h-8 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">+</button>
+                    </div>
+                    <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + TVA))}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1027,6 +1088,125 @@ function EcranEchec({
 // ═══════════════════════════════════════════════════════════════════════
 // NFC ondes animées (utilisé dans EcranChoixPaiement)
 // ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// MODAL FICHE PRODUIT (McDo-style)
+// ═══════════════════════════════════════════════════════════════════════
+// S'ouvre au tap sur un produit du catalogue : image en grand, nom,
+// description, prix, sélecteur quantité +/-, bouton "Ajouter X au panier".
+// Si déjà au panier : la quantité initiale = celle au panier, validation
+// remplace (pas cumul) — comme McDo.
+function FicheProduitModal({
+  produit, quantiteActuelle, onClose, onAjouter,
+}: {
+  produit: Produit
+  quantiteActuelle: number
+  onClose: () => void
+  onAjouter: (qty: number) => void
+}) {
+  const initial = quantiteActuelle > 0 ? quantiteActuelle : 1
+  const [qty, setQty] = useState<number>(initial)
+  const prixUnit = produit.prix_vente_ht * (1 + TVA)
+  const prixTotal = prixUnit * qty
+  const dejaPresent = quantiteActuelle > 0
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-sm flex items-stretch justify-center p-2 sm:p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl bg-zinc-950 rounded-3xl border-2 border-zinc-800 shadow-2xl flex flex-col max-h-[95vh] overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Image header */}
+        <div className="relative shrink-0">
+          {produit.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={produit.image_url} alt={produit.nom} className="w-full h-56 sm:h-72 object-cover bg-zinc-900" />
+          ) : (
+            <div className="w-full h-56 sm:h-72 bg-zinc-800 flex items-center justify-center text-8xl">
+              {produit.tag_destination === 'BAR' ? '🥤' : '🍽'}
+            </div>
+          )}
+          {/* Close X */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur text-white text-2xl flex items-center justify-center shadow-lg"
+          >×</button>
+          {/* Favori */}
+          {produit.favori && (
+            <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-amber-500 text-white text-xs font-black shadow-lg">
+              ⭐ Favori
+            </span>
+          )}
+          {/* Gradient bottom pour le titre */}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-zinc-950 to-transparent pointer-events-none" />
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-emerald-400 font-black">{produit.categorie}</p>
+            <h2 className="font-display italic text-3xl sm:text-4xl font-medium text-white mt-1 leading-tight">{produit.nom}</h2>
+          </div>
+
+          {produit.description && (
+            <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">{produit.description}</p>
+          )}
+
+          <div className="flex items-baseline gap-2 pt-2 border-t border-zinc-800">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Prix unitaire</span>
+            <span className="font-display italic text-2xl font-medium tabular-nums text-emerald-400">{fmtPrix(prixUnit)}</span>
+          </div>
+
+          {dejaPresent && (
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/40 px-3 py-2 text-sm text-emerald-300">
+              ⓘ Déjà dans le panier (×{quantiteActuelle}). La validation remplacera la quantité.
+            </div>
+          )}
+
+          {/* Quantité */}
+          <div className="rounded-2xl bg-zinc-900 border border-zinc-800 p-4 flex items-center justify-between gap-4">
+            <span className="text-sm font-black uppercase tracking-widest text-zinc-400">Quantité</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setQty(q => Math.max(0, q - 1))}
+                className="w-14 h-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white text-3xl font-black"
+              >−</button>
+              <span className="font-display italic text-4xl font-medium tabular-nums w-14 text-center text-white">{qty}</span>
+              <button
+                onClick={() => setQty(q => q + 1)}
+                className="w-14 h-14 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white text-3xl font-black"
+              >+</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="shrink-0 p-4 border-t-2 border-zinc-800 bg-zinc-950 flex flex-col gap-2">
+          <button
+            onClick={() => onAjouter(qty)}
+            disabled={qty < 0}
+            className={cn(
+              'w-full h-16 rounded-2xl font-black uppercase tracking-wider text-base transition-all active:scale-95',
+              qty === 0
+                ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/30'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/40',
+            )}
+          >
+            {qty === 0
+              ? dejaPresent ? '🗑 Retirer du panier' : 'Annuler'
+              : <>✓ {dejaPresent ? 'Modifier' : 'Ajouter'} · {fmtPrix(prixTotal)}</>}
+          </button>
+          <button
+            onClick={onClose}
+            className="h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-wider text-xs"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function NFCOndes({ active }: { active: boolean }) {
   return (
     <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center">
