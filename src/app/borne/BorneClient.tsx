@@ -380,6 +380,7 @@ function EcranCatalogue({
   onVider: () => void
   onAllerCaisse: () => void
 }) {
+  const [showPanierMobile, setShowPanierMobile] = useState(false)
   // Icône par catégorie (mapping le plus large possible)
   const iconeCat = (nom: string): string => {
     const n = nom.toLowerCase()
@@ -506,86 +507,164 @@ function EcranCatalogue({
           )}
         </div>
 
-        {/* Panier sticky */}
+        {/* Panier sticky desktop (lg+) */}
         <aside className="hidden lg:flex flex-col border-l-2 border-zinc-800 bg-zinc-950">
-          <div className="shrink-0 px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <p className="font-display italic text-lg font-medium text-white">Panier</p>
-            {panier.length > 0 && (
-              <button onClick={onVider} className="text-xs text-zinc-500 hover:text-red-400 underline">Vider</button>
-            )}
-          </div>
-          <div className="flex-1 overflow-y-auto scroll-visible-dark p-3 space-y-2">
-            {panier.length === 0 ? (
-              <p className="text-center text-zinc-600 italic mt-12 text-sm">Tapez sur un produit pour l&apos;ajouter</p>
-            ) : panier.map(l => (
-              <div key={l.produit.id} className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 flex gap-2.5">
-                {/* Miniature */}
-                {l.produit.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.produit.image_url} alt={l.produit.nom} className="w-14 h-14 rounded-lg object-cover bg-zinc-950 shrink-0" />
-                ) : (
-                  <div className="w-14 h-14 rounded-lg bg-zinc-800 flex items-center justify-center text-2xl shrink-0">🍽</div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-1">
-                    <p className="text-sm font-medium text-white line-clamp-2 leading-tight">{l.produit.nom}</p>
-                    <button
-                      onClick={() => onSupprimer(l.produit)}
-                      className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white text-sm shrink-0 transition-colors active:scale-90"
-                      title="Supprimer du panier"
-                    >🗑</button>
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => onRetirer(l.produit)} className="w-8 h-8 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">−</button>
-                      <span className="w-7 text-center font-black tabular-nums text-sm">{l.quantite}</span>
-                      <button onClick={() => onAjouter(l.produit, 1)} className="w-8 h-8 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">+</button>
-                    </div>
-                    <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + TVA))}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="shrink-0 p-3 border-t-2 border-zinc-800 bg-zinc-950 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{nbArticles} article{nbArticles > 1 ? 's' : ''}</span>
-              <span className="font-display italic text-2xl font-medium tabular-nums text-white">{fmtPrix(totalTTC)}</span>
-            </div>
-            <button
-              onClick={onAllerCaisse}
-              disabled={panier.length === 0}
-              className={cn(
-                'w-full h-16 rounded-xl font-black text-lg uppercase tracking-wider transition-all',
-                panier.length === 0
-                  ? 'bg-zinc-800 text-zinc-600'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 active:scale-95',
-              )}
-            >
-              ✓ Payer {fmtPrix(totalTTC)}
-            </button>
-          </div>
+          <PanierContenu
+            panier={panier}
+            nbArticles={nbArticles}
+            totalTTC={totalTTC}
+            onAjouter={onAjouter}
+            onRetirer={onRetirer}
+            onSupprimer={onSupprimer}
+            onVider={onVider}
+            onAllerCaisse={onAllerCaisse}
+          />
         </aside>
       </div>
 
-      {/* MOBILE bottom bar */}
+      {/* MOBILE bottom bar — bouton qui ouvre le panier en bottom-sheet */}
       <div className="lg:hidden shrink-0 border-t-2 border-zinc-800 bg-zinc-950 p-3 flex items-center gap-3">
-        <div className="flex-1">
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">{nbArticles} article{nbArticles > 1 ? 's' : ''}</p>
-          <p className="font-display italic text-xl font-medium tabular-nums text-white">{fmtPrix(totalTTC)}</p>
-        </div>
+        <button
+          onClick={() => setShowPanierMobile(true)}
+          disabled={panier.length === 0}
+          className={cn(
+            'flex-1 h-14 px-4 rounded-xl flex items-center justify-between gap-2 font-black uppercase tracking-wider text-sm active:scale-95 transition-all',
+            panier.length === 0
+              ? 'bg-zinc-800 text-zinc-600'
+              : 'bg-zinc-900 border-2 border-emerald-500 text-white shadow-lg',
+          )}
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-xl">🛒</span>
+            <span className="text-xs">{nbArticles} article{nbArticles > 1 ? 's' : ''}</span>
+          </span>
+          <span className="font-display italic text-base font-medium tabular-nums normal-case">{fmtPrix(totalTTC)}</span>
+        </button>
         <button
           onClick={onAllerCaisse}
           disabled={panier.length === 0}
           className={cn(
-            'h-14 px-6 rounded-xl font-black text-base uppercase tracking-wider',
+            'h-14 px-4 rounded-xl font-black text-base uppercase tracking-wider',
             panier.length === 0 ? 'bg-zinc-800 text-zinc-600' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 active:scale-95',
           )}
         >
           Payer →
         </button>
       </div>
+
+      {/* MOBILE bottom-sheet panier détaillé */}
+      {showPanierMobile && (
+        <div
+          className="lg:hidden fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-end"
+          onClick={() => setShowPanierMobile(false)}
+        >
+          <div
+            className="w-full max-h-[88vh] bg-zinc-950 rounded-t-3xl flex flex-col shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="shrink-0 p-3 flex items-center justify-center">
+              <span className="w-12 h-1.5 rounded-full bg-zinc-700" />
+            </div>
+            <PanierContenu
+              panier={panier}
+              nbArticles={nbArticles}
+              totalTTC={totalTTC}
+              onAjouter={onAjouter}
+              onRetirer={onRetirer}
+              onSupprimer={onSupprimer}
+              onVider={onVider}
+              onAllerCaisse={() => { setShowPanierMobile(false); onAllerCaisse() }}
+              onClose={() => setShowPanierMobile(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+// ─── Contenu du panier (extrait pour partage desktop/mobile bottom-sheet) ──
+function PanierContenu({
+  panier, nbArticles, totalTTC,
+  onAjouter, onRetirer, onSupprimer, onVider, onAllerCaisse, onClose,
+}: {
+  panier: LignePanier[]
+  nbArticles: number
+  totalTTC: number
+  onAjouter: (p: Produit, qty?: number) => void
+  onRetirer: (p: Produit) => void
+  onSupprimer: (p: Produit) => void
+  onVider: () => void
+  onAllerCaisse: () => void
+  onClose?: () => void
+}) {
+  return (
+    <>
+      <div className="shrink-0 px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+        <p className="font-display italic text-lg font-medium text-white">
+          Panier {panier.length > 0 && <span className="text-zinc-500 text-sm">· {nbArticles} article{nbArticles > 1 ? 's' : ''}</span>}
+        </p>
+        <div className="flex items-center gap-2">
+          {panier.length > 0 && (
+            <button onClick={onVider} className="text-xs text-zinc-500 hover:text-red-400 underline">Vider</button>
+          )}
+          {onClose && (
+            <button onClick={onClose} className="w-9 h-9 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-lg">×</button>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto scroll-visible-dark p-3 space-y-2 min-h-0">
+        {panier.length === 0 ? (
+          <p className="text-center text-zinc-600 italic mt-12 text-sm">Tapez sur un produit pour l&apos;ajouter</p>
+        ) : panier.map(l => (
+          <div key={l.produit.id} className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 flex gap-2.5">
+            {/* Miniature */}
+            {l.produit.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={l.produit.image_url} alt={l.produit.nom} className="w-14 h-14 rounded-lg object-cover bg-zinc-950 shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-zinc-800 flex items-center justify-center text-2xl shrink-0">🍽</div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-1">
+                <p className="text-sm font-medium text-white line-clamp-2 leading-tight">{l.produit.nom}</p>
+                <button
+                  onClick={() => onSupprimer(l.produit)}
+                  className="w-9 h-9 rounded-lg bg-zinc-800 hover:bg-red-600 text-zinc-400 hover:text-white text-sm shrink-0 transition-colors active:scale-90"
+                  title="Supprimer du panier"
+                >🗑</button>
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <div className="flex items-center gap-1">
+                  <button onClick={() => onRetirer(l.produit)} className="w-9 h-9 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">−</button>
+                  <span className="w-8 text-center font-black tabular-nums text-base">{l.quantite}</span>
+                  <button onClick={() => onAjouter(l.produit, 1)} className="w-9 h-9 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">+</button>
+                </div>
+                <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + TVA))}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="shrink-0 p-3 border-t-2 border-zinc-800 bg-zinc-950 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Total</span>
+          <span className="font-display italic text-2xl font-medium tabular-nums text-white">{fmtPrix(totalTTC)}</span>
+        </div>
+        <button
+          onClick={onAllerCaisse}
+          disabled={panier.length === 0}
+          className={cn(
+            'w-full h-16 rounded-xl font-black text-lg uppercase tracking-wider transition-all',
+            panier.length === 0
+              ? 'bg-zinc-800 text-zinc-600'
+              : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 active:scale-95',
+          )}
+        >
+          ✓ Payer {fmtPrix(totalTTC)}
+        </button>
+      </div>
+    </>
   )
 }
 
