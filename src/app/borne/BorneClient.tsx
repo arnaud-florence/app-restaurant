@@ -13,7 +13,7 @@ import QRCode from 'qrcode'
 
 // ─── Types ─────────────────────────────────────────────────────────────
 type Produit = {
-  type: 'recette' | 'boisson'
+  type: 'recette'
   id: string
   nom: string
   categorie: string
@@ -128,17 +128,25 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     setEtape('choix-paiement')
   }, [panier.length])
 
+  // commande_articles n'a que recette_id ; on filtre donc le panier sur les
+  // produits qui ont une vraie recette_id côté DB (les "boissons" pures sans
+  // recette miroir sont ignorées — l'app actuelle les stocke en recettes
+  // avec tag_destination='BAR', cf. ComptoirOrderModal).
+  const panierToItems = useCallback((): PanierBorneItem[] => {
+    return panier.map(l => ({
+      recette_id: l.produit.id,
+      nom: l.produit.nom,
+      quantite: l.quantite,
+      prix_unitaire_ht: l.produit.prix_vente_ht,
+      tag_destination: l.produit.tag_destination,
+    }))
+  }, [panier])
+
   const lancerNFC = useCallback(async () => {
     setErreur(null)
     try {
-      const items: PanierBorneItem[] = panier.map(l => ({
-        recette_id: l.produit.type === 'recette' ? l.produit.id : null,
-        boisson_id: l.produit.type === 'boisson' ? l.produit.id : null,
-        nom: l.produit.nom,
-        quantite: l.quantite,
-        prix_unitaire_ht: l.produit.prix_vente_ht,
-        tag_destination: l.produit.tag_destination,
-      }))
+      const items = panierToItems()
+      if (items.length === 0) throw new Error('Panier vide ou contient uniquement des boissons sans recette miroir')
       const cmd = await creerCommandeBorne({
         borne_id: borneId,
         panier: items,
@@ -149,19 +157,13 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panier, borneId])
+  }, [panierToItems, borneId])
 
   const lancerComptoir = useCallback(async () => {
     setErreur(null)
     try {
-      const items: PanierBorneItem[] = panier.map(l => ({
-        recette_id: l.produit.type === 'recette' ? l.produit.id : null,
-        boisson_id: l.produit.type === 'boisson' ? l.produit.id : null,
-        nom: l.produit.nom,
-        quantite: l.quantite,
-        prix_unitaire_ht: l.produit.prix_vente_ht,
-        tag_destination: l.produit.tag_destination,
-      }))
+      const items = panierToItems()
+      if (items.length === 0) throw new Error('Panier vide ou contient uniquement des boissons sans recette miroir')
       const cmd = await creerCommandeBorne({
         borne_id: borneId,
         panier: items,
@@ -172,7 +174,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panier, borneId])
+  }, [panierToItems, borneId])
 
   // ─── Reset complet (retour catalogue) ────────────────────────────────
   const reset = useCallback(() => {
@@ -353,7 +355,7 @@ function EcranCatalogue({
                       <img src={p.image_url} alt={p.nom} className="w-full aspect-[4/3] object-cover bg-zinc-950" />
                     ) : (
                       <div className="w-full aspect-[4/3] bg-zinc-800 flex items-center justify-center text-4xl">
-                        {p.type === 'boisson' ? '🥤' : '🍽'}
+                        {p.tag_destination === 'BAR' ? '🥤' : '🍽'}
                       </div>
                     )}
                     {enPanier > 0 && (

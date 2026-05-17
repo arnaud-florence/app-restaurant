@@ -16,10 +16,11 @@ import { z } from 'zod'
 import { sendPushToPostes } from '@/lib/push'
 
 // ─── Types ─────────────────────────────────────────────────────────────
+// Les "boissons" sont en fait des recettes avec tag_destination='BAR' dans
+// l'app actuelle. commande_articles n'a qu'une FK recette_id (pas boisson_id).
 const PanierItemSchema = z.object({
-  recette_id: z.string().uuid().nullable(),
-  boisson_id: z.string().uuid().nullable(),
-  nom: z.string().min(1),
+  recette_id: z.string().uuid(),
+  nom: z.string().min(1), // capturé côté UI, non persisté ici (pas de colonne dédiée)
   quantite: z.number().int().positive(),
   prix_unitaire_ht: z.number().nonnegative(),
   tag_destination: z.enum(['CUISINE', 'SNACKING', 'PIZZA', 'BAR']),
@@ -47,24 +48,28 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   const total_ttc = total_ht * (1 + tva)
 
   // Statut initial selon le mode de paiement
-  //   NFC : en_attente (passe direct en cuisine si paiement confirmé)
-  //         on insère en 'en_attente_paiement_comptoir' aussi en attendant
-  //         que payment intent soit créé → marquerBornePayee la fera passer
+  //   NFC : en_attente_paiement_comptoir → marquerBornePayee bascule en cuisine
   //   Comptoir : en_attente_paiement_comptoir (visible /caisse, pas cuisine)
   const statut = 'en_attente_paiement_comptoir'
   const expire_at = data.mode_paiement === 'comptoir'
     ? new Date(Date.now() + EXPIRATION_COMPTOIR_MS).toISOString()
     : null
 
+  // Génère un numéro lisible BRN-YYMMDD-XXXX (pattern aligné sur TKT-/etc)
+  const today = new Date()
+  const yymmdd = `${String(today.getFullYear()).slice(2)}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+  const random4 = Math.random().toString(36).slice(2, 6).toUpperCase()
+  const numero = `BRN-${yymmdd}-${random4}`
+
   // Insert commande
   const { data: cmd, error: errCmd } = await supabase
     .from('commandes')
     .insert({
+      numero,
       source: 'BORNE',
       statut,
-      montant_total_ht: total_ht,
-      montant_total_ttc: total_ttc,
-      tva_taux: tva,
+      montant_total_ht: Math.round(total_ht * 100) / 100,
+      montant_total_ttc: Math.round(total_ttc * 100) / 100,
       client_nom: data.client_prenom ?? null,
       borne_id: data.borne_id,
       borne_payment_method: data.mode_paiement,
@@ -76,14 +81,12 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   if (errCmd) throw new Error('Création commande borne : ' + errCmd.message)
   if (!cmd) throw new Error('Création commande borne : aucune ligne retournée')
 
-  // Insert articles
+  // Insert articles (commande_articles n'a que recette_id, pas boisson_id ni nom_capture)
   const articles = data.panier.map(p => ({
     commande_id: cmd.id,
     recette_id: p.recette_id,
-    boisson_id: p.boisson_id,
-    nom_capture: p.nom,
     quantite: p.quantite,
-    prix_unitaire_ht: p.prix_unitaire_ht,
+    prix_unitaire_ht: Math.round(p.prix_unitaire_ht * 100) / 100,
     tag_destination: p.tag_destination,
     statut: 'en_attente',
   }))
