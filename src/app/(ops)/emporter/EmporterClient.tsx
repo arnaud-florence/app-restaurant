@@ -642,13 +642,24 @@ function CommandeComptoirCard({
             {s.nextLabel}
           </button>
         )}
+        {/* Bouton Encaisser : MASQUÉ si la commande est déjà payée
+            (cas BORNE / SNACK comptoir pré-paiement). On affiche à la place
+            un libellé "Déjà encaissée" pour information. */}
         {(commande.statut === 'pret' || commande.statut === 'servi') && (
-          <button
-            onClick={onEncaisser}
-            className="flex-1 min-h-[44px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors active:scale-95"
-          >
-            💰 Encaisser
-          </button>
+          commande.mode_paiement
+            ? (
+              <div className="flex-1 min-h-[44px] rounded-md bg-emerald-900/30 border border-emerald-700 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 px-2">
+                ✓ Déjà encaissée <span className="opacity-70">· {commande.mode_paiement}</span>
+              </div>
+            )
+            : (
+              <button
+                onClick={onEncaisser}
+                className="flex-1 min-h-[44px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors active:scale-95"
+              >
+                💰 Encaisser
+              </button>
+            )
         )}
       </div>
     </article>

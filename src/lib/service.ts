@@ -29,6 +29,10 @@ export type CommandeService = {
   // Ex : { "SNACKING": "...T14:30:00Z", "PIZZA": "...T14:45:00Z" }.
   // `creneau_retrait` global = max de ces valeurs (= moment où tout est prêt).
   creneaux_par_tag?: Partial<Record<TagDestination, string>>
+  // Mode de paiement enregistré une fois encaissé. Null = pas encore payée.
+  // Utilisé pour masquer le bouton "Encaisser" sur les commandes BORNE/SNACK
+  // déjà encaissées au comptoir (avant prep).
+  mode_paiement?: string | null
 }
 
 export type ArticleService = {

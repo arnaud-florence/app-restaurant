@@ -1011,7 +1011,7 @@ export async function listCommandesActives() {
     .from('commandes')
     .select(`
       id, numero, source, numero_table, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
-      montant_total_ttc, tva_total, consommation,
+      montant_total_ttc, tva_total, consommation, mode_paiement,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
@@ -1035,6 +1035,7 @@ export async function listCommandesActives() {
       consommation:      ((r.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
       creneau_retrait:   (r.creneau_retrait as string) ?? null,
       creneaux_par_tag:  (r.creneaux_par_tag as Partial<Record<'CUISINE'|'SNACKING'|'PIZZA'|'BAR', string>> | null) ?? {},
+      mode_paiement:     (r.mode_paiement as string) ?? null,
       articles: articles.map(a => ({
         id: a.id as string,
         commande_id: a.commande_id as string,
