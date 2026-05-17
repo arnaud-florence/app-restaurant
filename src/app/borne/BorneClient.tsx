@@ -57,7 +57,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const router = useRouter()
   const [etape, setEtape] = useState<Etape>('catalogue')
   const [panier, setPanier] = useState<LignePanier[]>([])
-  const [cat, setCat] = useState<string | 'tous'>('tous')
+  // null = écran "choisis ta catégorie" en grand / sinon = grille produits de la cat
+  const [cat, setCat] = useState<string | null>(null)
   const [provider, setProvider] = useState<PaymentProvider | null>(null)
   const [commande, setCommande] = useState<{ id: string; numero: string; expire_at: string | null } | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -85,14 +86,25 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   }, [borneId])
 
   // ─── Catégories ──────────────────────────────────────────────────────
-  const categories = useMemo(() => {
-    const set = new Set<string>()
-    produits.forEach(p => set.add(p.categorie))
-    return ['tous', ...Array.from(set).sort()]
+  // Groupées avec compteur + 1er image url pour l'aperçu carte.
+  const categoriesAvecMeta = useMemo(() => {
+    const map = new Map<string, { count: number; firstImage: string | null; firstProduit: Produit }>()
+    for (const p of produits) {
+      if (!map.has(p.categorie)) {
+        map.set(p.categorie, { count: 1, firstImage: p.image_url, firstProduit: p })
+      } else {
+        const v = map.get(p.categorie)!
+        v.count++
+        if (!v.firstImage && p.image_url) v.firstImage = p.image_url
+      }
+    }
+    return Array.from(map.entries())
+      .map(([nom, meta]) => ({ nom, ...meta }))
+      .sort((a, b) => a.nom.localeCompare(b.nom))
   }, [produits])
 
   const produitsFiltres = useMemo(() => {
-    if (cat === 'tous') return produits
+    if (!cat) return []
     return produits.filter(p => p.categorie === cat)
   }, [produits, cat])
 
@@ -210,8 +222,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     <>
       {etape === 'catalogue' && (
         <EcranCatalogue
-          produits={produitsFiltres}
-          categories={categories}
+          produitsFiltres={produitsFiltres}
+          categoriesAvecMeta={categoriesAvecMeta}
           cat={cat}
           setCat={setCat}
           panier={panier}
@@ -308,13 +320,13 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
 // ÉCRAN 1 — CATALOGUE
 // ═══════════════════════════════════════════════════════════════════════
 function EcranCatalogue({
-  produits, categories, cat, setCat, panier, nbArticles, totalTTC,
+  produitsFiltres, categoriesAvecMeta, cat, setCat, panier, nbArticles, totalTTC,
   onAjouter, onRetirer, onVider, onAllerCaisse,
 }: {
-  produits: Produit[]
-  categories: string[]
-  cat: string
-  setCat: (c: string) => void
+  produitsFiltres: Produit[]
+  categoriesAvecMeta: Array<{ nom: string; count: number; firstImage: string | null; firstProduit: Produit }>
+  cat: string | null
+  setCat: (c: string | null) => void
   panier: LignePanier[]
   nbArticles: number
   totalTTC: number
@@ -323,15 +335,41 @@ function EcranCatalogue({
   onVider: () => void
   onAllerCaisse: () => void
 }) {
+  // Icône par catégorie (mapping le plus large possible)
+  const iconeCat = (nom: string): string => {
+    const n = nom.toLowerCase()
+    if (n.includes('snack') || n.includes('sandwich') || n.includes('burger')) return '🥪'
+    if (n.includes('pizza')) return '🍕'
+    if (n.includes('salade')) return '🥗'
+    if (n.includes('frite')) return '🍟'
+    if (n.includes('tacos')) return '🌮'
+    if (n.includes('menu')) return '🍱'
+    if (n.includes('boisson') || n.includes('soft') || n.includes('drink')) return '🥤'
+    if (n.includes('bière') || n.includes('biere')) return '🍺'
+    if (n.includes('café') || n.includes('cafe')) return '☕'
+    if (n.includes('dessert')) return '🍰'
+    return '🍽'
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="shrink-0 px-6 h-16 flex items-center justify-between bg-zinc-900 border-b border-zinc-800">
         <div className="flex items-center gap-3">
+          {cat && (
+            <button
+              onClick={() => setCat(null)}
+              className="inline-flex items-center gap-1 h-10 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-black"
+            >
+              ← Catégories
+            </button>
+          )}
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-md">🛍</span>
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 leading-none">Borne self-service</p>
-            <h1 className="font-display italic text-xl font-medium text-white tracking-tight leading-none mt-0.5">Composez votre commande</h1>
+            <h1 className="font-display italic text-xl font-medium text-white tracking-tight leading-none mt-0.5">
+              {cat ? `${iconeCat(cat)} ${cat}` : 'Choisissez une catégorie'}
+            </h1>
           </div>
         </div>
         <div className="text-right">
@@ -340,35 +378,50 @@ function EcranCatalogue({
         </div>
       </header>
 
-      {/* Onglets catégories */}
-      <div className="shrink-0 px-4 py-3 bg-zinc-950 border-b border-zinc-800 overflow-x-auto scroll-visible-dark">
-        <div className="flex items-center gap-2 min-w-max">
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={cn(
-                'inline-flex items-center px-4 h-10 rounded-xl text-sm font-black tracking-wide whitespace-nowrap transition-all',
-                cat === c
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
-              )}
-            >
-              {c === 'tous' ? '⭐ Tous' : c}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Catalogue grid + Panier */}
+      {/* Body : catégories (cat=null) OU produits (cat=...) + Panier */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] overflow-hidden min-h-0">
-        {/* Produits */}
-        <div className="overflow-y-auto scroll-visible-dark p-4">
-          {produits.length === 0 ? (
+        {/* Colonne principale */}
+        <div className="overflow-y-auto scroll-visible-dark p-4 sm:p-6">
+          {cat === null ? (
+            /* ═══ ÉTAPE A : Grille de catégories en grand ═══ */
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              {categoriesAvecMeta.map(c => (
+                <button
+                  key={c.nom}
+                  onClick={() => setCat(c.nom)}
+                  className="group relative aspect-square rounded-3xl bg-zinc-900 border-2 border-zinc-800 overflow-hidden transition-all active:scale-95 hover:border-emerald-500 shadow-xl"
+                >
+                  {/* Image de fond */}
+                  {c.firstImage ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.firstImage} alt={c.nom} className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-8xl bg-zinc-800">
+                      {iconeCat(c.nom)}
+                    </div>
+                  )}
+                  {/* Overlay texte */}
+                  <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-5">
+                    <span className="text-4xl sm:text-5xl mb-2">{iconeCat(c.nom)}</span>
+                    <h3 className="font-display italic text-2xl sm:text-3xl font-medium text-white drop-shadow-lg">
+                      {c.nom}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-200 mt-1 opacity-90">
+                      {c.count} produit{c.count > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : produitsFiltres.length === 0 ? (
             <p className="text-center text-zinc-500 italic py-20">Aucun produit dans cette catégorie.</p>
           ) : (
+            /* ═══ ÉTAPE B : Grille de produits de la cat ═══ */
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {produits.map(p => {
+              {produitsFiltres.map(p => {
                 const enPanier = panier.find(l => l.produit.id === p.id)?.quantite ?? 0
                 return (
                   <button
