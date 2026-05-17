@@ -23,7 +23,8 @@ type Produit = {
   favori: boolean
 }
 
-type Etape = 'catalogue' | 'choix-paiement' | 'nfc' | 'comptoir' | 'succes' | 'echec'
+type Etape = 'catalogue' | 'consommation' | 'prenom' | 'choix-paiement' | 'nfc' | 'comptoir' | 'succes' | 'echec'
+type Consommation = 'sur_place' | 'emporter'
 
 type LignePanier = {
   produit: Produit
@@ -61,6 +62,9 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const [commande, setCommande] = useState<{ id: string; numero: string; expire_at: string | null } | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [borneId] = useState(getBorneId)
+  // Options choisies entre catalogue et paiement
+  const [consommation, setConsommation] = useState<Consommation>('sur_place')
+  const [prenomClient, setPrenomClient] = useState<string>('')
 
   // ─── Init provider de paiement + heartbeat ───────────────────────────
   useEffect(() => {
@@ -125,7 +129,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   // ─── Création commande + lancement paiement ──────────────────────────
   const allerCaisse = useCallback(() => {
     if (panier.length === 0) return
-    setEtape('choix-paiement')
+    // Flow : catalogue → consommation → prénom → choix paiement
+    setEtape('consommation')
   }, [panier.length])
 
   // commande_articles n'a que recette_id ; on filtre donc le panier sur les
@@ -151,13 +156,15 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         borne_id: borneId,
         panier: items,
         mode_paiement: 'nfc',
+        consommation,
+        client_prenom: prenomClient.trim() || null,
       })
       setCommande(cmd)
       setEtape('nfc')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId])
+  }, [panierToItems, borneId, consommation, prenomClient])
 
   const lancerComptoir = useCallback(async () => {
     setErreur(null)
@@ -168,13 +175,15 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         borne_id: borneId,
         panier: items,
         mode_paiement: 'comptoir',
+        consommation,
+        client_prenom: prenomClient.trim() || null,
       })
       setCommande(cmd)
       setEtape('comptoir')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId])
+  }, [panierToItems, borneId, consommation, prenomClient])
 
   // ─── Reset complet (retour catalogue) ────────────────────────────────
   const reset = useCallback(() => {
@@ -182,6 +191,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     setPanier([])
     setCommande(null)
     setErreur(null)
+    setConsommation('sur_place')
+    setPrenomClient('')
   }, [])
 
   // ─── Annulation depuis NFC/Comptoir ──────────────────────────────────
@@ -212,6 +223,24 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           onAllerCaisse={allerCaisse}
         />
       )}
+      {etape === 'consommation' && (
+        <EcranConsommation
+          totalTTC={totalTTC}
+          consommation={consommation}
+          onChoix={(c) => { setConsommation(c); setEtape('prenom') }}
+          onRetour={() => setEtape('catalogue')}
+        />
+      )}
+      {etape === 'prenom' && (
+        <EcranPrenom
+          totalTTC={totalTTC}
+          prenom={prenomClient}
+          onChange={setPrenomClient}
+          onSuivant={() => setEtape('choix-paiement')}
+          onIgnorer={() => { setPrenomClient(''); setEtape('choix-paiement') }}
+          onRetour={() => setEtape('consommation')}
+        />
+      )}
       {etape === 'choix-paiement' && (
         <EcranChoixPaiement
           totalTTC={totalTTC}
@@ -219,7 +248,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           supportNFC={provider?.supportsTapToPay ?? false}
           onNFC={lancerNFC}
           onComptoir={lancerComptoir}
-          onRetour={() => setEtape('catalogue')}
+          onRetour={() => setEtape('prenom')}
         />
       )}
       {etape === 'nfc' && commande && provider && (
@@ -243,13 +272,14 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
       {etape === 'comptoir' && commande && (
         <EcranComptoir
           commande={commande}
+          prenom={prenomClient}
           totalTTC={totalTTC}
           onExpire={() => annuler('expiration')}
           onRetour={() => annuler('retour_client')}
         />
       )}
       {etape === 'succes' && commande && (
-        <EcranSucces commande={commande} onTermine={reset} />
+        <EcranSucces commande={commande} prenom={prenomClient} onTermine={reset} />
       )}
       {etape === 'echec' && commande && (
         <EcranEchec
@@ -446,6 +476,160 @@ function EcranCatalogue({
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// ÉCRAN 1.5 — SUR PLACE OU À EMPORTER
+// ═══════════════════════════════════════════════════════════════════════
+function EcranConsommation({
+  totalTTC, consommation, onChoix, onRetour,
+}: {
+  totalTTC: number
+  consommation: 'sur_place' | 'emporter'
+  onChoix: (c: 'sur_place' | 'emporter') => void
+  onRetour: () => void
+}) {
+  return (
+    <div className="flex-1 flex flex-col">
+      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+          ← Modifier
+        </button>
+        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+      </header>
+      <main className="flex-1 flex items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-5xl">
+          <h2 className="font-display italic text-3xl sm:text-5xl text-center text-white mb-2">Vous mangez ici ou à emporter ?</h2>
+          <p className="text-center text-zinc-400 mb-10">Choisissez votre option</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <button
+              onClick={() => onChoix('sur_place')}
+              className={cn(
+                'group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 transition-all active:scale-95 shadow-2xl',
+                consommation === 'sur_place'
+                  ? 'bg-amber-500 ring-4 ring-amber-300/50 shadow-amber-500/40'
+                  : 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30',
+              )}
+            >
+              <span className="text-8xl sm:text-9xl">🍽</span>
+              <p className="font-display italic text-3xl sm:text-5xl font-medium text-white">Sur place</p>
+              <p className="text-sm sm:text-base text-amber-100 opacity-90">Je mange ici</p>
+            </button>
+            <button
+              onClick={() => onChoix('emporter')}
+              className={cn(
+                'group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 transition-all active:scale-95 shadow-2xl',
+                consommation === 'emporter'
+                  ? 'bg-blue-500 ring-4 ring-blue-300/50 shadow-blue-500/40'
+                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30',
+              )}
+            >
+              <span className="text-8xl sm:text-9xl">📦</span>
+              <p className="font-display italic text-3xl sm:text-5xl font-medium text-white">À emporter</p>
+              <p className="text-sm sm:text-base text-blue-100 opacity-90">J&apos;emporte ma commande</p>
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ÉCRAN 1.8 — SAISIE PRÉNOM CLIENT (facultatif)
+// ═══════════════════════════════════════════════════════════════════════
+function EcranPrenom({
+  totalTTC, prenom, onChange, onSuivant, onIgnorer, onRetour,
+}: {
+  totalTTC: number
+  prenom: string
+  onChange: (s: string) => void
+  onSuivant: () => void
+  onIgnorer: () => void
+  onRetour: () => void
+}) {
+  const PREN_MAX = 12
+  const ROWS = [
+    ['A','Z','E','R','T','Y','U','I','O','P'],
+    ['Q','S','D','F','G','H','J','K','L','M'],
+    ['W','X','C','V','B','N',' ','-','\'','⌫'],
+  ]
+  function tap(ch: string) {
+    if (ch === '⌫') { onChange(prenom.slice(0, -1)); return }
+    if (prenom.length >= PREN_MAX) return
+    // Première lettre majuscule, suite minuscule (style prénom)
+    const nv = prenom.length === 0 ? ch.toUpperCase() : ch.toLowerCase()
+    onChange(prenom + nv)
+  }
+  return (
+    <div className="flex-1 flex flex-col">
+      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+          ← Retour
+        </button>
+        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+      </header>
+      <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-2">
+        <h2 className="font-display italic text-3xl sm:text-5xl text-center text-white mt-2">Votre prénom ?</h2>
+        <p className="text-center text-zinc-400 text-sm sm:text-base mt-2 max-w-md">
+          Pour qu&apos;on puisse vous appeler quand votre commande est prête. <span className="text-zinc-500 italic">Facultatif.</span>
+        </p>
+
+        {/* Affichage prénom saisi */}
+        <div className="mt-6 mb-4 w-full max-w-md">
+          <div className="h-20 rounded-2xl bg-zinc-900 ring-2 ring-zinc-800 flex items-center justify-center px-6">
+            <p className={cn(
+              'font-display italic text-4xl sm:text-5xl font-medium tabular-nums tracking-wide',
+              prenom ? 'text-emerald-300' : 'text-zinc-600',
+            )}>
+              {prenom || '—'}
+              <span className="inline-block w-1 h-10 bg-emerald-400 ml-1 align-middle animate-pulse" />
+            </p>
+          </div>
+        </div>
+
+        {/* Clavier AZERTY simplifié */}
+        <div className="w-full max-w-2xl space-y-1.5 sm:space-y-2">
+          {ROWS.map((row, ri) => (
+            <div key={ri} className="flex justify-center gap-1.5 sm:gap-2">
+              {row.map((ch, ci) => {
+                const isWide = ch === ' ' || ch === '⌫'
+                return (
+                  <button
+                    key={ci}
+                    onClick={() => tap(ch)}
+                    className={cn(
+                      'h-12 sm:h-14 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 text-white font-bold text-xl sm:text-2xl transition-all active:scale-95 border border-zinc-800',
+                      isWide ? 'flex-[2]' : 'flex-1',
+                      ch === '⌫' && 'bg-red-950/40 border-red-900 hover:bg-red-900/40',
+                    )}
+                  >
+                    {ch === ' ' ? '␣' : ch}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex items-center gap-3 w-full max-w-md">
+          <button
+            onClick={onIgnorer}
+            className="flex-1 h-14 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-wider text-sm"
+          >
+            Ignorer
+          </button>
+          <button
+            onClick={onSuivant}
+            className="flex-1 h-14 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-sm shadow-lg shadow-emerald-500/30 active:scale-95"
+          >
+            Suivant →
+          </button>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // ÉCRAN 2 — CHOIX MODE DE PAIEMENT
 // ═══════════════════════════════════════════════════════════════════════
 function EcranChoixPaiement({
@@ -623,9 +807,10 @@ function EcranNFC({
 // ÉCRAN 4 — COMPTOIR (numéro + QR + minuteur)
 // ═══════════════════════════════════════════════════════════════════════
 function EcranComptoir({
-  commande, totalTTC, onExpire, onRetour,
+  commande, prenom, totalTTC, onExpire, onRetour,
 }: {
   commande: { id: string; numero: string; expire_at: string | null }
+  prenom: string
   totalTTC: number
   onExpire: () => void
   onRetour: () => void
@@ -661,11 +846,16 @@ function EcranComptoir({
         </span>
       </header>
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6">
+        {prenom && (
+          <p className="font-display italic text-3xl sm:text-4xl text-blue-100 mb-2">Bonjour {prenom} 👋</p>
+        )}
         <p className="font-display italic text-2xl sm:text-3xl text-blue-200 mb-4">Rendez-vous à la caisse</p>
         <p className="text-zinc-400 mb-8 max-w-md">Présentez ce numéro au comptoir pour régler votre commande (carte ou espèces).</p>
 
         <div className="bg-white rounded-3xl px-8 py-6 shadow-2xl">
-          <p className="text-zinc-500 text-xs uppercase tracking-widest font-black">Votre numéro de commande</p>
+          <p className="text-zinc-500 text-xs uppercase tracking-widest font-black">
+            {prenom ? `Numéro de ${prenom}` : 'Votre numéro de commande'}
+          </p>
           <p className="font-display italic text-7xl sm:text-9xl font-bold tabular-nums text-zinc-900 leading-tight">
             #{commande.numero?.slice(-4)}
           </p>
@@ -688,9 +878,10 @@ function EcranComptoir({
 // ÉCRAN 5 — SUCCÈS
 // ═══════════════════════════════════════════════════════════════════════
 function EcranSucces({
-  commande, onTermine,
+  commande, prenom, onTermine,
 }: {
   commande: { numero: string }
+  prenom: string
   onTermine: () => void
 }) {
   // Confettis CSS via pseudo-particules
@@ -729,8 +920,13 @@ function EcranSucces({
       `}</style>
 
       <span className="text-9xl mb-6 animate-bounce">✅</span>
-      <h2 className="font-display italic text-5xl sm:text-6xl font-medium text-white text-center">Merci !</h2>
-      <p className="text-emerald-200 mt-4 text-xl text-center max-w-md">Votre commande est en préparation.</p>
+      <h2 className="font-display italic text-5xl sm:text-6xl font-medium text-white text-center">
+        Merci {prenom ? prenom : ''} !
+      </h2>
+      <p className="text-emerald-200 mt-4 text-xl text-center max-w-md">
+        Votre commande est en préparation.
+        {prenom && <span className="block text-sm opacity-80 mt-2">On vous appelle dès qu&apos;elle est prête.</span>}
+      </p>
       <div className="bg-white rounded-3xl px-10 py-6 mt-8 shadow-2xl">
         <p className="text-zinc-500 text-xs uppercase tracking-widest font-black text-center">Numéro</p>
         <p className="font-display italic text-7xl font-bold tabular-nums text-emerald-600 leading-tight">#{commande.numero?.slice(-4)}</p>

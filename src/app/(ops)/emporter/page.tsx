@@ -41,7 +41,7 @@ export default async function EmporterPage() {
     // tous en statut 'en_attente_paiement_comptoir'.
     supabase
       .from('commandes')
-      .select('id, numero, source, montant_total_ttc, borne_payment_method, borne_expire_at, created_at, borne_id')
+      .select('id, numero, source, montant_total_ttc, borne_payment_method, borne_expire_at, created_at, borne_id, client_nom, consommation')
       .in('source', ['BORNE', 'COMPTOIR'])
       .eq('statut', 'en_attente_paiement_comptoir')
       .order('created_at', { ascending: true }),
@@ -55,6 +55,8 @@ export default async function EmporterPage() {
     borne_expire_at: (c.borne_expire_at as string) ?? null,
     created_at: c.created_at as string,
     borne_id: (c.borne_id as string) ?? null,
+    client_nom: (c.client_nom as string) ?? null,
+    consommation: ((c.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
   }))
 
   const recettes = (recettesRes.data ?? []).map(r => ({

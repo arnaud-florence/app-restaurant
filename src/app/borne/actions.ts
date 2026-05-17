@@ -31,6 +31,7 @@ const CreerCommandeBorneSchema = z.object({
   panier: z.array(PanierItemSchema).min(1),
   mode_paiement: z.enum(['nfc', 'comptoir']),
   client_prenom: z.string().max(64).nullable().optional(),
+  consommation: z.enum(['sur_place', 'emporter']).default('sur_place'),
 })
 
 export type PanierBorneItem = z.infer<typeof PanierItemSchema>
@@ -71,6 +72,7 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
       montant_total_ht: Math.round(total_ht * 100) / 100,
       montant_total_ttc: Math.round(total_ttc * 100) / 100,
       client_nom: data.client_prenom ?? null,
+      consommation: data.consommation,
       borne_id: data.borne_id,
       borne_payment_method: data.mode_paiement,
       borne_expire_at: expire_at,

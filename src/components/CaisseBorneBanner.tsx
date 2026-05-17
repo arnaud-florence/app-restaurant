@@ -31,6 +31,8 @@ type CommandeBorne = {
   borne_expire_at: string | null
   created_at: string
   borne_id: string | null
+  client_nom?: string | null
+  consommation?: 'sur_place' | 'emporter'
 }
 
 export default function CaisseBorneBanner({
@@ -179,11 +181,19 @@ export default function CaisseBorneBanner({
             )}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
+                  {c.client_nom && (
+                    <p className="font-display italic text-lg text-emerald-300 truncate leading-tight">
+                      👋 {c.client_nom}
+                    </p>
+                  )}
                   <p className="font-display italic text-3xl font-medium tabular-nums text-white leading-none">
                     #{c.numero?.slice(-4)}
                   </p>
                   <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">
                     {c.source === 'BORNE' ? `🛍 Borne ${c.borne_id ?? '—'}` : '🛒 Snack comptoir'}
+                    {c.consommation && (
+                      <span className="ml-1.5">· {c.consommation === 'emporter' ? '📦 Emporter' : '🍽 Sur place'}</span>
+                    )}
                   </p>
                 </div>
                 {timeLeft !== null && (

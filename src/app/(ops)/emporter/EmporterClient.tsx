@@ -551,7 +551,23 @@ function CommandeComptoirCard({
       <header className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs text-zinc-500">#{commande.numero} · créée {heureCreation}</p>
-          <p className="text-base font-bold text-white">🛒 Comptoir</p>
+          {commande.client_nom ? (
+            <p className="font-display italic text-lg text-emerald-300 leading-tight">
+              👋 {commande.client_nom}
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 ml-2">
+                {commande.source === 'BORNE' ? '🛍 Borne' : '🛒 Comptoir'}
+              </span>
+            </p>
+          ) : (
+            <p className="text-base font-bold text-white">
+              {commande.source === 'BORNE' ? '🛍 Borne' : '🛒 Comptoir'}
+              {commande.consommation && (
+                <span className="text-[10px] uppercase tracking-widest text-zinc-500 ml-2">
+                  · {commande.consommation === 'emporter' ? '📦' : '🍽'}
+                </span>
+              )}
+            </p>
+          )}
         </div>
         <span className={cn('text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider', s.cls)}>
           {s.label}
