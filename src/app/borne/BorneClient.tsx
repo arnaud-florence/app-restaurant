@@ -687,37 +687,39 @@ function EcranConsommation({
         </button>
         <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
       </header>
-      <main className="flex-1 flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-5xl">
-          <h2 className="font-display italic text-3xl sm:text-5xl text-center text-white mb-2">Vous mangez ici ou à emporter ?</h2>
-          <p className="text-center text-zinc-400 mb-10">Choisissez votre option</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <button
-              onClick={() => onChoix('sur_place')}
-              className={cn(
-                'group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 transition-all active:scale-95 shadow-2xl',
-                consommation === 'sur_place'
-                  ? 'bg-amber-500 ring-4 ring-amber-300/50 shadow-amber-500/40'
-                  : 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30',
-              )}
-            >
-              <span className="text-8xl sm:text-9xl">🍽</span>
-              <p className="font-display italic text-3xl sm:text-5xl font-medium text-white">Sur place</p>
-              <p className="text-sm sm:text-base text-amber-100 opacity-90">Je mange ici</p>
-            </button>
-            <button
-              onClick={() => onChoix('emporter')}
-              className={cn(
-                'group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 transition-all active:scale-95 shadow-2xl',
-                consommation === 'emporter'
-                  ? 'bg-blue-500 ring-4 ring-blue-300/50 shadow-blue-500/40'
-                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30',
-              )}
-            >
-              <span className="text-8xl sm:text-9xl">📦</span>
-              <p className="font-display italic text-3xl sm:text-5xl font-medium text-white">À emporter</p>
-              <p className="text-sm sm:text-base text-blue-100 opacity-90">J&apos;emporte ma commande</p>
-            </button>
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex items-center justify-center p-4 sm:p-10">
+          <div className="w-full max-w-5xl">
+            <h2 className="font-display italic text-2xl sm:text-5xl text-center text-white mb-2">Vous mangez ici ou à emporter ?</h2>
+            <p className="text-center text-zinc-400 mb-6 sm:mb-10 text-sm sm:text-base">Choisissez votre option</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              <button
+                onClick={() => onChoix('sur_place')}
+                className={cn(
+                  'group relative aspect-[3/2] md:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-3 p-4 sm:p-6 transition-all active:scale-95 shadow-2xl',
+                  consommation === 'sur_place'
+                    ? 'bg-amber-500 ring-4 ring-amber-300/50 shadow-amber-500/40'
+                    : 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/30',
+                )}
+              >
+                <span className="text-6xl sm:text-9xl">🍽</span>
+                <p className="font-display italic text-2xl sm:text-5xl font-medium text-white">Sur place</p>
+                <p className="text-xs sm:text-base text-amber-100 opacity-90">Je mange ici</p>
+              </button>
+              <button
+                onClick={() => onChoix('emporter')}
+                className={cn(
+                  'group relative aspect-[3/2] md:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-3 p-4 sm:p-6 transition-all active:scale-95 shadow-2xl',
+                  consommation === 'emporter'
+                    ? 'bg-blue-500 ring-4 ring-blue-300/50 shadow-blue-500/40'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30',
+                )}
+              >
+                <span className="text-6xl sm:text-9xl">📦</span>
+                <p className="font-display italic text-2xl sm:text-5xl font-medium text-white">À emporter</p>
+                <p className="text-xs sm:text-base text-blue-100 opacity-90">J&apos;emporte ma commande</p>
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -847,52 +849,54 @@ function EcranChoixPaiement({
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-5xl">
-          <h2 className="font-display italic text-3xl sm:text-4xl text-center text-white mb-2">Choisissez votre mode de paiement</h2>
-          <p className="text-center text-zinc-400 mb-8">Sélectionnez l&apos;option qui vous convient</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {/* Bouton NFC */}
-            <button
-              onClick={onNFC}
-              disabled={!supportNFC}
-              className={cn(
-                'group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 transition-all',
-                supportNFC
-                  ? 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 shadow-2xl shadow-emerald-500/40'
-                  : 'bg-zinc-800/50 text-zinc-600 cursor-not-allowed',
-              )}
-            >
-              <NFCOndes active={supportNFC} />
-              <div className="text-center mt-2">
-                <p className="font-display italic text-2xl sm:text-3xl font-medium text-white">Sans contact</p>
-                <p className="text-sm sm:text-base text-emerald-100 mt-2">
-                  Carte ou téléphone<br />
-                  <span className="opacity-80 text-xs">Approchez de l&apos;écran</span>
-                </p>
-              </div>
-              <div className="flex items-center gap-2 mt-2 text-2xl">
-                <span title="Visa">💳</span><span title="Apple Pay">🍎</span><span title="Google Pay">G</span>
-              </div>
-              {!supportNFC && (
-                <p className="absolute bottom-3 text-xs text-zinc-500 italic">Indisponible sur cette tablette</p>
-              )}
-            </button>
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex items-center justify-center p-4 sm:p-8">
+          <div className="w-full max-w-5xl">
+            <h2 className="font-display italic text-2xl sm:text-4xl text-center text-white mb-2">Choisissez votre mode de paiement</h2>
+            <p className="text-center text-zinc-400 mb-6 sm:mb-8 text-sm sm:text-base">Sélectionnez l&apos;option qui vous convient</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {/* Bouton NFC */}
+              <button
+                onClick={onNFC}
+                disabled={!supportNFC}
+                className={cn(
+                  'group relative aspect-[3/2] md:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-3 p-4 sm:p-6 transition-all',
+                  supportNFC
+                    ? 'bg-emerald-600 hover:bg-emerald-500 active:scale-95 shadow-2xl shadow-emerald-500/40'
+                    : 'bg-zinc-800/50 text-zinc-600 cursor-not-allowed',
+                )}
+              >
+                <NFCOndes active={supportNFC} />
+                <div className="text-center mt-1">
+                  <p className="font-display italic text-xl sm:text-3xl font-medium text-white">Sans contact</p>
+                  <p className="text-xs sm:text-base text-emerald-100 mt-1 sm:mt-2">
+                    Carte ou téléphone<br />
+                    <span className="opacity-80 text-[10px] sm:text-xs">Approchez de l&apos;écran</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xl sm:text-2xl">
+                  <span title="Visa">💳</span><span title="Apple Pay">🍎</span><span title="Google Pay">G</span>
+                </div>
+                {!supportNFC && (
+                  <p className="absolute bottom-2 text-[10px] text-zinc-500 italic">Indisponible sur cette tablette</p>
+                )}
+              </button>
 
-            {/* Bouton Comptoir */}
-            <button
-              onClick={onComptoir}
-              className="group relative aspect-square sm:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-4 p-6 bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-2xl shadow-blue-500/40 transition-all"
-            >
-              <span className="text-7xl sm:text-8xl">🏪</span>
-              <div className="text-center">
-                <p className="font-display italic text-2xl sm:text-3xl font-medium text-white">Au comptoir</p>
-                <p className="text-sm sm:text-base text-blue-100 mt-2">
-                  Carte à insérer<br />
-                  <span className="opacity-80 text-xs">ou espèces</span>
-                </p>
-              </div>
-            </button>
+              {/* Bouton Comptoir */}
+              <button
+                onClick={onComptoir}
+                className="group relative aspect-[3/2] md:aspect-[4/5] rounded-3xl flex flex-col items-center justify-center gap-3 p-4 sm:p-6 bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-2xl shadow-blue-500/40 transition-all"
+              >
+                <span className="text-5xl sm:text-8xl">🏪</span>
+                <div className="text-center">
+                  <p className="font-display italic text-xl sm:text-3xl font-medium text-white">Au comptoir</p>
+                  <p className="text-xs sm:text-base text-blue-100 mt-1 sm:mt-2">
+                    Carte à insérer<br />
+                    <span className="opacity-80 text-[10px] sm:text-xs">ou espèces</span>
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </main>
