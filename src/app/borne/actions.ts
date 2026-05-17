@@ -32,6 +32,7 @@ const CreerCommandeBorneSchema = z.object({
   mode_paiement: z.enum(['nfc', 'comptoir']),
   client_prenom: z.string().max(64).nullable().optional(),
   consommation: z.enum(['sur_place', 'emporter']).default('sur_place'),
+  client_id: z.string().uuid().nullable().optional(),
 })
 
 export type PanierBorneItem = z.infer<typeof PanierItemSchema>
@@ -72,6 +73,7 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
       montant_total_ht: Math.round(total_ht * 100) / 100,
       montant_total_ttc: Math.round(total_ttc * 100) / 100,
       client_nom: data.client_prenom ?? null,
+      client_id: data.client_id ?? null,
       consommation: data.consommation,
       borne_id: data.borne_id,
       borne_payment_method: data.mode_paiement,
@@ -297,6 +299,47 @@ export async function heartbeatBorne(input: { borne_id: string; user_agent?: str
     user_agent: input.user_agent ?? null,
   })
   return { ok: true }
+}
+
+// ─── Fidélité : recherche client par téléphone (saisie borne) ──────────
+// On normalise le téléphone (retire espaces / points / tirets) pour matching tolérant.
+export type ClientFidelite = {
+  id: string
+  prenom: string | null
+  nom: string | null
+  points_fidelite: number
+  niveau_fidelite: string
+  nb_visites: number
+}
+
+function normaliserTel(t: string): string {
+  return t.replace(/[\s.\-()]/g, '')
+}
+
+export async function chercherClientFideliteParTel(telephone: string): Promise<ClientFidelite | null> {
+  const tel = normaliserTel(telephone)
+  if (tel.length < 9) return null // FR minimum
+  const supabase = await createClient()
+  // Match exact ou avec préfixe FR (0X → 33X)
+  const variantes = [tel]
+  if (tel.startsWith('0')) variantes.push('33' + tel.slice(1))
+  if (tel.startsWith('33')) variantes.push('0' + tel.slice(2))
+  if (tel.startsWith('+')) variantes.push(tel.slice(1))
+  const { data } = await supabase
+    .from('clients')
+    .select('id, prenom, nom, telephone, points_fidelite, niveau_fidelite, nb_visites')
+    .in('telephone', variantes)
+    .limit(1)
+    .maybeSingle()
+  if (!data) return null
+  return {
+    id: data.id as string,
+    prenom: (data.prenom as string) ?? null,
+    nom: (data.nom as string) ?? null,
+    points_fidelite: Number(data.points_fidelite ?? 0),
+    niveau_fidelite: (data.niveau_fidelite as string) ?? 'standard',
+    nb_visites: Number(data.nb_visites ?? 0),
+  }
 }
 
 // ─── Log neutre (panier_ajout etc) ─────────────────────────────────────

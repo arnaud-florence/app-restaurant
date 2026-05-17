@@ -7,7 +7,8 @@ import { getPaymentProvider, type PaymentProvider, type PaymentResult } from '@/
 import {
   creerCommandeBorne, marquerBornePayee, annulerCommandeBorne,
   incrementerEchecsNFC, heartbeatBorne, logBorneEvenement,
-  type PanierBorneItem,
+  chercherClientFideliteParTel,
+  type PanierBorneItem, type ClientFidelite,
 } from './actions'
 import QRCode from 'qrcode'
 
@@ -24,7 +25,7 @@ type Produit = {
   favori: boolean
 }
 
-type Etape = 'catalogue' | 'consommation' | 'prenom' | 'choix-paiement' | 'nfc' | 'comptoir' | 'succes' | 'echec'
+type Etape = 'catalogue' | 'consommation' | 'prenom' | 'fidelite' | 'choix-paiement' | 'nfc' | 'comptoir' | 'succes' | 'echec'
 type Consommation = 'sur_place' | 'emporter'
 
 type LignePanier = {
@@ -69,6 +70,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   // Options choisies entre catalogue et paiement
   const [consommation, setConsommation] = useState<Consommation>('sur_place')
   const [prenomClient, setPrenomClient] = useState<string>('')
+  // Compte fidélité — null si client a skippé / pas trouvé
+  const [clientFidelite, setClientFidelite] = useState<ClientFidelite | null>(null)
 
   // ─── Init provider de paiement + heartbeat ───────────────────────────
   useEffect(() => {
@@ -195,14 +198,15 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         panier: items,
         mode_paiement: 'nfc',
         consommation,
-        client_prenom: prenomClient.trim() || null,
+        client_prenom: prenomClient.trim() || clientFidelite?.prenom || null,
+        client_id: clientFidelite?.id ?? null,
       })
       setCommande(cmd)
       setEtape('nfc')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId, consommation, prenomClient])
+  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite])
 
   const lancerComptoir = useCallback(async () => {
     setErreur(null)
@@ -214,14 +218,15 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         panier: items,
         mode_paiement: 'comptoir',
         consommation,
-        client_prenom: prenomClient.trim() || null,
+        client_prenom: prenomClient.trim() || clientFidelite?.prenom || null,
+        client_id: clientFidelite?.id ?? null,
       })
       setCommande(cmd)
       setEtape('comptoir')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId, consommation, prenomClient])
+  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite])
 
   // ─── Reset complet (retour catalogue) ────────────────────────────────
   const reset = useCallback(() => {
@@ -231,6 +236,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     setErreur(null)
     setConsommation('sur_place')
     setPrenomClient('')
+    setClientFidelite(null)
   }, [])
 
   // ─── Annulation depuis NFC/Comptoir ──────────────────────────────────
@@ -291,9 +297,23 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           totalTTC={totalTTC}
           prenom={prenomClient}
           onChange={setPrenomClient}
-          onSuivant={() => setEtape('choix-paiement')}
-          onIgnorer={() => { setPrenomClient(''); setEtape('choix-paiement') }}
+          onSuivant={() => setEtape('fidelite')}
+          onIgnorer={() => { setPrenomClient(''); setEtape('fidelite') }}
           onRetour={() => setEtape('consommation')}
+        />
+      )}
+      {etape === 'fidelite' && (
+        <EcranFidelite
+          totalTTC={totalTTC}
+          clientFidelite={clientFidelite}
+          onTrouve={(c) => {
+            setClientFidelite(c)
+            // Si l'utilisateur n'a pas saisi de prénom, on prend celui du compte
+            if (!prenomClient && c.prenom) setPrenomClient(c.prenom)
+          }}
+          onContinuer={() => setEtape('choix-paiement')}
+          onIgnorer={() => { setClientFidelite(null); setEtape('choix-paiement') }}
+          onRetour={() => setEtape('prenom')}
         />
       )}
       {etape === 'choix-paiement' && (
@@ -303,7 +323,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           supportNFC={provider?.supportsTapToPay ?? false}
           onNFC={lancerNFC}
           onComptoir={lancerComptoir}
-          onRetour={() => setEtape('prenom')}
+          onRetour={() => setEtape('fidelite')}
         />
       )}
       {etape === 'nfc' && commande && provider && (
@@ -818,6 +838,167 @@ function EcranPrenom({
           >
             Suivant →
           </button>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ÉCRAN 1.9 — COMPTE FIDÉLITÉ (saisie téléphone)
+// ═══════════════════════════════════════════════════════════════════════
+function EcranFidelite({
+  totalTTC, clientFidelite, onTrouve, onContinuer, onIgnorer, onRetour,
+}: {
+  totalTTC: number
+  clientFidelite: ClientFidelite | null
+  onTrouve: (c: ClientFidelite) => void
+  onContinuer: () => void
+  onIgnorer: () => void
+  onRetour: () => void
+}) {
+  const [tel, setTel] = useState<string>('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  function tap(d: string) {
+    if (d === '⌫') { setTel(prev => prev.slice(0, -1)); setErr(null); return }
+    if (tel.length >= 12) return
+    setTel(prev => prev + d)
+    setErr(null)
+  }
+
+  async function rechercher() {
+    if (tel.length < 9) { setErr('Numéro trop court'); return }
+    setBusy(true); setErr(null)
+    try {
+      const c = await chercherClientFideliteParTel(tel)
+      if (c) onTrouve(c)
+      else setErr('Aucun compte trouvé pour ce numéro')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erreur')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Si client trouvé → écran de confirmation (skip saisie)
+  if (clientFidelite) {
+    const niveauEmoji: Record<string, string> = { standard: '⭐', or: '🥇', argent: '🥈', bronze: '🥉', platine: '💎', vip: '👑' }
+    const emoji = niveauEmoji[clientFidelite.niveau_fidelite.toLowerCase()] ?? '⭐'
+    return (
+      <div className="flex-1 flex flex-col">
+        <header className="shrink-0 px-6 py-4 flex items-center justify-between">
+          <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+            ← Retour
+          </button>
+          <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+        </header>
+        <main className="flex-1 overflow-y-auto scroll-visible-dark">
+          <div className="min-h-full flex items-center justify-center p-4 sm:p-10">
+            <div className="w-full max-w-md text-center">
+              <span className="text-7xl sm:text-8xl">{emoji}</span>
+              <h2 className="font-display italic text-3xl sm:text-5xl text-white mt-4">
+                Bonjour {clientFidelite.prenom ?? clientFidelite.nom ?? ''} !
+              </h2>
+              <div className="mt-6 rounded-3xl bg-gradient-to-br from-amber-500/10 to-amber-700/10 border-2 border-amber-500/40 p-6 space-y-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-amber-300 font-black">Niveau</p>
+                  <p className="font-display italic text-2xl text-white capitalize">{clientFidelite.niveau_fidelite}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-amber-300 font-black">Points cumulés</p>
+                  <p className="font-display italic text-5xl tabular-nums text-amber-400">{clientFidelite.points_fidelite}</p>
+                </div>
+                <p className="text-xs text-zinc-400">Visites : {clientFidelite.nb_visites}</p>
+              </div>
+              <p className="text-sm text-emerald-300 mt-6">
+                ✓ Cette commande sera créditée sur votre compte
+              </p>
+              <button
+                onClick={onContinuer}
+                className="w-full h-16 mt-6 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-base shadow-lg shadow-emerald-500/30 active:scale-95"
+              >
+                Continuer → paiement
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Sinon : saisie téléphone
+  return (
+    <div className="flex-1 flex flex-col">
+      <header className="shrink-0 px-6 py-4 flex items-center justify-between">
+        <button onClick={onRetour} className="inline-flex items-center gap-2 px-4 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-black text-sm">
+          ← Retour
+        </button>
+        <p className="text-3xl font-black tabular-nums text-white">{fmtPrix(totalTTC)}</p>
+      </header>
+      <main className="flex-1 overflow-y-auto scroll-visible-dark">
+        <div className="min-h-full flex flex-col items-center p-4 sm:p-6 py-3">
+          <span className="text-5xl sm:text-6xl">🎁</span>
+          <h2 className="font-display italic text-2xl sm:text-4xl text-center text-white mt-2">Compte fidélité ?</h2>
+          <p className="text-center text-zinc-400 text-sm sm:text-base mt-2 max-w-md">
+            Cumulez des points à chaque commande. Tapez votre numéro de téléphone.
+          </p>
+
+          {/* Affichage tel */}
+          <div className="mt-4 w-full max-w-md">
+            <div className="h-16 sm:h-20 rounded-2xl bg-zinc-900 ring-2 ring-zinc-800 flex items-center justify-center px-6">
+              <p className={cn(
+                'font-display italic text-3xl sm:text-4xl font-medium tabular-nums tracking-widest',
+                tel ? 'text-amber-300' : 'text-zinc-600',
+              )}>
+                {tel || '06 ── ── ── ──'}
+              </p>
+            </div>
+            {err && <p className="text-red-400 text-sm font-bold mt-2 text-center">{err}</p>}
+          </div>
+
+          {/* Clavier numérique */}
+          <div className="mt-4 grid grid-cols-3 gap-2 w-full max-w-sm">
+            {['1','2','3','4','5','6','7','8','9'].map(d => (
+              <button
+                key={d}
+                onClick={() => tap(d)}
+                disabled={busy}
+                className="h-14 sm:h-16 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 text-white font-display italic text-2xl sm:text-3xl font-medium tabular-nums transition-all active:scale-95 border border-zinc-800 disabled:opacity-40"
+              >{d}</button>
+            ))}
+            <button
+              onClick={() => tap('⌫')}
+              disabled={busy}
+              className="h-14 sm:h-16 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xl disabled:opacity-40"
+            >⌫</button>
+            <button
+              onClick={() => tap('0')}
+              disabled={busy}
+              className="h-14 sm:h-16 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 text-white font-display italic text-2xl sm:text-3xl font-medium tabular-nums transition-all active:scale-95 border border-zinc-800 disabled:opacity-40"
+            >0</button>
+            <button
+              onClick={rechercher}
+              disabled={busy || tel.length < 9}
+              className={cn(
+                'h-14 sm:h-16 rounded-2xl font-black text-sm uppercase tracking-wider transition-all active:scale-95',
+                busy || tel.length < 9
+                  ? 'bg-zinc-800 text-zinc-600'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30',
+              )}
+            >{busy ? '…' : 'OK'}</button>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-4 flex flex-col w-full max-w-sm gap-2">
+            <button
+              onClick={onIgnorer}
+              className="h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-wider text-xs"
+            >
+              Continuer sans compte
+            </button>
+          </div>
         </div>
       </main>
     </div>
