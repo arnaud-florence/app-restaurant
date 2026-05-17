@@ -14,10 +14,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { fmtPrix, playDing } from '@/lib/service'
+import { fmtPrix, playDing, type CommandeService } from '@/lib/service'
 import { annulerCommandeBorne } from '@/app/borne/actions'
+import { getCommandeServiceById } from '@/app/(ops)/actions'
 import PinManagerModal from '@/components/PinManagerModal'
-import BorneEncaissementModal from '@/components/BorneEncaissementModal'
+import EncaissementModal from '@/app/(ops)/serveur/EncaissementModal'
+
+type Employe = { id: string; prenom: string; nom: string; poste: string }
 
 type CommandeBorne = {
   id: string
@@ -30,22 +33,27 @@ type CommandeBorne = {
   borne_id: string | null
 }
 
-export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[] }) {
+export default function CaisseBorneBanner({
+  initial, employes = [], operateurId = null,
+}: {
+  initial: CommandeBorne[]
+  employes?: Employe[]
+  operateurId?: string | null
+}) {
   const router = useRouter()
   const [commandes, setCommandes] = useState<CommandeBorne[]>(initial)
   const [now, setNow] = useState(() => Date.now())
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
-  // PIN gate : on stocke l'action à exécuter une fois le PIN validé
-  // 'encaisser' → ouvre BorneEncaissementModal (choix mode paiement etc)
-  // 'refuser'   → annule la commande
+  // PIN gate : étape 1 si source=BORNE
   const [pinAction, setPinAction] = useState<
     | { type: 'encaisser'; cmd: CommandeBorne }
     | { type: 'refuser'; cmd: CommandeBorne }
     | null
   >(null)
-  // Modal d'encaissement ouvert APRÈS validation du PIN (étape 2)
-  const [encaisserCmd, setEncaisserCmd] = useState<CommandeBorne | null>(null)
+  // Étape 2 : commande chargée en CommandeService prête pour EncaissementModal
+  const [encaisserCmd, setEncaisserCmd] = useState<CommandeService | null>(null)
+  const [chargement, setChargement] = useState(false)
 
   useEffect(() => {
     setCommandes(initial)
@@ -82,14 +90,26 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
     playDing()
   }
 
+  // Charge la commande complète (articles) puis ouvre EncaissementModal
+  async function chargerEtOuvrir(c: CommandeBorne) {
+    setChargement(true)
+    try {
+      const full = await getCommandeServiceById(c.id)
+      setEncaisserCmd(full as CommandeService)
+    } catch (e) {
+      alert('Erreur chargement commande : ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setChargement(false)
+    }
+  }
+
   // BORNE → PIN obligatoire (client peut être malveillant)
   // COMPTOIR → pas de PIN (le snackiste prend la commande lui-même)
   function encaisser(c: CommandeBorne) {
     if (c.source === 'BORNE') {
       setPinAction({ type: 'encaisser', cmd: c })
     } else {
-      // Skip PIN, ouvre direct l'encaissement
-      setEncaisserCmd(c)
+      void chargerEtOuvrir(c)
     }
   }
   function refuser(c: CommandeBorne) {
@@ -110,9 +130,8 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
     setPinAction(null)
     try {
       if (type === 'encaisser') {
-        // PIN OK → on n'encaisse PAS directement, on ouvre le modal d'encaissement.
-        // Le caissier choisit le mode (carte/espèces/etc) puis valide.
-        setEncaisserCmd(cmd)
+        // PIN OK → charge la commande complète et ouvre EncaissementModal standard
+        await chargerEtOuvrir(cmd)
       } else {
         // Annulation : action directe (déjà confirmée par le PIN)
         await annulerCommandeBorne({ commande_id: cmd.id, raison: 'manuel', borne_id: cmd.borne_id ?? undefined })
@@ -221,11 +240,15 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
       onClose={() => setPinAction(null)}
     />
 
-    {/* Étape 2 : modal d'encaissement après PIN validé ───────────────── */}
+    {/* Étape 2 : EncaissementModal standard (fidélité, sélection client,
+        parts, pourboires par serveur, etc.). Quand la commande est en
+        'en_attente_paiement_comptoir', l'action encaisserCommande bascule
+        en 'en_attente' au lieu de 'encaisse' → part en cuisine. */}
     {encaisserCmd && (
-      <BorneEncaissementModal
-        commandeId={encaisserCmd.id}
-        total={encaisserCmd.montant_total_ttc}
+      <EncaissementModal
+        commande={encaisserCmd}
+        serveurId={operateurId ?? ''}
+        employes={employes}
         onClose={() => setEncaisserCmd(null)}
         onSuccess={() => {
           setEncaisserCmd(null)

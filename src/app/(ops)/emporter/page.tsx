@@ -99,7 +99,11 @@ export default async function EmporterPage() {
       <BriefingPoste briefing={briefing} />
       <AlertesAgentsOps agentIds={['stock', 'haccp', 'snack_rt']} />
       <div className="px-3 pt-3">
-        <CaisseBorneBanner initial={commandesBorne} />
+        <CaisseBorneBanner
+          initial={commandesBorne}
+          employes={employes}
+          operateurId={employeId}
+        />
       </div>
       <EmporterClient
         initial={commandes}

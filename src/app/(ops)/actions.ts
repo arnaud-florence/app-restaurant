@@ -441,6 +441,11 @@ export async function encaisserCommande(input: unknown) {
   if (cmd.statut === 'encaisse') throw new Error('Commande déjà encaissée')
   if (cmd.statut === 'annule')   throw new Error('Commande annulée')
 
+  // Détection mode "pré-cuisine" : commande en attente de paiement comptoir
+  // (BORNE ou SNACK comptoir). Après encaissement → bascule en 'en_attente'
+  // pour partir en cuisine, AU LIEU de 'encaisse' (qui clôt le cycle).
+  const modePreCuisine = cmd.statut === 'en_attente_paiement_comptoir'
+
   // Récupère la session caisse ouverte
   const { data: session } = await supabase
     .from('sessions_caisse')
@@ -471,10 +476,13 @@ export async function encaisserCommande(input: unknown) {
   if (pErr) throw new Error(`Erreur paiements : ${pErr.message}`)
 
   // 2. Marque commande encaisse + tip total + lien client (si fourni)
+  // EXCEPTION : mode pré-cuisine (borne/snack comptoir) → statut='en_attente'
+  // (la commande doit encore être préparée, on ne clôt PAS le cycle).
   const updateCmd: Record<string, unknown> = {
-    statut: 'encaisse',
+    statut: modePreCuisine ? 'en_attente' : 'encaisse',
     mode_paiement: p.paiements.map(x => x.methode).join('+'),
     pourboire_total: totalTips,
+    ...(modePreCuisine ? { borne_expire_at: null } : {}),
   }
   if (p.client_id) updateCmd.client_id = p.client_id
   const { error: uErr } = await supabase
@@ -483,8 +491,8 @@ export async function encaisserCommande(input: unknown) {
     .eq('id', p.commande_id)
   if (uErr) throw new Error(`Erreur maj commande : ${uErr.message}`)
 
-  // 3. Libère la table
-  if (cmd.numero_table) {
+  // 3. Libère la table (sauf en mode pré-cuisine : pas de table en borne/snack)
+  if (cmd.numero_table && !modePreCuisine) {
     await supabase
       .from('tables_restaurant')
       .update({ statut: 'libre', commande_active_id: null })
@@ -1041,4 +1049,53 @@ export async function listCommandesActives() {
       })),
     }
   })
+}
+
+/**
+ * Charge UNE commande au format CommandeService (utile pour l'encaissement
+ * d'une commande borne/snack via EncaissementModal partagé).
+ */
+export async function getCommandeServiceById(id: string) {
+  const supabase = await createClient()
+  const { data: r, error } = await supabase
+    .from('commandes')
+    .select(`
+      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
+      montant_total_ttc, tva_total, consommation, client_nom,
+      serveur:employes!serveur_id(prenom, nom),
+      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
+    `)
+    .eq('id', id)
+    .single()
+  if (error || !r) throw new Error(error?.message ?? 'Commande introuvable')
+  const serv = r.serveur as { prenom?: string; nom?: string } | null
+  const articles = (r.commande_articles ?? []) as Array<Record<string, unknown> & { recette?: { nom?: string } | null }>
+  return {
+    id: r.id as string,
+    numero: r.numero as string,
+    source: r.source as SourceCommande,
+    numero_table: (r.numero_table as string) ?? null,
+    statut: r.statut as StatutCommande,
+    notes: (r.notes as string) ?? null,
+    client_nom: (r.client_nom as string) ?? null,
+    created_at: r.created_at as string,
+    serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
+    montant_total_ttc: Number(r.montant_total_ttc ?? 0),
+    tva_total:         Number(r.tva_total ?? 0),
+    consommation:      ((r.consommation as string) === 'emporter' ? 'emporter' : 'sur_place') as 'sur_place' | 'emporter',
+    creneau_retrait:   (r.creneau_retrait as string) ?? null,
+    creneaux_par_tag:  (r.creneaux_par_tag as Partial<Record<'CUISINE'|'SNACKING'|'PIZZA'|'BAR', string>> | null) ?? {},
+    articles: articles.map(a => ({
+      id: a.id as string,
+      commande_id: a.commande_id as string,
+      recette_id: (a.recette_id as string) ?? null,
+      recette_nom: a.recette?.nom ?? '— recette supprimée —',
+      quantite: Number(a.quantite ?? 1),
+      prix_unitaire_ht: Number(a.prix_unitaire_ht ?? 0),
+      tag_destination: a.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
+      commentaire: (a.commentaire as string) ?? null,
+      allergenes_a_eviter: (a.allergenes_a_eviter as string[] | undefined) ?? [],
+      statut: a.statut as StatutArticle,
+    })),
+  }
 }
