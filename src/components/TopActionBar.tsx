@@ -116,6 +116,8 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   // Système
   '/admin/setup':             Settings,
   '/admin/securite':          Lock,
+  '/admin/borne':             ShoppingBag,
+  '/admin/borne-pin':         Lock,
 }
 
 // Alias pour compat (utilisé dans le code ops chips)
