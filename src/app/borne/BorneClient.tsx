@@ -76,6 +76,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const [configFid, setConfigFid] = useState<{ points_par_euro_remise: number; points_par_euro: number }>({
     points_par_euro_remise: 100, points_par_euro: 1,
   })
+  // Points fidélité que le client choisit d'utiliser sur cette commande (= remise €)
+  const [pointsAUtiliser, setPointsAUtiliser] = useState<number>(0)
 
   // ─── Init provider de paiement + heartbeat ───────────────────────────
   useEffect(() => {
@@ -127,6 +129,14 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     [panier],
   )
   const nbArticles = useMemo(() => panier.reduce((s, l) => s + l.quantite, 0), [panier])
+  // Remise fidélité = pointsAUtiliser / config.points_par_euro_remise, capée au total
+  const remiseEur = useMemo(() => {
+    if (!clientFidelite || pointsAUtiliser <= 0) return 0
+    const ratio = Math.max(1, configFid.points_par_euro_remise)
+    const valeur = pointsAUtiliser / ratio
+    return Math.min(valeur, totalTTC)
+  }, [clientFidelite, pointsAUtiliser, configFid, totalTTC])
+  const totalApresRemise = Math.max(0, totalTTC - remiseEur)
 
   // ─── Actions panier ──────────────────────────────────────────────────
   // ajouter(p, qty?) : ajoute qty (défaut +1) à p. Si déjà au panier → cumul.
@@ -207,13 +217,14 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         consommation,
         client_prenom: prenomClient.trim() || clientFidelite?.prenom || null,
         client_id: clientFidelite?.id ?? null,
+        points_a_utiliser: pointsAUtiliser,
       })
       setCommande(cmd)
       setEtape('nfc')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite])
+  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite, pointsAUtiliser])
 
   const lancerComptoir = useCallback(async () => {
     setErreur(null)
@@ -227,13 +238,14 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         consommation,
         client_prenom: prenomClient.trim() || clientFidelite?.prenom || null,
         client_id: clientFidelite?.id ?? null,
+        points_a_utiliser: pointsAUtiliser,
       })
       setCommande(cmd)
       setEtape('comptoir')
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Erreur création commande')
     }
-  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite])
+  }, [panierToItems, borneId, consommation, prenomClient, clientFidelite, pointsAUtiliser])
 
   // ─── Reset complet (retour catalogue) ────────────────────────────────
   const reset = useCallback(() => {
@@ -244,6 +256,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     setConsommation('sur_place')
     setPrenomClient('')
     setClientFidelite(null)
+    setPointsAUtiliser(0)
   }, [])
 
   // ─── Annulation depuis NFC/Comptoir ──────────────────────────────────
@@ -312,22 +325,27 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
       {etape === 'fidelite' && (
         <EcranFidelite
           totalTTC={totalTTC}
+          totalApresRemise={totalApresRemise}
           clientFidelite={clientFidelite}
           prenomClient={prenomClient}
           configFid={configFid}
+          pointsAUtiliser={pointsAUtiliser}
+          setPointsAUtiliser={setPointsAUtiliser}
+          remiseEur={remiseEur}
           onTrouve={(c) => {
             setClientFidelite(c)
-            // Si l'utilisateur n'a pas saisi de prénom, on prend celui du compte
             if (!prenomClient && c.prenom) setPrenomClient(c.prenom)
           }}
           onContinuer={() => setEtape('choix-paiement')}
-          onIgnorer={() => { setClientFidelite(null); setEtape('choix-paiement') }}
+          onIgnorer={() => {
+            setClientFidelite(null); setPointsAUtiliser(0); setEtape('choix-paiement')
+          }}
           onRetour={() => setEtape('prenom')}
         />
       )}
       {etape === 'choix-paiement' && (
         <EcranChoixPaiement
-          totalTTC={totalTTC}
+          totalTTC={totalApresRemise}
           nbArticles={nbArticles}
           supportNFC={provider?.supportsTapToPay ?? false}
           onNFC={lancerNFC}
@@ -338,7 +356,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
       {etape === 'nfc' && commande && provider && (
         <EcranNFC
           commande={commande}
-          totalTTC={totalTTC}
+          totalTTC={totalApresRemise}
           provider={provider}
           borneId={borneId}
           onSucces={async (result) => {
@@ -357,7 +375,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
         <EcranComptoir
           commande={commande}
           prenom={prenomClient}
-          totalTTC={totalTTC}
+          totalTTC={totalApresRemise}
           onExpire={() => annuler('expiration')}
           onRetour={() => annuler('retour_client')}
         />
@@ -367,7 +385,7 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
       )}
       {etape === 'echec' && commande && (
         <EcranEchec
-          totalTTC={totalTTC}
+          totalTTC={totalApresRemise}
           onReessayer={() => setEtape('nfc')}
           onComptoir={async () => {
             await annulerCommandeBorne({ commande_id: commande.id, raison: 'nfc_echec', borne_id: borneId })
@@ -883,12 +901,18 @@ function EcranPrenom({
 // ÉCRAN 1.9 — COMPTE FIDÉLITÉ (saisie téléphone)
 // ═══════════════════════════════════════════════════════════════════════
 function EcranFidelite({
-  totalTTC, clientFidelite, prenomClient, configFid, onTrouve, onContinuer, onIgnorer, onRetour,
+  totalTTC, totalApresRemise, clientFidelite, prenomClient, configFid,
+  pointsAUtiliser, setPointsAUtiliser, remiseEur,
+  onTrouve, onContinuer, onIgnorer, onRetour,
 }: {
   totalTTC: number
+  totalApresRemise: number
   clientFidelite: ClientFidelite | null
   prenomClient: string  // pour préfill création compte
   configFid: { points_par_euro_remise: number; points_par_euro: number }
+  pointsAUtiliser: number
+  setPointsAUtiliser: (n: number) => void
+  remiseEur: number
   onTrouve: (c: ClientFidelite) => void
   onContinuer: () => void
   onIgnorer: () => void
@@ -990,11 +1014,67 @@ function EcranFidelite({
                 ✓ Vous gagnerez <strong className="tabular-nums">{Math.floor(totalTTC * Math.max(1, configFid.points_par_euro))}</strong> points sur cette commande
               </p>
 
-              {/* Note utilisation des points (modes de paiement) */}
-              {clientFidelite.points_fidelite >= configFid.points_par_euro_remise && (
-                <div className="mt-3 rounded-xl bg-blue-500/10 border border-blue-500/40 px-3 py-2.5 text-xs text-blue-200 text-left">
-                  💡 <strong>Utiliser mes points ?</strong><br />
-                  Au paiement <strong>au comptoir</strong>, dis au caissier que tu veux utiliser tes points. Il appliquera la remise dans la caisse.
+              {/* ─── UTILISATION DES POINTS (sur place AVANT paiement) ─── */}
+              {(() => {
+                const ratio = Math.max(1, configFid.points_par_euro_remise)
+                // Max points consommables = limite client + limite total commande
+                const maxParSolde = clientFidelite.points_fidelite
+                const maxParTotal = Math.floor(totalTTC * ratio)
+                const maxConsommable = Math.min(maxParSolde, maxParTotal)
+                if (maxConsommable < ratio) return null  // pas assez pour 1 € de remise
+                // 3 paliers : 1 €, 5 €, max possible
+                const paliers = [
+                  { label: `${ratio} pts = 1 €`, pts: ratio },
+                  { label: `${ratio * 5} pts = 5 €`, pts: ratio * 5 },
+                  { label: `Max (${maxConsommable} pts)`, pts: maxConsommable },
+                ].filter(p => p.pts <= maxConsommable)
+                  .filter((p, i, arr) => arr.findIndex(q => q.pts === p.pts) === i)  // dédup
+                return (
+                  <div className="mt-4 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 p-4 text-left">
+                    <p className="text-xs font-black uppercase tracking-widest text-emerald-300 mb-2">
+                      🎁 Utiliser mes points sur cette commande
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setPointsAUtiliser(0)}
+                        className={cn(
+                          'h-12 rounded-xl font-black text-xs uppercase tracking-wider transition-all',
+                          pointsAUtiliser === 0
+                            ? 'bg-zinc-100 text-zinc-900 shadow ring-2 ring-white'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
+                        )}
+                      >Aucun</button>
+                      {paliers.map(p => (
+                        <button
+                          key={p.pts}
+                          onClick={() => setPointsAUtiliser(p.pts)}
+                          className={cn(
+                            'h-12 rounded-xl font-black text-xs tracking-wider transition-all px-2',
+                            pointsAUtiliser === p.pts
+                              ? 'bg-emerald-500 text-white shadow ring-2 ring-white'
+                              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
+                          )}
+                        >{p.label}</button>
+                      ))}
+                    </div>
+                    {remiseEur > 0 && (
+                      <div className="mt-3 pt-3 border-t border-emerald-500/30 flex items-center justify-between gap-2">
+                        <span className="text-xs text-zinc-400">Remise appliquée</span>
+                        <span className="font-display italic text-2xl tabular-nums text-emerald-300">−{fmtPrix(remiseEur)}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Récap total à payer */}
+              {remiseEur > 0 && (
+                <div className="mt-3 rounded-2xl bg-zinc-900 border border-zinc-700 p-4 flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-widest text-zinc-400">À payer</span>
+                  <div className="text-right">
+                    <p className="font-display italic text-3xl tabular-nums text-white">{fmtPrix(totalApresRemise)}</p>
+                    <p className="text-[10px] text-zinc-500 line-through">{fmtPrix(totalTTC)}</p>
+                  </div>
                 </div>
               )}
               <button

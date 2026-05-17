@@ -33,6 +33,7 @@ const CreerCommandeBorneSchema = z.object({
   client_prenom: z.string().max(64).nullable().optional(),
   consommation: z.enum(['sur_place', 'emporter']).default('sur_place'),
   client_id: z.string().uuid().nullable().optional(),
+  points_a_utiliser: z.number().int().nonnegative().optional().default(0),
 })
 
 export type PanierBorneItem = z.infer<typeof PanierItemSchema>
@@ -45,9 +46,26 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   const data = CreerCommandeBorneSchema.parse(input)
   const supabase = await createClient()
 
-  const total_ht = data.panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
+  const total_ht_brut = data.panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
   const tva = 0.10
-  const total_ttc = total_ht * (1 + tva)
+  const total_ttc_brut = total_ht_brut * (1 + tva)
+
+  // Application de la remise fidélité (points → €)
+  let remise_eur = 0
+  let points_utilises = 0
+  if (data.client_id && data.points_a_utiliser && data.points_a_utiliser > 0) {
+    const config = await getConfigFideliteBorne()
+    const ratio = Math.max(1, config.points_par_euro_remise)
+    // Vérifier solde réel du client (anti-triche côté client)
+    const supabaseCheck = await createClient()
+    const { data: cli } = await supabaseCheck.from('clients')
+      .select('points_fidelite').eq('id', data.client_id).maybeSingle()
+    const solde = Number(cli?.points_fidelite ?? 0)
+    points_utilises = Math.min(data.points_a_utiliser, solde, total_ttc_brut * ratio)
+    remise_eur = Math.round((points_utilises / ratio) * 100) / 100
+  }
+  const total_ttc = Math.max(0, total_ttc_brut - remise_eur)
+  const total_ht = total_ttc / (1 + tva)
 
   // Statut initial selon le mode de paiement
   //   NFC : en_attente_paiement_comptoir → marquerBornePayee bascule en cuisine
@@ -78,6 +96,8 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
       borne_id: data.borne_id,
       borne_payment_method: data.mode_paiement,
       borne_expire_at: expire_at,
+      borne_points_utilises: points_utilises,
+      borne_remise_eur: remise_eur,
     })
     .select('id, numero')
     .single()
@@ -208,23 +228,58 @@ export async function marquerBornePayee(input: {
   via: 'nfc' | 'comptoir'
 }) {
   const supabase = await createClient()
+
+  // Lire la commande pour voir si points fidélité à consommer
+  const { data: cmd } = await supabase
+    .from('commandes')
+    .select('client_id, borne_points_utilises, mode_paiement')
+    .eq('id', input.commande_id)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('commandes')
     .update({
       statut: 'en_attente', // bascule en cuisine
       borne_payment_intent_id: input.payment_intent_id ?? null,
       borne_expire_at: null,
+      // Marque le mode de paiement pour que /emporter affiche '✓ déjà payé'
+      mode_paiement: cmd?.mode_paiement ?? (input.via === 'nfc' ? 'carte_nfc' : 'comptoir'),
     })
     .eq('id', input.commande_id)
   if (error) throw new Error('Marquer borne payée : ' + error.message)
 
+  // Consomme les points fidélité si applicable (best-effort, log si erreur)
+  const ptsUtilises = Number(cmd?.borne_points_utilises ?? 0)
+  if (cmd?.client_id && ptsUtilises > 0) {
+    try {
+      const { consommerPointsFidelite } = await import('@/lib/fidelite')
+      await consommerPointsFidelite({
+        client_id: cmd.client_id as string,
+        points: ptsUtilises,
+        commande_id: input.commande_id,
+      })
+    } catch (e) {
+      // Log mais on ne bloque pas l'encaissement (la commande est déjà payée)
+      console.error('[borne] consommation points fidélité échouée :', e)
+      await supabase.from('borne_evenements').insert({
+        commande_id: input.commande_id, borne_id: 'caisse',
+        type: 'nfc_echec',
+        details: { etape: 'consommation_points', erreur: e instanceof Error ? e.message : String(e) },
+      })
+    }
+  }
+
   await supabase.from('borne_evenements').insert({
     commande_id: input.commande_id,
-    borne_id: 'caisse', // au moins pour le log si on vient de la caisse
+    borne_id: 'caisse',
     type: input.via === 'nfc' ? 'nfc_succes' : 'comptoir_paye',
-    details: { payment_intent_id: input.payment_intent_id ?? null },
+    details: {
+      payment_intent_id: input.payment_intent_id ?? null,
+      points_utilises: ptsUtilises,
+    },
   })
   revalidatePath('/caisse')
+  revalidatePath('/emporter')
   revalidatePath('/cuisine')
   revalidatePath('/pizza')
   revalidatePath('/bar')
