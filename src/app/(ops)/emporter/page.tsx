@@ -7,6 +7,7 @@ import { listCommandesActives } from '../actions'
 import EmporterClient from './EmporterClient'
 import BriefingPoste from '@/components/BriefingPoste'
 import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
+import CaisseBorneBanner from '@/components/CaisseBorneBanner'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
@@ -21,7 +22,7 @@ export default async function EmporterPage() {
   //   - SNACKING / PIZZA / BAR (cœur du poste snack rapide)
   //   - + desserts (catégorie commençant par "dessert", insensible à la casse)
   // Les plats CUISINE principaux sont exclus (pas pertinent ici).
-  const [commandes, recettesRes, employesRes] = await Promise.all([
+  const [commandes, recettesRes, employesRes, borneRes] = await Promise.all([
     listCommandesActives(),
     supabase
       .from('recettes')
@@ -36,7 +37,23 @@ export default async function EmporterPage() {
       .select('id, prenom, nom, poste')
       .eq('actif', true)
       .order('prenom'),
+    // Encaissement borne snack (BORNE COMPTOIR à encaisser ici)
+    supabase
+      .from('commandes')
+      .select('id, numero, montant_total_ttc, borne_payment_method, borne_expire_at, created_at, borne_id')
+      .eq('source', 'BORNE')
+      .eq('statut', 'en_attente_paiement_comptoir')
+      .order('created_at', { ascending: true }),
   ])
+  const commandesBorne = (borneRes.data ?? []).map(c => ({
+    id: c.id as string,
+    numero: c.numero as string,
+    montant_total_ttc: Number(c.montant_total_ttc ?? 0),
+    borne_payment_method: c.borne_payment_method as 'nfc' | 'comptoir' | null,
+    borne_expire_at: (c.borne_expire_at as string) ?? null,
+    created_at: c.created_at as string,
+    borne_id: (c.borne_id as string) ?? null,
+  }))
 
   const recettes = (recettesRes.data ?? []).map(r => ({
     id: r.id as string,
@@ -79,6 +96,9 @@ export default async function EmporterPage() {
     <>
       <BriefingPoste briefing={briefing} />
       <AlertesAgentsOps agentIds={['stock', 'haccp', 'snack_rt']} />
+      <div className="px-3 pt-3">
+        <CaisseBorneBanner initial={commandesBorne} />
+      </div>
       <EmporterClient
         initial={commandes}
         recettes={recettes}
