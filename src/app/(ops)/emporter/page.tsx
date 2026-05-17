@@ -37,17 +37,19 @@ export default async function EmporterPage() {
       .select('id, prenom, nom, poste')
       .eq('actif', true)
       .order('prenom'),
-    // Encaissement borne snack (BORNE COMPTOIR à encaisser ici)
+    // Encaissement à venir : BORNE (PIN obligatoire) + COMPTOIR snack (sans PIN)
+    // tous en statut 'en_attente_paiement_comptoir'.
     supabase
       .from('commandes')
-      .select('id, numero, montant_total_ttc, borne_payment_method, borne_expire_at, created_at, borne_id')
-      .eq('source', 'BORNE')
+      .select('id, numero, source, montant_total_ttc, borne_payment_method, borne_expire_at, created_at, borne_id')
+      .in('source', ['BORNE', 'COMPTOIR'])
       .eq('statut', 'en_attente_paiement_comptoir')
       .order('created_at', { ascending: true }),
   ])
   const commandesBorne = (borneRes.data ?? []).map(c => ({
     id: c.id as string,
     numero: c.numero as string,
+    source: c.source as 'BORNE' | 'COMPTOIR',
     montant_total_ttc: Number(c.montant_total_ttc ?? 0),
     borne_payment_method: c.borne_payment_method as 'nfc' | 'comptoir' | null,
     borne_expire_at: (c.borne_expire_at as string) ?? null,

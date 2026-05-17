@@ -825,7 +825,9 @@ const ComptoirSnackModalMemo = memo(function ComptoirSnackModalMemo(props: {
   onClose: () => void
   onSuccess: (commandeId: string) => void
 }) {
-  return <ComptoirOrderModal {...props} withCreneaux={SNACK_CRENEAUX} tagInitial="SNACKING" />
+  // paiementAuComptoir=true : la commande passe par le banner d'encaissement
+  // /emporter avant de partir en cuisine (même flow que la borne).
+  return <ComptoirOrderModal {...props} withCreneaux={SNACK_CRENEAUX} tagInitial="SNACKING" paiementAuComptoir />
 })
 
 function KPI({ label, value, accent = 'default', pulse }: { label: string; value: string | number; accent?: 'default' | 'red' | 'orange'; pulse?: boolean }) {

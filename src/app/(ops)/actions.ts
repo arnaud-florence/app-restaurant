@@ -140,6 +140,10 @@ const creerCommandeSchema = z.object({
     z.string().datetime(),
   ).optional().nullable(),
   articles: z.array(articleInputSchema).min(1, 'Au moins un article'),
+  // Si true → commande créée en statut 'en_attente_paiement_comptoir' (visible
+  // dans le banner d'encaissement /emporter), bascule en cuisine APRÈS encaissement.
+  // Utilisé pour les commandes snack comptoir (mêmes règles que la borne).
+  paiement_au_comptoir: z.boolean().optional().default(false),
 })
 
 export async function creerCommande(input: unknown): Promise<{ id: string; numero: string }> {
@@ -252,11 +256,17 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
   const random4 = Math.random().toString(36).slice(2, 6).toUpperCase()
   const numero = `TKT-${yymmdd}-${random4}`
 
+  // Si paiement_au_comptoir → statut 'en_attente_paiement_comptoir' (banner /emporter
+  // affiche, snack ne voit pas tant que pas payé). Sinon flow normal 'en_attente'.
+  const statutInitial = p.paiement_au_comptoir === true
+    ? 'en_attente_paiement_comptoir'
+    : 'en_attente'
+
   const { data: cmd, error } = await supabase.from('commandes').insert({
     numero,
     source: p.source,
     numero_table: p.numero_table || null,
-    statut: 'en_attente',
+    statut: statutInitial,
     montant_total_ht: Math.round(total_ht * 100) / 100,
     montant_total_ttc: Math.round(total_ttc * 100) / 100,
     tva_total: Math.round(tva_total * 100) / 100,

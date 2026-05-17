@@ -116,6 +116,87 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   return { id: cmd.id as string, numero: cmd.numero as string, expire_at }
 }
 
+// ─── Encaisser borne au comptoir (modal /emporter) ─────────────────────
+// Crée le paiement_caisse (traçabilité comptable) + bascule la commande
+// de 'en_attente_paiement_comptoir' → 'en_attente' (= part en cuisine).
+export async function encaisserBorne(input: {
+  commande_id: string
+  methode: 'especes' | 'carte' | 'ticket_resto' | 'virement' | 'autre'
+  montant: number
+  pourboire?: number
+  reference?: string | null
+  serveur_id?: string | null
+}) {
+  const supabase = await createClient()
+
+  // 1. Trouver la session caisse ouverte du jour (peut être null si fermée)
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: session } = await supabase
+    .from('sessions_caisse')
+    .select('id')
+    .eq('date_session', today)
+    .is('fermee_at', null)
+    .order('ouverte_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // 2. Crée le paiement_caisse
+  const { error: errPay } = await supabase.from('paiements_caisse').insert({
+    commande_id: input.commande_id,
+    session_caisse_id: session?.id ?? null,
+    methode: input.methode,
+    montant: input.montant,
+    pourboire: input.pourboire ?? 0,
+    serveur_id: input.serveur_id ?? null,
+    reference: input.reference ?? null,
+  })
+  if (errPay) throw new Error('Création paiement borne : ' + errPay.message)
+
+  // 3. Bascule la commande en 'en_attente' → part en cuisine
+  const { error: errUpd } = await supabase
+    .from('commandes')
+    .update({
+      statut: 'en_attente',
+      borne_expire_at: null,
+      mode_paiement: input.methode,
+      session_caisse_id: session?.id ?? null,
+    })
+    .eq('id', input.commande_id)
+  if (errUpd) throw new Error('Maj commande borne : ' + errUpd.message)
+
+  // 4. Log
+  await supabase.from('borne_evenements').insert({
+    commande_id: input.commande_id,
+    borne_id: 'caisse',
+    type: 'comptoir_paye',
+    details: { methode: input.methode, montant: input.montant, session_id: session?.id ?? null },
+  })
+
+  revalidatePath('/caisse')
+  revalidatePath('/emporter')
+  revalidatePath('/cuisine')
+  revalidatePath('/pizza')
+  revalidatePath('/bar')
+  return { ok: true }
+}
+
+// ─── Récupère une commande borne avec ses articles (pour le modal) ────
+export async function getCommandeBorneDetails(commande_id: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('commandes')
+    .select(`
+      id, numero, montant_total_ttc, montant_total_ht, tva_total,
+      borne_id, borne_payment_method, borne_expire_at, created_at,
+      commande_articles(id, quantite, prix_unitaire_ht, tag_destination,
+        recette:recettes(nom))
+    `)
+    .eq('id', commande_id)
+    .single()
+  if (error) throw new Error('Détails commande borne : ' + error.message)
+  return data
+}
+
 // ─── Marquer borne payée (NFC succès OU caissier valide) ───────────────
 export async function marquerBornePayee(input: {
   commande_id: string

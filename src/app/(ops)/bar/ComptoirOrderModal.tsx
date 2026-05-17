@@ -54,6 +54,7 @@ const TAG_LABEL_COURT: Record<TagPlanning, { emoji: string; label: string }> = {
 
 export default function ComptoirOrderModal({
   recettes, barmanId, onClose, onSuccess, withCreneaux = null, tagInitial = 'BAR',
+  paiementAuComptoir = false,
 }: {
   recettes: Recette[]
   barmanId: string | null
@@ -65,6 +66,9 @@ export default function ComptoirOrderModal({
   withCreneaux?: { tagsAvecPlanning: TagPlanning[] } | null
   // Onglet sélectionné à l'ouverture (utile pour préfiltrer selon le poste appelant)
   tagInitial?: TagPanier
+  // Si true → commande créée en 'en_attente_paiement_comptoir' (l'encaissement
+  // se fait via le banner /emporter avant que la prep cuisine démarre).
+  paiementAuComptoir?: boolean
 }) {
   const [tagActif, setTagActif] = useState<TagPanier>(tagInitial)
   const [panier, setPanier] = useState<LignePanier[]>([])
@@ -258,6 +262,7 @@ export default function ComptoirOrderModal({
           source: 'COMPTOIR',
           numero_table: null,
           serveur_id: barmanId || null,
+          paiement_au_comptoir: paiementAuComptoir,
           // Multi-créneaux (envoyé seulement s'il y en a)
           ...(hasCreneaux ? { creneaux_par_tag: creneauxFinaux } : {}),
           articles: panier.map(p => ({

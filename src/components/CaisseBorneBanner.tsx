@@ -15,12 +15,14 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { fmtPrix, playDing } from '@/lib/service'
-import { marquerBornePayee, annulerCommandeBorne } from '@/app/borne/actions'
+import { annulerCommandeBorne } from '@/app/borne/actions'
 import PinManagerModal from '@/components/PinManagerModal'
+import BorneEncaissementModal from '@/components/BorneEncaissementModal'
 
 type CommandeBorne = {
   id: string
   numero: string
+  source: 'BORNE' | 'COMPTOIR'  // BORNE = client a commandé seul (PIN requis) / COMPTOIR = snackiste a pris la commande (pas de PIN)
   montant_total_ttc: number
   borne_payment_method: 'nfc' | 'comptoir' | null
   borne_expire_at: string | null
@@ -35,11 +37,15 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
   const previousIdsRef = useRef(new Set(initial.map(c => c.id)))
   const audioReadyRef = useRef(false)
   // PIN gate : on stocke l'action à exécuter une fois le PIN validé
+  // 'encaisser' → ouvre BorneEncaissementModal (choix mode paiement etc)
+  // 'refuser'   → annule la commande
   const [pinAction, setPinAction] = useState<
     | { type: 'encaisser'; cmd: CommandeBorne }
     | { type: 'refuser'; cmd: CommandeBorne }
     | null
   >(null)
+  // Modal d'encaissement ouvert APRÈS validation du PIN (étape 2)
+  const [encaisserCmd, setEncaisserCmd] = useState<CommandeBorne | null>(null)
 
   useEffect(() => {
     setCommandes(initial)
@@ -76,9 +82,27 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
     playDing()
   }
 
-  // Les actions sont déclenchées APRÈS validation du PIN manager
-  function encaisser(c: CommandeBorne) { setPinAction({ type: 'encaisser', cmd: c }) }
-  function refuser(c: CommandeBorne)   { setPinAction({ type: 'refuser', cmd: c }) }
+  // BORNE → PIN obligatoire (client peut être malveillant)
+  // COMPTOIR → pas de PIN (le snackiste prend la commande lui-même)
+  function encaisser(c: CommandeBorne) {
+    if (c.source === 'BORNE') {
+      setPinAction({ type: 'encaisser', cmd: c })
+    } else {
+      // Skip PIN, ouvre direct l'encaissement
+      setEncaisserCmd(c)
+    }
+  }
+  function refuser(c: CommandeBorne) {
+    if (c.source === 'BORNE') {
+      setPinAction({ type: 'refuser', cmd: c })
+    } else {
+      // Annulation directe (avec confirm)
+      if (confirm(`Annuler la commande #${c.numero?.slice(-4)} ?`)) {
+        void annulerCommandeBorne({ commande_id: c.id, raison: 'manuel', borne_id: c.borne_id ?? undefined })
+          .then(() => router.refresh())
+      }
+    }
+  }
 
   async function executerActionApresPin(employeNom: string) {
     if (!pinAction) return
@@ -86,11 +110,14 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
     setPinAction(null)
     try {
       if (type === 'encaisser') {
-        await marquerBornePayee({ commande_id: cmd.id, payment_intent_id: null, via: 'comptoir' })
+        // PIN OK → on n'encaisse PAS directement, on ouvre le modal d'encaissement.
+        // Le caissier choisit le mode (carte/espèces/etc) puis valide.
+        setEncaisserCmd(cmd)
       } else {
+        // Annulation : action directe (déjà confirmée par le PIN)
         await annulerCommandeBorne({ commande_id: cmd.id, raison: 'manuel', borne_id: cmd.borne_id ?? undefined })
+        router.refresh()
       }
-      router.refresh()
     } catch (e) {
       alert(`Erreur (${employeNom}) : ` + (e instanceof Error ? e.message : String(e)))
     }
@@ -107,12 +134,12 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
             🛍
           </span>
           <h2 className="font-display italic text-xl text-white">
-            Borne comptoir
+            À encaisser
             <span className="ml-2 inline-flex items-center px-2 h-6 rounded-full bg-red-500 text-white text-xs font-black tabular-nums">
               {commandes.length}
             </span>
           </h2>
-          <span className="text-[10px] uppercase tracking-widest text-red-300 font-bold">À encaisser</span>
+          <span className="text-[10px] uppercase tracking-widest text-red-300 font-bold">Borne + snack comptoir</span>
         </div>
         {!audioReadyRef.current && (
           <button onClick={activerSon} className="px-3 h-9 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-black text-zinc-200">
@@ -137,7 +164,7 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
                     #{c.numero?.slice(-4)}
                   </p>
                   <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">
-                    Borne {c.borne_id ?? '—'}
+                    {c.source === 'BORNE' ? `🛍 Borne ${c.borne_id ?? '—'}` : '🛒 Snack comptoir'}
                   </p>
                 </div>
                 {timeLeft !== null && (
@@ -155,9 +182,15 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
               <div className="flex gap-2 mt-3">
                 <button
                   onClick={() => encaisser(c)}
-                  className="flex-1 h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow active:scale-95"
+                  className={cn(
+                    'flex-1 h-11 rounded-xl text-white font-black text-xs uppercase tracking-wider shadow active:scale-95 inline-flex items-center justify-center gap-1.5',
+                    c.source === 'BORNE'
+                      ? 'bg-amber-500 hover:bg-amber-400'
+                      : 'bg-emerald-500 hover:bg-emerald-400',
+                  )}
+                  title={c.source === 'BORNE' ? 'PIN manager requis → ouvre l\'encaissement' : 'Ouvre l\'encaissement'}
                 >
-                  ✓ Encaisser
+                  {c.source === 'BORNE' ? <>🔒 Ouvrir</> : <>💰 Encaisser</>}
                 </button>
                 <button
                   onClick={() => refuser(c)}
@@ -173,12 +206,12 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
       </div>
     </section>
 
-    {/* Modal PIN manager : gate sur Encaisser / Annuler ─────────────── */}
+    {/* Étape 1 : PIN gate (déverrouille l'accès) ─────────────────────── */}
     <PinManagerModal
       open={pinAction !== null}
       title={
         pinAction?.type === 'encaisser'
-          ? `Encaisser #${pinAction.cmd.numero?.slice(-4)}`
+          ? `Ouvrir #${pinAction.cmd.numero?.slice(-4)}`
           : pinAction?.type === 'refuser'
             ? `Annuler #${pinAction.cmd.numero?.slice(-4)}`
             : ''
@@ -187,6 +220,19 @@ export default function CaisseBorneBanner({ initial }: { initial: CommandeBorne[
       onValid={executerActionApresPin}
       onClose={() => setPinAction(null)}
     />
+
+    {/* Étape 2 : modal d'encaissement après PIN validé ───────────────── */}
+    {encaisserCmd && (
+      <BorneEncaissementModal
+        commandeId={encaisserCmd.id}
+        total={encaisserCmd.montant_total_ttc}
+        onClose={() => setEncaisserCmd(null)}
+        onSuccess={() => {
+          setEncaisserCmd(null)
+          router.refresh()
+        }}
+      />
+    )}
     </>
   )
 }
