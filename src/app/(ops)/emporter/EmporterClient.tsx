@@ -52,8 +52,8 @@ export default function EmporterClient({
   const audioReadyRef = useRef(false)
   const [autoPrint, setAutoPrint] = useState(false)
   const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
-  // Filtre source affiché dans l'agenda partagé : 'all' (défaut) | 'online' | 'comptoir'
-  const [filtreSrc, setFiltreSrc] = useState<'all' | 'online' | 'comptoir'>('all')
+  // Filtre source affiché dans l'agenda partagé : 'all' (défaut) | 'online' | 'comptoir' | 'borne'
+  const [filtreSrc, setFiltreSrc] = useState<'all' | 'online' | 'comptoir' | 'borne'>('all')
 
   useEffect(() => {
     try { setAutoPrint(localStorage.getItem('emporter_auto_print') === '1') } catch { /* ignore */ }
@@ -153,6 +153,18 @@ export default function EmporterClient({
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
   }, [commandes])
 
+  // Commandes BORNE déjà ENCAISSÉES (donc plus en attente paiement) :
+  // placées dans l'agenda au créneau le plus proche (= maintenant) car
+  // les commandes borne n'ont pas de creneau_retrait → servies au plus vite.
+  // Les commandes en attente_paiement_comptoir restent dans le banner du haut.
+  const commandesBorne = useMemo(() => {
+    return commandes
+      .filter(c => c.source === 'BORNE')
+      .filter(c => c.statut !== 'encaisse' && c.statut !== 'annule')
+      .filter(c => c.statut !== 'en_attente_paiement_comptoir') // ← uniquement après encaissement
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }, [commandes])
+
   // Vue agenda : groupe les commandes par créneau (heure de retrait).
   // Tri chrono ; "sans créneau" en bas.
   const commandesParCreneau = useMemo(() => {
@@ -183,9 +195,10 @@ export default function EmporterClient({
   const nbEnAttente = commandesOnline.filter(c => c.statut === 'en_attente').length
   const nbPretRetrait = commandesOnline.filter(c => c.statut === 'pret_pour_retrait').length
 
-  // ─── AGENDA PARTAGÉ : online + comptoir fusionnés ─────────────────
+  // ─── AGENDA PARTAGÉ : online + comptoir + borne fusionnés ────────────
   // Chaque item porte sa source pour que le renderItem choisisse le bon composant
-  // et que le badge couleur soit visible (🌐 emerald online / 🛒 violet comptoir).
+  // et que le badge couleur soit visible (🌐 emerald online / 🛒 violet comptoir / 🛍 red borne).
+  // Les commandes borne n'ont pas de créneau → tombent dans la 1ère colonne (= maintenant).
   const agendaItems = useMemo(() => {
     type Item = { creneauISO: string | null | undefined; data: CommandeService }
     const online: Item[] = commandesOnline.map(c => ({ creneauISO: c.creneau_retrait, data: c }))
@@ -198,12 +211,14 @@ export default function EmporterClient({
         : c.creneau_retrait
       return { creneauISO: minIso, data: c }
     })
+    const borne: Item[] = commandesBorne.map(c => ({ creneauISO: null, data: c }))
     if (filtreSrc === 'online') return online
     if (filtreSrc === 'comptoir') return comptoir
-    return [...online, ...comptoir]
-  }, [commandesOnline, commandesComptoirSnack, filtreSrc])
+    if (filtreSrc === 'borne') return borne
+    return [...online, ...comptoir, ...borne]
+  }, [commandesOnline, commandesComptoirSnack, commandesBorne, filtreSrc])
 
-  const nbTotal = commandesOnline.length + commandesComptoirSnack.length
+  const nbTotal = commandesOnline.length + commandesComptoirSnack.length + commandesBorne.length
 
   // Callbacks stables pour le modal Comptoir → évite re-render à chaque tick d'horloge.
   // Le state `now` ticke chaque seconde pour les compteurs des cartes ONLINE,
@@ -365,6 +380,18 @@ export default function EmporterClient({
                 <span>🛒 Comptoir</span>
                 <span className="text-[10px] opacity-80">{commandesComptoirSnack.length}</span>
               </button>
+              <button
+                onClick={() => setFiltreSrc('borne')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-black transition-all tabular-nums',
+                  filtreSrc === 'borne'
+                    ? 'bg-red-500 text-white shadow shadow-red-500/30'
+                    : 'text-red-300 hover:text-red-200',
+                )}
+              >
+                <span>🛍 Borne</span>
+                <span className="text-[10px] opacity-80">{commandesBorne.length}</span>
+              </button>
             </div>
             <p className="hidden lg:block text-[10px] uppercase tracking-widest text-zinc-500 ml-auto">⟵ Scroll horizontal ⟶</p>
           </div>
@@ -388,11 +415,12 @@ export default function EmporterClient({
               )
             )}
             // Accent neutre/zinc en mode "toutes", couleur source si filtré
-            accent={filtreSrc === 'online' ? 'emerald' : filtreSrc === 'comptoir' ? 'violet' : 'emerald'}
+            accent={filtreSrc === 'online' ? 'emerald' : filtreSrc === 'comptoir' ? 'violet' : filtreSrc === 'borne' ? 'red' : 'emerald'}
             now={new Date(now)}
             emptyMessage={
               filtreSrc === 'online' ? 'Aucune commande online en cours.'
               : filtreSrc === 'comptoir' ? 'Aucune commande snack comptoir.'
+              : filtreSrc === 'borne' ? 'Aucune commande borne encaissée.'
               : 'Aucune commande dans l\'agenda. Clique « + Nouvelle commande ».'
             }
           />

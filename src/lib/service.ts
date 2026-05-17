@@ -2,10 +2,10 @@
 // Pures fonctions + types + constants temps réel.
 
 // ─── Types métier ────────────────────────────────────────────────────
-export type StatutCommande = 'en_attente' | 'en_preparation' | 'pret' | 'servi' | 'encaisse' | 'annule' | 'pret_pour_retrait' | 'retire_par_client'
+export type StatutCommande = 'en_attente' | 'en_preparation' | 'pret' | 'servi' | 'encaisse' | 'annule' | 'pret_pour_retrait' | 'retire_par_client' | 'en_livraison' | 'en_attente_paiement_comptoir'
 export type StatutArticle  = 'en_attente' | 'en_preparation' | 'pret' | 'servi'
 export type TagDestination = 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
-export type SourceCommande = 'ONLINE' | 'TABLE' | 'COMPTOIR'
+export type SourceCommande = 'ONLINE' | 'TABLE' | 'COMPTOIR' | 'BORNE'
 export type StatutTable    = 'libre' | 'occupee' | 'reservee' | 'a_encaisser'
 
 export type CommandeService = {
@@ -53,14 +53,16 @@ export const STATUT_ARTICLE_LABEL: Record<StatutArticle, { label: string; emoji:
 }
 
 export const STATUT_COMMANDE_LABEL: Record<StatutCommande, { label: string; emoji: string; cls: string }> = {
-  en_attente:        { label: 'En attente',         emoji: '🆕', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
-  en_preparation:    { label: 'En préparation',     emoji: '🔥', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
-  pret:              { label: 'Prêt',               emoji: '✓',  cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  servi:             { label: 'Servi — à encaisser', emoji: '💰', cls: 'bg-red-100 text-red-900 border-red-300' },
-  encaisse:          { label: 'Encaissée',          emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
-  annule:            { label: 'Annulée',            emoji: '✗',  cls: 'bg-zinc-200 text-zinc-600 border-zinc-300' },
-  pret_pour_retrait: { label: 'Prêt à retirer',     emoji: '🎁', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  retire_par_client: { label: 'Retiré',             emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  en_attente:                    { label: 'En attente',             emoji: '🆕', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+  en_preparation:                { label: 'En préparation',         emoji: '🔥', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
+  pret:                          { label: 'Prêt',                   emoji: '✓',  cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  servi:                         { label: 'Servi — à encaisser',     emoji: '💰', cls: 'bg-red-100 text-red-900 border-red-300' },
+  encaisse:                      { label: 'Encaissée',              emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  annule:                        { label: 'Annulée',                emoji: '✗',  cls: 'bg-zinc-200 text-zinc-600 border-zinc-300' },
+  pret_pour_retrait:             { label: 'Prêt à retirer',         emoji: '🎁', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  retire_par_client:             { label: 'Retiré',                 emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  en_livraison:                  { label: 'En livraison',           emoji: '🛵', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+  en_attente_paiement_comptoir:  { label: 'Paiement en attente',    emoji: '💳', cls: 'bg-red-100 text-red-900 border-red-300' },
 }
 
 export const TAG_DEST_LABEL: Record<TagDestination, { label: string; emoji: string; cls: string }> = {
@@ -74,6 +76,7 @@ export const SOURCE_LABEL: Record<SourceCommande, { label: string; emoji: string
   ONLINE:   { label: 'ONLINE',  emoji: '🌐', bg: 'bg-emerald-500', text: 'text-white' },
   TABLE:    { label: 'TABLE',   emoji: '🪑', bg: 'bg-blue-500',    text: 'text-white' },
   COMPTOIR: { label: 'COMPTOIR',emoji: '🛒', bg: 'bg-violet-500',  text: 'text-white' },
+  BORNE:    { label: 'BORNE',   emoji: '🛍', bg: 'bg-red-500',     text: 'text-white' },
 }
 
 export const STATUT_TABLE_STYLE: Record<StatutTable, { label: string; bg: string; ring: string; text: string }> = {
