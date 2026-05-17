@@ -20,8 +20,12 @@ export const viewport: Viewport = {
 export const dynamic = 'force-dynamic'
 
 export default function BorneLayout({ children }: { children: React.ReactNode }) {
+  // min-h-dvh (dynamic viewport height) = couvre tout l'écran SANS interférer
+  // avec la barre URL mobile. Le scroll est natif du body si le contenu déborde.
+  // (Avant : fixed inset-0 + overflow-hidden, qui bloquait le scroll natif et
+  // pouvait rogner le contenu en bas sur mobile portrait.)
   return (
-    <div className="fixed inset-0 bg-[#0D0D0D] text-zinc-100 overflow-hidden flex flex-col" data-ops-theme="dark">
+    <div className="min-h-dvh bg-[#0D0D0D] text-zinc-100 flex flex-col" data-ops-theme="dark">
       {children}
     </div>
   )
