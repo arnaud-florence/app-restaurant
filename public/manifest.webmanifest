@@ -1,8 +1,8 @@
 {
-  "name": "App Restaurant — Pilotage gérant",
+  "name": "App Restaurant — Tableau de bord",
   "short_name": "Resto",
   "description": "Application de gestion restaurant : caisse, hygiène, RH, finances, pilotage stratégique.",
-  "start_url": "/admin/pilotage",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -14,6 +14,7 @@
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png",     "purpose": "any maskable" }
   ],
   "shortcuts": [
+    { "name": "Tableau de bord", "url": "/admin/cat", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
     { "name": "Pilotage", "url": "/admin/pilotage", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
     { "name": "Assistant IA", "url": "/admin/assistant", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
     { "name": "Caisse", "url": "/caisse", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
