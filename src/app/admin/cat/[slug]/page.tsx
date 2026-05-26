@@ -268,8 +268,8 @@ export default async function CategoriePage({ params }: { params: { slug: string
             <div className="flex items-start justify-between gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logo-relais.png"
-                alt="Logo Le Relais"
+                src="/videos/logo%20casatasia.png"
+                alt="Logo CASATASIA"
                 className="h-10 sm:h-12 w-auto drop-shadow-2xl"
               />
             </div>

@@ -99,8 +99,8 @@ export default async function CatIndexPage() {
             <div className="flex items-start justify-between gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/logo-relais.png"
-                alt="Logo Le Relais"
+                src="/videos/logo%20casatasia.png"
+                alt="Logo CASATASIA"
                 className="h-12 sm:h-16 w-auto drop-shadow-2xl"
               />
               <span className="inline-flex items-center gap-1.5 h-7 sm:h-8 px-3 rounded-full bg-white/15 backdrop-blur-md text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] ring-1 ring-white/30">

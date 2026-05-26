@@ -29,18 +29,18 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "App Restaurant — Pilotage gérant",
-  description: "Gestion restaurant : caisse, hygiène, RH, finances, pilotage stratégique.",
+  title: "CASATASIA — Pilotage gérant",
+  description: "CASATASIA — Gestion restaurant : caisse, hygiène, RH, finances, pilotage stratégique.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Resto",
+    title: "CASATASIA",
     statusBarStyle: "default",
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/icon-192.png", sizes: "192x192" }],
   },

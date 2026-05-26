@@ -30,7 +30,7 @@ export default function Step1Etablissement({
             id="nom"
             value={value.nom}
             onChange={e => set('nom', e.target.value)}
-            placeholder="Le Relais des Saveurs"
+            placeholder="CASATASIA"
             required
             autoFocus
           />

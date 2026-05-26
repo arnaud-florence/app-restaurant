@@ -5,7 +5,7 @@
 //  - Pages HTML : network-first avec fallback offline.html (toujours frais si online)
 //  - API/POST/Supabase : pas de cache, network only (fail si offline → géré côté UI)
 
-const CACHE_VERSION = 'v4-2026-05-15-cat-as-home'
+const CACHE_VERSION = 'v5-2026-05-26-casatasia-rebrand'
 const STATIC_CACHE  = `static-${CACHE_VERSION}`
 const PAGES_CACHE   = `pages-${CACHE_VERSION}`
 const OFFLINE_URL   = '/offline.html'
@@ -115,7 +115,7 @@ self.addEventListener('push', (event) => {
   try { payload = event.data.json() }
   catch { payload = { title: 'Notification', body: event.data.text() } }
 
-  const title = payload.title || '🍽 Resto'
+  const title = payload.title || '🍽 CASATASIA'
   const options = {
     body:    payload.body || '',
     icon:    payload.icon  || '/icon-192.png',

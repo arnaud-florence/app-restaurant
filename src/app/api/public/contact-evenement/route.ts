@@ -114,7 +114,7 @@ export async function POST(req: Request) {
           <p style="color:#78716c;font-size:13px;">Pour toute question urgente : <a href="mailto:contact@lerelaisdessaveurs.fr" style="color:#C0392B;">contact@lerelaisdessaveurs.fr</a></p>
         `,
       })
-      await sendEmail({ to: p.email, subject: 'Votre demande de privatisation — Le Relais des Saveurs', html, text: 'Demande reçue, nous vous recontactons sous 48h.' })
+      await sendEmail({ to: p.email, subject: 'Votre demande de privatisation — CASATASIA', html, text: 'Demande reçue, nous vous recontactons sous 48h.' })
     }
   } catch (e) {
     console.error('[email-evt] :', e)

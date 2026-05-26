@@ -53,7 +53,7 @@ export default function ZReportPrintClient({
         <div className="grid grid-cols-2 gap-6 pb-6 border-b-2 border-zinc-900">
           <div>
             <p className="text-xs uppercase tracking-wider text-zinc-500 mb-1">Établissement</p>
-            <p className="font-bold text-lg">{etablissement.etablissement_nom || 'Le Relais des Saveurs'}</p>
+            <p className="font-bold text-lg">{etablissement.etablissement_nom || 'CASATASIA'}</p>
             {etablissement.etablissement_adresse && <p className="text-sm whitespace-pre-line">{etablissement.etablissement_adresse}</p>}
             {etablissement.etablissement_telephone && <p className="text-sm">📞 {etablissement.etablissement_telephone}</p>}
             {etablissement.etablissement_siret && <p className="text-xs text-zinc-500 mt-1">SIRET : {etablissement.etablissement_siret}</p>}

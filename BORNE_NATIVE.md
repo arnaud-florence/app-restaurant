@@ -13,7 +13,7 @@ afin d'activer Tap to Pay sur iPhone et Android.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Le Relais — Borne (Capacitor)                                   │
+│ CASATASIA — Borne (Capacitor)                                   │
 │  ┌───────────────────────────────────────────────────────────┐ │
 │  │ Webview Next.js (PWA /borne) — UI 100% web                │ │
 │  └──────────────────┬────────────────────────────────────────┘ │
@@ -53,7 +53,7 @@ afin d'activer Tap to Pay sur iPhone et Android.
 ```bash
 npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
 npm install @capacitor-community/stripe-terminal
-npx cap init "Le Relais — Borne" app.lerelais.borne
+npx cap init "CASATASIA — Borne" app.lerelais.borne
 ```
 
 ### 2. Configurer Next pour l'export statique de la page /borne

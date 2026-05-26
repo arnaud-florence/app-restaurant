@@ -48,7 +48,7 @@ export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: s
         <div className="text-center mb-6">
           <Lock className="h-10 w-10 mx-auto text-emerald-600 mb-2" />
           <h1 className="text-2xl font-bold">{mode === 'signup' ? 'Créer un compte' : 'Connexion'}</h1>
-          <p className="text-sm text-zinc-500">App Restaurant — espace admin</p>
+          <p className="text-sm text-zinc-500">CASATASIA — espace admin</p>
         </div>
 
         {nbManagers === 0 && mode === 'signup' && (

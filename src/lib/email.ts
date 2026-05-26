@@ -3,7 +3,7 @@
 //
 // Variables d'env requises sur Vercel app-restaurant :
 //   RESEND_API_KEY=re_xxxxx
-//   EMAIL_FROM="Le Relais des Saveurs <noreply@lerelaisdessaveurs.fr>"
+//   EMAIL_FROM="CASATASIA <noreply@lerelaisdessaveurs.fr>"
 //   EMAIL_GERANT="contact@lerelaisdessaveurs.fr"  (pour les notifs internes)
 
 export type EmailPayload = {
@@ -25,7 +25,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
     console.warn('[email] RESEND_API_KEY absent — email skip :', payload.subject, '→', payload.to)
     return { ok: false, reason: 'no_api_key' }
   }
-  const from = process.env.EMAIL_FROM ?? 'Le Relais des Saveurs <onboarding@resend.dev>'
+  const from = process.env.EMAIL_FROM ?? 'CASATASIA <onboarding@resend.dev>'
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -54,7 +54,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
   }
 }
 
-// ─── Layout HTML branded Le Relais des Saveurs ────────────────────
+// ─── Layout HTML branded CASATASIA ────────────────────
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://site-restaurant-beta.vercel.app'
 const LOGO_URL = `${SITE_URL}/icon-512.png`
@@ -82,8 +82,8 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;"
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fafaf9;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.4);">
         <tr>
           <td style="background:linear-gradient(135deg,#0D0D0D 0%,#1a1a2e 100%);padding:32px 24px;text-align:center;">
-            <img src="${LOGO_URL}" width="80" height="80" alt="Le Relais des Saveurs" style="display:block;margin:0 auto 16px;border-radius:50%;border:2px solid #E8B86D;" />
-            <p style="margin:0;color:#E8B86D;font-size:11px;letter-spacing:0.4em;text-transform:uppercase;">Le Relais des Saveurs</p>
+            <img src="${LOGO_URL}" width="80" height="80" alt="CASATASIA" style="display:block;margin:0 auto 16px;border-radius:50%;border:2px solid #E8B86D;" />
+            <p style="margin:0;color:#E8B86D;font-size:11px;letter-spacing:0.4em;text-transform:uppercase;">CASATASIA</p>
             <p style="margin:6px 0 0;color:#fff;font-size:22px;font-weight:700;font-family:Georgia,serif;">${escapeHtml(titre)}</p>
           </td>
         </tr>
@@ -136,7 +136,7 @@ export function emailConfirmationCommande(data: {
       <p>Votre commande <strong>#${escapeHtml(data.numero)}</strong> est bien enregistrée. Nous la préparons et vous attendons :</p>
       <p style="background:#fef3c7;padding:14px 18px;border-radius:8px;margin:18px 0;border-left:3px solid #E8B86D;">
         📅 <strong>${escapeHtml(heure)}</strong><br>
-        📍 Le Relais des Saveurs · Sainte Anastasie sur Issole
+        📍 CASATASIA · Sainte Anastasie sur Issole
       </p>
       <p style="margin:24px 0 8px;font-weight:600;font-size:16px;">Récapitulatif</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
@@ -148,8 +148,8 @@ export function emailConfirmationCommande(data: {
     ctaLabel: 'Voir ma commande',
     ctaUrl: `${SITE_URL}/mon-compte`,
   })
-  const text = `Commande #${data.numero} confirmée\n\nBonjour ${prenom},\nVotre commande est prête le ${heure} au Relais des Saveurs.\nTotal : ${data.total.toFixed(2)} €`
-  return { subject: `Commande #${data.numero} confirmée — Le Relais des Saveurs`, html, text }
+  const text = `Commande #${data.numero} confirmée\n\nBonjour ${prenom},\nVotre commande est prête le ${heure} chez CASATASIA.\nTotal : ${data.total.toFixed(2)} €`
+  return { subject: `Commande #${data.numero} confirmée — CASATASIA`, html, text }
 }
 
 export function emailConfirmationReservationChambre(data: {
@@ -208,7 +208,7 @@ export function emailRappelReservation(data: {
       <p>Petit rappel : votre arrivée à <strong>${escapeHtml(data.chambre_nom)}</strong> est prévue dans 48h.</p>
       <p style="background:#fef3c7;padding:14px 18px;border-radius:8px;margin:18px 0;border-left:3px solid #E8B86D;">
         📅 <strong>${escapeHtml(arr)}</strong><br>
-        📍 Le Relais des Saveurs · Sainte Anastasie sur Issole · 83136
+        📍 CASATASIA · Sainte Anastasie sur Issole · 83136
       </p>
       <p>Nous vous attendons avec impatience. Pour toute question (heure d'arrivée, demande spéciale), n'hésitez pas à nous contacter.</p>
     `,
@@ -232,7 +232,7 @@ export function emailBienvenueFidelite(data: {
     preheader: `+${data.points} points de bienvenue offerts !`,
     bodyHtml: `
       <p>Bonjour ${escapeHtml(prenom)},</p>
-      <p>Bienvenue dans le programme fidélité du <strong>Relais des Saveurs</strong> ! 🎉</p>
+      <p>Bienvenue dans le programme fidélité de <strong>CASATASIA</strong> ! 🎉</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:linear-gradient(135deg,#fef3c7,#fed7aa);padding:18px;border-radius:8px;margin:18px 0;text-align:center;">
         <tr><td style="padding:4px 0;font-size:36px;font-weight:700;color:#C0392B;">+${data.points}</td></tr>
         <tr><td style="padding:0 0 6px;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#78716c;">points de bienvenue</td></tr>

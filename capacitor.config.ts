@@ -15,7 +15,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'app.lerelais.borne',
-  appName: 'Le Relais — Borne',
+  appName: 'CASATASIA — Borne',
   // Webview pointe par défaut sur les fichiers statiques exportés.
   // Pour un mode "kiosque sur serveur" (recommandé en prod pour live update),
   // décommenter `server.url` et pointer sur l'URL prod.
