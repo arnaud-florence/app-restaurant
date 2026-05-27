@@ -16,6 +16,8 @@ export type Poste =
   | 'receptionniste'
   | 'plonge'
   | 'extra'
+  | 'snack'          // poste polyvalent comptoir + borne + emporter
+  | 'livreur'        // livraisons commandes ONLINE
   | 'autre'
 
 export type Permissions = {
@@ -158,6 +160,39 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     ],
   },
   extra: { /* alias plonge */ } as unknown as Permissions,
+
+  snack: {
+    label: 'Snack / Comptoir',
+    main: '/emporter',
+    allowed: [
+      '/emporter',                      // page principale — gère ONLINE/BORNE/COMPTOIR
+      '/caisse',                        // Z-report
+      '/bar',                           // peut créer commandes COMPTOIR
+      '/cuisine',                       // voir items snacking (filtre tag possible)
+      '/admin/borne',                   // monitoring kiosque (lecture)
+      '/admin/clients',                 // fiches + fidélité
+      '/admin/hygiene',                 // checklists comptoir + vitrines snack
+      '/admin/dechets',                 // pesées emballages
+      ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/borne',                   // dashboard kiosque en lecture seule
+    ],
+  },
+
+  livreur: {
+    label: 'Livreur',
+    main: '/livreur',
+    allowed: [
+      '/livreur',                       // page principale — tournée du jour
+      '/admin/clients',                 // lecture fiches (allergies, préférences, téléphone)
+      '/admin/hygiene',                 // checklist véhicule
+      ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/clients',                 // pas de modif client depuis le terrain
+    ],
+  },
 
   autre: {
     label: 'Autre',

@@ -19,6 +19,67 @@ Tu as **accès à tous les modules** sans restriction. Tu personnalises au besoi
 
 ---
 
+## 🌐 Multi-canal : tu pilotes 4 sources de commandes
+
+Ton restaurant n'est plus un simple service en salle. Tu accueilles des commandes via **4 canaux différents** que tu dois piloter de manière distincte :
+
+| Source | Badge | Origine | Avantages | Pièges à surveiller |
+|---|---|---|---|---|
+| 🪑 **TABLE** | bleu | Plan de salle traditionnel | Ticket moyen plus élevé, expérience client soignée | Saisie serveur peut être fausse (allergène oublié, table mal indiquée) |
+| 🛒 **COMPTOIR** | violet | Vente directe au bar/snack | Encaissement immédiat, rotation rapide | Pas de fiche client → pas de fidélité collectée |
+| 🌐 **ONLINE** | émeraude | Site web public | Volume = pure marge (pas de coûts variables sup), CRM auto | Mauvais créneau → préparation décalée, plat froid au retrait |
+| 🛍 **BORNE** | rouge | Kiosk libre-service | Pas de personnel monopolisé, paiement Tap-to-Pay direct | NFC peut échouer → fallback comptoir, surveille `borne_nfc_echecs` |
+
+### Dashboard `/admin/borne` (déjà déployé)
+
+Tu as accès à un **dashboard temps réel de l'activité kiosque** :
+- Nombre de commandes du jour par borne
+- Taux d'échec NFC (alerte si >10%)
+- Taux d'abandon (commandes créées non payées dans les 10 min)
+- Catégories les plus commandées
+
+→ Va sur `/admin/borne` au moins une fois par jour pour t'assurer que la borne tourne bien.
+
+### Lecture des KPI multi-canal
+
+Sur `/admin/pilotage` (ton dashboard 10 KPIs), tu vois la **répartition CA par source**. C'est un indicateur de **maturité commerciale** :
+
+| % ONLINE+BORNE / CA total | Lecture |
+|---|---|
+| < 5% | Ton resto est encore très traditionnel, tu as un gros potentiel digital |
+| 5-15% | Bon début, le digital prend, mais tu peux pousser via promos site + visibilité borne |
+| 15-30% | Excellent — tu captes la clientèle pressée et tu désengorges le service salle |
+| > 30% | Très fort digital — vérifie que ton équipe en salle ne se sent pas dévaluée |
+
+### Règles de pilotage par source
+
+| Source | Ce que tu pilotes |
+|---|---|
+| 🪑 TABLE | Plan de salle, planning serveurs, ticket moyen, retours plats |
+| 🛒 COMPTOIR | Catalogue snacking, vitesse de service au bar, satisfaction (avis Google) |
+| 🌐 ONLINE | Carte du site web (plats vedettes, photos), créneaux disponibles, code-promos, campagnes email |
+| 🛍 BORNE | Catalogue borne (`/admin/borne` ou `/admin/recettes` filtre "visible_borne"), fidélité borne, taux NFC OK |
+
+### Cas concret : tu remarques que le ONLINE plafonne
+
+Si tu vois sur `/admin/pilotage` que la part ONLINE stagne à 8% depuis 3 mois :
+1. Va sur **`/admin/affichage`** → met à jour ton menu du jour avec photos appétissantes
+2. Va sur **`/admin/clients`** onglet Campagnes → crée une campagne email "20% sur ta 3ᵉ commande online"
+3. Va sur **`/admin/recettes`** → marque tes meilleurs plats comme "visible online" et active leur photo
+4. Demande à l'assistant IA : *"comment booster les commandes online ?"* — il analyse ton historique et propose 3 actions
+
+### Multi-canal et fidélité
+
+Le programme fidélité (Module 20) fonctionne **sur les 4 canaux** :
+- TABLE : serveur ajoute le client à l'encaissement
+- COMPTOIR : barman scan / recherche client en début de transaction
+- ONLINE : client connecte son compte au panier
+- BORNE : étape dédiée "Fidélité" dans le tunnel kiosk (par téléphone)
+
+→ Veille à ce que **tous tes employés sachent demander le compte fidélité** à l'encaissement, sur tous les canaux. C'est ton arme #1 pour la rétention.
+
+---
+
 ## 2. Routine quotidienne — par moment de la journée
 
 ### 🌅 7h30 - 9h30 — Avant l'ouverture

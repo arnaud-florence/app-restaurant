@@ -33,6 +33,73 @@ L'app a une vue dédiée pour toi sur `/bar` (commandes boissons en temps réel)
 
 Sur ta tablette / mobile, en bas tu vois la **bottom nav 4 boutons** : Serveur · Cuisine · 🍺 Bar · Caisse. Tu utilises principalement Bar + Caisse.
 
+**EN PLUS** : tu as accès à `/emporter` pour voir et encaisser les commandes BORNE/COMPTOIR/ONLINE.
+
+---
+
+## 🌐 Multi-canal : ton bar reçoit de 4 sources + tu CRÉES les commandes COMPTOIR
+
+Tu es le poste avec le **plus de polyvalence multi-canal**. Tu vois et tu agis sur tous les canaux :
+
+### Tableau des sources que tu reçois
+
+| Badge | Source | Spécificité BAR |
+|---|---|---|
+| 🪑 **TABLE** (bleu) | Boisson commandée par serveur | Tu prépares, le serveur passe chercher |
+| 🛒 **COMPTOIR** (violet) | **TU L'AS CRÉÉE** ou un autre comptoir | Souvent paiement immédiat |
+| 🌐 **ONLINE** (émeraude) | Boissons commandées sur le site | Préparer en emballage à emporter |
+| 🛍 **BORNE** (rouge) | Boisson du catalogue borne | Limité (eau, soft, bière — pas d'alcool fort) |
+
+### 🛒 Ton rôle unique : créer des commandes COMPTOIR
+
+Quand un client arrive directement **au bar/comptoir** (sans passer par une table), c'est TOI qui crées la commande :
+
+1. Sur `/bar`, en bas tu vois un bouton **"+ Comptoir"** (ou un onglet "Comptoir")
+2. Tap → modal de création de commande comptoir s'ouvre
+3. Sélectionne les articles (catalogue boisson + snacking)
+4. Choisis **consommation** : 🍽 sur place / 📦 à emporter (impacte la TVA)
+5. **Fidélité** (optionnel) : si le client est fidélité, scan ou recherche par nom/téléphone
+6. **Paiement** : carte / espèces / TR — encaissement immédiat
+7. Bouton **"Valider et encaisser"** → la commande part directement en cuisine/bar (statut `en_attente`)
+
+⚠️ **Important** : les commandes COMPTOIR sont **toujours payées avant de partir en cuisine**. Pas de "je règle après".
+
+### 🛍 Si la borne plante (NFC en échec)
+
+Quand un client paye à la borne avec sa carte (NFC) et que ça plante, la borne peut basculer en mode "paiement au comptoir" :
+1. La commande arrive dans `/emporter` au statut `en_attente_paiement_comptoir` (badge rouge 🛍)
+2. Le client se présente à TON comptoir avec son numéro de commande
+3. Tu vas sur `/emporter` → tu retrouves sa commande → modal paiement
+4. Une fois encaissée, la commande **part en cuisine automatiquement** (Realtime)
+
+Tu peux aussi prendre l'initiative : si tu vois un client perdu devant la borne, **clique "Payer au comptoir"** sur l'écran borne pour lui → il vient te voir.
+
+### 🌐 Workflow ONLINE (boissons)
+
+Si un client commande une boisson sur le site (rare mais possible — il a un retrait combiné pizza+bière) :
+- Tu la reçois sur `/bar` avec badge 🌐 + créneau horaire
+- Tu la prépares **juste avant le créneau**
+- Tu la mets en sachet/emballage avec la pizza/snacking de la même commande
+- Statut "prêt" quand l'ensemble de la commande est prêt
+
+### ⚠️ Règle d'or alcool
+
+**La borne ne sert PAS d'alcool fort** (catalogue limité aux boissons soft + bière sans alcool max). C'est volontaire pour éviter qu'un mineur commande de l'alcool en autonomie.
+
+Si un client te dit "j'ai commandé une bière mais la borne refuse" → c'est normal pour les alcools forts. Propose-lui de commander **au bar** avec vérification de pièce d'identité si nécessaire.
+
+### Vue d'ensemble : qui voit quoi
+
+| Écran | TABLE | COMPTOIR | ONLINE | BORNE |
+|---|---|---|---|---|
+| `/serveur` | ✅ centré | ❌ | ❌ | ❌ |
+| `/cuisine` | ✅ | ✅ | ✅ | ✅ (post-paiement) |
+| `/pizza` | ✅ (pizzas) | ✅ (pizzas) | ✅ (pizzas) | ✅ (pizzas, post-paiement) |
+| `/bar` | ✅ (boissons) | ✅ (boissons) | ✅ (boissons) | ✅ (boissons, post-paiement) |
+| `/emporter` | ❌ | ✅ (à encaisser/encaissée) | ✅ (retrait) | ✅ (à encaisser) |
+| `/livreur` | ❌ | ❌ | ✅ (livraison uniquement) | ❌ |
+| `/caisse` | ✅ (Z-report) | ✅ | ✅ | ✅ |
+
 ---
 
 ## 3. Routine quotidienne

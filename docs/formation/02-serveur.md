@@ -41,6 +41,59 @@ Sur ton téléphone / tablette, en bas tu vois la **bottom nav 4 boutons** : �
 
 ---
 
+## 🌐 Multi-canal : les 4 sources de commandes
+
+Le restaurant reçoit des commandes par **4 canaux différents**. Tu dois savoir les reconnaître pour comprendre ce qui se passe en cuisine et qui fait quoi.
+
+### Tableau de référence
+
+| Source | Badge | Couleur | Origine | Qui crée la commande |
+|---|---|---|---|---|
+| **TABLE** | 🪑 TABLE | bleu | Plan de salle | **Toi** (serveur) sur `/serveur` |
+| **COMPTOIR** | 🛒 COMPTOIR | violet | Vente directe bar/snack | Barman via modal "Comptoir" |
+| **ONLINE** | 🌐 ONLINE | émeraude | Site web public | Client lui-même (autonome) |
+| **BORNE** | 🛍 BORNE | rouge | Kiosk libre-service | Client sur la borne tactile |
+
+### Ce que TU fais sur chaque source
+
+| Source | Ton rôle |
+|---|---|
+| 🪑 **TABLE** | **Tu prends + tu sers + tu encaisses** (cycle complet) |
+| 🛒 **COMPTOIR** | Tu ne crées PAS, mais tu peux **encaisser** au comptoir si le barman est occupé |
+| 🌐 **ONLINE** | Tu ne crées PAS, mais **si un client te demande où retirer**, va sur `/emporter` |
+| 🛍 **BORNE** | Tu ne touches PAS — c'est autonome (sauf si la borne plante : appelle Arnaud) |
+
+### Comment ça se présente côté cuisine
+
+Quand la cuisine reçoit ta commande TABLE, elle voit le **badge bleu 🪑 + numéro de table**. Quand elle reçoit une commande ONLINE, elle voit le **badge vert 🌐 + créneau horaire**. Ça l'aide à prioriser. **Tes commandes TABLE ont la priorité quand la table attend.**
+
+### Le statut spécial "en attente paiement comptoir"
+
+Quand un client commande sur la **BORNE** ou au **COMPTOIR**, sa commande **n'apparaît PAS en cuisine tant qu'il n'a pas payé**. Elle est en statut `en_attente_paiement_comptoir`.
+
+Pourquoi ? Pour éviter qu'on prépare un plat qu'un client n'a pas validé.
+
+Si tu te retrouves à l'encaisser au comptoir (la borne est en mode "payer plus tard" parce que NFC a échoué) :
+1. Va sur **`/emporter`** → tu vois la liste des commandes BORNE/COMPTOIR à encaisser
+2. Tap sur la commande → modal encaissement (carte / espèces / TR)
+3. Une fois encaissée, **la commande part automatiquement en cuisine**
+
+### Cas pratique : client mixte (commande online + bouteille à table)
+
+Un client a commandé une pizza en ligne pour retrait à 19h, mais en arrivant il veut aussi un verre de vin. Tu fais :
+1. Tu lui sers d'abord son vin via une commande TABLE classique (table T4 → ajouter article vin)
+2. Sa pizza ONLINE est dans `/emporter` ou en cuisine. Quand elle est prête, tu vas la chercher et tu lui apportes
+3. À l'encaissement : 2 commandes séparées (la TABLE vin + la ONLINE pizza déjà payée online ou à régler au comptoir selon son choix initial)
+
+### Cas pratique : la borne tombe en panne
+
+Si un client est devant la borne et clique "Payer au comptoir" (ou si la borne plante) :
+1. Sa commande est dans `/emporter` au statut "en_attente_paiement_comptoir" (badge rouge 🛍)
+2. Va sur `/emporter` → encaisse comme une commande normale (modal paiement)
+3. Préviens Arnaud via `/equipes` qu'il y a eu un souci de borne
+
+---
+
 ## 3. Routine quotidienne — par moment
 
 ### 🌅 Prise de poste (10 min avant l'ouverture)

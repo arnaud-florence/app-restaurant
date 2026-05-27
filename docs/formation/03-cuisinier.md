@@ -34,6 +34,57 @@ Tu **reçois les commandes du serveur, tu produis les plats, tu garantis la tra�
 
 ---
 
+## 🌐 Multi-canal : tes commandes viennent de 4 sources
+
+Tu reçois des commandes sur `/cuisine` qui peuvent venir de **4 canaux différents**. Chaque ticket affiche un **badge coloré en haut** pour que tu identifies l'origine en un coup d'œil :
+
+| Badge | Source | D'où ça vient | Info importante |
+|---|---|---|---|
+| 🪑 **TABLE** (bleu) | Le client est assis à une table | Saisi par un serveur sur `/serveur` | Numéro de table affiché (T1, T2…) — **prioritaire** car client en attente physique |
+| 🛒 **COMPTOIR** (violet) | Vente directe au comptoir/snack | Barman via "Comptoir" ou caissier | À emporter ou sur place, paiement immédiat |
+| 🌐 **ONLINE** (émeraude) | Client web | Site public CASATASIA, payé en ligne | **Créneau horaire affiché** (ex: prêt à 19h30) — tu prépares pour ce timing |
+| 🛍 **BORNE** (rouge) | Borne kiosque tactile | Self-service avec Tap-to-Pay | Catalogue limité (snacking + pizza + boissons), créneau "dès que possible" |
+
+### ⚠️ Règle critique : tu ne vois la commande QU'APRÈS paiement
+
+Pour **COMPTOIR** et **BORNE**, tant que le client n'a pas payé, **la commande n'apparaît PAS sur ton écran**. Elle est en statut `en_attente_paiement_comptoir` côté caisse.
+
+Dès que le caissier/barman/serveur encaisse :
+- Statut passe à `en_attente`
+- La carte **apparaît instantanément sur ta colonne** (Realtime Supabase)
+- 🔔 Bip d'alerte si le son est activé
+
+Donc si un client BORNE râle "ma pizza n'avance pas !" → vérifier d'abord qu'il a bien payé. Si non, c'est normal qu'on n'ait rien fait. Va voir le caissier.
+
+### Ce que change la source pour TOI (cuisine)
+
+| Source | Différence de traitement |
+|---|---|
+| 🪑 TABLE | Sers dressé. Le serveur passe le chercher. |
+| 🛒 COMPTOIR | Sers **en emballage** ou en assiette selon `consommation` (sur_place / emporter). Voir le badge sur le ticket. |
+| 🌐 ONLINE | Sers en **emballage emporter** (sauf si livraison → idem emballage). Tu vois l'**heure de retrait souhaitée** sur le ticket — ne le finalise pas trop tôt, ne le sors pas trop tard. |
+| 🛍 BORNE | Idem ONLINE : emballage. Pas de créneau précis = "dès que possible". |
+
+### Cas pratique : 3 sources arrivent en même temps
+
+12h35, tu vois en cuisine :
+- 🪑 T7 — 1 entrecôte, 1 tarte (table 7, en attente depuis 5 min, vert)
+- 🌐 ONLINE — 2 pizzas pour retrait 13h00 (encore 25 min, tu peux attendre)
+- 🛍 BORNE — 1 burger snacking (dès que possible, à servir avant qu'il refroidisse)
+
+**Priorité** :
+1. La 🪑 T7 (client assis, attend) — go immédiat
+2. La 🛍 BORNE (commande passée, client probablement sur place) — go ensuite
+3. La 🌐 ONLINE (créneau 13h00) — tu peux la commencer à 12h45 pour qu'elle soit prête à 13h pile
+
+### Si une commande ONLINE est en retard de retrait
+
+Si une commande ONLINE est prête depuis 30 min et le client n'est pas venu, **statut `pret_pour_retrait`**. Tu n'as rien à faire — c'est le serveur ou le réceptionniste qui gère la relance client (via fiche client).
+
+Ne jette pas le plat avant 1h sauf pour des produits sensibles (poisson cru, etc.).
+
+---
+
 ## 3. Routine quotidienne — par moment
 
 ### 🌅 Prise de poste (15 min avant l'ouverture)

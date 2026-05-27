@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Setup pg_cron contenant CRON_SECRET en clair (à régénérer si rotation)
 sql/setup-pgcron-agents.sql
+.env*
+
+# Sauvegardes locales (contiennent des données prod, ne pas pousser)
+/backups/

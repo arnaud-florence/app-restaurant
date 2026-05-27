@@ -50,6 +50,49 @@ Mêmes accès que le **cuisinier** sauf que tout est **filtré PIZZA** :
 
 **Tu n'as PAS accès à** : finances, RH (sauf pointage), réservations, sécurité, configuration, fournisseurs, boissons. Idem cuisinier.
 
+**EN PLUS du cuisinier**, tu as accès à `/emporter` (pour aider à encaisser les commandes BORNE/COMPTOIR si besoin, et voir les commandes ONLINE en attente de retrait).
+
+---
+
+## 🌐 Multi-canal : la pizza arrive de 4 sources
+
+Comme le cuisinier, tu reçois des commandes de **4 canaux** différents (vue dédiée `/cuisine?role=pizzaiolo` ou `/pizza`) :
+
+| Badge | Source | Spécificité PIZZA |
+|---|---|---|
+| 🪑 **TABLE** (bleu) | Client en salle | Pizza servie chaude au plus vite, le serveur passe la chercher |
+| 🛒 **COMPTOIR** (violet) | Snack/vente directe | Pizza souvent à emporter — vérifier le badge "consommation" |
+| 🌐 **ONLINE** (émeraude) | Site web | **Créneau horaire affiché** — ne sors pas la pizza trop tôt (elle refroidit), ne la sors pas en retard |
+| 🛍 **BORNE** (rouge) | Kiosk catalogue limité | **70%+ des pizzas du soir** peuvent venir de la borne (snacking) |
+
+### Spécificité pizza vs cuisinier classique
+
+Le pizzaiolo gère **uniquement** la colonne PIZZA. Pour une commande mixte (1 pizza + 1 plat cuisine) :
+- Toi tu prends la pizza
+- Le cuisinier prend le plat
+- **Synchronisation** : la cuisine et toi devez sortir vos préparations **en même temps** pour que le serveur apporte tout chaud à la table.
+
+Regarde le ticket complet (badge T7, T3…) pour savoir s'il y a d'autres plats sur la même commande. Si oui, **attends que le cuisinier soit prêt** avant de cuire ta pizza (la pizza cuit 90s, le plat 8 min).
+
+### Si tu reçois `/emporter` accès
+
+Tu peux aller sur `/emporter` pour :
+- **Encaisser** une commande BORNE/COMPTOIR si le caissier est débordé (modal paiement)
+- **Voir les commandes ONLINE prêtes à retirer** (et appeler le client si besoin)
+- **Marquer "Retiré ✓"** quand un client vient chercher sa pizza ONLINE
+
+⚠️ **Ne fais pas ça pendant un coup de feu** — sauf urgence. Ton job c'est de faire des pizzas, pas de tenir la caisse.
+
+### Cas pratique : créneau pizza ONLINE serré
+
+12h45, tu reçois 3 pizzas ONLINE pour retrait à 13h00 :
+- **À 12h45** : commencer à étaler les pâtes, préparer les garnitures
+- **À 12h52** : enfourner (90 sec de cuisson = sortie à 12h53-54)
+- **À 12h54** : pizzas prêtes, marquer "prêt" → le client est notifié par push (s'il a l'app PWA installée)
+- **À 13h00** : le client arrive, tu lui remets ses pizzas chaudes
+
+Si tu sors les pizzas à 12h47 (trop tôt), elles sont froides à 13h00 → mauvaise expérience client. Le timing est crucial pour le ONLINE.
+
 ---
 
 ## 4. Routine quotidienne — par moment

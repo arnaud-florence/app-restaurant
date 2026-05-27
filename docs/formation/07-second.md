@@ -46,6 +46,66 @@ Page d'accueil par défaut : **`/cuisine`** (tu commences par là pour voir le s
 
 ---
 
+## 🌐 Multi-canal : tu superviser 4 sources de commandes
+
+En tant que second de cuisine, tu pilotes l'arrivée des commandes sur les 4 canaux et tu adaptes l'organisation de l'équipe en fonction :
+
+| Source | Badge | Volume typique | Ton arbitrage |
+|---|---|---|---|
+| 🪑 **TABLE** | bleu | 40-60% du CA | Service synchrone — pizza + plats + dessert doivent tomber ensemble |
+| 🛒 **COMPTOIR** | violet | 5-15% | Service rapide — snacking principalement |
+| 🌐 **ONLINE** | émeraude | 10-25% | Service planifié — créneaux ⏰, anticipe la production |
+| 🛍 **BORNE** | rouge | 5-30% (grimpe) | Service immédiat — souvent en pic de service (12h-13h, 19h-20h30) |
+
+### Lecture du flux : que faire dans la cuisine
+
+Quand tu prends ton poste, regarde `/cuisine` et identifie :
+
+1. **Combien de cartes en attente** (charge actuelle)
+2. **Combien venant de chaque source** (badges colorés)
+3. **Combien avec créneau ONLINE imminent** (< 15 min) → priorité absolue
+4. **Combien BORNE accumulées** (> 5 = tu dois renforcer le snacking)
+
+→ Si tu vois 6 cartes ONLINE à servir entre 12h45 et 13h00, tu **alertes le cuisinier 15 min en avance** pour qu'il commence à mise en place.
+
+### Spécificité ONLINE : la production planifiée
+
+Le créneau de retrait est **affiché sur le ticket** (ex: "retrait 19h45"). Tu organises avec ton équipe :
+- **T-30 min** : prep ingrédients (légumes coupés, viandes portionnées)
+- **T-15 min** : préchauffage four / friteuse / plaque
+- **T-5 min** : cuisson démarrée
+- **T-0** : plat dressé, en sachet emporter, statut "prêt"
+
+Si la cuisine est débordée, **tu peux décaler un ONLINE** en parlant au serveur/réceptionniste pour qu'il prévient le client par téléphone (le numéro est dans la fiche commande).
+
+### Spécificité BORNE : la file qui s'allonge
+
+Le piège BORNE : un client paye, son ticket part en cuisine, **il attend physiquement devant le comptoir** que ce soit prêt. Si tu prends 25 min pour faire son burger, il râle.
+
+→ Surveille `/cuisine` pour les tickets 🛍 BORNE depuis > 10 min. Si tu en as 3+ : **stop ce que tu fais et concentre-toi sur les BORNE**. Sinon tu vas avoir des avis Google 1 étoile dans la soirée.
+
+### Quand le ONLINE explose : ajustement carte
+
+Si tu vois que les ventes ONLINE concentrent **2-3 plats spécifiques** (ex: la pizza Margherita = 60% des ventes web) :
+1. Va sur `/admin/recettes` → mets ces plats en **avant** (badge 🔥 / vidéo / photo)
+2. **Prépare des bases en avance** (pâtes étalées prêtes, sauces prêtes)
+3. Demande au gérant d'**ajouter des créneaux** sur ces plats (configurer plus de slots à 12h30, 13h00…)
+
+### Synchro avec l'équipe : 3 règles d'or
+
+1. **Le pizzaiolo voit ce que tu vois** (sa colonne PIZZA) — synchronisez-vous oralement quand un ticket TABLE a 1 plat + 1 pizza
+2. **Le barman voit aussi tes tickets BAR** — pour une commande avec entrée + boisson + plat, vérifie qu'il prépare la boisson au bon moment
+3. **Le serveur ne voit que TABLE** — donc si une commande ONLINE est prête à retirer et qu'il n'y a personne au comptoir, **tu sors physiquement chercher quelqu'un** (ou tu utilises `/equipes` pour appeler)
+
+### Tableau de pilotage par source (à voir sur `/admin/pilotage`)
+
+Le manager voit la **répartition CA par source**. Toi tu vois la **répartition VOLUME par source** sur ton dashboard cuisine (à demander au gérant d'activer le widget si pas affiché par défaut) :
+- Combien de plats préparés par source aujourd'hui
+- Temps moyen de préparation par source (TABLE souvent plus lent car dressage soigné)
+- Taux de retour plat par source (signe qualité)
+
+---
+
 ## 3. Routine quotidienne — par moment
 
 ### 🌅 Prise de poste (20-30 min — plus que le cuisinier)

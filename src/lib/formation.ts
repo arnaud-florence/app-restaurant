@@ -4,6 +4,7 @@ export type Poste =
   | 'cuisine' | 'cuisinier' | 'pizzaiolo' | 'bar' | 'barman' | 'salle'
   | 'serveur' | 'manager'   | 'gerant'    | 'plonge' | 'extra'
   | 'second'  | 'receptionniste'
+  | 'snack'   | 'livreur'
   | 'autre'   | 'tous'
 
 export const POSTE_INFO: Record<Poste, { label: string; emoji: string; cls: string }> = {
@@ -20,6 +21,8 @@ export const POSTE_INFO: Record<Poste, { label: string; emoji: string; cls: stri
   receptionniste: { label: 'Réceptionniste',  emoji: '📞',    cls: 'bg-pink-100    text-pink-900    border-pink-300' },
   plonge:         { label: 'Plonge',          emoji: '🧽',    cls: 'bg-cyan-100    text-cyan-900    border-cyan-300' },
   extra:          { label: 'Extra',           emoji: '🆘',    cls: 'bg-cyan-100    text-cyan-900    border-cyan-300' },
+  snack:          { label: 'Snack/Comptoir',  emoji: '🥪',    cls: 'bg-yellow-100  text-yellow-900  border-yellow-300' },
+  livreur:        { label: 'Livreur',         emoji: '🛵',    cls: 'bg-teal-100    text-teal-900    border-teal-300' },
   autre:          { label: 'Autre',           emoji: '•',     cls: 'bg-zinc-100    text-zinc-700    border-zinc-300' },
   tous:           { label: 'Tous postes',     emoji: '👥',    cls: 'bg-stone-100   text-stone-800   border-stone-300' },
 }
@@ -125,6 +128,8 @@ const POSTE_ALIAS: Record<string, string[]> = {
   second:         ['second'],
   plonge:         ['plonge', 'extra'],
   extra:          ['plonge', 'extra'],
+  snack:          ['snack', 'autre'],       // snack voit ses guides + ceux 'autre' (encaissement snacking partagé)
+  livreur:        ['livreur', 'autre'],     // livreur voit ses guides + ceux 'autre' (livraison partagée)
   autre:          ['autre'],
 }
 
