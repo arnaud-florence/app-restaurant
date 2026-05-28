@@ -193,7 +193,7 @@ export async function GET(req: Request) {
         titre: `Bon de commande ${fournInfo.nom} prêt à valider`,
         message: `${lignes.length} produit(s) · ${montantHt.toFixed(2)}€ HT · Livraison prévue ${formatJour(dateLiv)}${minNonAtteint ? ' · ⚠ Sous le minimum commande' : ''}`,
         action_label: 'Voir le bon',
-        action_url:   `/admin/fournisseurs/bons/${bc.id}`,
+        action_url:   `/admin/fournisseurs`,
         data: { bon_commande_id: bc.id, fournisseur_id: fournId, fournisseur: fournInfo.nom, montant: montantHt, lignes: lignes.length },
       })
     }

@@ -91,7 +91,7 @@ async function detecterDormants(ctx: AgentContext) {
         titre: `${dormants.length} client(s) dormant(s) à réactiver`,
         message: `Pas commandé depuis ${SEUIL_DORMANT_JOURS} jours. Lance une campagne email avec un avantage (-10%, plat offert…) pour les faire revenir.`,
         action_label: 'Créer une campagne',
-        action_url:   '/admin/clients/campagnes',
+        action_url:   '/admin/clients',
         data: { date: new Date().toISOString().slice(0, 10), nb: dormants.length, ids: dormants.slice(0, 50).map(d => d.id) },
       })
     }
@@ -135,7 +135,7 @@ async function detecterAnniversaires(ctx: AgentContext) {
         titre: `${aSouhaiter.length} anniversaire(s) cette semaine`,
         message: aSouhaiter.slice(0, 5).map(a => `${a.client.prenom} ${a.client.nom} (${a.date} - ${a.age} ans)`).join(' · ') + (aSouhaiter.length > 5 ? '…' : ''),
         action_label: 'Lancer la campagne',
-        action_url:   '/admin/clients/campagnes',
+        action_url:   '/admin/clients',
         data: { date: today.toISOString().slice(0, 10), nb: aSouhaiter.length, clients: aSouhaiter.slice(0, 20).map(a => a.client.id) },
       })
     }
@@ -163,7 +163,7 @@ async function detecterAvisNonRepondus(ctx: AgentContext) {
       titre: `Avis ${a.source} non répondu (${a.note}/5)${a.titre ? ' — ' + a.titre.slice(0, 40) : ''}`,
       message: `${a.contenu ? a.contenu.slice(0, 200) + (a.contenu.length > 200 ? '…' : '') : ''}${a.brouillon_reponse_ia ? '\n\n📝 Brouillon IA prêt à valider.' : ''}`,
       action_label: a.brouillon_reponse_ia ? 'Valider la réponse' : 'Répondre',
-      action_url:   '/admin/clients/avis',
+      action_url:   '/admin/reputation',
       data: { avis_id: a.id, source: a.source, note: a.note, brouillon_pret: !!a.brouillon_reponse_ia },
     })
   }
@@ -227,7 +227,7 @@ async function detecterReclamationsAttente(ctx: AgentContext) {
       titre: `Réclamation ${clientNom} sans réponse depuis > ${SEUIL_RECLAMATION_HEURES}h`,
       message: `Catégorie : ${r.categorie ?? '?'} · Sévérité : ${r.severite ?? '?'}. Réponds rapidement pour préserver la relation client.`,
       action_label: 'Voir la réclamation',
-      action_url:   '/admin/clients/reclamations',
+      action_url:   '/admin/clients',
       data: { reclam_id: r.id, client: clientNom, severite: r.severite },
     })
   }
