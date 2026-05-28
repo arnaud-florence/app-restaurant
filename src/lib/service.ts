@@ -49,24 +49,26 @@ export type ArticleService = {
 }
 
 // ─── Statuts UI (libellés + couleurs) ────────────────────────────────
+// Labels en FRANÇAIS SIMPLE (orientés débutant). Les CLÉS (en_attente, pret…)
+// restent les valeurs techniques stockées en base — on ne renomme QUE l'affichage.
 export const STATUT_ARTICLE_LABEL: Record<StatutArticle, { label: string; emoji: string; bg: string; text: string }> = {
-  en_attente:     { label: 'En attente',     emoji: '🆕', bg: 'bg-blue-500',    text: 'text-white' },
-  en_preparation: { label: 'En préparation', emoji: '🔥', bg: 'bg-amber-500',   text: 'text-white' },
-  pret:           { label: 'Prêt',           emoji: '✓',  bg: 'bg-emerald-500', text: 'text-white' },
-  servi:          { label: 'Servi',          emoji: '🍽', bg: 'bg-zinc-500',    text: 'text-white' },
+  en_attente:     { label: 'Nouvelle commande',       emoji: '🆕', bg: 'bg-blue-500',    text: 'text-white' },
+  en_preparation: { label: 'En cours de préparation', emoji: '🔥', bg: 'bg-amber-500',   text: 'text-white' },
+  pret:           { label: 'Prêt à servir',           emoji: '✓',  bg: 'bg-emerald-500', text: 'text-white' },
+  servi:          { label: 'Servi au client',         emoji: '🍽', bg: 'bg-zinc-500',    text: 'text-white' },
 }
 
 export const STATUT_COMMANDE_LABEL: Record<StatutCommande, { label: string; emoji: string; cls: string }> = {
-  en_attente:                    { label: 'En attente',             emoji: '🆕', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
-  en_preparation:                { label: 'En préparation',         emoji: '🔥', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
-  pret:                          { label: 'Prêt',                   emoji: '✓',  cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  servi:                         { label: 'Servi — à encaisser',     emoji: '💰', cls: 'bg-red-100 text-red-900 border-red-300' },
-  encaisse:                      { label: 'Encaissée',              emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
-  annule:                        { label: 'Annulée',                emoji: '✗',  cls: 'bg-zinc-200 text-zinc-600 border-zinc-300' },
-  pret_pour_retrait:             { label: 'Prêt à retirer',         emoji: '🎁', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  retire_par_client:             { label: 'Retiré',                 emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
-  en_livraison:                  { label: 'En livraison',           emoji: '🛵', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
-  en_attente_paiement_comptoir:  { label: 'Paiement en attente',    emoji: '💳', cls: 'bg-red-100 text-red-900 border-red-300' },
+  en_attente:                    { label: 'Nouvelle commande',          emoji: '🆕', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+  en_preparation:                { label: 'En cours de préparation',    emoji: '🔥', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
+  pret:                          { label: 'Prêt à servir',              emoji: '✓',  cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  servi:                         { label: 'Servi — à encaisser',        emoji: '💰', cls: 'bg-red-100 text-red-900 border-red-300' },
+  encaisse:                      { label: 'Payé et terminé',            emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  annule:                        { label: 'Annulée',                    emoji: '✗',  cls: 'bg-zinc-200 text-zinc-600 border-zinc-300' },
+  pret_pour_retrait:             { label: 'Prêt à retirer',             emoji: '🎁', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  retire_par_client:             { label: 'Retiré par le client',       emoji: '✓',  cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  en_livraison:                  { label: 'En cours de livraison',      emoji: '🛵', cls: 'bg-blue-100 text-blue-900 border-blue-300' },
+  en_attente_paiement_comptoir:  { label: 'En attente de paiement',     emoji: '💳', cls: 'bg-red-100 text-red-900 border-red-300' },
 }
 
 export const TAG_DEST_LABEL: Record<TagDestination, { label: string; emoji: string; cls: string }> = {
