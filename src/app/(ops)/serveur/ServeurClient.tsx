@@ -217,7 +217,7 @@ export default function ServeurClient({
             allergenes_a_eviter: p.allergenes_a_eviter,
           })),
         })
-        flashOk(`Commande envoyée pour T${tableSelectionnee.numero}`)
+        flashOk(`Commande envoyée pour ${tableSelectionnee.numero}`)
         fermerCatalogue()
         router.refresh()
       } catch (e) { flashKo(e) }
@@ -1039,7 +1039,7 @@ function ListeAServir({
             {/* Header table ULTRA-COMPACT */}
             <div className="px-2.5 py-1.5 bg-emerald-500/15 border-b border-emerald-500/20 flex items-center justify-between">
               <span className="text-sm font-black text-white tabular-nums">
-                🪑 T{c.numero_table ?? '?'}
+                🪑 {c.numero_table ?? '?'}
               </span>
               <div className="flex items-center gap-1">
                 <a
@@ -1118,7 +1118,7 @@ function ListeAEncaisser({
             {/* Header ULTRA-COMPACT */}
             <div className="px-2.5 py-1.5 bg-rose-500/15 border-b border-rose-500/20 flex items-center justify-between">
               <span className="text-sm font-black text-white tabular-nums">
-                🪑 T{c.numero_table ?? '?'}
+                🪑 {c.numero_table ?? '?'}
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-black text-white tabular-nums">{fmtPrix(total)}</span>
@@ -1220,7 +1220,7 @@ function CatalogueModal({
       <header className="bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Table</p>
-          <h2 className="text-2xl font-bold">T{table.numero} <span className="text-sm font-normal text-zinc-400">· {table.capacite} couverts · {table.zone}</span></h2>
+          <h2 className="text-2xl font-bold">{table.numero} <span className="text-sm font-normal text-zinc-400">· {table.capacite} couverts · {table.zone}</span></h2>
         </div>
         <button onClick={onClose} className="min-h-[48px] px-4 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-semibold">
           ✕ Fermer
