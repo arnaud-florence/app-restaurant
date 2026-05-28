@@ -79,7 +79,7 @@ Regarde le ticket complet (badge T7, T3…) pour savoir s'il y a d'autres plats 
 Tu peux aller sur `/emporter` pour :
 - **Encaisser** une commande BORNE/COMPTOIR si le caissier est débordé (modal paiement)
 - **Voir les commandes ONLINE prêtes à retirer** (et appeler le client si besoin)
-- **Marquer "Retiré ✓"** quand un client vient chercher sa pizza ONLINE
+- **Cliquer "✓ Client a retiré"** quand un client vient chercher sa pizza ONLINE
 
 ⚠️ **Ne fais pas ça pendant un coup de feu** — sauf urgence. Ton job c'est de faire des pizzas, pas de tenir la caisse.
 

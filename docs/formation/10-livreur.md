@@ -63,31 +63,37 @@ Quand un client commande sur le site et choisit "livraison" :
 
 ## 3. Ton écran principal : `/livreur`
 
-Quand tu ouvres `/livreur`, tu vois :
+Quand tu ouvres `/livreur`, tu vois **4 sections** dans l'ordre :
 
-### Section "Tournée du jour"
+### Section 1 — "À livrer" (colonnes par créneau)
 
-Liste de toutes les livraisons prévues aujourd'hui, triées par créneau de livraison. Chaque carte affiche :
-- **Numéro de commande** (#1234)
-- **Nom du client** + téléphone
-- **Adresse complète** (+ étage / code / infos)
-- **Créneau prévu** (ex: 19:00-19:30)
-- **Articles** (résumé : "2 pizzas + 1 boisson")
-- **Statut actuel** :
-  - 🟡 `en_attente` ou `en_preparation` → la cuisine bosse, ne pars pas encore
-  - 🟢 `pret` → tu peux récupérer
-  - 🔵 `en_livraison` → tu es parti
-  - ✅ `livre` → terminé
+Les commandes prêtes (`pret` / `pret_pour_retrait`), affichées en **colonnes d'agenda triées par créneau horaire**. Chaque carte affiche :
+- **Nom du client** + **#numéro**
+- **Compte à rebours** : "🕒 dans X min" (ou "⚠ +X min retard" en rouge si dépassé)
+- **📍 Maps** : un encart vert cliquable qui ouvre directement Google Maps sur l'adresse
+- **📞 téléphone** : cliquable (lance l'appel directement depuis ton mobile)
+- **📝 notes** de la commande (ex: "code portail 1234")
+- **Total** de la commande
+- Bouton **"🛵 Partir"** (violet)
 
-### Section "À livrer maintenant"
+⚠️ Quand le créneau approche (< 15 min), la carte devient **rouge et clignote** pour attirer ton attention.
 
-Filtre dynamique : les commandes au statut `pret` (la cuisine a terminé) **et** dont le créneau commence dans < 15 min.
+### Section 2 — "🛵 En tournée"
 
-→ C'est ton **buffer prioritaire**. Pars dès que tu en as 1-3 sur cette section.
+Les commandes que tu as déjà prises (statut `en_livraison`). Pour chacune :
+- Nom client + #numéro
+- **📍 adresse cliquable** (Google Maps)
+- Badge **"⚠ Retard X min"** si tu es en retard de plus de 10 min sur le créneau
+- Bouton **"✓ Livrée"** (vert) → marque la livraison effectuée
+- Bouton **"📧 Prévenir client du retard"** (apparaît seulement si tu es en retard ET que le client a donné son email) → envoie un email automatique d'excuse
 
-### Section "Historique du jour"
+### Section 3 — "🍳 En cours de préparation"
 
-Liste des livraisons déjà effectuées (statut `livre`). Tu peux vérifier ce que tu as fait + horaire.
+Informatif : les commandes encore en cuisine (`en_attente` / `en_preparation`). **Tu ne peux rien faire dessus** — c'est juste pour anticiper ta prochaine tournée.
+
+### Section 4 — "✓ N livrée(s) aujourd'hui"
+
+Historique des livraisons terminées du jour (avec le montant). Pour vérifier ce que tu as fait.
 
 ---
 
@@ -128,33 +134,36 @@ Sur `/livreur` :
 
 #### Workflow d'une livraison standard
 
-1. Sur `/livreur`, tu vois une commande passer de 🟡 à 🟢 (cuisine prête)
+1. Sur `/livreur` section **"À livrer"**, une commande apparaît quand la cuisine l'a marquée prête (`pret`)
 2. Tu vas en cuisine, tu prends le sachet
 3. **Vérifie le sachet** : nom client visible (étiquette ou notes), nombre d'items vs ce que dit la commande
-4. Sur `/livreur` → tap la commande → bouton **"🛵 En route"** → statut passe `en_livraison`
-5. Tu pars (GPS sur l'adresse)
+4. Sur la carte → bouton **"🛵 Partir"** → la commande bascule dans la section **"🛵 En tournée"** (statut `en_livraison`)
+5. Tu pars — tap sur **📍 Maps** pour ouvrir l'itinéraire, ou **📞** pour appeler le client
 6. À l'arrivée :
    - Sonne à l'interphone / code / appartement
    - Remets la commande au client
    - Sourire + "bon appétit !"
-7. Sur `/livreur` → tap la commande → bouton **"✅ Livré"** → statut passe `livre`
+7. Sur `/livreur` section "En tournée" → bouton **"✓ Livrée"** → popup **"Confirmer la livraison ?"** → OK
+   - Si la commande était déjà payée en ligne (CB) → statut `encaisse`
+   - Si paiement à la livraison → statut `retire_par_client`
+   - Dans les deux cas, elle passe dans "✓ livrées aujourd'hui"
 
-⚠️ **Marque "Livré" IMMÉDIATEMENT après la remise**, pas 30 min après en bas de l'immeuble. Sinon le manager ne sait pas où tu en es.
+⚠️ **Clique "✓ Livrée" IMMÉDIATEMENT après la remise**, pas 30 min après en bas de l'immeuble. Sinon le manager ne sait pas où tu en es.
 
 #### Si tu fais plusieurs livraisons en tournée
 
-Tu peux marquer "En route" pour plusieurs commandes en même temps si elles partent ensemble :
-1. Avant de partir : tap les 3 commandes → "En route" pour chacune
-2. À chaque remise au client : "Livré" sur celle-ci
-3. La dernière, tu rentres au resto
+Tu peux faire "🛵 Partir" sur plusieurs commandes avant de partir si elles vont dans la même zone :
+1. Avant de partir : "🛵 Partir" sur chaque commande → elles s'empilent dans "🛵 En tournée"
+2. À chaque remise au client : "✓ Livrée" sur celle-ci
+3. La dernière livrée, tu rentres au resto
 
 ⚠️ **Respecte la chaîne du froid/chaud.** Si tu as 30 min entre la 1ère et la 3ème livraison, les premiers plats refroidissent. Le sac isotherme limite mais ne stoppe pas.
 
-#### Cas critique : tu démarres "En route" sans avoir le sachet
+#### Cas critique : tu cliques "Partir" sans avoir le sachet
 
-Bug classique : tu cliques "En route" depuis ton phone en marchant vers la cuisine → tu te crois parti alors que le sachet n'est pas dans tes mains.
+Bug classique : tu cliques "🛵 Partir" depuis ton phone en marchant vers la cuisine → tu te crois parti alors que le sachet n'est pas dans tes mains.
 
-→ **Règle d'or** : ne cliques "En route" QU'APRÈS avoir le sachet dans ta main.
+→ **Règle d'or** : ne cliques "🛵 Partir" QU'APRÈS avoir le sachet dans ta main.
 
 ---
 
@@ -162,20 +171,21 @@ Bug classique : tu cliques "En route" depuis ton phone en marchant vers la cuisi
 
 #### Le client n'est pas là quand tu sonnes
 
-1. **Appelle le client** (numéro affiché sur la carte commande)
+1. **Appelle le client** (bouton 📞 sur la carte, ou en tournée)
 2. **Attends 5-10 min** (souvent il est dans le salon, douche, etc.)
-3. Si toujours pas : **prends une photo** du paquet devant la porte (preuve)
-4. **Ne laisse PAS le paquet sans contact**
-5. Repars avec le sachet, préviens le manager via `/equipes`
-6. Sur `/livreur`, **NE marque PAS livré** — laisse en `en_livraison`
-7. Quand le manager décide (re-livrer ce soir, demain, ou rembourser), il te dira quoi faire
+3. Si tu es en retard et que le client a un email : tu peux cliquer **"📧 Prévenir client du retard"**
+4. Si toujours pas de réponse : **prends une photo** du paquet devant la porte (preuve)
+5. **Ne laisse PAS le paquet sans contact**
+6. Repars avec le sachet, préviens le manager via `/equipes`
+7. Sur `/livreur`, **NE clique PAS "✓ Livrée"** — laisse la commande dans "🛵 En tournée"
+8. Quand le manager décide (re-livrer ce soir, demain, ou rembourser), il te dira quoi faire
 
 #### Le client refuse la livraison (mauvais plat, retard, etc.)
 
 1. **Reste poli**, prends le motif
 2. **Reprends le sachet**, repars au resto
 3. Via `/equipes` → préviens immédiatement le manager
-4. Sur `/livreur`, **laisse en `en_livraison`** — le manager marquera comme "refusée" et fera le geste commercial
+4. Sur `/livreur`, **laisse la commande dans "🛵 En tournée"** (ne clique pas "✓ Livrée") — le manager gère le geste commercial et le statut depuis l'admin
 
 #### Tu as un accident / panne / problème véhicule
 
@@ -201,9 +211,9 @@ Bug classique : tu cliques "En route" depuis ton phone en marchant vers la cuisi
 
 #### a) Vérifier qu'il n'y a plus de commandes en attente
 
-`/livreur` → toutes tes commandes du jour doivent être au statut `livre` (ou `refusee` / `non_livree` pour les cas spéciaux).
+`/livreur` → la section "🛵 En tournée" doit être **vide** : toutes tes livraisons doivent être dans "✓ livrées aujourd'hui".
 
-Si tu as encore une commande en `en_livraison` → tu l'oublies, va voir le manager.
+Si tu as encore une commande dans "🛵 En tournée" → soit tu l'as oubliée, soit il y a eu un incident (client absent / refus). Va voir le manager pour la régulariser.
 
 #### b) Pointage sortie
 
@@ -228,9 +238,9 @@ Ces infos sont précieuses pour améliorer le service.
 
 ## 5. Les 5 réflexes à avoir
 
-1. **"En route" UNIQUEMENT avec le sachet en main.** Pas avant.
+1. **"🛵 Partir" UNIQUEMENT avec le sachet en main.** Pas avant.
 
-2. **"Livré" IMMÉDIATEMENT après remise.** Pas dans 30 min, pas en rentrant.
+2. **"✓ Livrée" IMMÉDIATEMENT après remise.** Pas dans 30 min, pas en rentrant.
 
 3. **Vérifie le sachet AVANT de partir** : items vs commande, étiquette client, bouchon scellé.
 
@@ -245,8 +255,11 @@ Ces infos sont précieuses pour améliorer le service.
 | Je veux… | Aller sur |
 |---|---|
 | Voir ma tournée du jour | `/livreur` |
-| Marquer "en route" | `/livreur` → tap commande → "🛵 En route" |
-| Marquer "livré" | `/livreur` → tap commande → "✅ Livré" |
+| Partir en livraison | `/livreur` section "À livrer" → bouton "🛵 Partir" |
+| Marquer une livraison faite | `/livreur` section "En tournée" → bouton "✓ Livrée" |
+| Ouvrir l'itinéraire | tap sur "📍 Maps" de la carte |
+| Appeler le client | tap sur "📞 [numéro]" de la carte |
+| Prévenir d'un retard | bouton "📧 Prévenir client du retard" (si en retard) |
 | Voir les détails d'un client | `/livreur` → tap commande → fiche client |
 | Voir les allergies d'un client | `/admin/clients` → fiche |
 | Signaler un incident | `/equipes` |
@@ -258,11 +271,11 @@ Ces infos sont précieuses pour améliorer le service.
 
 ## 7. Pièges classiques
 
-1. **Cliquer "En route" trop tôt** (avant d'avoir le sachet) → tu te crois parti, tu oublies le sachet
-2. **Oublier de marquer "Livré"** → le manager ne sait pas si la livraison est faite, peut envoyer un 2ᵉ livreur
+1. **Cliquer "🛵 Partir" trop tôt** (avant d'avoir le sachet) → tu te crois parti, tu oublies le sachet
+2. **Oublier de cliquer "✓ Livrée"** → le manager ne sait pas si la livraison est faite, peut envoyer un 2ᵉ livreur
 3. **Laisser un paquet sans contact** → litige possible si le client dit ne pas l'avoir reçu
 4. **Pas appeler avant un retard** → avis négatif assuré
-5. **Marquer "Livré" alors que tu as eu un problème** → ça brouille les stats, le manager ne sait pas qu'il y a eu incident
+5. **Cliquer "✓ Livrée" alors que tu as eu un problème** → ça brouille les stats, le manager ne sait pas qu'il y a eu incident
 6. **Ne pas respecter la chaîne du froid/chaud** → réclamation client garantie
 7. **Pas pointer sortie** → tes heures sont faussées
 
@@ -285,7 +298,7 @@ Ces infos sont précieuses pour améliorer le service.
 - [ ] Tu finalises ton guide Module 27 LIVREUR
 
 ### Premier mois
-- [ ] 0% de "Livré" en retard ou faux
+- [ ] 0% de "✓ Livrée" en retard ou faux
 - [ ] 100% des incidents tracés via `/equipes`
 - [ ] Tes avis Google moyennent ≥ 4.5/5 sur les commentaires livraison
 - [ ] Tu connais les "habitués" et leurs préférences

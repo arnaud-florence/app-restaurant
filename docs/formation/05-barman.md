@@ -54,7 +54,7 @@ Tu es le poste avec le **plus de polyvalence multi-canal**. Tu vois et tu agis s
 
 Quand un client arrive directement **au bar/comptoir** (sans passer par une table), c'est TOI qui crées la commande :
 
-1. Sur `/bar`, en bas tu vois un bouton **"+ Comptoir"** (ou un onglet "Comptoir")
+1. Sur `/bar`, en bas à droite tu vois un bouton flottant vert **"+ Nouvelle commande"** → un modal **"🛒 Comptoir"** s'ouvre
 2. Tap → modal de création de commande comptoir s'ouvre
 3. Sélectionne les articles (catalogue boisson + snacking)
 4. Choisis **consommation** : 🍽 sur place / 📦 à emporter (impacte la TVA)

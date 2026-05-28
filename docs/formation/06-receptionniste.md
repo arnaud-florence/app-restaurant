@@ -32,7 +32,7 @@ Tu es le **carrefour entre les clients et l'équipe**. Sans ta saisie rigoureuse
 | **`/admin/clients`** | ÉCRITURE | Fiches clients, fidélité, communications |
 | **`/admin/groupes`** | ÉCRITURE | Tour-opérateurs, mariages, séminaires |
 | **`/admin/chambres`** (route legacy) | ÉCRITURE | Configuration chambres (capacité, prix) |
-| **`/admin/evenements`** | ÉCRITURE | Devis, contrats, événements privatisés |
+| **`/admin/reservations`** (onglet Événements) | ÉCRITURE | Devis, contrats, événements privatisés (imprimables via la fiche événement) |
 | **`/admin/allergenes`** | 👁 LECTURE | Catalogue plats × allergènes (utile pour suggérer aux clients) |
 | **`/equipes`** | ÉCRITURE | Briefing équipe, communication interne |
 | **`/admin/formation`** | ÉCRITURE | Tes formations |

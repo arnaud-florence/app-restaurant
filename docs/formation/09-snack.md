@@ -56,7 +56,7 @@ Tu es l'interface directe pour **COMPTOIR, ONLINE retrait, et BORNE**. Le canal 
 
 Quand un client arrive directement au comptoir (sans table) :
 
-1. Sur ton écran principal (`/emporter` ou `/bar` selon ce que ton manager a configuré), tap le bouton **"+ Comptoir"**
+1. Sur ton écran principal (`/emporter` ou `/bar`), tap le bouton flottant vert **"+ Nouvelle commande"** (en bas à droite) → un modal **"🛒 Comptoir"** s'ouvre
 2. Modal qui s'ouvre :
    - **Catalogue** filtré sur SNACKING + PIZZA + BAR (boissons) → ce qui peut être vendu au comptoir
    - Tap sur chaque article voulu (×1, ×2, etc.)
@@ -95,7 +95,7 @@ Exemple : un client doit retirer à 13h00, on est à 12h45.
 2. Tu cherches la commande sur `/emporter` (filtre nom ou numéro)
 3. Tu **vérifies** que tout est dedans (vs la liste affichée)
 4. Tu mets dans un sachet, scellé si possible
-5. Tu remets au client + tap **"Retiré ✓"** → statut passe à `retire_par_client`
+5. Tu remets au client + tap **"✓ Client a retiré"** → statut passe à `retire_par_client`
 
 #### Si le client n'arrive jamais
 
@@ -321,8 +321,8 @@ Tablette ou `/admin/rh` → pointer sortie.
 | Voir les commandes en attente de retrait | `/emporter` (section "Prêtes") |
 | Voir les commandes BORNE/COMPTOIR à encaisser | `/emporter` (section "Caisse borne") |
 | Encaisser une commande BORNE | `/emporter` → tap → modal paiement |
-| Créer une commande COMPTOIR | `/emporter` ou `/bar` → bouton "+ Comptoir" |
-| Marquer une ONLINE comme retirée | `/emporter` → "Retiré ✓" |
+| Créer une commande COMPTOIR | `/emporter` ou `/bar` → bouton "+ Nouvelle commande" |
+| Marquer une ONLINE comme retirée | `/emporter` → "✓ Client a retiré" |
 | Voir l'activité kiosque | `/admin/borne` (lecture seule) |
 | Encaisser le total du jour | `/caisse` → "Fermer session" |
 | Cocher la checklist hygiène | `/admin/hygiene` |

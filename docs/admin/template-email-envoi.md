@@ -22,7 +22,7 @@ Trois variantes à copier-coller dans Gmail (ou ton client email).
 >
 > 📱 **Sur ton téléphone** : installe l'app en allant sur l'URL puis "Ajouter à l'écran d'accueil" (Safari) ou "Installer" (Chrome).
 >
-> 📖 **Guide complet** : pièce jointe (ou : https://app-restaurant-livid.vercel.app/admin/formation/docs/bienvenue-employe — si tu rends le doc accessible online)
+> 📖 **Guide complet** : pièce jointe PDF (ou consultable par toi, manager, sur https://app-restaurant-livid.vercel.app/admin/formation/docs/bienvenue-employe)
 >
 > 📞 **Une question, un bug** : appelle-moi ou envoie-moi un SMS.
 >
