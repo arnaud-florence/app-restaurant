@@ -131,8 +131,8 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
     supabase.from('commandes').select('id', { count: 'exact', head: true })
       .eq('statut', 'encaisse').gte('created_at', pN1.debut).lte('created_at', pN1.fin + 'T23:59:59'),
     supabase.from('employes').select('id, salaire_horaire').eq('actif', true),
-    supabase.from('pointage').select('employe_id, debut, fin')
-      .gte('debut', p.debut + 'T00:00:00').lte('debut', p.fin + 'T23:59:59').not('fin', 'is', null),
+    supabase.from('pointage').select('employe_id, heures_travaillees')
+      .gte('date_pointage', p.debut).lte('date_pointage', p.fin).not('heures_travaillees', 'is', null),
     supabase.from('recettes').select('food_cost_pct').not('food_cost_pct', 'is', null),
     supabase.from('non_conformites').select('id', { count: 'exact', head: true }).eq('statut', 'ouverte'),
     supabase.from('releves_energie').select('consommation, unite, date_releve').gte('date_releve', debut30j).lte('date_releve', fin30j),
@@ -152,10 +152,10 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
   const nbC   = commandesRes.count ?? 0
   const nbCN1 = commandesN1Res.count ?? 0
 
-  // Masse salariale = sum(heures pointage) × salaire_horaire
+  // Masse salariale = sum(heures_travaillees pointage) × salaire_horaire
   const tauxParId = new Map((employesRes.data ?? []).map(e => [e.id as string, Number(e.salaire_horaire ?? 0)]))
   const masseSalariale = (pointageRes.data ?? []).reduce((s, p) => {
-    const h = (new Date(p.fin as string).getTime() - new Date(p.debut as string).getTime()) / 3_600_000
+    const h = Number(p.heures_travaillees ?? 0)
     return s + (h > 0 ? h * (tauxParId.get(p.employe_id as string) ?? 0) : 0)
   }, 0)
 

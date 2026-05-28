@@ -110,6 +110,9 @@ export default function BarClient({
       articles: CommandeService['articles']
     }> = []
     for (const c of commandes) {
+      // Commande BORNE/COMPTOIR non payée → pas en prep (reste dans la section
+      // "Comptoir à encaisser" ci-dessous jusqu'à encaissement). Règle multi-canal.
+      if (c.statut === 'en_attente_paiement_comptoir') continue
       const articlesBar = c.articles.filter(a => a.tag_destination === 'BAR' && a.statut !== 'servi')
       if (articlesBar.length === 0) continue
       out.push({ commande: c, articles: articlesBar })

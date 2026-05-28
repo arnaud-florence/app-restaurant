@@ -63,12 +63,13 @@ export type LigneCourse = {
 }
 
 /**
- * Liste de courses : tous les ingrédients dont stock_actuel < stock_minimum,
+ * Liste de courses : tous les ingrédients dont stock_actuel <= stock_minimum,
  * avec une suggestion de quantité pour atteindre stock_maximum.
+ * (<= pour rester cohérent avec le seuil d'alerte orange de statutStock.)
  */
 export function listeCourses(ingredients: Ingredient[]): LigneCourse[] {
   return ingredients
-    .filter(i => i.actif && i.stock_actuel < i.stock_minimum)
+    .filter(i => i.actif && i.stock_actuel <= i.stock_minimum)
     .map(i => {
       const cible = i.stock_maximum > 0 ? i.stock_maximum : i.stock_minimum * 2
       const qte = Math.max(0, cible - i.stock_actuel)

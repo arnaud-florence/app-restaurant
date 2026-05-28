@@ -119,6 +119,9 @@ export default function CuisineClient({
     for (const tag of ['CUISINE', 'PIZZA'] as ColonneTag[]) {
       const map = new Map<string, CommandeService['articles']>()
       for (const c of commandes) {
+        // Une commande BORNE/COMPTOIR non encore payée ne doit PAS apparaître en prep
+        // (elle reste sur /emporter jusqu'à encaissement). Cf. règle métier multi-canal.
+        if (c.statut === 'en_attente_paiement_comptoir') continue
         const articlesDuTag = c.articles.filter(a => a.tag_destination === tag && a.statut !== 'servi')
         if (articlesDuTag.length === 0) continue
         // On indexe via la commande complète pour avoir created_at, source, etc.

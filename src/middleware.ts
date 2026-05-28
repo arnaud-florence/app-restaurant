@@ -17,7 +17,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { canAccess, getMainRoute, type CustomPermissions } from '@/lib/permissions'
 
-const OPS_PATHS = ['/serveur', '/cuisine', '/pizza', '/bar', '/caisse', '/emporter', '/equipes']
+const OPS_PATHS = ['/serveur', '/cuisine', '/pizza', '/bar', '/caisse', '/emporter', '/livreur', '/reception', '/equipes']
 function isOpsPath(path: string) {
   return OPS_PATHS.some(p => path === p || path.startsWith(p + '/'))
 }

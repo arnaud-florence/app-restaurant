@@ -220,14 +220,14 @@ async function suggererRepartitionPourboires(ctx: AgentContext) {
   const jourDebut = new Date(`${todayStr}T00:00:00`).toISOString()
   const jourFin = new Date(`${todayStr}T23:59:59`).toISOString()
 
-  // Pourboires du jour (paiements_caisse avec tip > 0)
+  // Pourboires du jour (paiements_caisse avec pourboire > 0)
   const { data: paiements } = await ctx.supabase
     .from('paiements_caisse')
-    .select('tip')
-    .gte('created_at', jourDebut)
-    .lte('created_at', jourFin)
-    .gt('tip', 0)
-  const montant = (paiements ?? []).reduce((s, p) => s + Number(p.tip ?? 0), 0)
+    .select('pourboire')
+    .gte('encaisse_at', jourDebut)
+    .lte('encaisse_at', jourFin)
+    .gt('pourboire', 0)
+  const montant = (paiements ?? []).reduce((s, p) => s + Number(p.pourboire ?? 0), 0)
   if (montant <= 0) return { montant: 0, repartition: [] }
 
   // Pointages du jour, postes en salle (serveur, barman) ont la part la plus grosse
