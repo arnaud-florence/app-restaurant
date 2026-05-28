@@ -22,7 +22,7 @@ import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 const fmtPrix = (n: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(n)
 
-export default function IngredientsClient({ initial, readOnly = false }: { initial: Ingredient[]; readOnly?: boolean }) {
+export default function IngredientsClient({ initial, readOnly = false, peutVoirPrix = true }: { initial: Ingredient[]; readOnly?: boolean; peutVoirPrix?: boolean }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filtreCat, setFiltreCat] = useState<string>('')
@@ -177,6 +177,7 @@ export default function IngredientsClient({ initial, readOnly = false }: { initi
                   key={i.id}
                   i={i}
                   readOnly={readOnly}
+                  peutVoirPrix={peutVoirPrix}
                   onEdit={() => setEditing(i)}
                   onHistorique={() => setHistorique(i)}
                   onToggle={() => onActiver(i, !i.actif)}
@@ -194,7 +195,7 @@ export default function IngredientsClient({ initial, readOnly = false }: { initi
                       <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         <th className="text-left py-2.5 px-4">Ingrédient</th>
                         <th className="text-left py-2.5 px-2">Catégorie</th>
-                        <th className="text-right py-2.5 px-2">Prix HT</th>
+                        {peutVoirPrix && <th className="text-right py-2.5 px-2">Prix HT</th>}
                         <th className="text-center py-2.5 px-2">Stock</th>
                         <th className="text-left py-2.5 px-2">Allergènes</th>
                         <th className="text-right py-2.5 px-4">Actions</th>
@@ -206,6 +207,7 @@ export default function IngredientsClient({ initial, readOnly = false }: { initi
                           key={i.id}
                           i={i}
                           readOnly={readOnly}
+                          peutVoirPrix={peutVoirPrix}
                           onEdit={() => setEditing(i)}
                           onHistorique={() => setHistorique(i)}
                           onToggle={() => onActiver(i, !i.actif)}
@@ -290,10 +292,11 @@ function KPI({ label, value, tone, icon, pulse }: {
 
 // ─── Mobile : carte ──────────────────────────────────────────────────
 function IngredientCard({
-  i, readOnly = false, onEdit, onHistorique, onToggle, onDelete,
+  i, readOnly = false, peutVoirPrix = true, onEdit, onHistorique, onToggle, onDelete,
 }: {
   i: Ingredient
   readOnly?: boolean
+  peutVoirPrix?: boolean
   onEdit: () => void
   onHistorique: () => void
   onToggle: () => void
@@ -326,10 +329,12 @@ function IngredientCard({
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
+          {peutVoirPrix && (
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Prix HT</p>
             <p className="font-bold">{fmtPrix(i.prix_achat_ht)}<span className="text-xs text-muted-foreground"> /{i.unite}</span></p>
           </div>
+          )}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
             <p className="font-bold">
@@ -349,7 +354,7 @@ function IngredientCard({
         )}
 
         <div className="flex flex-wrap gap-1.5 pt-1">
-          <Button size="sm" variant="ghost" onClick={onHistorique}>📈 Prix</Button>
+          {peutVoirPrix && <Button size="sm" variant="ghost" onClick={onHistorique}>📈 Prix</Button>}
           {!readOnly && (
             <>
               <Button size="sm" variant="outline" onClick={onEdit} className="flex-1">✏️ Modifier</Button>
@@ -367,10 +372,11 @@ function IngredientCard({
 
 // ─── Desktop : ligne ─────────────────────────────────────────────────
 function IngredientRow({
-  i, readOnly = false, onEdit, onHistorique, onToggle, onDelete,
+  i, readOnly = false, peutVoirPrix = true, onEdit, onHistorique, onToggle, onDelete,
 }: {
   i: Ingredient
   readOnly?: boolean
+  peutVoirPrix?: boolean
   onEdit: () => void
   onHistorique: () => void
   onToggle: () => void
@@ -397,9 +403,11 @@ function IngredientRow({
         </div>
       </td>
       <td className="py-3 px-2 text-muted-foreground">{i.categorie}</td>
-      <td className="py-3 px-2 text-right tabular-nums font-semibold">
-        {fmtPrix(i.prix_achat_ht)}<span className="text-xs text-muted-foreground"> /{i.unite}</span>
-      </td>
+      {peutVoirPrix && (
+        <td className="py-3 px-2 text-right tabular-nums font-semibold">
+          {fmtPrix(i.prix_achat_ht)}<span className="text-xs text-muted-foreground"> /{i.unite}</span>
+        </td>
+      )}
       <td className="py-3 px-2 text-center">
         <span className={cn('inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-md border', sty.bg, sty.text, sty.border)}>
           {i.stock_actuel} / {i.stock_minimum} {i.unite}
