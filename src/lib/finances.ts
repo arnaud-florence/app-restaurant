@@ -92,9 +92,11 @@ export function calculerCR(input: {
   masse_salariale: number
   charges_fixes_mensuelles: number
   notes_de_frais_mois: number
+  ca_ht?: number   // HT réel agrégé depuis les commandes (ventilation multi-taux). Si absent → flat 10% (legacy).
 }): CompteResultat {
   const ca_ttc = input.ca_ttc
-  const ca_ht = ca_ttc / 1.10  // TVA 10% par défaut
+  // Préfère le HT réel (somme des montant_total_ht des commandes encaissées), sinon flat 10%.
+  const ca_ht = (input.ca_ht != null && input.ca_ht > 0) ? input.ca_ht : ca_ttc / 1.10
   const total_charges = input.food_cost + input.masse_salariale + input.charges_fixes_mensuelles + input.notes_de_frais_mois
   const resultat_net = ca_ht - total_charges  // résultat = HT - charges HT
   return {
@@ -133,8 +135,15 @@ export type TvaSummary = {
   tva_a_reverser: number     // collectée - déductible
 }
 
-export function calculerTVA(caTTCMois: number, factures: { montant_ht: number; montant_ttc: number }[], taux = 0.10): TvaSummary {
-  const tva_collectee = round2(caTTCMois - caTTCMois / (1 + taux))
+export function calculerTVA(
+  caTTCMois: number,
+  factures: { montant_ht: number; montant_ttc: number }[],
+  taux = 0.10,
+  tvaCollecteeReelle?: number,   // TVA réelle agrégée (somme tva_total des commandes, multi-taux). Si absent → flat (legacy).
+): TvaSummary {
+  const tva_collectee = (tvaCollecteeReelle != null && tvaCollecteeReelle > 0)
+    ? round2(tvaCollecteeReelle)
+    : round2(caTTCMois - caTTCMois / (1 + taux))
   const tva_deductible = round2(factures.reduce((s, f) => s + (f.montant_ttc - f.montant_ht), 0))
   return {
     tva_collectee,

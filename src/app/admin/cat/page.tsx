@@ -172,6 +172,7 @@ export default async function CatIndexPage() {
                 <Link
                   key={cat.slug}
                   href={`/admin/cat/${cat.slug}`}
+                  prefetch={false}
                   style={{ ['--stagger' as any]: `${idx * 50}ms` }}
                   className="stagger-fadeup lift-on-hover group relative flex flex-col justify-end overflow-hidden rounded-3xl bg-zinc-900 ring-1 ring-zinc-200 hover:ring-2 hover:ring-zinc-900/30 hover:shadow-2xl hover:shadow-zinc-900/20 active:scale-[0.98] active:translate-y-0 min-h-[220px] sm:min-h-[260px]"
                 >

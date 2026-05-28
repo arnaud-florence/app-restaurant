@@ -167,23 +167,25 @@ export async function GET(req: Request) {
       const badgesEmp = badgesByEmp.get(emp.id) ?? new Set<string>()
       // premiere_certif
       if (certifsEmp.size >= 1 && !badgesEmp.has('premiere_certif')) {
-        await ctx.supabase.from('badges_employes').insert({
+        const { error } = await ctx.supabase.from('badges_employes').insert({
           employe_id: emp.id,
           badge_code: 'premiere_certif',
           badge_titre: 'Première certification',
           badge_emoji: '🎯',
           description: 'Tu as obtenu ta première certification ! Bravo.',
-        }).then(() => { nbNouvellesBadges++ })
+        })
+        if (!error) nbNouvellesBadges++
       }
       // couteau_suisse (≥ 3 certifs)
       if (certifsEmp.size >= SEUIL_COUTEAU_SUISSE && !badgesEmp.has('couteau_suisse')) {
-        await ctx.supabase.from('badges_employes').insert({
+        const { error } = await ctx.supabase.from('badges_employes').insert({
           employe_id: emp.id,
           badge_code: 'couteau_suisse',
           badge_titre: 'Couteau suisse',
           badge_emoji: '🔪',
           description: `Tu es certifié(e) sur ${certifsEmp.size} postes — tu peux remplacer presque tout le monde !`,
-        }).then(() => { nbNouvellesBadges++ })
+        })
+        if (!error) nbNouvellesBadges++
       }
 
       recap.push({

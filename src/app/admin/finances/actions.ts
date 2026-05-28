@@ -220,8 +220,11 @@ export async function chargerCRMois(moisIso: string) {
   const interval = intervalleMoisIso(ref)
   const supabase = await createClient()
 
-  const [paiementsRes, mouvementsRes, planningRes, chargesRes, ndfRes, facturesRes] = await Promise.all([
-    supabase.from('paiements_caisse').select('montant').gte('encaisse_at', interval.debut).lte('encaisse_at', interval.fin + 'T23:59:59'),
+  const [commandesRes, mouvementsRes, planningRes, chargesRes, ndfRes, facturesRes] = await Promise.all([
+    // Source de vérité unique du CA = commandes encaissées (montants TTC/HT/TVA réels, ventilation multi-taux).
+    // Inclut livraisons cash (statut encaisse sans paiement) et évite le double comptage Stripe.
+    supabase.from('commandes').select('montant_total_ttc, montant_total_ht, tva_total')
+      .eq('statut', 'encaisse').gte('created_at', interval.debut).lte('created_at', interval.fin + 'T23:59:59'),
     supabase.from('mouvements_stock').select('quantite, prix_unitaire_ht').eq('type', 'entree').gte('created_at', interval.debut).lte('created_at', interval.fin + 'T23:59:59'),
     supabase.from('planning').select('employe_id, heure_debut, heure_fin, employe:employes!employe_id(salaire_horaire)').gte('date_travail', interval.debut).lte('date_travail', interval.fin),
     supabase.from('charges_fixes').select('montant_ttc, frequence, actif'),
@@ -229,7 +232,10 @@ export async function chargerCRMois(moisIso: string) {
     supabase.from('factures_fournisseurs').select('montant_ht, montant_ttc').gte('date_emission', interval.debut).lte('date_emission', interval.fin),
   ])
 
-  const ca_ttc = (paiementsRes.data ?? []).reduce((s, p) => s + Number(p.montant ?? 0), 0)
+  const cmds = commandesRes.data ?? []
+  const ca_ttc = cmds.reduce((s, c) => s + Number(c.montant_total_ttc ?? 0), 0)
+  const ca_ht  = cmds.reduce((s, c) => s + Number(c.montant_total_ht ?? 0), 0)
+  const tva_collectee_reelle = cmds.reduce((s, c) => s + Number(c.tva_total ?? 0), 0)
   const food_cost = (mouvementsRes.data ?? []).reduce((s, m) => s + Number(m.quantite ?? 0) * Number(m.prix_unitaire_ht ?? 0), 0)
 
   type ShiftRow = { heure_debut: string; heure_fin: string; employe?: { salaire_horaire?: number | string } | null }
@@ -246,11 +252,11 @@ export async function chargerCRMois(moisIso: string) {
 
   const notes_de_frais_mois = (ndfRes.data ?? []).reduce((s, n) => s + Number(n.montant ?? 0), 0)
 
-  const cr = calculerCR({ ca_ttc, food_cost, masse_salariale, charges_fixes_mensuelles, notes_de_frais_mois })
+  const cr = calculerCR({ ca_ttc, ca_ht, food_cost, masse_salariale, charges_fixes_mensuelles, notes_de_frais_mois })
   const tva = calculerTVA(ca_ttc, (facturesRes.data ?? []).map(f => ({
     montant_ht: Number(f.montant_ht ?? 0),
     montant_ttc: Number(f.montant_ttc ?? 0),
-  })))
+  })), 0.10, tva_collectee_reelle)
 
   return { cr, tva, libelle: interval.libelle }
 }

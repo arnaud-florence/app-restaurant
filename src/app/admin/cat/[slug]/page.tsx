@@ -319,6 +319,7 @@ export default async function CategoriePage({ params }: { params: { slug: string
                 <Link
                   key={it.href}
                   href={it.href}
+                  prefetch={false}
                   style={{ ['--stagger' as any]: `${idx * 40}ms` }}
                   className={`stagger-fadeup lift-on-hover group relative flex flex-col overflow-hidden rounded-3xl ring-1 ring-zinc-200 hover:ring-2 hover:ring-zinc-900/30 hover:shadow-2xl hover:shadow-zinc-900/20 active:scale-[0.98] active:translate-y-0 min-h-[200px] sm:min-h-[240px] ${
                     hasImage ? 'bg-zinc-900' : `${tone.cardBg}`

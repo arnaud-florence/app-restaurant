@@ -34,6 +34,7 @@ export async function GET(req: Request) {
     const dlc          = await analyseDLC(ctx)
     const echeances    = await analyseEcheancesLegales(ctx)
     const maintenance  = await analyseMaintenance(ctx)
+    const nc           = await analyseNonConformites(ctx)
 
     const summary = [
       temperatures.nbManquants > 0 ? `${temperatures.nbManquants} relevé(s) T° en retard` : null,
@@ -43,11 +44,12 @@ export async function GET(req: Request) {
       dlc.nbProches > 0 ? `${dlc.nbProches} DLC proche(s)` : null,
       echeances.nbAlertes > 0 ? `${echeances.nbAlertes} échéance(s) légale(s)` : null,
       maintenance.nbAlertes > 0 ? `${maintenance.nbAlertes} maintenance(s) à prévoir` : null,
+      nc.nbOuvertes > 0 ? `${nc.nbOuvertes} NC ouverte(s)` : null,
     ].filter(Boolean).join(' · ')
 
     return {
       summary: summary || 'Conformité HACCP OK',
-      data: { temperatures, checklists, dlc, echeances, maintenance },
+      data: { temperatures, checklists, dlc, echeances, maintenance, nc },
     }
   })
 
@@ -292,6 +294,40 @@ async function analyseEcheancesLegales(ctx: AgentContext) {
     })
   }
   return { nbAlertes }
+}
+
+// ─────────────────────────────────────────────────────────────
+// (6) Non-conformités ouvertes (manuelles + non-température)
+//     L'agent surveillait le SIGNAL (T° non conforme) mais jamais
+//     la table non_conformites elle-même → NC manuelles invisibles.
+// ─────────────────────────────────────────────────────────────
+async function analyseNonConformites(ctx: AgentContext) {
+  const { data: ncs } = await ctx.supabase
+    .from('non_conformites')
+    .select('id, type, gravite, description, statut, created_at')
+    .in('statut', ['ouverte', 'en_cours'])
+
+  const now = Date.now()
+  let nbOuvertes = 0
+  for (const nc of (ncs ?? []) as Array<{ id: string; type: string | null; gravite: string | null; description: string | null; statut: string; created_at: string }>) {
+    nbOuvertes++
+    const ageJours = Math.floor((now - new Date(nc.created_at).getTime()) / 86400_000)
+    // On alerte : critique dès le 1er jour, sinon à partir de 2 jours d'ancienneté.
+    const critique = nc.gravite === 'critique'
+    if (!critique && ageJours < 2) continue
+    if (await findingDejaActif(ctx, 'nc_ouverte', { nc_id: nc.id })) continue
+
+    await emitFinding(ctx, {
+      urgence: critique ? 'rouge' : 'jaune',
+      type: 'nc_ouverte',
+      titre: `NC ${nc.gravite ?? ''} ouverte depuis ${ageJours}j : ${(nc.type ?? 'non-conformité')}`,
+      message: `${nc.description?.slice(0, 160) ?? 'Non-conformité'} — ouverte le ${nc.created_at.slice(0, 10)}. À traiter et clôturer.`,
+      action_label: 'Voir la non-conformité',
+      action_url:   '/admin/hygiene',
+      data: { nc_id: nc.id, gravite: nc.gravite, type: nc.type, age_jours: ageJours },
+    })
+  }
+  return { nbOuvertes }
 }
 
 // ─────────────────────────────────────────────────────────────
