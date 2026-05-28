@@ -62,6 +62,29 @@ export async function updateEmploye(input: unknown) {
   return { ok: true as const }
 }
 
+// ─── Autonomie configurable par employé ───────────────────────────
+const autonomieSchema = z.object({
+  employe_id:               z.string().uuid(),
+  autonomie_reception:      z.boolean().optional(),
+  autonomie_commande:       z.boolean().optional(),
+  autonomie_modif_recettes: z.boolean().optional(),
+  autonomie_voir_prix:      z.boolean().optional(),
+})
+
+/** Active/désactive un ou plusieurs interrupteurs d'autonomie d'un employé.
+ *  Par défaut tout est false ; le gérant ouvre au cas par cas. */
+export async function setAutonomie(input: unknown) {
+  const p = autonomieSchema.parse(input)
+  const { employe_id, ...flags } = p
+  const patch = Object.fromEntries(Object.entries(flags).filter(([, v]) => v !== undefined))
+  if (Object.keys(patch).length === 0) return { ok: true as const }
+  const supabase = await createClient()
+  const { error } = await supabase.from('employes').update(patch).eq('id', employe_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/rh')
+  return { ok: true as const }
+}
+
 // ─── Permissions personnalisées par employé ───────────────────────
 const customPermissionsSchema = z.object({
   employe_id: z.string().uuid(),

@@ -46,7 +46,7 @@ export default async function RhPage() {
     paiementsRes,
   ] = await Promise.all([
     supabase.from('employes')
-      .select('id, prenom, nom, poste, type_contrat, email, telephone, salaire_horaire, heures_contrat, date_embauche, date_sortie, solde_conges_jours, notes_internes, actif, created_at')
+      .select('id, prenom, nom, poste, type_contrat, email, telephone, salaire_horaire, heures_contrat, date_embauche, date_sortie, solde_conges_jours, notes_internes, actif, created_at, autonomie_reception, autonomie_commande, autonomie_modif_recettes, autonomie_voir_prix')
       .order('actif', { ascending: false })
       .order('prenom'),
     supabase.from('documents_employes').select('*').order('created_at', { ascending: false }),

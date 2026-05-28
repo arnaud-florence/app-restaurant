@@ -22,7 +22,7 @@ import {
   creerShift, supprimerShift,
   pointerArrivee, pointerDepart,
   demanderConge, validerConge, refuserConge, ajusterSoldeConges,
-  setEmployePermissions, getEmployePermissions,
+  setEmployePermissions, getEmployePermissions, setAutonomie,
 } from './actions'
 import { canAccess, isReadOnly } from '@/lib/permissions'
 import type { DataRH } from './page'
@@ -734,6 +734,10 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
         <PermissionsPanel employe_id={employe.id} poste={poste} onError={onError} onOk={onSuccess} />
       )}
 
+      {isEdit && employe && (
+        <AutonomiePanel employe={employe} onError={onError} onOk={onSuccess} />
+      )}
+
       <div className="flex gap-2 pt-2">
         <button onClick={onClose} disabled={isPending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
         {isEdit && employe?.actif && (
@@ -803,6 +807,56 @@ const ROUTES_PERMISSIONS: Array<{ groupe: string; items: Array<{ href: string; l
 ]
 
 type RouteState = 'inherit' | 'allowed' | 'readonly' | 'denied'
+
+// Interrupteurs d'autonomie par employé. Par défaut tout est désactivé ;
+// le gérant ouvre au cas par cas. Pilote la validation des bons de commande,
+// la réception sans validation, la modif des recettes et la visibilité des prix.
+function AutonomiePanel({
+  employe, onError, onOk,
+}: {
+  employe: Employe
+  onError: (e: unknown) => void
+  onOk: (msg: string) => void
+}) {
+  const [pending, startTransition] = useTransition()
+  const flags = [
+    { key: 'autonomie_reception',      label: 'Réceptionner les livraisons sans validation', emoji: '📦' },
+    { key: 'autonomie_commande',       label: 'Passer des commandes fournisseurs sans validation', emoji: '🛒' },
+    { key: 'autonomie_modif_recettes', label: 'Modifier les quantités de recettes', emoji: '📖' },
+    { key: 'autonomie_voir_prix',      label: "Voir les prix d'achat des ingrédients", emoji: '💶' },
+  ] as const
+
+  function toggle(key: string, value: boolean) {
+    startTransition(async () => {
+      try { await setAutonomie({ employe_id: employe.id, [key]: value }); onOk('Autonomie mise à jour') }
+      catch (e) { onError(e) }
+    })
+  }
+
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
+      <summary className="font-bold text-sm cursor-pointer select-none">🔓 Autonomie (avancé)</summary>
+      <p className="text-xs text-zinc-500 mt-1 mb-2">Tout est désactivé par défaut. Active uniquement ce que tu autorises pour cet employé.</p>
+      <div className="space-y-2.5">
+        {flags.map(f => {
+          const checked = Boolean((employe as unknown as Record<string, unknown>)[f.key])
+          return (
+            <label key={f.key} className="flex items-center justify-between gap-3 text-sm cursor-pointer">
+              <span className="text-zinc-700">{f.emoji} {f.label}</span>
+              <input
+                type="checkbox"
+                defaultChecked={checked}
+                disabled={pending}
+                onChange={e => toggle(f.key, e.target.checked)}
+                className="h-5 w-5 accent-emerald-600 shrink-0"
+              />
+            </label>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
 
 function PermissionsPanel({
   employe_id, poste, onError, onOk,

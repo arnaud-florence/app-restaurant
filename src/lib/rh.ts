@@ -44,6 +44,11 @@ export type Employe = {
   notes_internes: string | null
   actif: boolean
   created_at: string
+  // Interrupteurs d'autonomie (pilotés par le gérant dans /admin/rh)
+  autonomie_reception?: boolean
+  autonomie_commande?: boolean
+  autonomie_modif_recettes?: boolean
+  autonomie_voir_prix?: boolean
 }
 
 export type TypeDocument = 'contrat' | 'cni' | 'passeport' | 'permis_travail' | 'casier' | 'visite_medicale' | 'rib' | 'attestation' | 'autre'
