@@ -5,6 +5,9 @@ import CuisineClient from '../cuisine/CuisineClient'
 import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import BriefingPoste from '@/components/BriefingPoste'
+import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
+import { getBriefingForPoste } from '@/lib/briefing/poste'
 
 export const metadata = { title: 'Pizza — Service' }
 export const dynamic = 'force-dynamic'
@@ -19,9 +22,9 @@ export default async function PizzaPage() {
   } : null
 
   const employeId = profil?.employe_id ?? null
+  const supabase = await createClient()
   let initialDone: string[] = []
   if (employeId) {
-    const supabase = await createClient()
     const { data } = await supabase.from('taches_completees')
       .select('tache_id')
       .eq('employe_id', employeId)
@@ -29,14 +32,23 @@ export default async function PizzaPage() {
     initialDone = (data ?? []).map(r => r.tache_id as string)
   }
 
+  // Briefing + alertes agents (manquaient sur /pizza alors que /cuisine les a).
+  const briefing = await getBriefingForPoste(supabase, 'pizzaiolo', {
+    prenom: profil?.prenom ?? null,
+  })
+
   return (
-    <CuisineClient
-      initial={commandes}
-      role="pizzaiolo"
-      widgetPoste="pizzaiolo"
-      navProfil={navProfil}
-      widgetEmployeId={employeId}
-      widgetInitialDone={initialDone}
-    />
+    <>
+      <BriefingPoste briefing={briefing} />
+      <AlertesAgentsOps agentIds={['stock', 'haccp', 'cuisine_rt']} />
+      <CuisineClient
+        initial={commandes}
+        role="pizzaiolo"
+        widgetPoste="pizzaiolo"
+        navProfil={navProfil}
+        widgetEmployeId={employeId}
+        widgetInitialDone={initialDone}
+      />
+    </>
   )
 }
