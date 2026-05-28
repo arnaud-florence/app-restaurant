@@ -9,6 +9,7 @@ export type Poste =
   | 'cuisine'        // = cuisinier (legacy enum employes.poste)
   | 'cuisinier'      // alias explicite
   | 'pizzaiolo'
+  | 'cuisinier_snacking'  // cuisine snacking (burgers/tacos/paninis), distinct de 'snack' (encaissement)
   | 'salle'          // = serveur (legacy)
   | 'serveur'
   | 'bar'            // = barman (legacy)
@@ -60,6 +61,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
       '/admin/recettes',
       '/admin/ingredients',
       '/admin/stock',
+      '/admin/fournisseurs',            // réception livraisons + bons de commande (cf. autonomie RH)
       '/admin/hygiene',                 // checklists et températures
       '/admin/allergenes',
       '/admin/dechets',
@@ -73,6 +75,28 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
   },
   cuisinier: { /* alias — populé après ce bloc */ } as unknown as Permissions,
 
+  cuisinier_snacking: {
+    label: 'Cuisinier Snacking',
+    main: '/mon-espace',
+    allowed: [
+      '/cuisine',                       // KDS (filtré SNACKING via getPosteFilter)
+      '/emporter',                      // snacking souvent à emporter / online
+      '/admin/recettes',
+      '/admin/ingredients',
+      '/admin/stock',
+      '/admin/fournisseurs',            // réception + bons (domaine snacking)
+      '/admin/hygiene',
+      '/admin/allergenes',
+      '/admin/dechets',
+      ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      '/admin/recettes',
+      '/admin/ingredients',
+      '/admin/allergenes',
+    ],
+  },
+
   pizzaiolo: {
     label: 'Pizzaiolo',
     main: '/mon-espace',
@@ -82,6 +106,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
       '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
       '/admin/ingredients',             // pizza uniquement (v2 filtre contenu)
       '/admin/stock',                   // déduction pizza (v2 filtre contenu)
+      '/admin/fournisseurs',            // réception + bons (domaine pizza)
       '/admin/hygiene',                 // checklists pizza (v2 filtre contenu)
       '/admin/allergenes',              // pizza uniquement (v2 filtre contenu)
       '/admin/dechets',
@@ -310,11 +335,15 @@ export function getPosteFilter(poste: string | null | undefined): PosteContentFi
   switch (poste) {
     case 'pizzaiolo':
       return { recetteTags: ['PIZZA'] }
+    case 'cuisinier_snacking':
+      return { recetteTags: ['SNACKING'] }            // burgers / tacos / paninis
+    case 'cuisine':
+    case 'cuisinier':
+      return { recetteTags: ['CUISINE', 'SNACKING'] } // brasserie + snacking
     case 'bar':
     case 'barman':
       return { recetteTags: ['BAR'] }
-    // Cuisinier / second / serveur : pas de filtre contenu (la matrice
-    // gère déjà l'accès + lecture seule). Manager : tout.
+    // second / serveur : pas de filtre contenu. Manager : tout.
     default:
       return { recetteTags: null }
   }
