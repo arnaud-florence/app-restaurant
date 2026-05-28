@@ -82,6 +82,32 @@ export default async function FormationListPage() {
           <MonProfilFormation employeId={lockedEmployeId} />
         </div>
       )}
+      {/* Encart polyvalence — encourage chaque employé à apprendre d'autres postes */}
+      <div className="max-w-6xl mx-auto px-4 pt-4">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <h2 className="font-bold text-emerald-900 flex items-center gap-2">🎓 Deviens polyvalent</h2>
+          <p className="text-sm text-emerald-800/90 mt-1">
+            Apprends d&apos;autres postes : plus d&apos;heures possibles, plus de valeur, et tu aides l&apos;équipe quand un poste est débordé. Chaque poste maîtrisé = un badge.
+          </p>
+          <div className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg bg-white/70 border border-emerald-100 p-2">
+              <p className="font-semibold text-emerald-900">👨‍🍳 Cuisine</p>
+              <p className="text-emerald-700/80">Cuisinier · Pizzaïolo · Snacking se complètent</p>
+            </div>
+            <div className="rounded-lg bg-white/70 border border-emerald-100 p-2">
+              <p className="font-semibold text-emerald-900">🍽️ Salle &amp; caisse</p>
+              <p className="text-emerald-700/80">Serveur · Barman · Encaissement Snacking</p>
+            </div>
+            <div className="rounded-lg bg-white/70 border border-emerald-100 p-2">
+              <p className="font-semibold text-emerald-900">🏅 Tes badges</p>
+              <p className="text-emerald-700/80">1 certif = 🎯 · 3 certifs = 🔪 Couteau suisse</p>
+            </div>
+          </div>
+          <p className="text-xs text-emerald-700/70 mt-2">
+            Comment : choisis un poste ci-dessous → lis le manuel → pratique → passe le quiz (80 %) → badge obtenu 🎉
+          </p>
+        </div>
+      </div>
       <FormationListClient
         guides={guides}
         employes={employes}
