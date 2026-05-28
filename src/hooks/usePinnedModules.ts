@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 export const MAX_PINNED = 5
 const STORAGE_KEY = 'pinned_modules'
 
-export function usePinnedModules() {
+export function usePinnedModules(defaultPins?: string[]) {
   const [pinned, setPinned] = useState<string[]>([])
 
   // Hydrate depuis localStorage au mount
@@ -21,8 +21,14 @@ export function usePinnedModules() {
         if (Array.isArray(arr) && arr.every(x => typeof x === 'string')) {
           setPinned(arr.slice(0, MAX_PINNED))
         }
+      } else if (defaultPins && defaultPins.length > 0) {
+        // 1ère utilisation (aucune préférence) : pré-épingle les écrans clés.
+        const next = defaultPins.slice(0, MAX_PINNED)
+        setPinned(next)
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
       }
     } catch { /* SSR / private mode */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Synchronise les changements entre onglets (storage event)

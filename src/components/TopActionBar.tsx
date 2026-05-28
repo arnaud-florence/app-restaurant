@@ -332,7 +332,12 @@ export default function TopActionBar({
   /** Sous-modules épinglés par l'utilisateur (localStorage). Apparaissent dans
    *  la barre entre Accueil et les catégories. Max 5. Pinning/unpinning via
    *  l'étoile dans le drawer Modules. */
-  const { pinned, isPinned, togglePin, count: nbPinned } = usePinnedModules()
+  // Pré-épingle les 5 écrans clés du gérant à la 1ère utilisation (raccourcis du matin).
+  const { pinned, isPinned, togglePin, count: nbPinned } = usePinnedModules(
+    profil?.role === 'manager'
+      ? ['/admin/pilotage', '/admin/stock', '/admin/finances', '/caisse', '/admin/rh']
+      : undefined,
+  )
 
   // Résout les hrefs pinnés en items concrets (label/emoji/tone) depuis CATEGORIES
   const pinnedItems = useMemo(() => {
@@ -354,9 +359,15 @@ export default function TopActionBar({
   useEffect(() => {
     try {
       const v = localStorage.getItem('service_intense_mode')
-      if (v === '1') setServiceMode(true)
+      if (v === '1') { setServiceMode(true); return }
+      if (v === '0') return // choix explicite "mode complet" respecté
+      // Aucune préférence enregistrée : on active le mode service par défaut si
+      // l'employé arrive sur un écran de service (cuisine/bar/salle/caisse…),
+      // pour lui montrer les écrans ops directs plutôt que la nav admin.
+      const opsPrefixes = ['/serveur', '/cuisine', '/bar', '/caisse', '/emporter', '/livreur', '/pizza', '/reception']
+      if (opsPrefixes.some(p => pathname === p || pathname.startsWith(p + '/'))) setServiceMode(true)
     } catch { /* SSR / private mode */ }
-  }, [])
+  }, [pathname])
   function toggleServiceMode() {
     setServiceMode(prev => {
       const next = !prev
