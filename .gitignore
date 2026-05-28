@@ -50,3 +50,6 @@ sql/setup-pgcron-agents.sql
 
 # Sauvegardes locales (contiennent des données prod, ne pas pousser)
 /backups/
+
+# Résultats de campagne E2E (screenshots + rapports JSON, artefacts locaux)
+/e2e-results/
