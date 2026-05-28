@@ -43,9 +43,12 @@ export const dynamic = 'force-dynamic'
 const POSTE_TO_WIDGET: Record<string, PosteWidget> = {
   manager: 'gerant', gerant: 'gerant',
   cuisine: 'cuisinier', cuisinier: 'cuisinier',
+  cuisinier_snacking: 'snacking',   // production snacking (burgers/tacos/paninis)
   pizzaiolo: 'pizzaiolo',
   bar: 'barman', barman: 'barman',
   serveur: 'serveur', salle: 'serveur',
+  snack: 'caisse_snacking',         // encaissement comptoir/borne
+  livreur: 'livreur',               // débloque la checklist livreur (kilométrage, fond rendu)
   receptionniste: 'receptionniste',
   second: 'second',
   plonge: 'plonge', extra: 'plonge',
@@ -58,11 +61,14 @@ const POSTE_TO_ACTION: Record<string, { href: string; label: string; emoji: stri
   second:         { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   cuisine:        { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   cuisinier:      { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
+  cuisinier_snacking: { href: '/emporter',       label: 'Service snacking',   emoji: '🍔' },
   pizzaiolo:      { href: '/pizza',               label: 'Service pizza',      emoji: '🍕' },
   serveur:        { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
   salle:          { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
   bar:            { href: '/bar',                label: 'Service bar',        emoji: '🍷' },
   barman:         { href: '/bar',                label: 'Service bar',        emoji: '🍷' },
+  snack:          { href: '/emporter',           label: 'Caisse snacking',    emoji: '🛒' },
+  livreur:        { href: '/livreur',            label: 'Mes livraisons',     emoji: '🛵' },
   receptionniste: { href: '/admin/reservations', label: 'Réservations',       emoji: '📅' },
   plonge:         { href: '/admin/hygiene',      label: 'Hygiène & nettoyage', emoji: '🧴' },
   extra:          { href: '/admin/hygiene',      label: 'Hygiène & nettoyage', emoji: '🧴' },

@@ -321,11 +321,6 @@ export default function LivreurClient({
           </section>
         )}
 
-        {/* Note Phase 3 (à venir) */}
-        <div className="rounded-md bg-zinc-900 border border-zinc-800 p-3 text-xs text-zinc-500 italic">
-          <p className="font-bold text-zinc-400 mb-1 not-italic">📋 À venir Phase 3</p>
-          <p>Optimisation trajet multi-livraisons · SMS auto au client si retard · Statut dédié 'en_livraison'.</p>
-        </div>
       </main>
 
       {navProfil && <OpsBottomNav profil={navProfil} />}

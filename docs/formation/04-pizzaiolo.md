@@ -48,7 +48,9 @@ Mêmes accès que le **cuisinier** sauf que tout est **filtré PIZZA** :
 | **`/equipes`** | ÉCRITURE | Pas de filtre |
 | **`/admin/formation`** | ÉCRITURE | Pas de filtre |
 
-**Tu n'as PAS accès à** : finances, RH (sauf pointage), réservations, sécurité, configuration, fournisseurs, boissons. Idem cuisinier.
+Tu **as accès aux fournisseurs** (`/admin/fournisseurs`) pour réceptionner les livraisons pizza et passer des bons de commande (selon l'autonomie accordée par le gérant).
+
+**Tu n'as PAS accès à** : finances, RH (sauf pointage), réservations, sécurité, configuration, boissons. Idem cuisinier.
 
 **EN PLUS du cuisinier**, tu as accès à `/emporter` (pour aider à encaisser les commandes BORNE/COMPTOIR si besoin, et voir les commandes ONLINE en attente de retrait).
 

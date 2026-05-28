@@ -30,7 +30,9 @@ Tu **reçois les commandes du serveur, tu produis les plats, tu garantis la tra�
 | **`/equipes`** | ÉCRITURE | Chat équipe |
 | **`/admin/formation`** | ÉCRITURE (parcours guides) | Tes formations |
 
-**Tu n'as PAS accès à** : finances, RH (sauf pointage), réservations, sécurité, configuration, fournisseurs, boissons. Si tu en as besoin, vois avec le second ou le gérant.
+Tu **as accès aux fournisseurs** (`/admin/fournisseurs`) pour **réceptionner les livraisons** (scan du bon, DLC, n° de lot) et **passer des bons de commande** — selon l'autonomie que le gérant t'a accordée (sinon le bon part en validation chez lui).
+
+**Tu n'as PAS accès à** : finances, RH (sauf pointage), réservations, sécurité, configuration, boissons. Si tu en as besoin, vois avec le second ou le gérant.
 
 ---
 
