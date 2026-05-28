@@ -129,7 +129,7 @@ export default function ProduitCard({
           {produit.nom}
         </p>
         <p className="text-emerald-400 font-bold text-base tabular-nums mt-1">
-          {fmtPrix(produit.prix_vente_ht)}
+          {fmtPrix(produit.prix_vente_ht)} <span className="text-[10px] font-medium text-emerald-400/60">HT</span>
         </p>
       </div>
     </button>

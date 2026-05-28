@@ -324,6 +324,18 @@ export default function EncaissementModal({
           <button onClick={onClose} className="min-h-[44px] min-w-[44px] rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400">×</button>
         </div>
 
+        {/* Récap des articles — permet de vérifier l'addition sans imprimer le ticket (litiges) */}
+        <div className="px-5 py-2.5 border-b border-zinc-800 max-h-44 overflow-y-auto bg-zinc-950/40">
+          <ul className="space-y-1 text-sm">
+            {commande.articles.map((a, i) => (
+              <li key={i} className="flex justify-between gap-3">
+                <span className="truncate text-zinc-200"><b className="text-emerald-400 tabular-nums">×{a.quantite}</b> {a.recette_nom}</span>
+                <span className="tabular-nums text-zinc-400 shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)} <span className="text-[10px] text-zinc-600">HT</span></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Toggle Sur place / À emporter (recalcule TVA) */}
         <div className="px-5 py-3 border-b border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-xs text-zinc-400">

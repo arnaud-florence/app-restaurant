@@ -77,6 +77,16 @@ export default function ServeurClient({
   // Sync depuis props (post router.refresh)
   useEffect(() => { setCommandes(initialCommandes) }, [initialCommandes])
 
+  // Persistance du serveur sélectionné : évite de le re-choisir à chaque
+  // rafraîchissement realtime (sinon pourboires/ventes non attribués).
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('serveur_actif_id') : null
+    if (saved) setServeurId(saved)
+  }, [])
+  useEffect(() => {
+    if (serveurId) window.localStorage.setItem('serveur_actif_id', serveurId)
+  }, [serveurId])
+
   // Realtime sur commandes / commande_articles / tables_restaurant
   useEffect(() => {
     const supabase = createClient()
@@ -155,6 +165,14 @@ export default function ServeurClient({
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
 
   function ouvrirTable(t: Table) {
+    // Si la table est prête à encaisser (commande servie), le tap mène
+    // DIRECTEMENT à l'encaissement — l'action la plus probable sur une carte
+    // rouge "à encaisser" (évite d'ouvrir le menu de prise de commande).
+    const cmd = cmdParTable.get(t.numero)
+    if (cmd && cmd.statut === 'servi') {
+      setEncaisserCmd(cmd)
+      return
+    }
     setTableSelectionnee(t)
     setPanier([])
     setErreur('')

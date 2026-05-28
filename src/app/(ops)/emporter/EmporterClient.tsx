@@ -661,7 +661,7 @@ function CommandeComptoirCard({
         {/* Bouton Encaisser : MASQUÉ si la commande est déjà payée
             (cas BORNE / SNACK comptoir pré-paiement). On affiche à la place
             un libellé "Déjà encaissée" pour information. */}
-        {(commande.statut === 'pret' || commande.statut === 'servi') && (
+        {(commande.statut === 'pret' || commande.statut === 'servi' || commande.statut === 'en_attente_paiement_comptoir') && (
           commande.mode_paiement
             ? (
               <div className="flex-1 min-h-[44px] rounded-md bg-emerald-900/30 border border-emerald-700 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 px-2">
