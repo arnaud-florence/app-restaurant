@@ -517,10 +517,11 @@ function Ticket({
             href={`/print/bons/${commande.id}?dest=${articles[0].tag_destination}`}
             target="_blank"
             rel="noopener"
-            className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+            className="text-base min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
             title="Réimprimer le bon de préparation"
           >🖨</a>
-          <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
+          <div className={cn('font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text,
+            min === 'rouge' ? 'text-base animate-pulse ring-2 ring-red-300' : 'text-sm')}>
             ⏱ {formatEcoule(commande.created_at, now)}
           </div>
         </div>
@@ -552,10 +553,10 @@ function Ticket({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-baseline gap-2 min-w-0 flex-1">
                   <span className="text-2xl font-bold tabular-nums shrink-0">×{a.quantite}</span>
-                  <p className="text-base font-semibold leading-tight truncate">{a.recette_nom}</p>
+                  <p className="text-base font-semibold leading-tight break-words">{a.recette_nom}</p>
                 </div>
                 <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
-                  {aSty.emoji}
+                  {aSty.emoji} <span className="hidden sm:inline">{aSty.label}</span>
                 </span>
                 {next && (
                   <button

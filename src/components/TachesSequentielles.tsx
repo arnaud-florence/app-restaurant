@@ -78,17 +78,10 @@ export default function TachesSequentielles({
   const muted = isDark ? 'text-zinc-400' : 'text-zinc-500'
 
   // ─── Pas d'employé sélectionné ────────────────────────────────────
-  if (!employeId) {
-    return (
-      <div className={cn('rounded-lg border p-4 flex items-center gap-3', surface)}>
-        <span className="text-2xl">👤</span>
-        <div>
-          <p className="font-bold text-sm">Sélectionne ton nom</p>
-          <p className={cn('text-xs', muted)}>Pour afficher tes tâches du jour.</p>
-        </div>
-      </div>
-    )
-  }
+  // Mode kiosk (aucun employé rattaché) : on n'affiche RIEN plutôt qu'une
+  // consigne "Sélectionne ton nom" sans sélecteur (qui faisait croire à un bug).
+  // Les tickets de commande restent affichés normalement par ailleurs.
+  if (!employeId) return null
 
   // ─── Tout fini : félicitations ────────────────────────────────────
   if (!currentTache) {

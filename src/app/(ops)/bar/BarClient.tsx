@@ -459,10 +459,10 @@ function TicketCommande({
             href={`/print/bons/${commande.id}?dest=BAR`}
             target="_blank"
             rel="noopener"
-            className="text-xs h-7 px-2 inline-flex items-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
+            className="text-base min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
             title="Réimprimer le bon bar"
           >🖨</a>
-          <div className={cn('text-sm font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text)}>
+          <div className={cn('font-bold tabular-nums px-2 py-0.5 rounded text-sm', minSty.bg, minSty.text)}>
             ⏱ {formatEcoule(commande.created_at, now)}
           </div>
         </div>
@@ -494,7 +494,7 @@ function TicketCommande({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-baseline gap-2 min-w-0 flex-1">
                   <span className="text-2xl font-bold tabular-nums text-zinc-100 flex-shrink-0">×{a.quantite}</span>
-                  <p className="text-base font-semibold leading-tight truncate">{a.recette_nom}</p>
+                  <p className="text-base font-semibold leading-tight break-words">{a.recette_nom}</p>
                 </div>
                 <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0', statutSty.bg, statutSty.text)}>
                   {statutSty.emoji}
@@ -537,7 +537,7 @@ function TicketCommande({
                     <span className="opacity-70">{tagSty.emoji}</span> <b className="tabular-nums">×{a.quantite}</b> {a.recette_nom}
                   </span>
                   <span className={cn('text-[9px] px-1 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
-                    {aSty.emoji}
+                    {aSty.emoji} <span className="hidden sm:inline">{aSty.label}</span>
                   </span>
                 </li>
               )
