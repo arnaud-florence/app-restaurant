@@ -3,6 +3,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { startOfMonth, endOfMonth, format, subMonths, subYears } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { foodCostMoyenEtAlertes } from './foodCostAgg'
 
 // ─── Types ────────────────────────────────────────────────────────
 export type KpiCode =
@@ -133,7 +134,7 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
     supabase.from('employes').select('id, salaire_horaire').eq('actif', true),
     supabase.from('pointage').select('employe_id, heures_travaillees')
       .gte('date_pointage', p.debut).lte('date_pointage', p.fin).not('heures_travaillees', 'is', null),
-    supabase.from('recettes').select('food_cost_pct').not('food_cost_pct', 'is', null),
+    foodCostMoyenEtAlertes(supabase),  // food cost calculé au runtime (recettes.food_cost_pct n'existe pas)
     supabase.from('non_conformites').select('id', { count: 'exact', head: true }).eq('statut', 'ouverte'),
     supabase.from('releves_energie').select('consommation, unite, date_releve').gte('date_releve', debut30j).lte('date_releve', fin30j),
     supabase.from('factures_fournisseurs').select('montant_ttc').eq('statut', 'a_payer'),
@@ -159,8 +160,8 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
     return s + (h > 0 ? h * (tauxParId.get(p.employe_id as string) ?? 0) : 0)
   }, 0)
 
-  const fcs = (recettesRes.data ?? []).map(r => Number(r.food_cost_pct ?? 0)).filter(n => n > 0)
-  const foodCostMoyen = fcs.length > 0 ? fcs.reduce((a, b) => a + b, 0) / fcs.length : 0
+  // recettesRes = résultat de foodCostMoyenEtAlertes (food cost calculé runtime)
+  const foodCostMoyen = recettesRes.moyen
   const margeBrute = foodCostMoyen > 0 ? 100 - foodCostMoyen : 0
 
   // Somme uniquement des relevés en kWh (élec/gaz). m3/litre exclus du KPI "énergie/couvert".

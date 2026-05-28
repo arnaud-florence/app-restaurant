@@ -34,8 +34,11 @@ export default async function EnergiePage() {
       .select('*')
       .gte('periode_debut', format(new Date(today.getFullYear() - 2, today.getMonth(), 1), 'yyyy-MM-dd'))
       .order('periode_debut'),
-    supabase.from('commande_articles')
-      .select('quantite, commande:commandes(statut, created_at)')
+    // Plats servis ce mois : on part de `commandes` (qui a created_at) et on
+    // embarque les articles. commande_articles n'a PAS de colonne created_at.
+    supabase.from('commandes')
+      .select('statut, created_at, commande_articles(quantite)')
+      .neq('statut', 'annule')
       .gte('created_at', debutMois)
       .lte('created_at', finMois + 'T23:59:59'),
   ])
@@ -57,12 +60,12 @@ export default async function EnergiePage() {
     created_at: r.created_at as string,
   }))
 
-  // Compte les plats servis ce mois (statut servi/encaisse non annulé)
-  type ArtRow = { quantite: number | string; commande?: { statut?: string; created_at?: string } | null }
-  const arts = (articlesRes.data ?? []) as ArtRow[]
-  const nb_plats_mois = arts
-    .filter(a => a.commande && a.commande.statut !== 'annule')
-    .reduce((s, a) => s + Number(a.quantite ?? 0), 0)
+  // Compte les plats servis ce mois (commandes non annulées → somme des quantités d'articles)
+  type CmdRow = { statut?: string; commande_articles?: Array<{ quantite: number | string }> | null }
+  const cmdsMois = (articlesRes.data ?? []) as CmdRow[]
+  const nb_plats_mois = cmdsMois
+    .filter(c => c.statut !== 'annule')
+    .reduce((s, c) => s + (c.commande_articles ?? []).reduce((ss, a) => ss + Number(a.quantite ?? 0), 0), 0)
 
   const total_energie_mois = releves
     .filter(r => r.periode_debut.slice(0, 7) === moisCourant)

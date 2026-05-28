@@ -168,15 +168,21 @@ export async function recalculerStatsClient(client_id: string) {
   if (!client_id) throw new Error('client_id manquant')
   const supabase = await createClient()
   const { data: c } = await supabase.from('clients').select('email, telephone').eq('id', client_id).single()
-  if (!c?.email && !c?.telephone) throw new Error('Client sans email/téléphone — impossible de matcher commandes')
 
-  let q = supabase.from('commandes').select('montant_total_ttc, created_at').eq('statut', 'encaisse')
-  if (c.email) q = q.eq('client_email', c.email)
-  else if (c.telephone) q = q.eq('client_telephone', c.telephone)
-  const { data: cmds } = await q
+  // Matche les commandes encaissées par client_id (flux salle/caisse, qui ne posent
+  // QUE client_id) OU par email/téléphone (flux ONLINE). Évite d'écraser les stats à 0.
+  // Montant en HT pour rester cohérent avec le recalcul automatique (lib/fidelite.ts).
+  const orConds = [`client_id.eq.${client_id}`]
+  if (c?.email) orConds.push(`client_email.eq.${c.email}`)
+  if (c?.telephone) orConds.push(`client_telephone.eq.${c.telephone}`)
+
+  const { data: cmds } = await supabase.from('commandes')
+    .select('montant_total_ht, created_at')
+    .eq('statut', 'encaisse')
+    .or(orConds.join(','))
 
   const nb = cmds?.length ?? 0
-  const total = (cmds ?? []).reduce((s, x) => s + Number(x.montant_total_ttc ?? 0), 0)
+  const total = (cmds ?? []).reduce((s, x) => s + Number(x.montant_total_ht ?? 0), 0)
   const derniere = (cmds ?? []).map(x => x.created_at as string).sort().pop()?.slice(0, 10) ?? null
   const niveau = calculerNiveau(nb)
 
