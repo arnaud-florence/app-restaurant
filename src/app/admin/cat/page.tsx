@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { CATEGORIES, type Category } from '@/lib/navigation'
 import { getProfile } from '@/lib/auth'
+import { foodCostMoyenEtAlertes } from '@/lib/foodCostAgg'
 import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { ArrowRight, Sparkles, AlertTriangle, TrendingUp, Users } from 'lucide-react'
@@ -50,16 +51,18 @@ export default async function CatIndexPage() {
   const monthStart = new Date()
   monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
 
-  const [alertesRes, caRes, equipeRes] = await Promise.all([
+  const [alertesRes, caRes, equipeRes, foodCostAgg] = await Promise.all([
     sb.from('agent_findings').select('id', { count: 'exact', head: true })
       .eq('resolu', false).eq('urgence', 'rouge'),
     sb.from('commandes').select('montant_total_ttc').eq('statut', 'encaisse')
       .gte('created_at', monthStart.toISOString()),
     sb.from('employes').select('id', { count: 'exact', head: true }).eq('actif', true),
+    foodCostMoyenEtAlertes(sb),  // food cost moyen calculé runtime
   ])
   const nbAlertesRouges = alertesRes.count ?? 0
   const caMois = (caRes.data ?? []).reduce((s, c) => s + Number(c.montant_total_ttc ?? 0), 0)
   const nbEquipe = equipeRes.count ?? 0
+  const fcMoyen = foodCostAgg.moyen  // 0 si recettes pas encore composées
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -124,8 +127,8 @@ export default async function CatIndexPage() {
           </div>
         </header>
 
-        {/* Bento stats — 3 cards alertes / CA / équipe */}
-        <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        {/* Bento stats — 4 cards : alertes / CA / food cost / équipe */}
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <StatCard
             label="Alertes urgentes"
             value={nbAlertesRouges.toString()}
@@ -133,6 +136,14 @@ export default async function CatIndexPage() {
             tone={nbAlertesRouges > 0 ? 'red' : 'emerald'}
             hint={nbAlertesRouges > 0 ? 'à traiter maintenant' : 'tout est sous contrôle'}
             href="/admin/cat/pilotage"
+          />
+          <StatCard
+            label="Food cost"
+            value={fcMoyen > 0 ? fcMoyen.toFixed(1).replace('.', ',') + ' %' : '—'}
+            icon={<TrendingUp className="h-4 w-4" strokeWidth={2.5} />}
+            tone={fcMoyen > 32 ? 'red' : 'emerald'}
+            hint={fcMoyen > 0 ? (fcMoyen > 32 ? 'trop élevé' : fcMoyen >= 28 ? 'à surveiller' : 'sain') : 'composez vos recettes'}
+            href="/admin/recettes/engineering"
           />
           <StatCard
             label="CA du mois"
