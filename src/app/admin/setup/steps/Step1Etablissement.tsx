@@ -64,7 +64,7 @@ export default function Step1Etablissement({
               type="email"
               value={value.email}
               onChange={e => set('email', e.target.value)}
-              placeholder="contact@lerelais.fr"
+              placeholder="contact@casatasia.fr"
             />
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function Step1Etablissement({
             type="url"
             value={value.site_web}
             onChange={e => set('site_web', e.target.value)}
-            placeholder="https://lerelais.fr"
+            placeholder="https://casatasia.fr"
           />
         </div>
 

@@ -114,23 +114,11 @@ async function chargerAlertesStockPoste(
     .in('recette_id', recetteIds)
   const ingredientIds = [...new Set((liens ?? []).map(l => l.ingredient_id).filter(Boolean) as string[])]
   if (ingredientIds.length === 0) {
-    // Fallback : pas de recette_ingredients configuré, on prend les alertes globales
-    // (tout ingrédient en rupture ou sous minimum)
-    const { data: ings } = await supabase
-      .from('ingredients')
-      .select('id, nom, unite, stock_actuel, stock_minimum')
-      .eq('actif', true)
-      .limit(50)
-    return (ings ?? [])
-      .filter(i => Number(i.stock_actuel ?? 0) <= Number(i.stock_minimum ?? 0))
-      .slice(0, limit)
-      .map(i => ({
-        ingredient_nom: i.nom as string,
-        stock_actuel: Number(i.stock_actuel ?? 0),
-        unite: (i.unite as string) ?? '',
-        type: Number(i.stock_actuel ?? 0) <= 0 ? 'rupture' as const : 'min' as const,
-        message: Number(i.stock_actuel ?? 0) <= 0 ? 'Rupture' : `Sous minimum (${i.stock_minimum})`,
-      }))
+    // Pas de recette_ingredients liés à ce tag → on n'affiche AUCUNE alerte
+    // plutôt que toutes les alertes globales (sinon le barman/livreur voyait
+    // des ruptures de "filet de bœuf" hors-sujet). Le filtrage par tag se fera
+    // correctement une fois les recettes composées (ingrédients associés).
+    return []
   }
 
   const { data: ings } = await supabase

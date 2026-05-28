@@ -77,7 +77,7 @@ export default function Step6Employes({
                   type="email"
                   value={e.email}
                   onChange={ev => modifier(e.id, { email: ev.target.value })}
-                  placeholder="marie@lerelais.fr"
+                  placeholder="marie@casatasia.fr"
                 />
               </div>
               <div className="space-y-1.5">
