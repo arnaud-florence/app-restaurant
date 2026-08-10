@@ -57,15 +57,18 @@ where r.tag_destination = 'FOURNIL'
 
 -- ─── Diagnostic ──────────────────────────────────────────────────────
 do $$
-declare r record; nb_recettes_visibles int; nb_online int; nb_sans_allergene int;
+-- `rec` et non `r` : `r` sert d'alias de table plus bas dans ce même bloc,
+-- et plpgsql ne sait alors plus si `r.actif` désigne la variable de boucle
+-- ou la colonne (erreur 42702 « column reference is ambiguous »).
+declare rec record; nb_recettes_visibles int; nb_online int; nb_sans_allergene int;
 begin
   raise notice '── APRÈS BASCULE ──';
-  for r in select nom, actif from etablissements order by ordre loop
-    raise notice '  PdV % : %', r.nom, case when r.actif then 'ACTIF' else 'fermé' end;
+  for rec in select nom, actif from etablissements order by ordre loop
+    raise notice '  PdV % : %', rec.nom, case when rec.actif then 'ACTIF' else 'fermé' end;
   end loop;
 
-  for r in select cle, actif from activites_modules order by ordre loop
-    raise notice '  module % : %', r.cle, case when r.actif then 'ALLUMÉ' else 'éteint' end;
+  for rec in select cle, actif from activites_modules order by ordre loop
+    raise notice '  module % : %', rec.cle, case when rec.actif then 'ALLUMÉ' else 'éteint' end;
   end loop;
 
   -- Ce que le site public verra désormais sur /menu
