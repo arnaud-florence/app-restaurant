@@ -5,7 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import QuizClient from './QuizClient'
 import { getProfile } from '@/lib/auth'
 import { guideAccessibleAuPoste, type Guide, type Question, type Progression } from '@/lib/formation'
-import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 
 export const dynamic = 'force-dynamic'
 

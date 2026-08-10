@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import { detecterEtNotifier } from '@/lib/challenges-notif'
 import { creerNotification } from '@/lib/notifications'
+import { getRappelsPourEmploye } from '@/lib/co-gerant/rappels-salarie'
+import { sendPushToEmployeRateLimited } from '@/lib/push'
 
 function todayISO() { return new Date().toISOString().slice(0, 10) }
 function nowTimeISO() { return new Date().toTimeString().slice(0, 8) }
@@ -34,6 +36,20 @@ export async function pointerArrivee(): Promise<{ ok: true; heure: string }> {
     heure_arrivee: heure,
   })
   if (error) throw new Error(error.message)
+
+  // 🧑‍💼 Arnaud pousse les rappels du jour à la prise de poste (best-effort, plafonné 3/h)
+  try {
+    const r = await getRappelsPourEmploye(profil.employe_id, profil.poste ?? null)
+    if (r.rappels.length) {
+      const top = r.rappels.slice(0, 3).map(x => x.titre).join(' · ')
+      await sendPushToEmployeRateLimited(profil.employe_id, {
+        title: '🧑‍💼 Arnaud — bon service !',
+        body: `À ne pas oublier : ${top}`,
+        url: '/mon-espace',
+        tag: 'arnaud-rappels',
+      }, { maxPerHour: 3 })
+    }
+  } catch { /* push best-effort */ }
 
   revalidatePath('/mon-espace')
   return { ok: true as const, heure }

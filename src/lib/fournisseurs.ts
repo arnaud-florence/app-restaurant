@@ -44,12 +44,13 @@ export type BonCommande = {
   id: string
   fournisseur_id: string
   fournisseur_nom?: string
-  statut: 'brouillon' | 'envoye' | 'recu' | 'annule'
+  statut: 'brouillon' | 'a_valider' | 'envoye' | 'recu' | 'annule'
   date_commande: string
   date_livraison_prevue: string | null
   montant_total_ht: number
   notes: string | null
   created_at: string
+  reception_a_verifier?: boolean
   lignes: BonCommandeLigne[]
 }
 
@@ -72,6 +73,7 @@ export type Facture = {
 // ─── Constantes UI ───────────────────────────────────────────────────
 export const STATUT_BON_LABEL: Record<BonCommande['statut'], { label: string; emoji: string; cls: string }> = {
   brouillon: { label: 'Brouillon',      emoji: '📝', cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' },
+  a_valider: { label: 'À valider',      emoji: '🕓', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
   envoye:    { label: 'Envoyé',         emoji: '📧', cls: 'bg-blue-100 text-blue-800 border-blue-300' },
   recu:      { label: 'Reçu',           emoji: '✅', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   annule:    { label: 'Annulé',         emoji: '❌', cls: 'bg-red-100 text-red-800 border-red-300' },

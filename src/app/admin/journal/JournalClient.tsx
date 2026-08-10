@@ -13,6 +13,7 @@ import {
   HUMEUR_INFO, fmtPrix, fmtDate, fmtDateCourt,
 } from '@/lib/journal'
 import { creerEntree, updateEntree, supprimerEntree } from './actions'
+import { askConfirm } from '@/lib/confirm'
 
 export default function JournalClient({
   entrees, employes, analyses,
@@ -59,7 +60,7 @@ export default function JournalClient({
           title="Journal de bord"
           description="Notes humeurs, photos joignables, analyses IA sur 6 mois."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Entrées" value={String(analyses.total)} />
               <KPI label="Score moyen" value={`${analyses.score_moyen}/5`} accent={analyses.score_moyen >= 3.5 ? 'vert' : analyses.score_moyen >= 2.5 ? 'zinc' : 'rouge'} />
               <KPI label="Tendance" value={analyses.tendance === 'amelioration' ? '📈 Mieux' : analyses.tendance === 'degradation' ? '📉 Moins bien' : analyses.tendance === 'stable' ? '➡️ Stable' : '— Inconnu'}
@@ -70,7 +71,7 @@ export default function JournalClient({
 
         {/* Analyses */}
         <section className="rounded-lg border border-zinc-200 bg-white p-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700 mb-3">📊 Analyses corrélations 6 mois</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700 mb-3">📊 Tendance humeur / CA · 6 mois</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <p className="text-xs text-zinc-500 mb-1">Répartition humeurs</p>
@@ -255,7 +256,7 @@ function DetailEntree({ entree, onEdit, onError, onOk }: { entree: Entree; onEdi
         <div className="flex gap-2 pt-3 border-t border-zinc-200">
           <button onClick={onEdit} className="text-xs h-9 px-3 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️ Modifier</button>
           <button onClick={async () => {
-            if (!confirm('Supprimer définitivement cette entrée ?')) return
+            if (!(await askConfirm('Supprimer définitivement cette entrée ?'))) return
             try { await supprimerEntree(entree.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
           }} className="text-xs h-9 px-3 text-zinc-500 hover:text-red-700">🗑 Supprimer</button>
         </div>

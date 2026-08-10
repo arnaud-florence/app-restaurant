@@ -115,7 +115,49 @@ export default async function PerformanceCard() {
         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1">
           <Users className="h-3 w-3" /> Primes prévisionnelles équipe ({perf.employes.length})
         </h4>
-        <div className="overflow-x-auto -mx-2">
+        {/* Cartes mobile */}
+        <ul className="md:hidden divide-y divide-zinc-100">
+          {perf.employes.length === 0 ? (
+            <li className="py-6 text-center text-zinc-500 italic text-sm">Aucun employé actif.</li>
+          ) : (
+            perf.employes.map(p => (
+              <li key={p.employe.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-zinc-900 truncate">{p.employe.prenom} {p.employe.nom}</p>
+                  <p className="text-[11px] text-zinc-500">{p.employe.poste} · {p.heures.toFixed(1)} h</p>
+                  <p className="text-[11px] mt-0.5 flex flex-wrap gap-x-2">
+                    <span className="text-emerald-700 tabular-nums">{p.primes_fixes > 0 ? `fixes +${p.primes_fixes.toFixed(2)} €` : 'fixes —'}</span>
+                    <span className="text-amber-700 tabular-nums">{p.bonus_surplus > 0 ? `bonus +${p.bonus_surplus.toFixed(2)} €` : 'bonus —'}</span>
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <strong className="tabular-nums text-zinc-900 text-base">
+                    {p.total > 0 ? `${p.total.toFixed(2)} €` : '—'}
+                  </strong>
+                </div>
+              </li>
+            ))
+          )}
+          {perf.employes.length > 0 && (
+            <li className="py-3 flex items-center justify-between gap-3 bg-zinc-50 -mx-2 px-2 rounded">
+              <div className="min-w-0">
+                <p className="font-bold text-zinc-900">TOTAL</p>
+                <p className="text-[11px] text-zinc-500 tabular-nums">{perf.total_heures.toFixed(1)} h</p>
+                <p className="text-[11px] mt-0.5 flex flex-wrap gap-x-2">
+                  <span className="text-emerald-700 tabular-nums font-bold">fixes +{perf.employes.reduce((s, p) => s + p.primes_fixes, 0).toFixed(2)} €</span>
+                  <span className="text-amber-700 tabular-nums font-bold">bonus +{perf.pool_equipe.toFixed(2)} €</span>
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <strong className="tabular-nums text-emerald-700 text-base">
+                  {perf.employes.reduce((s, p) => s + p.total, 0).toFixed(2)} €
+                </strong>
+              </div>
+            </li>
+          )}
+        </ul>
+        {/* Table desktop */}
+        <div className="hidden md:block overflow-x-auto -mx-2">
           <table className="w-full text-sm">
             <thead className="bg-zinc-50">
               <tr>

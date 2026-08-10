@@ -101,14 +101,18 @@ export default async function BorneAdminPage() {
 
       {/* KPIs du jour */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 4 KPI principaux visibles sur mobile */}
         <Kpi label="CA borne aujourd'hui" value={`${caJour.toFixed(2)} €`} emoji="💰" accent="emerald" />
-        <Kpi label="Commandes encaissées" value={String(nbEncaissees)} emoji="✓" accent="emerald" />
         <Kpi label="Paiement NFC" value={String(nbNfc)} emoji="📡" accent="blue" />
         <Kpi label="Paiement comptoir" value={String(nbComptoir)} emoji="🏪" accent="violet" />
-        <Kpi label="Avec fidélité" value={String(nbFidelite)} emoji="🎁" accent="amber" />
-        <Kpi label="Remises fidélité" value={`${remisesJour.toFixed(2)} €`} emoji="−" accent="amber" />
-        <Kpi label="Annulées / expirées" value={String(nbAnnulees)} emoji="✗" accent="red" />
         <Kpi label="Échecs NFC (7j)" value={String(nbEchecsNFC7j ?? 0)} emoji="⚠" accent="red" />
+        {/* 4 KPI secondaires masqués sur mobile (économise 2 écrans) */}
+        <div className="hidden sm:contents">
+          <Kpi label="Commandes encaissées" value={String(nbEncaissees)} emoji="✓" accent="emerald" />
+          <Kpi label="Avec fidélité" value={String(nbFidelite)} emoji="🎁" accent="amber" />
+          <Kpi label="Remises fidélité" value={`${remisesJour.toFixed(2)} €`} emoji="−" accent="amber" />
+          <Kpi label="Annulées / expirées" value={String(nbAnnulees)} emoji="✗" accent="red" />
+        </div>
       </section>
 
       {/* Sessions actives */}
@@ -129,7 +133,7 @@ export default async function BorneAdminPage() {
             <tbody>
               {sessions.map(s => (
                 <tr key={s.borne_id} className="border-b border-zinc-100">
-                  <td className="py-2 font-mono text-xs">{s.borne_id}</td>
+                  <td className="py-2 font-mono text-xs"><span className="truncate inline-block max-w-[120px] sm:max-w-none align-middle" title={s.borne_id}>{s.borne_id}</span></td>
                   <td className="py-2">
                     {s.active ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">

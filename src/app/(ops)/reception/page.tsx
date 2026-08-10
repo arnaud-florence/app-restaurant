@@ -5,19 +5,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import BriefingPoste from '@/components/BriefingPoste'
-import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import ReceptionClient from './ReceptionClient'
 
 export const metadata = { title: 'Réception — Service' }
 export const dynamic = 'force-dynamic'
 
-export default async function ReceptionPage() {
+const ONGLETS_VALIDES = ['tables', 'demandes', 'arrivees', 'departs', 'chambres', 'semaine'] as const
+type OngletReception = typeof ONGLETS_VALIDES[number]
+
+export default async function ReceptionPage({ searchParams }: { searchParams?: { tab?: string } }) {
+  const tabParam = searchParams?.tab
+  const tabInitial: OngletReception = ONGLETS_VALIDES.includes(tabParam as OngletReception) ? (tabParam as OngletReception) : 'demandes'
   const supabase = await createClient()
   const today = new Date().toISOString().slice(0, 10)
   const dans7j = new Date(); dans7j.setDate(dans7j.getDate() + 7)
 
-  const [arriveesRes, departsRes, demandesRes, futuresRes, chambresRes] = await Promise.all([
+  const [arriveesRes, departsRes, demandesRes, futuresRes, chambresRes, resaTablesRes] = await Promise.all([
     // Arrivées aujourd'hui
     supabase.from('reservations_chambres')
       .select('id, chambre_id, client_nom, client_email, client_telephone, date_arrivee, date_depart, nb_personnes, montant_total, acompte_verse, statut, notes, chambre:chambres(nom, numero)')
@@ -48,6 +52,11 @@ export default async function ReceptionPage() {
       .select('id, nom, numero, capacite, prix_nuit_ht')
       .eq('actif', true)
       .order('numero'),
+    // Réservations de TABLES aujourd'hui (pour rester dans le centre opérationnel)
+    supabase.from('reservations_tables')
+      .select('id, client_nom, client_telephone, heure_arrivee, heure_depart, nb_personnes, zone, notes, statut, table:tables_restaurant(numero)')
+      .eq('date_resa', today)
+      .order('heure_arrivee'),
   ])
 
   const profil = await getProfile()
@@ -63,13 +72,14 @@ export default async function ReceptionPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['commercial']} />
       <ReceptionClient
         arrivees={(arriveesRes.data ?? []) as Reservation[]}
         departs={(departsRes.data ?? []) as Reservation[]}
         demandes={(demandesRes.data ?? []) as Reservation[]}
         futures={(futuresRes.data ?? []) as Reservation[]}
         chambres={(chambresRes.data ?? []) as Chambre[]}
+        reservationsTables={(resaTablesRes.data ?? []) as ReservationTable[]}
+        tabInitial={tabInitial}
         navProfil={navProfil}
       />
     </>
@@ -100,4 +110,17 @@ export type Chambre = {
   numero: string
   capacite: number
   prix_nuit_ht: number
+}
+
+export type ReservationTable = {
+  id: string
+  client_nom: string
+  client_telephone?: string | null
+  heure_arrivee: string
+  heure_depart?: string | null
+  nb_personnes: number
+  zone?: string | null
+  notes?: string | null
+  statut?: string | null
+  table?: { numero: string | null } | Array<{ numero: string | null }> | null
 }

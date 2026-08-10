@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { getProfile } from '@/lib/auth'
+import { logActivite } from '@/lib/operateur'
 import { type Fournisseur, type BonCommande, type BonCommandeLigne, type Facture, type EntreePrix, JOURS_SEMAINE } from '@/lib/fournisseurs'
 
 // ─── Validation ──────────────────────────────────────────────────────
@@ -23,7 +25,7 @@ const fournisseurSchema = z.object({
 
 const bonCommandeSchema = z.object({
   fournisseur_id: z.string().uuid(),
-  statut: z.enum(['brouillon','envoye','recu','annule']),
+  statut: z.enum(['brouillon','a_valider','envoye','recu','annule']),
   date_commande: z.string(),
   date_livraison_prevue: z.string().optional().nullable(),
   notes: z.string().max(1000).optional().nullable(),
@@ -109,6 +111,7 @@ export async function listBonsCommande(): Promise<BonCommande[]> {
       montant_total_ht: Number(r.montant_total_ht ?? 0),
       notes: (r.notes as string) ?? null,
       created_at: r.created_at as string,
+      reception_a_verifier: Boolean(r.reception_a_verifier),
       lignes: lignes.map(li => ({
         id: li.id as string,
         bon_commande_id: li.bon_commande_id as string,
@@ -279,7 +282,7 @@ export async function autoGenererBonsDepuisStock() {
     .from('ingredients')
     .select('id, nom, unite, fournisseur_principal, stock_actuel, stock_minimum, stock_maximum, prix_achat_ht')
     .eq('actif', true)
-  const enAlerte = (ings ?? []).filter(i => Number(i.stock_actuel) < Number(i.stock_minimum) && i.fournisseur_principal)
+  const enAlerte = (ings ?? []).filter(i => Number(i.stock_actuel) <= Number(i.stock_minimum) && i.fournisseur_principal)
 
   if (enAlerte.length === 0) {
     return { bons_crees: 0, message: 'Aucun ingrédient sous le seuil minimum.' }
@@ -326,8 +329,29 @@ export async function autoGenererBonsDepuisStock() {
   return { bons_crees, message: `${bons_crees} bon${bons_crees > 1 ? 's' : ''} de commande créé${bons_crees > 1 ? 's' : ''}.` }
 }
 
-export async function changerStatutBon(id: string, statut: 'brouillon'|'envoye'|'recu'|'annule') {
+export async function changerStatutBon(id: string, statut: 'brouillon'|'a_valider'|'envoye'|'recu'|'annule') {
   const supabase = await createClient()
+
+  // Workflow de validation : si un employé NON-manager SANS autonomie_commande
+  // tente d'ENVOYER un bon, on le bascule en "à valider" (le gérant validera)
+  // au lieu de l'envoyer directement au fournisseur.
+  if (statut === 'envoye') {
+    const profil = await getProfile()
+    const isManager = profil?.role === 'manager'
+    if (!isManager && profil?.employe_id) {
+      const { data: emp } = await supabase.from('employes')
+        .select('autonomie_commande').eq('id', profil.employe_id).maybeSingle()
+      if (!emp?.autonomie_commande) {
+        const { error: e2 } = await supabase.from('bons_commande')
+          .update({ statut: 'a_valider', propose_par: profil.employe_id, soumis_at: new Date().toISOString() })
+          .eq('id', id)
+        if (e2) throw new Error(e2.message)
+        revalidatePath('/admin/fournisseurs')
+        return { ok: true as const, aValider: true as const }
+      }
+    }
+  }
+
   const { error } = await supabase.from('bons_commande').update({ statut }).eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/admin/fournisseurs')
@@ -347,6 +371,26 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
   if (!bon_id) throw new Error('bon_id manquant')
   const supabase = await createClient()
 
+  // Garde-fou idempotence : ne JAMAIS re-réceptionner un bon déjà reçu. Sans ça,
+  // un double-clic / une re-soumission ré-insère les mouvements 'entree' et
+  // ré-incrémente le stock → inventaire faussement gonflé.
+  const { data: bonStatut } = await supabase
+    .from('bons_commande').select('statut').eq('id', bon_id).maybeSingle()
+  if (!bonStatut) throw new Error('Bon de commande introuvable')
+  if (bonStatut.statut === 'recu') throw new Error('Ce bon de commande a déjà été réceptionné.')
+
+  // Autonomie réception : si un employé NON-manager SANS autonomie_reception
+  // enregistre la réception, on met quand même le stock à jour (marchandise
+  // physiquement arrivée), mais on flague le bon "à vérifier" pour le gérant.
+  const profil = await getProfile()
+  const isManager = profil?.role === 'manager'
+  let aVerifier = false
+  if (!isManager && profil?.employe_id) {
+    const { data: emp } = await supabase.from('employes')
+      .select('autonomie_reception').eq('id', profil.employe_id).maybeSingle()
+    aVerifier = !emp?.autonomie_reception
+  }
+
   // Map ligne_id → lot_numero pour la création des lots_produits (Module 11)
   const lotsParLigne = new Map<string, string>()
 
@@ -365,8 +409,13 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
     if (error) throw new Error(`ligne ${p.ligne_id}: ${error.message}`)
   }
 
-  // Passe le bon à 'recu'
-  await supabase.from('bons_commande').update({ statut: 'recu' }).eq('id', bon_id)
+  // Passe le bon à 'recu' (+ traçabilité réception et flag de vérification gérant)
+  await supabase.from('bons_commande').update({
+    statut: 'recu',
+    reception_par: profil?.employe_id ?? null,
+    reception_at: new Date().toISOString(),
+    reception_a_verifier: aVerifier,
+  }).eq('id', bon_id)
 
   // Pour chaque ligne reçue : mouvement_stock 'entree' + maj stock + lot Module 11
   const { data: lignesRecues } = await supabase
@@ -418,9 +467,22 @@ export async function enregistrerReception(bon_id: string, lignes: unknown[]) {
     }
   }
 
+  await logActivite({ action: 'reception', zone: 'Réception', cible: fournisseurNom ?? 'Livraison', details: { a_verifier: aVerifier } })
+
   revalidatePath('/admin/fournisseurs')
   revalidatePath('/admin/stock')
   revalidatePath('/admin/hygiene')
+  return { ok: true as const }
+}
+
+// Le gérant valide une réception saisie par un employé non-autonome (lève le flag).
+export async function validerReception(bon_id: string) {
+  if (!bon_id) throw new Error('bon_id manquant')
+  const supabase = await createClient()
+  const { error } = await supabase.from('bons_commande')
+    .update({ reception_a_verifier: false }).eq('id', bon_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/fournisseurs')
   return { ok: true as const }
 }
 

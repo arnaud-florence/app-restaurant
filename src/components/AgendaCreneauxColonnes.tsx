@@ -293,8 +293,68 @@ export default function AgendaCreneauxColonnes<T>({
     </div>
   ) : null
 
+  // Pour la vue mobile : uniquement les créneaux qui contiennent des commandes
+  // (inutile d'empiler verticalement des dizaines de tranches vides).
+  const slotsAvecItems = colonnes.filter(c => (bucketsParCreneau.get(c.key)?.length ?? 0) > 0)
+
+  // Bloc "hors créneau" version mobile (liste verticale)
+  const horsCreneauMobile = horsCreneau.length > 0 ? (
+    <section>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-black uppercase tracking-wider text-amber-300">{horsCreneauLabel}</span>
+        <span className="ml-auto inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-black tabular-nums">{horsCreneau.length}</span>
+      </div>
+      <div className="space-y-2">
+        {horsCreneau.map((data, i) => <div key={`mh-${i}`}>{renderItem(data, i)}</div>)}
+      </div>
+    </section>
+  ) : null
+
   return (
-    <div ref={scrollerRef} className="overflow-x-auto scroll-visible-dark" style={{ scrollSnapType: 'x mandatory' }}>
+    <>
+    {/* MOBILE : agenda VERTICAL — seuls les créneaux avec commandes, du plus proche au plus tard.
+        Scroll naturel vers le bas (façon fil), au lieu du scroll horizontal maladroit. */}
+    <div className="md:hidden space-y-5">
+      {horsCreneauPosition === 'before' && horsCreneauMobile}
+      {slotsAvecItems.length === 0 && horsCreneau.length === 0 && (
+        <div className="rounded-2xl border-2 border-dashed border-zinc-800 bg-zinc-950/40 p-8 text-center">
+          <p className="text-3xl mb-2">📭</p>
+          <p className="text-sm text-zinc-500">Aucune commande à venir</p>
+        </div>
+      )}
+      {slotsAvecItems.map(col => {
+        const its = bucketsParCreneau.get(col.key) ?? []
+        const isFirst = col.key === firstColKey
+        const isCible = col.key === cibleScrollKey
+        const hot = isFirst || isCible
+        return (
+          <section key={col.key}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={cn(
+                'font-display italic text-lg font-bold tabular-nums',
+                hot ? accentCls.text : 'text-zinc-200',
+              )}>{col.label}</span>
+              {isFirst && (
+                <span className={cn('text-[9px] font-black uppercase tracking-[0.15em] px-1.5 py-0.5 rounded', accentCls.bar, 'text-white')}>
+                  Maintenant
+                </span>
+              )}
+              <span className={cn(
+                'ml-auto inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[10px] font-black tabular-nums',
+                hot ? cn(accentCls.bar, 'text-white') : 'bg-zinc-700 text-zinc-200',
+              )}>{its.length}</span>
+            </div>
+            <div className="space-y-2">
+              {its.map((data, i) => <div key={i}>{renderItem(data, i)}</div>)}
+            </div>
+          </section>
+        )
+      })}
+      {horsCreneauPosition === 'after' && horsCreneauMobile}
+    </div>
+
+    {/* DESKTOP : colonnes horizontales (inchangé) */}
+    <div ref={scrollerRef} className="hidden md:block overflow-x-auto scroll-visible-dark" style={{ scrollSnapType: 'x mandatory' }}>
       <div className="flex items-stretch min-w-max">
         {horsCreneauPosition === 'before' && horsCreneauBlock}
         {colonnes.map((col, idx) => {
@@ -383,5 +443,6 @@ export default function AgendaCreneauxColonnes<T>({
         {horsCreneauPosition === 'after' && horsCreneauBlock}
       </div>
     </div>
+    </>
   )
 }

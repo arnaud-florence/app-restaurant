@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -45,7 +46,7 @@ export default function DechetsClient({ data }: { data: DataDechets }) {
           title="Déchets (AGEC)"
           description="Pesées 8 types, coût gaspillage, registre collectes, rapport annuel."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Total an" value={fmtPoids(data.total_an_poids)} />
               <KPI label="Coût mois" value={fmtPrix(data.total_mois_cout)} accent={data.total_mois_cout > 200 ? 'orange' : 'zinc'} />
               <KPI label="Bio 7j" value={fmtPoids(bio7jPoids)} accent={bio7jPoids > 5 ? 'rouge' : 'vert'} />
@@ -154,33 +155,61 @@ function DashboardTab({ data }: { data: DataDechets }) {
         {data.agg_an.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune pesée enregistrée.</p>
         ) : (
-          <table className="responsive-table w-full text-sm">
-            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-              <tr>
-                <th className="text-left px-3 py-1.5">Type</th>
-                <th className="text-right px-3 py-1.5">Poids total</th>
-                <th className="text-right px-3 py-1.5">Coût gaspi.</th>
-                <th className="text-right px-3 py-1.5">% du total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
+          <>
+            {/* Mobile : liste de cards (table 4 colonnes illisible à 375px) */}
+            <ul className="md:hidden divide-y divide-zinc-100">
               {data.agg_an.map(a => {
                 const info = TYPE_DECHET_INFO[a.type]
                 const pct = data.total_an_poids > 0 ? (a.poids_kg / data.total_an_poids) * 100 : 0
                 return (
-                  <tr key={a.type}>
-                    <td className="px-3 py-2">
-                      <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span>
-                      {info.bsd_obligatoire && <span className="ml-1 text-[9px] text-amber-700 font-bold">BSD</span>}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPoids(a.poids_kg)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPrix(a.cout)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-zinc-500">{pct.toFixed(1)} %</td>
-                  </tr>
+                  <li key={a.type} className="px-4 py-3 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1 flex-wrap">
+                        <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span>
+                        {info.bsd_obligatoire && <span className="text-[9px] text-amber-700 font-bold">BSD</span>}
+                      </span>
+                      <span className="tabular-nums font-bold">{fmtPoids(a.poids_kg)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] tabular-nums text-zinc-500">{pct.toFixed(1)} % du total</span>
+                      <span className="text-[11px] tabular-nums">{fmtPrix(a.cout)}</span>
+                    </div>
+                  </li>
                 )
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            {/* Desktop/tablette : table complète */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="hidden md:table w-full text-sm">
+                <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="text-left px-3 py-1.5">Type</th>
+                    <th className="text-right px-3 py-1.5">Poids total</th>
+                    <th className="text-right px-3 py-1.5">Coût gaspi.</th>
+                    <th className="text-right px-3 py-1.5">% du total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {data.agg_an.map(a => {
+                    const info = TYPE_DECHET_INFO[a.type]
+                    const pct = data.total_an_poids > 0 ? (a.poids_kg / data.total_an_poids) * 100 : 0
+                    return (
+                      <tr key={a.type}>
+                        <td className="px-3 py-2">
+                          <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span>
+                          {info.bsd_obligatoire && <span className="ml-1 text-[9px] text-amber-700 font-bold">BSD</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPoids(a.poids_kg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtPrix(a.cout)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-zinc-500">{pct.toFixed(1)} %</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>
@@ -209,42 +238,73 @@ function PeseesTab({ pesees, employes, onError, onOk }: { pesees: Pesee[]; emplo
         <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle pesée</button>
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+      <section className="rounded-lg border border-zinc-200 bg-white">
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune pesée.</p>
         ) : (
-          <table className="responsive-table w-full text-sm">
-            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-              <tr>
-                <th className="text-left px-3 py-1.5">Date</th>
-                <th className="text-left px-3 py-1.5">Type</th>
-                <th className="text-right px-3 py-1.5">Poids</th>
-                <th className="text-right px-3 py-1.5">Coût gaspi.</th>
-                <th className="text-left px-3 py-1.5">Employé</th>
-                <th className="text-right px-3 py-1.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
+          <>
+            {/* Mobile : liste de cards (table 6 colonnes illisible à 375px) */}
+            <ul className="md:hidden divide-y divide-zinc-100">
               {filtered.map(p => {
                 const info = TYPE_DECHET_INFO[p.type_dechet]
                 return (
-                  <tr key={p.id}>
-                    <td className="px-3 py-2 tabular-nums text-[11px]">{fmtDate(p.date_pesee)}</td>
-                    <td className="px-3 py-2"><span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span></td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPoids(p.poids_kg)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-amber-700">{p.cout_estime > 0 ? fmtPrix(p.cout_estime) : '—'}</td>
-                    <td className="px-3 py-2 text-zinc-600 text-[11px]">{p.employe_nom ?? '—'}</td>
-                    <td className="px-3 py-2 text-right">
+                  <li key={p.id} className="px-4 py-3 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span>
                       <button onClick={async () => {
-                        if (!confirm('Supprimer cette pesée ?')) return
+                        if (!(await askConfirm({ title: 'Supprimer la pesée ?', message: 'Cette pesée sera définitivement supprimée.', confirmLabel: 'Supprimer', danger: true }))) return
                         try { await supprimerPesee(p.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
-                      }} className="text-zinc-400 hover:text-red-600">×</button>
-                    </td>
-                  </tr>
+                      }} className="min-h-[40px] px-2 text-zinc-400 hover:text-red-600">×</button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] tabular-nums text-zinc-500">{fmtDate(p.date_pesee)}</span>
+                      <span className="tabular-nums font-bold">{fmtPoids(p.poids_kg)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-zinc-600">{p.employe_nom ?? '—'}</span>
+                      <span className="text-[11px] tabular-nums text-amber-700">{p.cout_estime > 0 ? fmtPrix(p.cout_estime) : '—'}</span>
+                    </div>
+                  </li>
                 )
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            {/* Desktop/tablette : table complète */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="hidden md:table w-full text-sm">
+                <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="text-left px-3 py-1.5">Date</th>
+                    <th className="text-left px-3 py-1.5">Type</th>
+                    <th className="text-right px-3 py-1.5">Poids</th>
+                    <th className="text-right px-3 py-1.5">Coût gaspi.</th>
+                    <th className="text-left px-3 py-1.5">Employé</th>
+                    <th className="text-right px-3 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filtered.map(p => {
+                    const info = TYPE_DECHET_INFO[p.type_dechet]
+                    return (
+                      <tr key={p.id}>
+                        <td className="px-3 py-2 tabular-nums text-[11px]">{fmtDate(p.date_pesee)}</td>
+                        <td className="px-3 py-2"><span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span></td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPoids(p.poids_kg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-amber-700">{p.cout_estime > 0 ? fmtPrix(p.cout_estime) : '—'}</td>
+                        <td className="px-3 py-2 text-zinc-600 text-[11px]">{p.employe_nom ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">
+                          <button onClick={async () => {
+                            if (!(await askConfirm({ title: 'Supprimer la pesée ?', message: 'Cette pesée sera définitivement supprimée.', confirmLabel: 'Supprimer', danger: true }))) return
+                            try { await supprimerPesee(p.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
+                          }} className="text-zinc-400 hover:text-red-600">×</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -356,7 +416,7 @@ function CollectesTab({ collectes, onError, onOk }: { collectes: Collecte[]; onE
                     {c.notes && <p className="text-xs italic text-zinc-600 mt-1">« {c.notes} »</p>}
                   </div>
                   <button onClick={async () => {
-                    if (!confirm('Supprimer cette collecte ?')) return
+                    if (!(await askConfirm({ title: 'Supprimer la collecte ?', message: 'Cette collecte sera définitivement supprimée.', confirmLabel: 'Supprimer', danger: true }))) return
                     try { await supprimerCollecte(c.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
                   }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
                 </li>
@@ -443,13 +503,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Modal({ title, onClose, disabled, children }: { title: string; onClose: () => void; disabled: boolean; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !disabled && onClose()}>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !disabled && onClose()}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="h-10 w-10 rounded-full hover:bg-zinc-100">×</button>
         </div>
-        <div className="overflow-y-auto p-5 space-y-3">{children}</div>
+        <div className="overflow-y-auto p-5 space-y-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>
   )

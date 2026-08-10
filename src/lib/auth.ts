@@ -1,9 +1,21 @@
 // Module 28 — Helpers d'authentification + audit + permissions pour Server Components/Actions.
 
 import { createClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { canAccess, getMainRoute, isReadOnly, type CustomPermissions } from '@/lib/permissions'
+
+/** Nom du cookie « aperçu employé » (mode gérant qui visualise l'appli d'un salarié). */
+export const APERCU_COOKIE = 'apercu_employe'
+
+/** Infos de l'employé actuellement « prévisualisé » par le gérant (nav + pages). */
+export type ApercuInfo = {
+  cibleId: string
+  ciblePrenom: string
+  cibleNom: string
+  ciblePoste: string | null
+  ciblePerms: CustomPermissions | null
+}
 
 /** Erreur d'autorisation lancée par les helpers server action. Le client la
  *  reçoit comme un Error standard via Server Actions Next 14. */
@@ -27,18 +39,23 @@ export type Profil = {
   custom_permissions: CustomPermissions | null
   totp_enabled: boolean
   derniere_connexion: string | null
+  derniere_activite: string | null
   created_at: string
   onboarding_completed_at: string | null
+  /** Présent uniquement quand un GÉRANT prévisualise l'appli d'un salarié.
+   *  N'altère PAS role/employe_id (le gérant garde tous ses droits) : sert juste
+   *  à afficher la navigation et les pages accessibles du salarié visé. */
+  apercu?: ApercuInfo | null
 }
 
-const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, created_at, onboarding_completed_at'
+const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, derniere_activite, created_at, onboarding_completed_at'
 
 /**
  * Renvoie le profil de l'utilisateur connecté, ou null.
  * Crée la ligne si elle n'existe pas, avec auto-link vers `employes` si email match.
  * Le 1ᵉʳ user qui se logue devient manager (bootstrap).
  */
-export async function getProfile(): Promise<Profil | null> {
+async function chargerProfil(): Promise<Profil | null> {
   const supabase = await createClient()
   // try/catch obligatoire : si le refresh token est invalide/expiré, getUser()
   // throw une AuthApiError qui crash le RSC. On traite alors l'user comme
@@ -68,6 +85,14 @@ export async function getProfile(): Promise<Profil | null> {
 
   if (existing) {
     const profil = existing as Profil
+    // Battement de présence : rafraîchit derniere_activite (throttlé ~3 min) pour
+    // la vue gérant « Équipe en direct ». Best-effort, jamais bloquant pour l'auth.
+    const last = profil.derniere_activite ? new Date(profil.derniere_activite).getTime() : 0
+    if (Date.now() - last > 3 * 60_000) {
+      try {
+        await supabase.from('profils').update({ derniere_activite: new Date().toISOString() }).eq('id', profil.id)
+      } catch { /* présence best-effort */ }
+    }
     // Si le profil n'est pas encore lié à un employé mais qu'on en trouve un, on lie.
     if (!profil.employe_id && employe) {
       const { data: updated } = await supabase.from('profils')
@@ -97,6 +122,40 @@ export async function getProfile(): Promise<Profil | null> {
   }).select(COLS).single()
   if (error || !created) return null
   return created as Profil
+}
+
+/**
+ * Profil de l'utilisateur connecté, enrichi du mode « aperçu employé » si un
+ * GÉRANT a activé la prévisualisation d'un salarié (cookie APERCU_COOKIE).
+ * Le rôle et l'employe_id RÉELS sont conservés (aucun blocage admin possible) :
+ * seul le champ `apercu` est ajouté pour que la nav reflète le salarié visé.
+ */
+export async function getProfile(): Promise<Profil | null> {
+  const profil = await chargerProfil()
+  if (!profil || profil.role !== 'manager') return profil
+  try {
+    const store = await cookies()
+    const cibleId = store.get(APERCU_COOKIE)?.value
+    if (!cibleId || cibleId === profil.employe_id) return profil
+    const supabase = await createClient()
+    const { data: emp } = await supabase.from('employes')
+      .select('id, prenom, nom, poste').eq('id', cibleId).eq('actif', true).maybeSingle()
+    if (!emp) return profil
+    const { data: cibleProfil } = await supabase.from('profils')
+      .select('custom_permissions').eq('employe_id', cibleId).maybeSingle()
+    return {
+      ...profil,
+      apercu: {
+        cibleId: emp.id as string,
+        ciblePrenom: (emp.prenom as string) ?? '',
+        cibleNom: (emp.nom as string) ?? '',
+        ciblePoste: (emp.poste as string) ?? null,
+        ciblePerms: (cibleProfil?.custom_permissions ?? null) as CustomPermissions | null,
+      },
+    }
+  } catch {
+    return profil
+  }
 }
 
 /** Redirige vers /login si pas de profil ou rôle insuffisant (manager). À appeler depuis /admin/* layout. */

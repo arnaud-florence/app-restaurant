@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
-import { Megaphone, Sparkles, Plus, Trash2, Copy, Check, Eye, Calendar } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
+import { Sparkles, Plus, Trash2, Copy, Check, Eye, Calendar } from 'lucide-react'
 import { PillTab } from '@/components/ui/PillTab'
 import { creerPost, modifierPost, changerStatutPost, supprimerPost } from './actions'
 import type { PostMarketing } from './page'
@@ -152,11 +153,12 @@ export default function MarketingClient({
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-zinc-500">
-          <Megaphone className="h-10 w-10 mx-auto text-zinc-300 mb-2" />
-          <p className="text-base font-medium">Aucun post {filterStatut !== 'tous' ? STATUT_INFO[filterStatut].label.toLowerCase() : ''}</p>
-          <p className="text-xs mt-1">Clique « Générer un post IA » pour démarrer.</p>
-        </Card>
+        <EmptyState
+          emoji="📨"
+          titre={`Aucun post ${filterStatut !== 'tous' ? STATUT_INFO[filterStatut].label.toLowerCase() : ''}`.trim()}
+          description="Laisse Claude rédiger ton premier post pour Instagram, Facebook ou Google My Business — adapté au canal en un clic."
+          action={{ label: '✨ Générer un post IA', onClick: () => setCreating(true) }}
+        />
       ) : (
         <div className="grid lg:grid-cols-2 gap-3">
           {filtered.map(p => {

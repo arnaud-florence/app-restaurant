@@ -56,7 +56,7 @@ export default function AppelsServeurBanner({ serveurId }: { serveurId: string |
 
   return (
     <div className={cn(
-      'sticky top-[64px] z-30 bg-red-600 text-white shadow-lg',
+      'sticky top-[var(--op-bar-h,48px)] z-30 bg-red-600 text-white shadow-lg',
       open ? '' : 'h-10 overflow-hidden',
     )}>
       <button

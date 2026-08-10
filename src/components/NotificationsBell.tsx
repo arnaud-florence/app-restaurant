@@ -1,15 +1,17 @@
 'use client'
 
 // Bouton cloche avec badge nb non-lues + drawer liste.
-// Auto-refresh toutes les 30s.
+// Temps réel (realtime sur la table `notifications`) + filet de poll 60 s.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { Bell, X, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import { TYPE_INFO, type Notification } from '@/lib/notifications-types'
 
 export default function NotificationsBell({ inverse = false }: { inverse?: boolean }) {
+  const channelId = useId()
   const [open, setOpen] = useState(false)
   const [notifs, setNotifs] = useState<Notification[]>([])
   const [nbNonLues, setNbNonLues] = useState(0)
@@ -26,9 +28,20 @@ export default function NotificationsBell({ inverse = false }: { inverse?: boole
 
   useEffect(() => {
     reload()
-    const t = setInterval(reload, 30_000)
-    return () => clearInterval(t)
-  }, [])
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    const reloadDebounced = () => { if (debounce) clearTimeout(debounce); debounce = setTimeout(reload, 600) }
+    const t = setInterval(reload, 60_000)   // filet, le realtime fait l'essentiel
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`notif-bell-${channelId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, reloadDebounced)
+      .subscribe()
+    return () => {
+      clearInterval(t)
+      if (debounce) clearTimeout(debounce)
+      supabase.removeChannel(channel)
+    }
+  }, [channelId])
 
   async function marquerToutesLues() {
     try {

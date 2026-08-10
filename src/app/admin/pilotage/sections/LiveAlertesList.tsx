@@ -84,6 +84,11 @@ function Bloc({
           )
         })}
       </ul>
+      {findings.length > 6 && (
+        <p className="text-[11px] text-zinc-500 mt-1.5 pl-1">
+          + {findings.length - 6} autre{findings.length - 6 > 1 ? 's' : ''} non affichée{findings.length - 6 > 1 ? 's' : ''}
+        </p>
+      )}
     </div>
   )
 }

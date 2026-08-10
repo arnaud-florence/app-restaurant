@@ -141,24 +141,50 @@ export async function exporterCSVMois(moisIso: string): Promise<{ csv: string; n
 
   const ecritures: EcritureComptable[] = []
 
-  // 1. Ventes : paiements_caisse → 411 (clients) débit / 707 (vente) + 44571 (TVA collectée)
+  // 1. Ventes : 512 (banque/caisse) débit par paiement / 707 (vente HT) + 44571 (TVA collectée)
+  //    crédités depuis la VENTILATION RÉELLE de chaque commande (multi-taux 5,5/10/20),
+  //    et non plus un /1.10 forfaitaire qui faussait la TVA dès qu'il y a alcool ou emporter.
   const { data: paiements } = await supabase
     .from('paiements_caisse')
-    .select('id, montant, methode, encaisse_at, commande:commandes(numero)')
+    .select('id, montant, methode, encaisse_at, commande:commandes(numero, montant_total_ht, ventilation_tva)')
     .gte('encaisse_at', interval.debut)
     .lte('encaisse_at', interval.fin + 'T23:59:59')
     .order('encaisse_at')
+  type CmdJoin = { numero?: string; montant_total_ht?: number; ventilation_tva?: Record<string, number> }
+  const cmdVues = new Set<string>()
   for (const p of paiements ?? []) {
-    type CmdJoin = { numero?: string }
     const cmd = p.commande as unknown as CmdJoin | null
     const num = cmd?.numero ?? p.id
     const date = (p.encaisse_at as string).slice(0, 10)
     const ttc = Number(p.montant)
-    const ht = Math.round((ttc / 1.10) * 100) / 100
-    const tva = Math.round((ttc - ht) * 100) / 100
+    // Ligne banque/caisse : montant réel encaissé par méthode (espèces, carte…).
     ecritures.push({ date, numero: num, libelle: `Vente ${p.methode}`, compte: '512', debit: ttc, credit: 0, journal: 'VTE' })
-    ecritures.push({ date, numero: num, libelle: `Vente ${p.methode}`, compte: '707', debit: 0, credit: ht, journal: 'VTE' })
-    if (tva > 0) ecritures.push({ date, numero: num, libelle: `TVA collectée ${p.methode}`, compte: '44571', debit: 0, credit: tva, journal: 'VTE' })
+    // Produits + TVA : émis UNE fois par commande (les paiements multiples se partagent le TTC).
+    if (num && !cmdVues.has(num)) {
+      cmdVues.add(num)
+      const ventil = (cmd?.ventilation_tva ?? {}) as Record<string, number>
+      const taux = Object.keys(ventil)
+      if (taux.length > 0) {
+        // HT réel = TTC commande − somme TVA ; on s'appuie sur la ventilation par taux.
+        let htTotal = Number(cmd?.montant_total_ht ?? 0)
+        if (!htTotal) {
+          // Fallback : reconstruit HT depuis la ventilation (HT = tva / (taux/100)).
+          htTotal = taux.reduce((s, t) => s + (Number(t) > 0 ? Number(ventil[t]) / (Number(t) / 100) : 0), 0)
+          htTotal = Math.round(htTotal * 100) / 100
+        }
+        ecritures.push({ date, numero: num, libelle: 'Vente HT', compte: '707', debit: 0, credit: htTotal, journal: 'VTE' })
+        for (const t of taux.sort((a, b) => Number(a) - Number(b))) {
+          const tva = Math.round(Number(ventil[t] ?? 0) * 100) / 100
+          if (tva > 0) ecritures.push({ date, numero: num, libelle: `TVA collectée ${t.replace('.', ',')}%`, compte: '44571', debit: 0, credit: tva, journal: 'VTE' })
+        }
+      } else {
+        // Commande sans ventilation (ancienne donnée) : fallback /1.10 historique.
+        const ht = Math.round((ttc / 1.10) * 100) / 100
+        const tva = Math.round((ttc - ht) * 100) / 100
+        ecritures.push({ date, numero: num, libelle: 'Vente HT', compte: '707', debit: 0, credit: ht, journal: 'VTE' })
+        if (tva > 0) ecritures.push({ date, numero: num, libelle: 'TVA collectée 10%', compte: '44571', debit: 0, credit: tva, journal: 'VTE' })
+      }
+    }
   }
 
   // 2. Achats : factures_fournisseurs → 6071 (achats) + 44566 (TVA déductible) / 401 (fournisseur)

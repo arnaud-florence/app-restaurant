@@ -1,6 +1,5 @@
 import CuisineClient from './CuisineClient'
 import BriefingPoste from '@/components/BriefingPoste'
-import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -52,7 +51,6 @@ export default async function CuisinePage({ searchParams }: { searchParams: { ro
   return (
     <>
       <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['stock', 'haccp', 'cuisine_rt']} />
       <CuisineClient
         initial={commandes}
         role={role}

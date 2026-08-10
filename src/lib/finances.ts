@@ -109,7 +109,7 @@ export function calculerCR(input: {
     total_charges: round2(total_charges),
     resultat_net: round2(resultat_net),
     food_cost_pct:        ca_ht > 0 ? round1((input.food_cost / ca_ht) * 100) : 0,
-    masse_salariale_pct:  ca_ttc > 0 ? round1((input.masse_salariale / ca_ttc) * 100) : 0,
+    masse_salariale_pct:  ca_ht > 0 ? round1((input.masse_salariale / ca_ht) * 100) : 0,
     charges_fixes_pct:    ca_ht > 0 ? round1((input.charges_fixes_mensuelles / ca_ht) * 100) : 0,
     marge_nette_pct:      ca_ht > 0 ? round1((resultat_net / ca_ht) * 100) : 0,
   }
@@ -203,12 +203,14 @@ export type SimulationCA = {
 export function simulerCA(
   ca_cible: number,
   food_cost_pct: number,    // % du CA HT
-  masse_salariale_pct: number, // % du CA TTC
+  masse_salariale_pct: number, // % du CA HT (cohérent avec le P&L réel : masse / ca_ht)
   charges_fixes_mensuelles: number,
 ): SimulationCA {
   const ca_ht = ca_cible / 1.10
   const food_cost = ca_ht * (food_cost_pct / 100)
-  const masse_salariale = ca_cible * (masse_salariale_pct / 100)
+  // Le P&L réel exprime masse_salariale_pct en % du CA HT (cf. computeFinances) et
+  // l'UI du simulateur l'annonce « % du CA HT » → on l'applique au HT, pas au TTC.
+  const masse_salariale = ca_ht * (masse_salariale_pct / 100)
   const total_charges = food_cost + masse_salariale + charges_fixes_mensuelles
   const resultat = ca_ht - total_charges
   return {

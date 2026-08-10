@@ -3,6 +3,7 @@ import RhClient from './RhClient'
 import {
   type Employe, type Document, type Formation, type Shift, type Pointage, type Conge,
   type TypeDocument, type TypeFormation, intervalleMois, joursDeLaSemaine, heuresEntre, coutShift, joursConge,
+  lundiDeLaSemaine, coutSemaineAvecHeuresSup,
 } from '@/lib/rh'
 
 export const metadata = { title: 'Ressources humaines — Admin' }
@@ -46,7 +47,7 @@ export default async function RhPage() {
     paiementsRes,
   ] = await Promise.all([
     supabase.from('employes')
-      .select('id, prenom, nom, poste, type_contrat, email, telephone, salaire_horaire, heures_contrat, date_embauche, date_sortie, solde_conges_jours, notes_internes, actif, created_at, autonomie_reception, autonomie_commande, autonomie_modif_recettes, autonomie_voir_prix')
+      .select('id, prenom, nom, poste, type_contrat, email, telephone, salaire_horaire, heures_contrat, date_embauche, date_sortie, solde_conges_jours, notes_internes, actif, created_at, autonomie_reception, autonomie_commande, autonomie_modif_recettes, autonomie_voir_prix, pin_hash')
       .order('actif', { ascending: false })
       .order('prenom'),
     supabase.from('documents_employes').select('*').order('created_at', { ascending: false }),
@@ -160,16 +161,59 @@ export default async function RhPage() {
   }))
 
   // ─── KPI Paie ────────────────────────────────────────────────────
-  // Masse salariale du mois = sum coûts shifts du mois (planning)
+  // Masse salariale du mois = coût réel, heures supplémentaires incluses.
+  //  1. Heures par (employé, jour) : on privilégie le POINTAGE réel ; à défaut de
+  //     pointage ce jour-là, on retombe sur le PLANNING (prévisionnel).
+  //  2. On regroupe par semaine (lundi) et on applique la majoration légale heures
+  //     sup (35h normal · 36-43h +25% · >43h +50%), au taux horaire de chacun.
+  const heuresParEmpJour = new Map<string, Map<string, number>>()  // empId → 'YYYY-MM-DD' → heures
+  const ensureJour = (empId: string) => {
+    let m = heuresParEmpJour.get(empId)
+    if (!m) { m = new Map(); heuresParEmpJour.set(empId, m) }
+    return m
+  }
+
+  // 1a. Planning (fallback)
   const { data: shiftsMoisRes } = await supabase
     .from('planning')
-    .select('employe_id, heure_debut, heure_fin')
+    .select('employe_id, date_travail, heure_debut, heure_fin')
     .gte('date_travail', mois.debut)
     .lte('date_travail', mois.fin)
-  let masseSalarialeMois = 0
   for (const s of (shiftsMoisRes ?? [])) {
-    const emp = empById.get(s.employe_id as string)
-    masseSalarialeMois += coutShift(s.heure_debut as string, s.heure_fin as string, emp?.salaire_horaire ?? 0)
+    const empId = s.employe_id as string
+    const jour = s.date_travail as string
+    const h = heuresEntre(s.heure_debut as string, s.heure_fin as string)
+    const m = ensureJour(empId)
+    m.set(jour, (m.get(jour) ?? 0) + h)
+  }
+  // 1b. Pointage réel (écrase le planning sur les jours réellement pointés)
+  const { data: pointagesPaieRes } = await supabase
+    .from('pointage')
+    .select('employe_id, date_pointage, heures_travaillees')
+    .gte('date_pointage', mois.debut)
+    .lte('date_pointage', mois.fin)
+    .not('heures_travaillees', 'is', null)
+  const joursPointes = new Set<string>()  // 'empId|jour' déjà remplacés par le pointage
+  for (const p of (pointagesPaieRes ?? [])) {
+    const empId = p.employe_id as string
+    const jour = p.date_pointage as string
+    const key = empId + '|' + jour
+    const m = ensureJour(empId)
+    const h = Number(p.heures_travaillees ?? 0)
+    if (!joursPointes.has(key)) { m.set(jour, h); joursPointes.add(key) }   // remplace le planning
+    else m.set(jour, (m.get(jour) ?? 0) + h)                                 // 2ᵉ pointage du jour → cumule
+  }
+  // 2. Regroupe par semaine + majoration heures sup, au taux de chaque employé
+  let masseSalarialeMois = 0
+  for (const [empId, parJour] of heuresParEmpJour) {
+    const rate = empById.get(empId)?.salaire_horaire ?? 0
+    if (rate <= 0) continue
+    const parSemaine = new Map<string, number>()
+    for (const [jour, h] of parJour) {
+      const sem = lundiDeLaSemaine(jour)
+      parSemaine.set(sem, (parSemaine.get(sem) ?? 0) + h)
+    }
+    for (const hSem of parSemaine.values()) masseSalarialeMois += coutSemaineAvecHeuresSup(hSem, rate)
   }
   masseSalarialeMois = Math.round(masseSalarialeMois * 100) / 100
 

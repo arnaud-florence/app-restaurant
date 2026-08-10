@@ -19,7 +19,7 @@
 //
 // IMPORTANT : prendre un backup avant via `node scripts/backup-export.mjs`.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
 const env = readFileSync('.env.local', 'utf8')
@@ -29,6 +29,7 @@ for (const line of env.split('\n')) {
 }
 
 const DRY = !process.argv.includes('--execute')
+const RESTORE_STOCK = process.argv.includes('--restore-stock')
 
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -162,6 +163,28 @@ if (DRY) {
   }
 }
 
+// Restauration du stock depuis le snapshot pris avant la formation
+console.log('\n▼ Restauration du stock (--restore-stock) :\n')
+if (!RESTORE_STOCK) {
+  console.log('  · option non demandée (ajoute --restore-stock pour restaurer stock_actuel)')
+} else if (!existsSync('backups/stock-snapshot.json')) {
+  console.log('  ⚠ backups/stock-snapshot.json introuvable — lance d\'abord node scripts/stock-snapshot.mjs')
+} else {
+  const snap = JSON.parse(readFileSync('backups/stock-snapshot.json', 'utf8'))
+  const items = snap.ingredients ?? []
+  console.log(`  📦 Snapshot du ${snap.date} — ${items.length} ingrédients`)
+  if (DRY) {
+    console.log(`  🔄 stock_actuel serait restauré pour ${items.length} ingrédients`)
+  } else {
+    let n = 0
+    for (const it of items) {
+      const { error } = await sb.from('ingredients').update({ stock_actuel: it.stock_actuel }).eq('id', it.id)
+      if (!error) n++
+    }
+    console.log(`  ✓ stock_actuel restauré pour ${n}/${items.length} ingrédients`)
+  }
+}
+
 console.log('\n' + '═'.repeat(60))
 console.log(`${DRY ? '🔍 Total qui serait supprimé' : '✅ Total supprimé'} : ${totalDeleted} lignes`)
-if (DRY) console.log(`\n💡 Pour exécuter pour de vrai : node scripts/reset-transactionnel.mjs --execute`)
+if (DRY) console.log(`\n💡 Pour exécuter pour de vrai : node scripts/reset-transactionnel.mjs --execute [--restore-stock]`)

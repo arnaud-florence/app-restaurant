@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
 import { getClientIp } from '@/lib/public-api/rate-limit'
+import { getAuthUser, getOrLinkClient } from '@/lib/public-api/auth-client'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -49,14 +50,33 @@ export async function POST(req: Request) {
   }
 
   const sb = await createClient()
+
+  // M2 — l'attribution (client_id / commande_id) ne vient JAMAIS du body :
+  // on la dérive du token client authentifié. Sinon avis anonyme (null).
+  let clientId: string | null = null
+  let commandeId: string | null = null
+  const authRes = await getAuthUser(req)
+  if (authRes.ok) {
+    try {
+      const { client_id } = await getOrLinkClient(authRes.user_id, authRes.email)
+      clientId = client_id
+      // commande_id accepté uniquement s'il appartient à ce client
+      if (p.commande_id) {
+        const { data: cmd } = await sb.from('commandes')
+          .select('id').eq('id', p.commande_id).eq('client_id', client_id).maybeSingle()
+        if (cmd) commandeId = p.commande_id
+      }
+    } catch { /* lien client impossible → avis anonyme */ }
+  }
+
   const { data, error } = await sb.from('avis_publics').insert({
     source: 'site',
     note: p.note,
     titre: p.titre || null,
     contenu: p.contenu || null,
     langue: p.langue,
-    client_id: p.client_id || null,
-    commande_id: p.commande_id || null,
+    client_id: clientId,
+    commande_id: commandeId,
     statut: 'en_attente',
   }).select('id').single()
 

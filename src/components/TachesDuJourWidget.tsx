@@ -7,6 +7,7 @@
 //   - employeId absent  → localStorage (kiosk mode tablette partagée)
 
 import { useEffect, useState, useTransition } from 'react'
+import { toast } from '@/lib/toast'
 import Link from 'next/link'
 import { ChevronDown, ChevronUp, ListTodo, Check, ExternalLink, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -106,7 +107,7 @@ export default function TachesDuJourWidget({
           else         next.delete(id)
           return next
         })
-        alert(e instanceof Error ? e.message : 'Erreur — réessaie.')
+        toast.error(e instanceof Error ? e.message : 'Erreur — réessaie.')
       }
     })
   }

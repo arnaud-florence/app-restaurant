@@ -10,10 +10,13 @@
  * - heartbeatBorne(borne_id) → maintient borne_sessions à jour
  */
 
+import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { sendPushToPostes } from '@/lib/push'
+import { tauxTvaArticle, calculerLigneTva, agregerVentilation } from '@/lib/tva'
+import { getOrCreateSessionCaisseId } from '@/lib/caisse'
 
 // ─── Types ─────────────────────────────────────────────────────────────
 // Les "boissons" sont en fait des recettes avec tag_destination='BAR' dans
@@ -46,17 +49,37 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   const data = CreerCommandeBorneSchema.parse(input)
   const supabase = await createClient()
 
-  const total_ht_brut = data.panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
-  const tva = 0.10
-  const total_ttc_brut = total_ht_brut * (1 + tva)
+  // ─── Prix + TVA recalculés SERVEUR (jamais le prix envoyé par le client) ──
+  // Sécurité : le payload borne fournit prix_unitaire_ht mais on l'IGNORE et on
+  // relit prix_vente_ht depuis recettes → empêche la manipulation de prix (0,01 €).
+  const recetteIds = Array.from(new Set(data.panier.map(p => p.recette_id)))
+  const { data: recettesDb } = await supabase.from('recettes')
+    .select('id, prix_vente_ht, contient_alcool').in('id', recetteIds)
+  const recMap = new Map<string, { prix: number; alcool: boolean }>()
+  for (const r of (recettesDb ?? [])) {
+    recMap.set(r.id as string, { prix: Number(r.prix_vente_ht ?? 0), alcool: !!r.contient_alcool })
+  }
+  for (const id of recetteIds) {
+    if (!recMap.has(id)) throw new Error('Produit introuvable ou indisponible')
+  }
 
-  // Application de la remise fidélité (points → €)
+  const lignesTva = data.panier.map(p => {
+    const rec = recMap.get(p.recette_id)!
+    const prixHt = rec.prix                                  // ← source de vérité = DB
+    const taux = tauxTvaArticle(rec.alcool, data.consommation)
+    const calc = calculerLigneTva(p.quantite, prixHt, taux)
+    return { ...p, prix_unitaire_ht: prixHt, tva_taux: taux, tva_eur: calc.tva_eur, ttc: calc.ttc, ht: calc.ht, prix_unitaire_ttc: calc.prix_unitaire_ttc }
+  })
+  const total_ht_brut  = lignesTva.reduce((s, l) => s + l.ht, 0)
+  const total_ttc_brut = lignesTva.reduce((s, l) => s + l.ttc, 0)
+  const tva_total_brut = lignesTva.reduce((s, l) => s + l.tva_eur, 0)
+
+  // Remise fidélité (points → €) appliquée sur le TTC
   let remise_eur = 0
   let points_utilises = 0
   if (data.client_id && data.points_a_utiliser && data.points_a_utiliser > 0) {
     const config = await getConfigFideliteBorne()
     const ratio = Math.max(1, config.points_par_euro_remise)
-    // Vérifier solde réel du client (anti-triche côté client)
     const supabaseCheck = await createClient()
     const { data: cli } = await supabaseCheck.from('clients')
       .select('points_fidelite').eq('id', data.client_id).maybeSingle()
@@ -65,7 +88,14 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
     remise_eur = Math.round((points_utilises / ratio) * 100) / 100
   }
   const total_ttc = Math.max(0, total_ttc_brut - remise_eur)
-  const total_ht = total_ttc / (1 + tva)
+  // Prorata de la remise → HT / TVA / ventilation restent cohérents
+  const factor = total_ttc_brut > 0 ? total_ttc / total_ttc_brut : 1
+  const total_ht  = Math.round(total_ht_brut * factor * 100) / 100
+  const tva_total = Math.round(tva_total_brut * factor * 100) / 100
+  const ventilation: Record<string, number> = {}
+  for (const [k, v] of Object.entries(agregerVentilation(lignesTva.map(l => ({ tva_taux: l.tva_taux, tva_eur: l.tva_eur }))))) {
+    ventilation[k] = Math.round(v * factor * 100) / 100
+  }
 
   // Statut initial selon le mode de paiement
   //   NFC : en_attente_paiement_comptoir → marquerBornePayee bascule en cuisine
@@ -88,8 +118,10 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
       numero,
       source: 'BORNE',
       statut,
-      montant_total_ht: Math.round(total_ht * 100) / 100,
+      montant_total_ht: total_ht,
       montant_total_ttc: Math.round(total_ttc * 100) / 100,
+      tva_total,
+      ventilation_tva: ventilation,
       client_nom: data.client_prenom ?? null,
       client_id: data.client_id ?? null,
       consommation: data.consommation,
@@ -106,12 +138,15 @@ export async function creerCommandeBorne(input: z.infer<typeof CreerCommandeBorn
   if (!cmd) throw new Error('Création commande borne : aucune ligne retournée')
 
   // Insert articles (commande_articles n'a que recette_id, pas boisson_id ni nom_capture)
-  const articles = data.panier.map(p => ({
+  const articles = lignesTva.map(l => ({
     commande_id: cmd.id,
-    recette_id: p.recette_id,
-    quantite: p.quantite,
-    prix_unitaire_ht: Math.round(p.prix_unitaire_ht * 100) / 100,
-    tag_destination: p.tag_destination,
+    recette_id: l.recette_id,
+    quantite: l.quantite,
+    prix_unitaire_ht: Math.round(l.prix_unitaire_ht * 100) / 100,
+    prix_unitaire_ttc: l.prix_unitaire_ttc,
+    tva_taux: l.tva_taux,
+    tva_eur: l.tva_eur,
+    tag_destination: l.tag_destination,
     statut: 'en_attente',
   }))
   const { error: errArt } = await supabase.from('commande_articles').insert(articles)
@@ -153,21 +188,19 @@ export async function encaisserBorne(input: {
 }) {
   const supabase = await createClient()
 
-  // 1. Trouver la session caisse ouverte du jour (peut être null si fermée)
-  const today = new Date().toISOString().slice(0, 10)
-  const { data: session } = await supabase
-    .from('sessions_caisse')
-    .select('id')
-    .eq('date_session', today)
-    .is('fermee_at', null)
-    .order('ouverte_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // Garde IDOR : doit être une commande BORNE en attente de paiement comptoir
+  const { data: cmdGarde } = await supabase
+    .from('commandes').select('source, statut').eq('id', input.commande_id).maybeSingle()
+  if (!cmdGarde || cmdGarde.source !== 'BORNE') throw new Error('Commande borne introuvable')
+  if (cmdGarde.statut !== 'en_attente_paiement_comptoir') return { ok: true as const, deja: true }
+
+  // 1. Session caisse du jour, créée si aucune n'est ouverte (filet anti-paiement orphelin)
+  const sessionId = await getOrCreateSessionCaisseId(supabase)
 
   // 2. Crée le paiement_caisse
   const { error: errPay } = await supabase.from('paiements_caisse').insert({
     commande_id: input.commande_id,
-    session_caisse_id: session?.id ?? null,
+    session_caisse_id: sessionId,
     methode: input.methode,
     montant: input.montant,
     pourboire: input.pourboire ?? 0,
@@ -183,9 +216,10 @@ export async function encaisserBorne(input: {
       statut: 'en_attente',
       borne_expire_at: null,
       mode_paiement: input.methode,
-      session_caisse_id: session?.id ?? null,
+      session_caisse_id: sessionId,
     })
     .eq('id', input.commande_id)
+    .eq('source', 'BORNE')
   if (errUpd) throw new Error('Maj commande borne : ' + errUpd.message)
 
   // 4. Log
@@ -193,7 +227,7 @@ export async function encaisserBorne(input: {
     commande_id: input.commande_id,
     borne_id: 'caisse',
     type: 'comptoir_paye',
-    details: { methode: input.methode, montant: input.montant, session_id: session?.id ?? null },
+    details: { methode: input.methode, montant: input.montant, session_id: sessionId },
   })
 
   revalidatePath('/caisse')
@@ -229,12 +263,32 @@ export async function marquerBornePayee(input: {
 }) {
   const supabase = await createClient()
 
-  // Lire la commande pour voir si points fidélité à consommer
+  // Lire la commande (+ garde IDOR : doit être une commande BORNE)
   const { data: cmd } = await supabase
     .from('commandes')
-    .select('client_id, borne_points_utilises, mode_paiement')
+    .select('source, statut, client_id, borne_points_utilises, mode_paiement, montant_total_ttc')
     .eq('id', input.commande_id)
     .maybeSingle()
+  if (!cmd || cmd.source !== 'BORNE') throw new Error('Commande borne introuvable')
+  // Idempotence : déjà payée / avancée → ne pas ré-encaisser (double paiement)
+  if (cmd.statut !== 'en_attente_paiement_comptoir') return { ok: true as const, deja: true }
+
+  // ─── C1 : vérification du paiement Stripe (NFC) ───────────────────────
+  // On ne fait JAMAIS confiance au client : on relit le PaymentIntent et on
+  // exige status=succeeded ET amount_received == total serveur de la commande.
+  if (input.via === 'nfc') {
+    const key = process.env.STRIPE_SECRET_KEY
+    if (!key) throw new Error('Paiement non vérifiable : Stripe non configuré')
+    if (!input.payment_intent_id) throw new Error('Paiement NFC sans référence Stripe')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stripe = new Stripe(key, { apiVersion: '2024-12-18.acacia' as any })
+    const pi = await stripe.paymentIntents.retrieve(input.payment_intent_id)
+    const attenduCents = Math.round(Number(cmd.montant_total_ttc ?? 0) * 100)
+    if (pi.status !== 'succeeded') throw new Error(`Paiement non abouti (statut Stripe : ${pi.status})`)
+    if (Number(pi.amount_received) !== attenduCents) {
+      throw new Error(`Montant payé incohérent (${pi.amount_received} ≠ ${attenduCents} cents)`)
+    }
+  }
 
   const { error } = await supabase
     .from('commandes')
@@ -246,7 +300,32 @@ export async function marquerBornePayee(input: {
       mode_paiement: cmd?.mode_paiement ?? (input.via === 'nfc' ? 'carte_nfc' : 'comptoir'),
     })
     .eq('id', input.commande_id)
+    .eq('source', 'BORNE')
   if (error) throw new Error('Marquer borne payée : ' + error.message)
+
+  // Enregistre le paiement carte NFC en caisse — SANS ça, le CA borne carte
+  // n'apparaît pas dans le pilotage ni la RH (qui lisent paiements_caisse),
+  // alors qu'il compte dans les finances (commandes encaissées) → CA incohérent.
+  if (input.via === 'nfc') {
+    try {
+      const { count: dejaPaye } = await supabase
+        .from('paiements_caisse').select('id', { count: 'exact', head: true })
+        .eq('commande_id', input.commande_id)
+      if (!dejaPaye) {
+        const sessionId = await getOrCreateSessionCaisseId(supabase)
+        await supabase.from('paiements_caisse').insert({
+          commande_id: input.commande_id,
+          session_caisse_id: sessionId,
+          methode: 'carte',
+          montant: Number(cmd?.montant_total_ttc ?? 0),
+          pourboire: 0,
+        })
+        if (sessionId) await supabase.from('commandes').update({ session_caisse_id: sessionId }).eq('id', input.commande_id)
+      }
+    } catch (e) {
+      console.error('[borne] paiement_caisse NFC non enregistré :', e)
+    }
+  }
 
   // Consomme les points fidélité si applicable (best-effort, log si erreur)
   const ptsUtilises = Number(cmd?.borne_points_utilises ?? 0)
@@ -293,10 +372,14 @@ export async function annulerCommandeBorne(input: {
   borne_id?: string
 }) {
   const supabase = await createClient()
+  // Garde IDOR : on n'annule QUE des commandes BORNE non déjà encaissées/annulées
+  // (empêche d'annuler une commande salle/table par id arbitraire = sabotage service).
   const { error } = await supabase
     .from('commandes')
     .update({ statut: 'annule', borne_expire_at: null })
     .eq('id', input.commande_id)
+    .eq('source', 'BORNE')
+    .not('statut', 'in', '(encaisse,annule)')
   if (error) throw new Error('Annuler commande borne : ' + error.message)
 
   await supabase.from('borne_evenements').insert({

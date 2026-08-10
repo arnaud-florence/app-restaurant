@@ -49,7 +49,61 @@ export type Guide = {
   seuil_reussite_pct: number
   duree_minutes: number | null
   created_at: string
+  /** Module 27 enrichi : 1 = manuel (théorie), 2 = simulation (pratique), 3 = quiz certification. */
+  niveau?: number | null
+  /** Config de simulation niveau 2 (checklist_simule | scenario_qcm). Présent ⇒ guide « Je pratique ». */
+  simulation_config?: Record<string, unknown> | null
 }
+
+// ─── Niveaux de formation (parcours guidé Manuel → Pratique → Certification) ───
+export const NIVEAU_INFO: Record<number, { label: string; court: string; emoji: string; cls: string }> = {
+  1: { label: 'Manuel — j\'apprends',      court: 'Manuel',    emoji: '📖', cls: 'bg-blue-100    text-blue-900    border-blue-300' },
+  2: { label: 'Pratique — je m\'entraîne', court: 'Pratique',  emoji: '🎯', cls: 'bg-amber-100   text-amber-900   border-amber-300' },
+  3: { label: 'Certification — je valide', court: 'Certif',    emoji: '🏅', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+}
+
+/** Niveau effectif d'un guide (1 par défaut si non renseigné). Un guide avec
+ *  simulation_config est au minimum niveau 2. */
+export function niveauGuide(g: Pick<Guide, 'niveau' | 'simulation_config'>): number {
+  if (g.niveau && g.niveau >= 1) return g.niveau
+  if (g.simulation_config) return 2
+  return 1
+}
+
+// ─── Familles de postes ───────────────────────────────────────────
+// Les manuels (niveau 1) et leurs simulations/certifs (niveaux 2-3) ne portent
+// pas toujours le même libellé de poste (ex: « Manuel Cuisinier » = poste
+// 'cuisinier', mais la simulation cuisine = poste 'cuisine'). On les regroupe
+// dans une même FAMILLE pour afficher le parcours complet d'un poste ensemble.
+const POSTE_FAMILLE: Record<string, string> = {
+  cuisine: 'cuisine', cuisinier: 'cuisine', second: 'cuisine', cuisinier_snacking: 'cuisine',
+  pizzaiolo: 'pizzaiolo',
+  bar: 'bar', barman: 'bar',
+  serveur: 'serveur', salle: 'serveur',
+  snack: 'autre', livreur: 'autre', receptionniste: 'autre', autre: 'autre',
+  manager: 'manager', gerant: 'manager',
+  plonge: 'plonge', extra: 'plonge',
+  tous: 'tous',
+}
+
+/** Famille canonique d'un poste (regroupe manuel + pratique + certif). */
+export function posteFamille(poste: string | null | undefined): string {
+  if (!poste) return 'autre'
+  return POSTE_FAMILLE[poste] ?? 'autre'
+}
+
+export const FAMILLE_INFO: Record<string, { label: string; emoji: string; cls: string }> = {
+  tous:      { label: 'À commencer',                 emoji: '👋', cls: 'bg-stone-100  text-stone-800   border-stone-300' },
+  cuisine:   { label: 'Cuisine',                     emoji: '👨‍🍳', cls: 'bg-amber-100  text-amber-900   border-amber-300' },
+  pizzaiolo: { label: 'Pizza',                       emoji: '🍕',  cls: 'bg-red-100    text-red-900     border-red-300' },
+  bar:       { label: 'Bar',                         emoji: '🍷',  cls: 'bg-violet-100 text-violet-900  border-violet-300' },
+  serveur:   { label: 'Salle & Service',             emoji: '🛎️',  cls: 'bg-blue-100   text-blue-900    border-blue-300' },
+  autre:     { label: 'Snack · Livraison · Réception', emoji: '🧩', cls: 'bg-yellow-100 text-yellow-900  border-yellow-300' },
+  manager:   { label: 'Gérance',                     emoji: '🧑‍💼', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  plonge:    { label: 'Plonge',                      emoji: '🧽',  cls: 'bg-cyan-100   text-cyan-900    border-cyan-300' },
+}
+
+export const FAMILLE_ORDRE = ['tous', 'cuisine', 'pizzaiolo', 'bar', 'serveur', 'autre', 'plonge', 'manager']
 
 export type Etape = {
   id: string
@@ -139,6 +193,8 @@ const POSTE_ALIAS: Record<string, string[]> = {
 export function guideAccessibleAuPoste(posteEmploye: string | null | undefined, posteGuide: string): boolean {
   if (posteGuide === 'tous') return true
   if (!posteEmploye) return false
+  // Polyvalent / gérant : accès à TOUS les guides (ils touchent à tous les postes).
+  if (posteEmploye === 'polyvalent' || posteEmploye === 'manager' || posteEmploye === 'gerant') return true
   const aliases = POSTE_ALIAS[posteEmploye] ?? [posteEmploye]
   return aliases.includes(posteGuide)
 }

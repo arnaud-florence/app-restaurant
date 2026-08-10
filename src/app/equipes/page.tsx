@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import EquipesClient from './EquipesClient'
+import StoriesNavServer from '@/components/StoriesNavServer'
 import { getProfile } from '@/lib/auth'
-import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import type {
   Canal, Employe, Message, InfoAffichage, CompteRendu, Materiel,
   Priorite, TypeMateriel, EtatMateriel,
@@ -20,7 +21,7 @@ export default async function EquipesPage() {
       .eq('actif', true)
       .order('prenom'),
     supabase.from('messages')
-      .select(`id, canal, expediteur_id, contenu, lu_par, created_at,
+      .select(`id, canal, expediteur_id, contenu, lu_par, reactions, created_at,
                expediteur:employes!expediteur_id(prenom, nom)`)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -110,6 +111,7 @@ export default async function EquipesPage() {
   const navProfil: OpsBottomNavProfil = profil ? {
     email: profil.email, role: profil.role, poste: profil.poste,
     custom_permissions: profil.custom_permissions,
+        apercu: profil.apercu,
   } : null
 
   return (
@@ -120,6 +122,8 @@ export default async function EquipesPage() {
       initialCRs={crs}
       initialMateriels={mats}
       navProfil={navProfil}
+      connectedEmployeId={profil?.employe_id ?? null}
+      storiesSlot={<StoriesNavServer />}
     />
   )
 }

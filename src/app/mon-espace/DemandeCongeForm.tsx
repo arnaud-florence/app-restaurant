@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { toast } from '@/lib/toast'
 import { Plus, X, Loader2, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,13 +16,13 @@ export default function DemandeCongeForm({ employeId }: { employeId: string }) {
   const [pending, startTransition] = useTransition()
 
   function envoyer() {
-    if (!debut || !fin) { alert('Date de début et fin obligatoires'); return }
-    if (new Date(fin) < new Date(debut)) { alert('Date fin avant date début'); return }
+    if (!debut || !fin) { toast.error('Date de début et fin obligatoires'); return }
+    if (new Date(fin) < new Date(debut)) { toast.error('Date fin avant date début'); return }
     startTransition(async () => {
       try {
         await demanderConge({ employe_id: employeId, date_debut: debut, date_fin: fin, type, notes: notes || null })
         setOpen(false); setDebut(''); setFin(''); setNotes(''); setType('conge')
-      } catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
+      } catch (e) { toast.error(e instanceof Error ? e.message : 'Erreur') }
     })
   }
 
@@ -44,16 +45,16 @@ export default function DemandeCongeForm({ employeId }: { employeId: string }) {
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         <div>
-          <label className="text-[10px] block">Du</label>
+          <label className="text-[11px] block">Du</label>
           <Input type="date" value={debut} onChange={e => setDebut(e.target.value)} className="text-xs h-8" />
         </div>
         <div>
-          <label className="text-[10px] block">Au</label>
+          <label className="text-[11px] block">Au</label>
           <Input type="date" value={fin} onChange={e => setFin(e.target.value)} className="text-xs h-8" />
         </div>
       </div>
       <div>
-        <label className="text-[10px] block">Type</label>
+        <label className="text-[11px] block">Type</label>
         <select value={type} onChange={e => setType(e.target.value as typeof type)} className="w-full text-xs border rounded h-8 px-2">
           <option value="conge">Congé payé</option>
           <option value="absence">Absence</option>
@@ -62,7 +63,7 @@ export default function DemandeCongeForm({ employeId }: { employeId: string }) {
         </select>
       </div>
       <div>
-        <label className="text-[10px] block">Notes (facultatif)</label>
+        <label className="text-[11px] block">Notes (facultatif)</label>
         <Input value={notes} onChange={e => setNotes(e.target.value)} className="text-xs h-8" placeholder="Mariage, voyage…" />
       </div>
       <Button onClick={envoyer} disabled={pending} size="sm" className="w-full h-8 gap-1 text-xs">

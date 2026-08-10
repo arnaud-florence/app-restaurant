@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition, useEffect } from 'react'
+import { toast } from '@/lib/toast'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix } from '@/lib/service'
@@ -39,6 +40,32 @@ type LignePaiement = {
   reference: string
 }
 
+// Construit les lignes de paiement pour un mode + total donnés (pur, réutilisable
+// à l'init, au changement de mode, de nb de parts, et au recalcul TVA conso).
+function buildPaiements(m: ModePaiement, total: number, nbParts: number, prev?: LignePaiement[]): LignePaiement[] {
+  if (m === 'mixte') {
+    return [
+      { key: 'p1', methode: 'especes', montant: 0, pourboire: 0, reference: '' },
+      { key: 'p2', methode: 'carte', montant: total, pourboire: 0, reference: '' },
+    ]
+  }
+  if (m === 'parts_egales') {
+    const part = Math.round((total / nbParts) * 100) / 100
+    return Array.from({ length: nbParts }, (_, i) => ({
+      key: 'p' + (i + 1),
+      methode: (prev?.[i]?.methode ?? 'carte') as Methode,
+      montant: i === nbParts - 1 ? Math.round((total - part * (nbParts - 1)) * 100) / 100 : part,
+      pourboire: prev?.[i]?.pourboire ?? 0,
+      reference: prev?.[i]?.reference ?? '',
+    }))
+  }
+  if (m === 'personnalise') {
+    return [{ key: 'p1', methode: 'carte', montant: 0, pourboire: 0, reference: '' }]
+  }
+  // simple
+  return [{ key: 'p1', methode: 'carte', montant: total, pourboire: 0, reference: '' }]
+}
+
 export default function EncaissementModal({
   commande, serveurId, employes, onClose, onSuccess,
 }: {
@@ -49,40 +76,62 @@ export default function EncaissementModal({
   onSuccess: () => void
 }) {
   const router = useRouter()
-  const totalHT = useMemo(
+  const totalHTInit = useMemo(
     () => commande.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0),
     [commande.articles]
   )
-  // Total TTC = montant calculé serveur (TVA réelle multi-taux). Fallback 1.10 si pas encore migré.
-  const totalTTC = Number(commande.montant_total_ttc ?? totalHT * 1.10)
-  const tvaTotal = Number(commande.tva_total ?? totalTTC - totalHT)
+  // Totaux en state : recalculés serveur quand on bascule sur place / à emporter
+  // (la TVA — donc le TTC — change). Fallback 1.10 si pas encore migré.
+  const [totals, setTotals] = useState(() => {
+    const ttc = Number(commande.montant_total_ttc ?? totalHTInit * 1.10)
+    return {
+      ht:  totalHTInit,
+      ttc,
+      tva: Number(commande.tva_total ?? ttc - totalHTInit),
+    }
+  })
+  const totalHT = totals.ht
+  const totalTTC = totals.ttc
+  const tvaTotal = totals.tva
   const consommation = commande.consommation ?? 'sur_place'
 
   const [conso, setConso] = useState<'sur_place' | 'emporter'>(consommation)
   const [pendingConso, setPendingConso] = useState(false)
 
+  const [mode, setMode] = useState<ModePaiement>('simple')
+  const [serveurChoisi, setServeurChoisi] = useState(serveurId)
+  const [paiements, setPaiements] = useState<LignePaiement[]>(() =>
+    buildPaiements('simple', Number(commande.montant_total_ttc ?? totalHTInit * 1.10), 2)
+  )
+  const [parts, setParts] = useState(2)
+
   async function basculerConso(c: 'sur_place' | 'emporter') {
     if (c === conso) return
     setPendingConso(true)
     try {
-      await setConsommationCommande({ commande_id: commande.id, consommation: c })
+      const r = await setConsommationCommande({ commande_id: commande.id, consommation: c })
       setConso(c)
+      // Resynchronise les totaux affichés + les lignes de paiement avec la TVA
+      // recalculée serveur, sinon « Total saisi » reste figé → écart bloquant.
+      if (r && typeof r.montant_total_ttc === 'number') {
+        setTotals({ ht: r.montant_total_ht, ttc: r.montant_total_ttc, tva: r.tva_total })
+        // Ne pas écraser une remise fidélité déjà appliquée (cas rare) : on laisse
+        // l'utilisateur réajuster manuellement si une ligne fidélité existe.
+        const aFidelite = paiements.some(p => p.methode === 'fidelite')
+        if (!aFidelite) setPaiements(buildPaiements(mode, r.montant_total_ttc, parts, paiements))
+      }
       router.refresh()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erreur')
+      toast.error(e instanceof Error ? e.message : 'Erreur')
     } finally {
       setPendingConso(false)
     }
   }
-
-  const [mode, setMode] = useState<ModePaiement>('simple')
-  const [serveurChoisi, setServeurChoisi] = useState(serveurId)
-  const [paiements, setPaiements] = useState<LignePaiement[]>([
-    { key: 'p1', methode: 'carte', montant: totalTTC, pourboire: 0, reference: '' },
-  ])
-  const [parts, setParts] = useState(2)
   const [erreur, setErreur] = useState('')
   const [isPending, startTransition] = useTransition()
+  // Espèces reçues par ligne (aide au rendu de monnaie). N'affecte PAS le montant
+  // enregistré : c'est juste un calculateur de rendu pour le serveur.
+  const [especesRecu, setEspecesRecu] = useState<Record<string, number>>({})
 
   // ─── Sélection client (fidélité) ───
   const [client, setClient] = useState<ClientChoisi | null>(null)
@@ -91,6 +140,10 @@ export default function EncaissementModal({
   const [searchPending, startSearchTransition] = useTransition()
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [pointsCredites, setPointsCredites] = useState<number | null>(null)
+  // Divulgation progressive : client/fidélité/serveur sont repliés par défaut
+  // (cas le plus fréquent = encaissement simple). On déplie au tap, ou
+  // automatiquement dès qu'un client est associé.
+  const [showOptions, setShowOptions] = useState(false)
 
   // Ratio de conversion points → € (chargé depuis config admin)
   const [ratioRemise, setRatioRemise] = useState(100) // default fallback
@@ -219,45 +272,14 @@ export default function EncaissementModal({
   function setPaiementsForMode(m: ModePaiement) {
     setMode(m)
     setErreur('')
-    if (m === 'simple') {
-      setPaiements([{ key: 'p1', methode: 'carte', montant: totalTTC, pourboire: 0, reference: '' }])
-    } else if (m === 'mixte') {
-      setPaiements([
-        { key: 'p1', methode: 'especes', montant: 0, pourboire: 0, reference: '' },
-        { key: 'p2', methode: 'carte',   montant: totalTTC, pourboire: 0, reference: '' },
-      ])
-    } else if (m === 'parts_egales') {
-      const part = Math.round((totalTTC / parts) * 100) / 100
-      setPaiements(
-        Array.from({ length: parts }, (_, i) => ({
-          key: 'p' + (i + 1),
-          methode: 'carte' as Methode,
-          montant: i === parts - 1 ? Math.round((totalTTC - part * (parts - 1)) * 100) / 100 : part,
-          pourboire: 0,
-          reference: '',
-        }))
-      )
-    } else if (m === 'personnalise') {
-      setPaiements([
-        { key: 'p1', methode: 'carte', montant: 0, pourboire: 0, reference: '' },
-      ])
-    }
+    setPaiements(buildPaiements(m, totalTTC, parts, paiements))
   }
 
   // Recalc parts égales quand `parts` change
   function changeNbParts(n: number) {
     setParts(n)
     if (mode === 'parts_egales') {
-      const part = Math.round((totalTTC / n) * 100) / 100
-      setPaiements(
-        Array.from({ length: n }, (_, i) => ({
-          key: 'p' + (i + 1),
-          methode: (paiements[i]?.methode ?? 'carte') as Methode,
-          montant: i === n - 1 ? Math.round((totalTTC - part * (n - 1)) * 100) / 100 : part,
-          pourboire: paiements[i]?.pourboire ?? 0,
-          reference: paiements[i]?.reference ?? '',
-        }))
-      )
+      setPaiements(buildPaiements('parts_egales', totalTTC, n, paiements))
     }
   }
 
@@ -317,7 +339,11 @@ export default function EncaissementModal({
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Encaissement</p>
             <h2 className="text-2xl font-bold">
-              {commande.numero_table ? `Table ${commande.numero_table}` : commande.numero}
+              {commande.numero_table
+                ? `Table ${commande.numero_table}`
+                : commande.ardoise_nom
+                  ? `🧾 ${commande.ardoise_nom}`
+                  : commande.numero}
             </h2>
             <p className="text-sm text-zinc-400 mt-0.5">{commande.articles.length} article{commande.articles.length > 1 ? 's' : ''} · Total à encaisser : <b className="text-zinc-100">{fmtPrix(totalTTC)}</b></p>
           </div>
@@ -330,7 +356,7 @@ export default function EncaissementModal({
             {commande.articles.map((a, i) => (
               <li key={i} className="flex justify-between gap-3">
                 <span className="truncate text-zinc-200"><b className="text-emerald-400 tabular-nums">×{a.quantite}</b> {a.recette_nom}</span>
-                <span className="tabular-nums text-zinc-400 shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)} <span className="text-[10px] text-zinc-600">HT</span></span>
+                <span className="tabular-nums text-zinc-400 shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ttc)}</span>
               </li>
             ))}
           </ul>
@@ -473,6 +499,58 @@ export default function EncaissementModal({
                   className="w-full h-10 px-2 text-xs rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300 outline-none focus:border-zinc-600"
                 />
               )}
+
+              {/* Rendu de monnaie (espèces) — calculateur, n'affecte pas le montant enregistré */}
+              {p.methode === 'especes' && (() => {
+                const du = Number(p.montant) || 0
+                // Arrondi légal espèces : au 0,05 € le plus proche.
+                const duArrondi = Math.round(du * 20) / 20
+                const recu = especesRecu[p.key] ?? 0
+                const rendu = Math.round((recu - duArrondi) * 100) / 100
+                return (
+                  <div className="rounded-md border border-amber-700/40 bg-amber-950/20 p-2.5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] uppercase tracking-wider text-amber-300/90">💵 Espèces reçues du client</label>
+                      {Math.abs(duArrondi - du) >= 0.005 && (
+                        <span className="text-[10px] text-amber-300/80">arrondi 0,05 € : <b>{fmtPrix(duArrondi)}</b></span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" step="0.05" min={0}
+                        value={especesRecu[p.key] ?? ''}
+                        onChange={e => setEspecesRecu(prev => ({ ...prev, [p.key]: parseFloat(e.target.value) || 0 }))}
+                        placeholder={fmtPrix(duArrondi)}
+                        className="flex-1 h-11 px-2 rounded-md bg-zinc-900 border border-amber-700/40 text-zinc-100 font-bold text-lg tabular-nums text-right outline-none focus:border-amber-500"
+                      />
+                      <div className="flex gap-1">
+                        {[duArrondi, Math.ceil(du / 5) * 5, Math.ceil(du / 10) * 10, Math.ceil(du / 20) * 20]
+                          .filter((v, i, a) => v > 0 && a.indexOf(v) === i)
+                          .slice(0, 3)
+                          .map(v => (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setEspecesRecu(prev => ({ ...prev, [p.key]: v }))}
+                              className="min-h-[44px] px-2.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold tabular-nums"
+                            >
+                              {fmtPrix(v)}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                    {recu > 0 && (
+                      <div className={cn(
+                        'flex items-center justify-between rounded-md px-3 py-2 text-base font-bold',
+                        rendu < 0 ? 'bg-red-900/40 text-red-300' : 'bg-emerald-900/40 text-emerald-200',
+                      )}>
+                        <span>{rendu < 0 ? 'Manque' : 'Rendu à donner'}</span>
+                        <span className="tabular-nums text-xl">{rendu < 0 ? fmtPrix(-rendu) : fmtPrix(rendu)}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           ))}
 
@@ -502,14 +580,24 @@ export default function EncaissementModal({
                 {fmtPrix(totalPaye)}
               </span>
             </div>
-            {Math.abs(ecart) > 0.01 && (
-              <div className="flex justify-between">
-                <span className="text-zinc-400">Écart</span>
-                <span className={cn('font-bold tabular-nums', ecart > 0 ? 'text-amber-300' : 'text-red-400')}>
-                  {ecart > 0 ? '+' : ''}{fmtPrix(ecart)}
-                </span>
-              </div>
-            )}
+            {/* Statut toujours visible : équilibré / reste à payer / trop perçu */}
+            <div className={cn(
+              'flex items-center justify-between rounded px-2 py-1.5 mt-1 font-black',
+              Math.abs(ecart) < 0.01 ? 'bg-emerald-500/15 text-emerald-300'
+                : ecart > 0 ? 'bg-amber-500/15 text-amber-300'
+                : 'bg-red-500/15 text-red-300',
+            )}>
+              <span className="uppercase tracking-wider text-xs">
+                {Math.abs(ecart) < 0.01 ? '✓ Compte juste'
+                  : ecart > 0 ? 'Trop perçu'
+                  : 'Reste à payer'}
+              </span>
+              <span className="tabular-nums text-base">
+                {Math.abs(ecart) < 0.01 ? fmtPrix(totalTTC)
+                  : ecart > 0 ? `+${fmtPrix(ecart)}`
+                  : fmtPrix(-ecart)}
+              </span>
+            </div>
             {totalTips > 0 && (
               <div className="flex justify-between border-t border-zinc-800 pt-1 mt-1">
                 <span className="text-emerald-400">Pourboire total</span>
@@ -518,6 +606,19 @@ export default function EncaissementModal({
             )}
           </div>
 
+          {/* Bouton pour déplier les options (client/fidélité/serveur) — repliées par défaut */}
+          {!(showOptions || client) && (
+            <button
+              type="button"
+              onClick={() => setShowOptions(true)}
+              className="w-full min-h-[48px] rounded-md border border-dashed border-zinc-700 hover:border-zinc-600 text-zinc-300 hover:text-zinc-100 text-sm font-bold transition-colors"
+            >
+              + Client &amp; fidélité <span className="text-zinc-500 font-normal">(optionnel)</span>
+            </button>
+          )}
+
+          {(showOptions || client) && (
+          <>
           {/* Client fidélité */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -795,6 +896,8 @@ export default function EncaissementModal({
               ))}
             </select>
           </div>
+          </>
+          )}
 
           {erreur && (
             <p className="text-sm bg-red-900/30 border border-red-800 text-red-300 rounded-md px-3 py-2">⚠️ {erreur}</p>

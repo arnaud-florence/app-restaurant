@@ -24,8 +24,16 @@ export default async function AdminHome() {
     .in('urgence', ['rouge', 'jaune'])
     .order('urgence', { ascending: true })
     .order('created_at', { ascending: false })
-    .limit(4)
-  const alertes = alertesData ?? []
+    .limit(40)
+  // Dédup à l'affichage : les agents créent parfois plusieurs fois le même
+  // finding (même agent + même titre) → on n'en montre qu'un, puis on plafonne à 4.
+  const seenAlerte = new Set<string>()
+  const alertes = (alertesData ?? []).filter(a => {
+    const key = `${a.agent_id}::${a.titre}`
+    if (seenAlerte.has(key)) return false
+    seenAlerte.add(key)
+    return true
+  }).slice(0, 4)
   const nbRouge = alertes.filter(a => a.urgence === 'rouge').length
   const nbJaune = alertes.filter(a => a.urgence === 'jaune').length
 

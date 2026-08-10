@@ -146,6 +146,42 @@ export default function ZReportPrintClient({
           )}
         </section>
 
+        {/* Ventilation TVA (multi-taux : 5,5 / 10 / 20) */}
+        <section className="mt-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2 border-b border-zinc-300 pb-1">Ventilation TVA</h3>
+          {resume.ventilation_tva.length === 0 ? (
+            <p className="text-sm italic text-zinc-500">Aucune TVA sur cette session.</p>
+          ) : (
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-xs uppercase tracking-wider text-zinc-500 border-b border-zinc-300">
+                  <th className="text-left py-1.5 pr-2">Taux</th>
+                  <th className="text-right py-1.5 px-2 w-28">Base HT</th>
+                  <th className="text-right py-1.5 px-2 w-28">TVA</th>
+                  <th className="text-right py-1.5 pl-2 w-28">TTC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resume.ventilation_tva.map(v => (
+                  <tr key={v.taux} className="border-b border-zinc-100">
+                    <td className="py-2 pr-2 font-semibold">{String(v.taux).replace('.', ',')} %</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{fmtPrix(v.ht)}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{fmtPrix(v.tva)}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums font-bold">{fmtPrix(v.ttc)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-zinc-900 font-bold">
+                  <td className="py-2 pr-2">TOTAL</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{fmtPrix(resume.ventilation_tva.reduce((s, v) => s + v.ht, 0))}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{fmtPrix(resume.ventilation_tva.reduce((s, v) => s + v.tva, 0))}</td>
+                  <td className="py-2 pl-2 text-right tabular-nums">{fmtPrix(resume.ventilation_tva.reduce((s, v) => s + v.ttc, 0))}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+          <p className="text-[10px] text-zinc-400 mt-1">5,5 % à emporter · 10 % sur place · 20 % alcool. Calculée sur les commandes encaissées.</p>
+        </section>
+
         {/* Tips par serveur */}
         {resume.tips_par_serveur.length > 0 && (
           <section className="mt-6">
@@ -178,6 +214,12 @@ export default function ZReportPrintClient({
             <tbody>
               <tr><td className="py-1 pr-2 text-zinc-600">Fond initial</td><td className="py-1 text-right tabular-nums">{fmtPrix(s.fond_initial)}</td></tr>
               <tr><td className="py-1 pr-2 text-zinc-600">+ Espèces encaissées</td><td className="py-1 text-right tabular-nums text-emerald-700">{fmtPrix(resume.paiements_par_methode.find(p => p.methode === 'especes')?.montant ?? 0)}</td></tr>
+              {resume.sorties_total > 0 && (
+                <tr><td className="py-1 pr-2 text-zinc-600">− Sorties espèces</td><td className="py-1 text-right tabular-nums text-amber-700">−{fmtPrix(resume.sorties_total)}</td></tr>
+              )}
+              {resume.entrees_total > 0 && (
+                <tr><td className="py-1 pr-2 text-zinc-600">+ Apports espèces</td><td className="py-1 text-right tabular-nums text-emerald-700">{fmtPrix(resume.entrees_total)}</td></tr>
+              )}
               <tr className="border-t border-zinc-300 font-bold"><td className="py-1.5 pr-2">= Caisse attendue</td><td className="py-1.5 text-right tabular-nums">{fmtPrix(resume.caisse_attendue)}</td></tr>
               {s.ca_compte !== null && (
                 <>

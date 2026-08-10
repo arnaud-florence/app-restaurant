@@ -89,7 +89,7 @@ export async function POST(req: Request) {
 
   // Email notif gérant + accusé réception client (best-effort)
   try {
-    const { sendEmail, emailNotifGerantEvenement, emailLayout } = await import('@/lib/email')
+    const { sendEmail, emailNotifGerantEvenement, emailLayout, escapeHtml } = await import('@/lib/email')
     const dest = process.env.EMAIL_GERANT
     if (dest) {
       const tplGerant = emailNotifGerantEvenement({
@@ -108,8 +108,8 @@ export async function POST(req: Request) {
       const html = emailLayout({
         titre: 'Demande bien reçue',
         bodyHtml: `
-          <p>Bonjour ${p.prenom ?? p.nom},</p>
-          <p>Nous avons bien reçu votre demande pour <strong>${p.type_evenement}</strong>.</p>
+          <p>Bonjour ${escapeHtml(p.prenom ?? p.nom)},</p>
+          <p>Nous avons bien reçu votre demande pour <strong>${escapeHtml(p.type_evenement)}</strong>.</p>
           <p>Notre équipe vous recontacte sous <strong>48h</strong> avec une proposition adaptée à vos besoins et votre budget.</p>
           <p style="color:#78716c;font-size:13px;">Pour toute question urgente : <a href="mailto:contact@lerelaisdessaveurs.fr" style="color:#C0392B;">contact@lerelaisdessaveurs.fr</a></p>
         `,

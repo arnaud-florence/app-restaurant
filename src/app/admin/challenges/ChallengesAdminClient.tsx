@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, Trash2, Trophy, Save, X, ToggleLeft, ToggleRight, Loader2, Info, Sparkles } from 'lucide-react'
+import { Plus, Pencil, Trash2, Save, X, ToggleLeft, ToggleRight, Loader2, Info, Sparkles } from 'lucide-react'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import EmptyState from '@/components/ui/EmptyState'
 import { upsertChallenge, toggleActifChallenge, supprimerChallenge, creerPackDemarrage } from './actions'
 import type { ChallengeAvecLive } from './page'
 import type { CibleSuggeree } from '@/lib/challenges-cibles'
@@ -45,8 +47,8 @@ export default function ChallengesAdminClient({
   const [packResult, setPackResult] = useState<{ nb_crees: number; nb_skipped: number; details: string[] } | null>(null)
   const [packPending, setPackPending] = useState(false)
 
-  function lancerPack() {
-    if (!confirm('Créer le pack démarrage ? 8 challenges types seront créés (ou ignorés si déjà actifs). Cibles auto-suggérées depuis tes données.')) return
+  async function lancerPack() {
+    if (!(await askConfirm({ message: 'Créer le pack démarrage ? 8 challenges types seront créés (ou ignorés si déjà actifs). Cibles auto-suggérées depuis tes données.', confirmLabel: 'Créer', danger: false }))) return
     setPackPending(true)
     startTransition(async () => {
       try {
@@ -67,8 +69,8 @@ export default function ChallengesAdminClient({
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
     })
   }
-  function del(c: ChallengeAvecLive) {
-    if (!confirm(`Supprimer "${c.titre}" ?`)) return
+  async function del(c: ChallengeAvecLive) {
+    if (!(await askConfirm({ title: `Supprimer "${c.titre}" ?`, message: 'Ce challenge sera définitivement supprimé.', confirmLabel: 'Supprimer', danger: true }))) return
     startTransition(async () => {
       try { await supprimerChallenge({ id: c.id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
@@ -140,11 +142,12 @@ export default function ChallengesAdminClient({
       )}
 
       {challenges.length === 0 ? (
-        <Card className="p-10 text-center text-zinc-500">
-          <Trophy className="h-12 w-12 mx-auto text-zinc-300 mb-3" />
-          <p>Aucun challenge configuré.</p>
-          <p className="text-xs mt-1">Crée le premier pour démarrer la gamification.</p>
-        </Card>
+        <EmptyState
+          emoji="🎯"
+          titre="Aucun challenge"
+          description="Lance ton premier challenge pour gamifier le service : objectifs équipe ou individuels, primes et leaderboard."
+          action={{ label: '+ Nouveau challenge', onClick: () => setShowForm(true) }}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {challenges.map(c => (

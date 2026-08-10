@@ -1,6 +1,7 @@
 'use client'
 
 import { useTransition } from 'react'
+import { toast } from '@/lib/toast'
 import Link from 'next/link'
 import { ChevronRight, BookOpen, Award, CheckCircle2, Loader2, GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -38,7 +39,7 @@ export default function OnboardingClient({
         const r = await terminerOnboarding()
         window.location.href = r.mainRoute
       } catch (e) {
-        alert(e instanceof Error ? e.message : 'Erreur')
+        toast.error(e instanceof Error ? e.message : 'Erreur')
       }
     })
   }

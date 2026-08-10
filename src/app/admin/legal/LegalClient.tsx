@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -55,7 +56,7 @@ export default function LegalClient({ data }: { data: DataLegal }) {
           title="Légal"
           description="Licences, affichages obligatoires, assurances, accidents, registre sécurité."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Échéances ≤1M" value={oblAlertes} accent={oblAlertes > 0 ? 'rouge' : 'zinc'} />
               <KPI label="Affichages" value={affMissing} accent={affMissing > 0 ? 'rouge' : 'vert'} />
               <KPI label="Accidents" value={accidentsAnnee} accent={accidentsAnnee > 0 ? 'orange' : 'vert'} />
@@ -85,15 +86,6 @@ export default function LegalClient({ data }: { data: DataLegal }) {
       {erreur && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30 cursor-pointer" onClick={() => setErreur('')}>⚠️ {erreur}</div>}
       {success && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30">✓ {success}</div>}
     </div>
-  )
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
   )
 }
 
@@ -173,7 +165,7 @@ function ObligationsTab({ obligations, onError, onOk }: { obligations: Obligatio
                     <div className="flex flex-col gap-1">
                       <button onClick={() => setShowForm(o)} className="text-xs h-7 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️</button>
                       <button onClick={async () => {
-                        if (!confirm(`Supprimer "${o.titre}" ?`)) return
+                        if (!(await askConfirm(`Supprimer "${o.titre}" ?`))) return
                         try { await supprimerObligation(o.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
                       }} className="text-xs h-7 px-2 text-zinc-400 hover:text-red-600">×</button>
                     </div>
@@ -326,7 +318,7 @@ function AffichageRow({ a, onEdit, onError, onOk, router }: { a: Affichage; onEd
         <button onClick={() => onEdit(a)} className="text-xs h-8 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️</button>
         {!a.obligatoire && (
           <button onClick={async () => {
-            if (!confirm(`Supprimer "${a.titre}" ?`)) return
+            if (!(await askConfirm(`Supprimer "${a.titre}" ?`))) return
             try { await supprimerAffichage(a.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
           }} className="text-xs h-7 px-2 text-zinc-400 hover:text-red-600">×</button>
         )}
@@ -445,7 +437,7 @@ function AccidentsTab({ accidents, employes, onError, onOk }: { accidents: Accid
                     {a.suites && <p className="text-xs italic text-zinc-600 mt-1">Suites : {a.suites}</p>}
                   </div>
                   <button onClick={async () => {
-                    if (!confirm('Supprimer cet accident ? (Action irréversible)')) return
+                    if (!(await askConfirm('Supprimer cet accident ? (Action irréversible)'))) return
                     try { await supprimerAccident(a.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
                   }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
                 </li>
@@ -517,7 +509,7 @@ function AccidentModal({ employes, onClose, onError, onSuccess }: { employes: { 
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Date"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Heure"><input type="time" value={heure} onChange={e => setHeure(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
         <Field label="Jours d'arrêt"><input type="number" min={0} value={arret} onChange={e => setArret(parseInt(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>

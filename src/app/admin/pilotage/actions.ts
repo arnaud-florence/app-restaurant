@@ -39,10 +39,14 @@ const objectifSchema = z.object({
 export async function upsertObjectif(input: unknown) {
   const p = objectifSchema.parse(input)
   const supabase = await createClient()
-  // Le UNIQUE (periode, mois, annee, kpi) garantit qu'un seul objectif existe par combinaison
-  const { data: existing } = await supabase.from('objectifs').select('id')
+  // Le UNIQUE (periode, mois, annee, kpi) garantit qu'un seul objectif existe par combinaison.
+  // Attention : pour un objectif annuel mois=null. En SQL `mois = ''` ne matche PAS `mois IS NULL`
+  // (et les NULL n'entrent pas dans la contrainte UNIQUE Postgres) → il faut `.is('mois', null)`,
+  // sinon chaque enregistrement annuel créait un doublon au lieu d'un update.
+  let q = supabase.from('objectifs').select('id')
     .eq('periode', p.periode).eq('annee', p.annee).eq('kpi', p.kpi)
-    .eq('mois', p.mois ?? '').maybeSingle()
+  q = p.mois == null ? q.is('mois', null) : q.eq('mois', p.mois)
+  const { data: existing } = await q.maybeSingle()
 
   if (existing) {
     const { error } = await supabase.from('objectifs')

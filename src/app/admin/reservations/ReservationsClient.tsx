@@ -2,10 +2,10 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { format, addDays, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -55,7 +55,7 @@ export default function ReservationsClient({ data, readOnly = false, showTachesD
           title="Réservations"
           description="Tables, terrasse, chambres et événementiel — calendrier multi-zones."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Arrivées" value={arriveesCe} accent={arriveesCe > 0 ? 'orange' : 'zinc'} />
               <KPI label="Tables aujd" value={tablesAujourdhui} />
               <KPI label="Événements" value={evenementsAVenir} />
@@ -87,15 +87,6 @@ export default function ReservationsClient({ data, readOnly = false, showTachesD
   )
 }
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
-  )
-}
-
 function KPI({ label, value, accent = 'zinc' }: { label: string; value: number; accent?: 'zinc' | 'orange' | 'rouge' }) {
   const cls = {
     zinc: 'bg-zinc-50 text-zinc-700 border-zinc-200',
@@ -116,6 +107,15 @@ function ChambresTab({ chambres, resas, readOnly = false, onError, onOk }: { cha
   const [showResa, setShowResa] = useState<{ chambre_id: string; date: string } | null>(null)
   const [openResa, setOpenResa] = useState<ResaChambre | null>(null)
   const jours = useMemo(() => joursSemaineFrom(refDate, 14), [refDate])
+  const today = new Date().toISOString().slice(0, 10)
+  // Réservations chevauchant la fenêtre de 14 jours (pour la vue liste mobile)
+  const resasPeriode = useMemo(() => {
+    const start = jours[0]?.iso ?? today
+    const end = jours[jours.length - 1]?.iso ?? today
+    return resas
+      .filter(r => r.statut !== 'annulee' && r.date_arrivee <= end && r.date_depart >= start)
+      .sort((a, b) => a.date_arrivee.localeCompare(b.date_arrivee))
+  }, [resas, jours, today])
 
   return (
     <div className="space-y-3">
@@ -128,7 +128,9 @@ function ChambresTab({ chambres, resas, readOnly = false, onError, onOk }: { cha
       {chambres.length === 0 ? (
         <p className="text-center py-12 text-zinc-400">Aucune chambre. Créez-en depuis /admin/setup ou via SQL.</p>
       ) : (
-        <div className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+        <>
+        {/* Desktop/tablette : matrice calendaire 14 jours */}
+        <div className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-x-auto">
           <table className="min-w-full text-xs">
             <thead className="bg-zinc-50">
               <tr>
@@ -174,6 +176,41 @@ function ChambresTab({ chambres, resas, readOnly = false, onError, onOk }: { cha
             </tbody>
           </table>
         </div>
+
+        {/* Mobile : liste des réservations de la période (la matrice est illisible au doigt) */}
+        <div className="md:hidden space-y-2">
+          {!readOnly && (
+            <button
+              onClick={() => setShowResa({ chambre_id: chambres[0].id, date: today })}
+              className="w-full min-h-[48px] rounded-lg border-2 border-dashed border-blue-300 text-blue-700 font-bold text-sm hover:bg-blue-50"
+            >
+              + Nouvelle réservation
+            </button>
+          )}
+          {resasPeriode.length === 0 ? (
+            <p className="text-center py-8 text-sm text-zinc-400">Aucune réservation sur ces 14 jours.</p>
+          ) : resasPeriode.map(r => {
+            const reste = r.montant_total - r.acompte_verse
+            return (
+              <button
+                key={r.id}
+                onClick={() => setOpenResa(r)}
+                className="w-full text-left rounded-lg border border-zinc-200 bg-white p-3 hover:bg-zinc-50 active:scale-[0.99] transition"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-sm">{r.chambre_nom}</span>
+                  <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0', STATUT_RESA_INFO[r.statut].cls)}>
+                    {STATUT_RESA_INFO[r.statut].label}
+                  </span>
+                </div>
+                <p className="text-sm mt-1">{r.client_nom} · {r.nb_personnes} pers</p>
+                <p className="text-xs text-zinc-600 mt-0.5">📅 {fmtDate(r.date_arrivee)} → {fmtDate(r.date_depart)} ({nbNuits(r.date_arrivee, r.date_depart)} nuits)</p>
+                <p className="text-xs mt-0.5">Total {fmtPrix(r.montant_total)} · Reste <b className={reste > 0 ? 'text-red-700' : 'text-emerald-700'}>{fmtPrix(reste)}</b></p>
+              </button>
+            )
+          })}
+        </div>
+        </>
       )}
 
       {showResa && (
@@ -240,7 +277,7 @@ function ResaChambreModal({ init, chambres, onClose, onError, onSuccess }: {
           {chambres.map(c => <option key={c.id} value={c.id}>N°{c.numero} {c.nom} — {fmtPrix(c.prix_nuit_ht)}/nuit ({c.capacite} pers)</option>)}
         </select>
       </Field>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Arrivée"><input type="date" value={arrivee} onChange={e => setArrivee(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Départ"><input type="date" value={depart} onChange={e => setDepart(e.target.value)} min={arrivee} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Nb personnes"><input type="number" min={1} value={nbPers} onChange={e => setNbPers(parseInt(e.target.value) || 1)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
@@ -248,7 +285,7 @@ function ResaChambreModal({ init, chambres, onClose, onError, onSuccess }: {
       <p className="text-sm bg-zinc-50 border border-zinc-200 rounded p-2">
         <b>{nb_n}</b> nuit{nb_n > 1 ? 's' : ''} · Total : <b className="tabular-nums">{fmtPrix(total)}</b>
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Nom client"><input value={clientNom} onChange={e => setClientNom(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Email"><input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Téléphone"><input value={clientTel} onChange={e => setClientTel(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
@@ -290,12 +327,12 @@ function DetailResaChambreModal({ resa, chambre, onClose, onError, onOk }: {
       </Field>
 
       <div className="flex gap-2 pt-2 flex-wrap">
-        <a href={`/admin/reservations/chambres/${resa.id}/facture/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold">🖨 Facture</a>
-        {resa.statut === 'demande' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'confirmee'); onOk('Confirmée'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-xs h-9 px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}
-        {resa.statut === 'confirmee' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'arrivee'); onOk('Check-in'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-xs h-9 px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">🛎️ Check-in</button>}
-        {resa.statut === 'arrivee' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'terminee'); onOk('Check-out'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-xs h-9 px-3 rounded bg-zinc-700 hover:bg-zinc-600 text-white font-bold">🚪 Check-out</button>}
-        {resa.statut !== 'annulee' && resa.statut !== 'terminee' && <button onClick={async () => { if (!confirm('Annuler ?')) return; startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'annulee'); onOk('Annulée'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-xs h-9 px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
-        <button onClick={async () => { if (!confirm('Supprimer définitivement ?')) return; try { await supprimerResaChambre(resa.id); onOk('Supprimée'); router.refresh(); onClose() } catch (e) { onError(e) } }} className="ml-auto text-xs h-9 px-3 text-zinc-500 hover:text-red-700">🗑</button>
+        <a href={`/admin/reservations/chambres/${resa.id}/facture/print`} target="_blank" rel="noopener" className="text-sm min-h-[44px] px-3 inline-flex items-center rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold">🖨 Facture</a>
+        {resa.statut === 'demande' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'confirmee'); onOk('Confirmée'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-sm min-h-[44px] px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}
+        {resa.statut === 'confirmee' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'arrivee'); onOk('Check-in'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-sm min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">🛎️ Check-in</button>}
+        {resa.statut === 'arrivee' && <button onClick={async () => { startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'terminee'); onOk('Check-out'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-sm min-h-[44px] px-3 rounded bg-zinc-700 hover:bg-zinc-600 text-white font-bold">🚪 Check-out</button>}
+        {resa.statut !== 'annulee' && resa.statut !== 'terminee' && <button onClick={async () => { if (!(await askConfirm('Annuler ?'))) return; startTransition(async () => { try { await changerStatutResaChambre(resa.id, 'annulee'); onOk('Annulée'); router.refresh(); onClose() } catch (e) { onError(e) } }) }} className="text-sm min-h-[44px] px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
+        <button onClick={async () => { if (!(await askConfirm('Supprimer définitivement ?'))) return; try { await supprimerResaChambre(resa.id); onOk('Supprimée'); router.refresh(); onClose() } catch (e) { onError(e) } }} className="ml-auto text-sm min-h-[44px] px-3 inline-flex items-center text-zinc-500 hover:text-red-700">🗑</button>
       </div>
     </Modal>
   )
@@ -315,7 +352,7 @@ function TablesTab({ resas, tables, readOnly = false, onError, onOk }: { resas: 
         <Field label="Date">
           <input type="date" value={filtreDate} onChange={e => setFiltreDate(e.target.value)} className="h-10 px-3 rounded-md border border-zinc-300" />
         </Field>
-        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réservation</button>}
+        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réservation</button>}
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white">
@@ -342,11 +379,11 @@ function TablesTab({ resas, tables, readOnly = false, onError, onOk }: { resas: 
                     </p>
                     {r.notes && <p className="text-xs italic text-zinc-600 mt-1">« {r.notes} »</p>}
                   </div>
-                  <div className="flex flex-col gap-1">
-                    {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'arrivee'); onOk('Arrivée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">↗ Arrivée</button>}
-                    {r.statut === 'arrivee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'terminee'); onOk('Terminée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-zinc-700 hover:bg-zinc-600 text-white font-bold">✓ Fini</button>}
-                    {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'no_show'); onOk('No-show'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-7 px-2 rounded bg-red-100 text-red-900 border border-red-300 font-bold">✗ No-show</button>}
-                    {!readOnly && <button onClick={async () => { if (!confirm('Supprimer ?')) return; try { await supprimerResaTable(r.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) } }} className="text-xs h-6 px-2 text-zinc-400 hover:text-red-600">×</button>}
+                  <div className="flex flex-col gap-2">
+                    {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'arrivee'); onOk('Arrivée'); router.refresh() } catch (e) { onError(e) } }} className="text-sm min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">↗ Arrivée</button>}
+                    {r.statut === 'arrivee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'terminee'); onOk('Terminée'); router.refresh() } catch (e) { onError(e) } }} className="text-sm min-h-[44px] px-3 rounded bg-zinc-700 hover:bg-zinc-600 text-white font-bold">✓ Fini</button>}
+                    {r.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutResaTable(r.id, 'no_show'); onOk('No-show'); router.refresh() } catch (e) { onError(e) } }} className="text-sm min-h-[44px] px-3 rounded bg-red-100 text-red-900 border border-red-300 font-bold">✗ No-show</button>}
+                    {!readOnly && <button onClick={async () => { if (!(await askConfirm('Supprimer ?'))) return; try { await supprimerResaTable(r.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) } }} className="text-sm min-h-[44px] px-3 inline-flex items-center justify-center text-zinc-400 hover:text-red-600">×</button>}
                   </div>
                 </li>
               )
@@ -411,13 +448,13 @@ function ResaTableModal({ date, tables, onClose, onError, onSuccess }: { date: s
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <Field label="Date"><input type="date" value={dateResa} onChange={e => setDateResa(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Arrivée"><input type="time" value={heureArr} onChange={e => setHeureArr(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
         <Field label="Départ"><input type="time" value={heureDep} onChange={e => setHeureDep(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
         <Field label="Nb pers"><input type="number" min={1} value={nbPers} onChange={e => setNbPers(parseInt(e.target.value) || 1)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Nom"><input value={nom} onChange={e => setNom(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Téléphone"><input value={tel} onChange={e => setTel(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
@@ -437,7 +474,7 @@ function EvenementsTab({ evenements, readOnly = false, onError, onOk }: { evenem
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel événement</button>}
+        {!readOnly && <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel événement</button>}
       </div>
 
       <div className="space-y-2">
@@ -477,12 +514,12 @@ function EvenementsTab({ evenements, readOnly = false, onError, onOk }: { evenem
                   {e.besoins_techniques && <p><b>Technique :</b> {e.besoins_techniques}</p>}
                   {e.notes && <p className="italic">Notes : {e.notes}</p>}
                   <div className="flex gap-2 flex-wrap pt-2">
-                    {!readOnly && <button onClick={() => setShowForm(e)} className="text-xs h-9 px-3 rounded border border-zinc-300 bg-white hover:bg-zinc-100 font-bold">✏️ Modifier</button>}
-                    <a href={`/admin/reservations/evenements/${e.id}/devis/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-blue-600 hover:bg-blue-500 text-white font-bold">📋 Devis</a>
-                    {e.privatisation && <a href={`/admin/reservations/evenements/${e.id}/contrat/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-red-600 hover:bg-red-500 text-white font-bold">📜 Contrat</a>}
-                    {e.statut === 'demande' && <button onClick={async () => { try { await changerStatutEvenement(e.id, 'confirmee'); onOk('Confirmé'); router.refresh() } catch (err) { onError(err) } }} className="text-xs h-9 px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}
-                    {e.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutEvenement(e.id, 'realise'); onOk('Réalisé'); router.refresh() } catch (err) { onError(err) } }} className="text-xs h-9 px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Marquer réalisé</button>}
-                    {e.statut !== 'annulee' && <button onClick={async () => { if (!confirm('Annuler ?')) return; try { await changerStatutEvenement(e.id, 'annulee'); onOk('Annulé'); router.refresh() } catch (err) { onError(err) } }} className="text-xs h-9 px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
+                    {!readOnly && <button onClick={() => setShowForm(e)} className="text-sm min-h-[44px] px-3 rounded border border-zinc-300 bg-white hover:bg-zinc-100 font-bold">✏️ Modifier</button>}
+                    <a href={`/admin/reservations/evenements/${e.id}/devis/print`} target="_blank" rel="noopener" className="text-sm min-h-[44px] px-3 inline-flex items-center rounded bg-blue-600 hover:bg-blue-500 text-white font-bold">📋 Devis</a>
+                    {e.privatisation && <a href={`/admin/reservations/evenements/${e.id}/contrat/print`} target="_blank" rel="noopener" className="text-sm min-h-[44px] px-3 inline-flex items-center rounded bg-red-600 hover:bg-red-500 text-white font-bold">📜 Contrat</a>}
+                    {e.statut === 'demande' && <button onClick={async () => { try { await changerStatutEvenement(e.id, 'confirmee'); onOk('Confirmé'); router.refresh() } catch (err) { onError(err) } }} className="text-sm min-h-[44px] px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}
+                    {e.statut === 'confirmee' && <button onClick={async () => { try { await changerStatutEvenement(e.id, 'realise'); onOk('Réalisé'); router.refresh() } catch (err) { onError(err) } }} className="text-sm min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Marquer réalisé</button>}
+                    {e.statut !== 'annulee' && <button onClick={async () => { if (!(await askConfirm('Annuler ?'))) return; try { await changerStatutEvenement(e.id, 'annulee'); onOk('Annulé'); router.refresh() } catch (err) { onError(err) } }} className="text-sm min-h-[44px] px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
                   </div>
                 </div>
               )}
@@ -569,12 +606,12 @@ function EvenementModal({ evenement, onClose, onError, onSuccess }: { evenement:
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Date"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Heure début"><input type="time" value={hDebut} onChange={e => setHDebut(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
         <Field label="Heure fin"><input type="time" value={hFin} onChange={e => setHFin(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <Field label="Nb pers"><input type="number" min={1} value={nbPers} onChange={e => setNbPers(parseInt(e.target.value) || 1)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
         <Field label="Prix/pers HT"><input type="number" step="0.01" value={prixPP} onChange={e => setPrixPP(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
         <Field label="TVA %"><input type="number" step="0.5" value={tva} onChange={e => setTva(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
@@ -583,7 +620,7 @@ function EvenementModal({ evenement, onClose, onError, onSuccess }: { evenement:
       <p className="text-xs bg-zinc-50 border border-zinc-200 rounded p-2">
         Auto : {nbPers} × {fmtPrix(prixPP)} = <b className="tabular-nums">{fmtPrix(montantCalc)}</b> HT
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Client"><input value={clientNom} onChange={e => setClientNom(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Email"><input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Téléphone"><input value={clientTel} onChange={e => setClientTel(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
@@ -603,7 +640,7 @@ function EvenementModal({ evenement, onClose, onError, onSuccess }: { evenement:
         <button onClick={onClose} disabled={isPending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
         {isEdit && (
           <button onClick={async () => {
-            if (!confirm('Supprimer définitivement ?')) return
+            if (!(await askConfirm('Supprimer définitivement ?'))) return
             try { await supprimerEvenement(evenement!.id); onSuccess('Supprimé'); router.refresh() } catch (e) { onError(e) }
           }} className="min-h-[48px] px-4 rounded-md bg-red-500 hover:bg-red-400 text-white font-bold">🗑</button>
         )}
@@ -625,13 +662,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Modal({ title, onClose, disabled, children }: { title: string; onClose: () => void; disabled: boolean; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !disabled && onClose()}>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !disabled && onClose()}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="h-10 w-10 rounded-full hover:bg-zinc-100">×</button>
         </div>
-        <div className="overflow-y-auto p-5 space-y-3">{children}</div>
+        <div className="overflow-y-auto p-5 space-y-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>
   )

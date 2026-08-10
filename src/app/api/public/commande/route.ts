@@ -153,21 +153,71 @@ export async function POST(req: Request) {
   totalTVA = Math.round(totalTVA * 100) / 100
   let totalTTC = Math.round((totalHT + totalTVA) * 100) / 100
 
-  // Code promo (validation + calcul réduction si fourni)
+  // Code promo — E3 : validation COMPLÈTE (dates, montant min, niveau fidélité)
+  // + incrément ATOMIQUE de usage_actuel (compare-and-swap anti-TOCTOU).
   let reductionEur = 0
   if (p.code_promo) {
     const { data: cp } = await sb.from('codes_promo')
-      .select('*').eq('code', p.code_promo.toUpperCase()).eq('actif', true).maybeSingle()
-    if (cp && (!cp.usage_max || Number(cp.usage_actuel ?? 0) < Number(cp.usage_max))) {
-      const valeur = Number(cp.valeur)
-      reductionEur = cp.type === 'pourcentage'
-        ? Math.round(totalTTC * (valeur / 100) * 100) / 100
-        : Math.min(valeur, totalTTC)
-      totalTTC = Math.max(0, Math.round((totalTTC - reductionEur) * 100) / 100)
-      // Increment usage_actuel
-      await sb.from('codes_promo')
-        .update({ usage_actuel: Number(cp.usage_actuel ?? 0) + 1 })
-        .eq('id', cp.id)
+      .select('*').eq('code', p.code_promo.toUpperCase()).maybeSingle()
+    const today = new Date().toISOString().slice(0, 10)
+    const ttcBrut = totalTTC
+    const ORDRE_NIVEAU: Record<string, number> = { standard: 0, bronze: 1, argent: 2, or: 3, platine: 4 }
+
+    // Niveau fidélité du client (seulement si le code est réservé à un niveau)
+    let niveauClient = 'standard'
+    if (cp?.reserve_fidelite_niveau && p.client_id) {
+      const { data: cli } = await sb.from('clients').select('niveau_fidelite').eq('id', p.client_id).maybeSingle()
+      niveauClient = (cli?.niveau_fidelite as string) ?? 'standard'
+    }
+
+    const valide = !!cp
+      && cp.actif === true
+      && (cp.date_debut as string).slice(0, 10) <= today
+      && (!cp.date_fin || (cp.date_fin as string).slice(0, 10) >= today)
+      && (cp.usage_max === null || Number(cp.usage_actuel ?? 0) < Number(cp.usage_max))
+      && (Number(cp.montant_min ?? 0) <= ttcBrut)
+      && (!cp.reserve_fidelite_niveau
+          || (ORDRE_NIVEAU[niveauClient] ?? 0) >= (ORDRE_NIVEAU[cp.reserve_fidelite_niveau as string] ?? 0))
+
+    if (valide && cp) {
+      // Incrément atomique : n'applique la remise QUE si la CAS réussit (sinon un
+      // code « 1 usage » pourrait être consommé N fois en parallèle).
+      let okIncrement = true
+      if (cp.usage_max !== null) {
+        const cur = Number(cp.usage_actuel ?? 0)
+        const { data: maj } = await sb.from('codes_promo')
+          .update({ usage_actuel: cur + 1 })
+          .eq('id', cp.id).eq('usage_actuel', cur)   // CAS : n'incrémente que si inchangé
+          .select('id')
+        okIncrement = !!(maj && maj.length > 0)
+      } else {
+        await sb.from('codes_promo')
+          .update({ usage_actuel: Number(cp.usage_actuel ?? 0) + 1 }).eq('id', cp.id)
+      }
+
+      if (okIncrement) {
+        const valeur = Number(cp.valeur)
+        reductionEur = cp.type === 'pourcentage'
+          ? Math.round(ttcBrut * (valeur / 100) * 100) / 100
+          : Math.min(valeur, ttcBrut)
+        totalTTC = Math.max(0, Math.round((ttcBrut - reductionEur) * 100) / 100)
+        // Prorata HT / TVA / ventilation pour garder TTC = HT + TVA cohérent.
+        const factor = ttcBrut > 0 ? totalTTC / ttcBrut : 1
+        totalHT = Math.round(totalHT * factor * 100) / 100
+        totalTVA = Math.round(totalTVA * factor * 100) / 100
+        for (const k of Object.keys(ventilationTva)) {
+          ventilationTva[k] = Math.round(ventilationTva[k] * factor * 100) / 100
+        }
+      }
+    }
+  }
+
+  // ─── E5 : le créneau doit être une date valide DANS LE FUTUR ───
+  // (le schéma n'impose que z.string() → un créneau passé/arbitraire passerait).
+  if (p.creneau_retrait) {
+    const slot = new Date(p.creneau_retrait)
+    if (isNaN(slot.getTime()) || slot.getTime() < Date.now() - 60_000) {
+      return Response.json({ error: 'Créneau de retrait invalide ou dans le passé.' }, { status: 400, headers: cors })
     }
   }
 

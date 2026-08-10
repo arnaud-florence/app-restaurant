@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO, addMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -56,10 +57,16 @@ export default function MaintenanceClient({ data }: { data: DataMaintenance }) {
           title="Maintenance"
           description="Équipements, planning préventif, interventions, contrôles obligatoires."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
-              <KPI label="Équipements" value={equipsActifs.length} />
-              <KPI label="Maint. proches" value={planningProche} accent={planningProche > 0 ? 'orange' : 'zinc'} />
-              <KPI label="Contrôles ≤1M" value={controlesAlerte} accent={controlesAlerte > 0 ? 'rouge' : 'vert'} />
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <div className="hidden sm:flex flex-wrap gap-2">
+                <KPI label="Équipements" value={equipsActifs.length} />
+                <KPI label="Maint. proches" value={planningProche} accent={planningProche > 0 ? 'orange' : 'zinc'} />
+                <KPI label="Contrôles ≤1M" value={controlesAlerte} accent={controlesAlerte > 0 ? 'rouge' : 'vert'} />
+              </div>
+              <a href="/admin/maintenance/registre/print" target="_blank" rel="noopener"
+                 className="inline-flex items-center gap-1.5 h-10 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold whitespace-nowrap">
+                🖨 Registre maintenance
+              </a>
             </div>
           }
         >
@@ -88,15 +95,6 @@ export default function MaintenanceClient({ data }: { data: DataMaintenance }) {
       {erreur && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30 cursor-pointer" onClick={() => setErreur('')}>⚠️ {erreur}</div>}
       {success && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30">✓ {success}</div>}
     </div>
-  )
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
   )
 }
 
@@ -335,7 +333,7 @@ function EquipementModal({ equipement, onClose, onError, onSuccess }: { equipeme
         <button onClick={onClose} disabled={isPending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
         {isEdit && equipement?.actif && (
           <button onClick={async () => {
-            if (!confirm(`Archiver "${equipement.nom}" ?`)) return
+            if (!(await askConfirm({ title: `Archiver "${equipement.nom}" ?`, message: 'L\'équipement sera archivé.', confirmLabel: 'Archiver' }))) return
             try { await archiverEquipement(equipement.id); onSuccess('Archivé'); router.refresh() }
             catch (e) { onError(e) }
           }} className="min-h-[48px] px-4 rounded-md bg-amber-500 hover:bg-amber-400 text-white font-bold">📦 Archiver</button>
@@ -359,48 +357,81 @@ function PlanningTab({ equipements, onError, onOk }: { equipements: Equipement[]
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-600">Trié par échéance. Click "+ Intervention" pour enregistrer une visite et planifier la prochaine.</p>
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
-        {sorted.length === 0 ? (
+      {sorted.length === 0 ? (
+        <section className="rounded-lg border border-zinc-200 bg-white">
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune maintenance préventive planifiée.</p>
-        ) : (
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-              <tr>
-                <th className="text-left px-3 py-1.5">Équipement</th>
-                <th className="text-left px-3 py-1.5">Catégorie</th>
-                <th className="text-left px-3 py-1.5">Prestataire</th>
-                <th className="text-left px-3 py-1.5">Prochaine</th>
-                <th className="text-right px-3 py-1.5">Jours</th>
-                <th className="text-right px-3 py-1.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {sorted.map(e => {
-                const s = statutEcheance(e.prochaine_maintenance)
-                const j = joursRestants(e.prochaine_maintenance)
-                const sty = STATUT_ECHEANCE_STYLE[s]
-                const cat = e.categorie ? CATEGORIE_INFO[e.categorie] : null
-                return (
-                  <tr key={e.id} className={cn(s === 'expire' && 'bg-red-50', s === 'critique' && 'bg-red-50', s === 'proche' && 'bg-amber-50')}>
-                    <td className="px-3 py-2 font-bold">{e.nom}</td>
-                    <td className="px-3 py-2">{cat ? <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', cat.cls)}>{cat.emoji} {cat.label}</span> : '—'}</td>
-                    <td className="px-3 py-2 text-zinc-600">{e.prestataire_maintenance ?? '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{fmtDate(e.prochaine_maintenance)}</td>
-                    <td className="px-3 py-2 text-right">
-                      <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', sty.cls)}>
-                        {j !== null && (j < 0 ? `${j} j` : `${j} j`)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => setShowInter(e)} className="text-xs h-8 px-2 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold">+ Intervention</button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+        </section>
+      ) : (
+        <>
+          {/* MOBILE — cartes */}
+          <ul className="md:hidden space-y-2">
+            {sorted.map(e => {
+              const s = statutEcheance(e.prochaine_maintenance)
+              const j = joursRestants(e.prochaine_maintenance)
+              const sty = STATUT_ECHEANCE_STYLE[s]
+              const cat = e.categorie ? CATEGORIE_INFO[e.categorie] : null
+              return (
+                <li key={e.id} className={cn('rounded-lg border border-zinc-200 bg-white p-3', s === 'expire' && 'bg-red-50 border-red-200', s === 'critique' && 'bg-red-50 border-red-200', s === 'proche' && 'bg-amber-50 border-amber-200')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-base text-zinc-900 truncate">{e.nom}</p>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        {cat && <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', cat.cls)}>{cat.emoji} {cat.label}</span>}
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">👤 {e.prestataire_maintenance ?? '—'}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5 tabular-nums">📅 {fmtDate(e.prochaine_maintenance)}</p>
+                    </div>
+                    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border shrink-0', sty.cls)}>
+                      {j !== null && `${j} j`}
+                    </span>
+                  </div>
+                  <button onClick={() => setShowInter(e)} className="mt-3 w-full min-h-[44px] rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Intervention</button>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* DESKTOP — table */}
+          <section className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+                <tr>
+                  <th className="text-left px-3 py-1.5">Équipement</th>
+                  <th className="text-left px-3 py-1.5">Catégorie</th>
+                  <th className="text-left px-3 py-1.5">Prestataire</th>
+                  <th className="text-left px-3 py-1.5">Prochaine</th>
+                  <th className="text-right px-3 py-1.5">Jours</th>
+                  <th className="text-right px-3 py-1.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {sorted.map(e => {
+                  const s = statutEcheance(e.prochaine_maintenance)
+                  const j = joursRestants(e.prochaine_maintenance)
+                  const sty = STATUT_ECHEANCE_STYLE[s]
+                  const cat = e.categorie ? CATEGORIE_INFO[e.categorie] : null
+                  return (
+                    <tr key={e.id} className={cn(s === 'expire' && 'bg-red-50', s === 'critique' && 'bg-red-50', s === 'proche' && 'bg-amber-50')}>
+                      <td className="px-3 py-2 font-bold">{e.nom}</td>
+                      <td className="px-3 py-2">{cat ? <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', cat.cls)}>{cat.emoji} {cat.label}</span> : '—'}</td>
+                      <td className="px-3 py-2 text-zinc-600">{e.prestataire_maintenance ?? '—'}</td>
+                      <td className="px-3 py-2 tabular-nums">{fmtDate(e.prochaine_maintenance)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', sty.cls)}>
+                          {j !== null && (j < 0 ? `${j} j` : `${j} j`)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => setShowInter(e)} className="text-xs h-8 px-2 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold">+ Intervention</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </section>
+        </>
+      )}
       {showInter && (
         <InterventionModal equipement={showInter} type="preventive" onClose={() => setShowInter(null)} onError={onError}
           onSuccess={() => { setShowInter(null); onOk('Intervention enregistrée') }} />
@@ -458,7 +489,7 @@ function InterventionsTab({ interventions, equipements, onError, onOk }: { inter
                     </p>
                   </div>
                   <button onClick={async () => {
-                    if (!confirm('Supprimer cette intervention ?')) return
+                    if (!(await askConfirm({ message: 'Supprimer cette intervention ?', confirmLabel: 'Supprimer', danger: true }))) return
                     try { await supprimerIntervention(i.id); onOk('Supprimée'); router.refresh() }
                     catch (e) { onError(e) }
                   }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
@@ -579,49 +610,81 @@ function ControlesTab({ equipements, onError, onOk }: { equipements: Equipement[
         Doivent être réalisés par un organisme certifié (APAVE, BUREAU VERITAS, SOCOTEC…). Conserver les rapports 5 ans.
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
-        {concernes.length === 0 ? (
+      {concernes.length === 0 ? (
+        <section className="rounded-lg border border-zinc-200 bg-white">
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun équipement marqué comme soumis à contrôle obligatoire. Édite tes équipements pour les renseigner.</p>
-        ) : (
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-              <tr>
-                <th className="text-left px-3 py-1.5">Équipement</th>
-                <th className="text-left px-3 py-1.5">Type contrôle</th>
-                <th className="text-left px-3 py-1.5">Organisme</th>
-                <th className="text-left px-3 py-1.5">Dernier</th>
-                <th className="text-left px-3 py-1.5">Prochain</th>
-                <th className="text-right px-3 py-1.5">Statut</th>
-                <th className="text-right px-3 py-1.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {concernes.map(e => {
-                const ctrl = e.type_controle_obligatoire ? TYPE_CONTROLE_INFO[e.type_controle_obligatoire] : null
-                const s = statutEcheance(e.prochain_controle_obligatoire)
-                const sty = STATUT_ECHEANCE_STYLE[s]
-                const j = joursRestants(e.prochain_controle_obligatoire)
-                return (
-                  <tr key={e.id} className={cn(s === 'expire' && 'bg-red-50', s === 'critique' && 'bg-red-50', s === 'proche' && 'bg-amber-50')}>
-                    <td className="px-3 py-2 font-bold">{e.nom}</td>
-                    <td className="px-3 py-2">{ctrl?.emoji} {ctrl?.label}</td>
-                    <td className="px-3 py-2 text-zinc-600">{e.organisme_certifie ?? '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{fmtDate(e.derniere_controle_obligatoire)}</td>
-                    <td className="px-3 py-2 tabular-nums">{fmtDate(e.prochain_controle_obligatoire)}</td>
-                    <td className="px-3 py-2 text-right">
+        </section>
+      ) : (
+        <>
+          {/* MOBILE — cartes */}
+          <ul className="md:hidden space-y-2">
+            {concernes.map(e => {
+              const ctrl = e.type_controle_obligatoire ? TYPE_CONTROLE_INFO[e.type_controle_obligatoire] : null
+              const s = statutEcheance(e.prochain_controle_obligatoire)
+              const sty = STATUT_ECHEANCE_STYLE[s]
+              const j = joursRestants(e.prochain_controle_obligatoire)
+              return (
+                <li key={e.id} className={cn('rounded-lg border border-zinc-200 bg-white p-3', s === 'expire' && 'bg-red-50 border-red-200', s === 'critique' && 'bg-red-50 border-red-200', s === 'proche' && 'bg-amber-50 border-amber-200')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-base text-zinc-900 truncate">{e.nom}</p>
+                      <p className="text-xs text-zinc-600 mt-1">{ctrl?.emoji} {ctrl?.label}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">🏢 {e.organisme_certifie ?? '—'}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5 tabular-nums">📅 Prochain : {fmtDate(e.prochain_controle_obligatoire)}</p>
+                    </div>
+                    <div className="text-right shrink-0">
                       <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', sty.cls)}>{sty.label}</span>
                       {j !== null && <p className="text-[10px] text-zinc-500 mt-0.5">{j < 0 ? `il y a ${-j} j` : `dans ${j} j`}</p>}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => setShowInter(e)} className="text-xs h-8 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">+ Visite</button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowInter(e)} className="mt-3 w-full min-h-[44px] rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm">+ Visite</button>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* DESKTOP — table */}
+          <section className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+                <tr>
+                  <th className="text-left px-3 py-1.5">Équipement</th>
+                  <th className="text-left px-3 py-1.5">Type contrôle</th>
+                  <th className="text-left px-3 py-1.5">Organisme</th>
+                  <th className="text-left px-3 py-1.5">Dernier</th>
+                  <th className="text-left px-3 py-1.5">Prochain</th>
+                  <th className="text-right px-3 py-1.5">Statut</th>
+                  <th className="text-right px-3 py-1.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {concernes.map(e => {
+                  const ctrl = e.type_controle_obligatoire ? TYPE_CONTROLE_INFO[e.type_controle_obligatoire] : null
+                  const s = statutEcheance(e.prochain_controle_obligatoire)
+                  const sty = STATUT_ECHEANCE_STYLE[s]
+                  const j = joursRestants(e.prochain_controle_obligatoire)
+                  return (
+                    <tr key={e.id} className={cn(s === 'expire' && 'bg-red-50', s === 'critique' && 'bg-red-50', s === 'proche' && 'bg-amber-50')}>
+                      <td className="px-3 py-2 font-bold">{e.nom}</td>
+                      <td className="px-3 py-2">{ctrl?.emoji} {ctrl?.label}</td>
+                      <td className="px-3 py-2 text-zinc-600">{e.organisme_certifie ?? '—'}</td>
+                      <td className="px-3 py-2 tabular-nums">{fmtDate(e.derniere_controle_obligatoire)}</td>
+                      <td className="px-3 py-2 tabular-nums">{fmtDate(e.prochain_controle_obligatoire)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', sty.cls)}>{sty.label}</span>
+                        {j !== null && <p className="text-[10px] text-zinc-500 mt-0.5">{j < 0 ? `il y a ${-j} j` : `dans ${j} j`}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => setShowInter(e)} className="text-xs h-8 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">+ Visite</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </section>
+        </>
+      )}
 
       {showInter && (
         <InterventionModal equipement={showInter} type="controle_obligatoire" onClose={() => setShowInter(null)} onError={onError}

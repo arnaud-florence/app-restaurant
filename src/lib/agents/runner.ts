@@ -59,6 +59,18 @@ export async function runAgent<T = unknown>(
 ): Promise<{ ok: true; runId: string; summary: string; durationMs: number } | { ok: false; runId: string; error: string }> {
   const supabase = await createClient()
 
+  // ─── Mode formation : agents EN PAUSE ──────────────────────────────
+  // Pendant la phase de prise en main par les équipes, on ne veut ni
+  // exécution (qui lirait des données d'exercice), ni findings, ni push.
+  // Flag global stocké dans parametres (cle='mode_formation', valeur='true').
+  try {
+    const { data: flag } = await supabase
+      .from('parametres').select('valeur').eq('cle', 'mode_formation').maybeSingle()
+    if (flag?.valeur === 'true') {
+      return { ok: true as const, runId: 'skip-formation', summary: '⏸️ Mode formation actif — agent en pause', durationMs: 0 }
+    }
+  } catch { /* lecture du flag impossible → on continue normalement */ }
+
   // Crée le run en "running"
   const { data: run, error: runErr } = await supabase
     .from('agents_runs')
@@ -155,6 +167,28 @@ export async function emitFinding(ctx: AgentContext, input: EmitFindingInput): P
       })
     } catch (e) {
       console.warn(`[agents/${ctx.agentId}] push notif échec (non bloquant)`, e)
+    }
+  }
+
+  // 👨‍🍳 Agents temps réel par poste → push AUSSI les salariés du poste concerné
+  // (coup de main en service). Findings dédupliqués → pas de spam à chaque cycle.
+  const POSTES_RT: Record<string, string[]> = {
+    cuisine_rt: ['cuisinier', 'cuisine', 'second', 'pizzaiolo', 'cuisinier_snacking', 'polyvalent'],
+    serveur_rt: ['serveur', 'salle', 'polyvalent'],
+    bar_rt:     ['barman', 'bar', 'polyvalent'],
+    snack_rt:   ['cuisinier_snacking', 'snack', 'polyvalent'],
+  }
+  const postesRT = POSTES_RT[ctx.agentId]
+  if (postesRT && (input.urgence === 'rouge' || input.urgence === 'jaune')) {
+    try {
+      const { sendPushToPostes } = await import('@/lib/push')
+      await sendPushToPostes(postesRT, {
+        title: `👨‍🍳 Arnaud : ${input.titre}`,
+        body:  input.message ?? '',
+        url:   input.action_url ?? '/mon-espace',
+      })
+    } catch (e) {
+      console.warn(`[agents/${ctx.agentId}] push poste échec (non bloquant)`, e)
     }
   }
 }

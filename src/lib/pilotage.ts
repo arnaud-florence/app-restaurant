@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { startOfMonth, endOfMonth, format, subMonths, subYears } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { foodCostMoyenEtAlertes } from './foodCostAgg'
+import { lundiDeLaSemaine, coutSemaineAvecHeuresSup } from './rh'
 
 // ─── Types ────────────────────────────────────────────────────────
 export type KpiCode =
@@ -123,16 +124,16 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
     energieRes, facturesRes, reclamationsRes, retoursRes,
     capaciteRes, objectifsRes,
   ] = await Promise.all([
-    supabase.from('paiements_caisse').select('montant, encaisse_at')
+    supabase.from('paiements_caisse').select('montant, encaisse_at').neq('methode', 'fidelite')
       .gte('encaisse_at', p.debut + 'T00:00:00').lte('encaisse_at', p.fin + 'T23:59:59'),
-    supabase.from('paiements_caisse').select('montant')
+    supabase.from('paiements_caisse').select('montant').neq('methode', 'fidelite')
       .gte('encaisse_at', pN1.debut + 'T00:00:00').lte('encaisse_at', pN1.fin + 'T23:59:59'),
     supabase.from('commandes').select('id', { count: 'exact', head: true })
       .eq('statut', 'encaisse').gte('created_at', p.debut).lte('created_at', p.fin + 'T23:59:59'),
     supabase.from('commandes').select('id', { count: 'exact', head: true })
       .eq('statut', 'encaisse').gte('created_at', pN1.debut).lte('created_at', pN1.fin + 'T23:59:59'),
     supabase.from('employes').select('id, salaire_horaire').eq('actif', true),
-    supabase.from('pointage').select('employe_id, heures_travaillees')
+    supabase.from('pointage').select('employe_id, date_pointage, heures_travaillees')
       .gte('date_pointage', p.debut).lte('date_pointage', p.fin).not('heures_travaillees', 'is', null),
     foodCostMoyenEtAlertes(supabase),  // food cost calculé au runtime (recettes.food_cost_pct n'existe pas)
     supabase.from('non_conformites').select('id', { count: 'exact', head: true }).eq('statut', 'ouverte'),
@@ -153,12 +154,24 @@ export async function calculerKPIs(supabase: SupabaseClient, refDate = new Date(
   const nbC   = commandesRes.count ?? 0
   const nbCN1 = commandesN1Res.count ?? 0
 
-  // Masse salariale = sum(heures_travaillees pointage) × salaire_horaire
+  // Masse salariale = heures pointées × salaire_horaire, AVEC majoration heures sup
+  // (35h normal · 36-43h +25% · >43h +50%), calculée par semaine et par employé.
   const tauxParId = new Map((employesRes.data ?? []).map(e => [e.id as string, Number(e.salaire_horaire ?? 0)]))
-  const masseSalariale = (pointageRes.data ?? []).reduce((s, p) => {
-    const h = Number(p.heures_travaillees ?? 0)
-    return s + (h > 0 ? h * (tauxParId.get(p.employe_id as string) ?? 0) : 0)
-  }, 0)
+  const heuresParEmpSem = new Map<string, Map<string, number>>()  // empId → lundiSemaine → heures
+  for (const pt of (pointageRes.data ?? [])) {
+    const empId = pt.employe_id as string
+    const h = Number(pt.heures_travaillees ?? 0)
+    if (h <= 0) continue
+    const sem = lundiDeLaSemaine(pt.date_pointage as string)
+    let m = heuresParEmpSem.get(empId)
+    if (!m) { m = new Map(); heuresParEmpSem.set(empId, m) }
+    m.set(sem, (m.get(sem) ?? 0) + h)
+  }
+  let masseSalariale = 0
+  for (const [empId, parSem] of heuresParEmpSem) {
+    const rate = tauxParId.get(empId) ?? 0
+    for (const hSem of parSem.values()) masseSalariale += coutSemaineAvecHeuresSup(hSem, rate)
+  }
 
   // recettesRes = résultat de foodCostMoyenEtAlertes (food cost calculé runtime)
   const foodCostMoyen = recettesRes.moyen
@@ -220,7 +233,7 @@ export async function calculerSaisonnier(supabase: SupabaseClient, refDate = new
   const fin   = format(endOfMonth(refDate), 'yyyy-MM-dd')
 
   const [paiRes, cmdRes] = await Promise.all([
-    supabase.from('paiements_caisse').select('montant, encaisse_at')
+    supabase.from('paiements_caisse').select('montant, encaisse_at').neq('methode', 'fidelite')
       .gte('encaisse_at', debut + 'T00:00:00').lte('encaisse_at', fin + 'T23:59:59'),
     supabase.from('commandes').select('id, created_at').eq('statut', 'encaisse')
       .gte('created_at', debut).lte('created_at', fin + 'T23:59:59'),

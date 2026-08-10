@@ -6,6 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
+import { tauxTvaArticle } from '@/lib/tva'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,27 +19,30 @@ export async function GET(req: Request) {
 
   const sb = await createClient()
 
-  // Récupère l'établissement principal pour filtrer ses recettes uniquement
-  const { data: etab } = await sb
+  // Carte en ligne = produits des points de vente du CA principal (Restauration,
+  // Bar, Snack, Fournil). FDJ/tabac/colis sont exclus (hors CA, pas de recettes).
+  // On inclut aussi les recettes legacy non rattachées (etablissement_id NULL).
+  const { data: etabs } = await sb
     .from('etablissements')
     .select('id')
-    .eq('is_principal', true)
+    .eq('inclus_ca_principal', true)
     .eq('actif', true)
-    .single()
+  const etabIds = (etabs ?? []).map(e => e.id as string)
 
-  if (!etab?.id) {
-    return Response.json({ error: 'Aucun établissement principal configuré' }, { status: 500 })
-  }
-
-  const { data, error } = await sb.from('recettes')
+  let query = sb.from('recettes')
     .select(`
       id, nom, categorie, tag_destination, description,
       prix_vente_ht, tva, contient_alcool, vendable_online, image_url,
       recette_ingredients(ingredient:ingredients(allergenes, nom))
     `)
     .eq('actif', true)
-    .eq('etablissement_id', etab.id)
-    .in('tag_destination', ['SNACKING', 'PIZZA', 'BAR', 'CUISINE'])
+    .in('tag_destination', ['SNACKING', 'PIZZA', 'BAR', 'CUISINE', 'FOURNIL'])
+
+  if (etabIds.length > 0) {
+    query = query.or(`etablissement_id.in.(${etabIds.join(',')}),etablissement_id.is.null`)
+  }
+
+  const { data, error } = await query
     .order('tag_destination')
     .order('categorie')
     .order('nom')
@@ -66,7 +70,9 @@ export async function GET(req: Request) {
       categorie: r.categorie,
       tag: r.tag_destination,
       description: r.description ?? '',
-      prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + Number(r.tva) / 100) * 100) / 100,
+      // TTC aligné sur la facturation réelle (commande en ligne = emporter :
+      // 5,5 % plat/soft, 20 % alcool). Évite l'écart prix affiché ≠ prix payé.
+      prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + tauxTvaArticle(r.contient_alcool, 'emporter') / 100) * 100) / 100,
       contient_alcool: r.contient_alcool,
       vendable_online: r.vendable_online,
       image_url: r.image_url,

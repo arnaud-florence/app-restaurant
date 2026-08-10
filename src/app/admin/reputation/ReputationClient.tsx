@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Star, Plus, Trash2, Sparkles, Send, Eye, Flag, X } from 'lucide-react'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import EmptyState from '@/components/ui/EmptyState'
 import {
   creerAvisManuel, modererAvis, publierReponse, supprimerAvis,
 } from './actions'
@@ -186,11 +187,12 @@ export default function ReputationClient({ avis }: { avis: AvisPublic[] }) {
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-zinc-500">
-          <Star className="h-10 w-10 mx-auto text-zinc-300 mb-2" />
-          <p className="text-base font-medium">Aucun avis</p>
-          <p className="text-xs mt-1">Saisis un avis externe ou attends les premiers via le site.</p>
-        </Card>
+        <EmptyState
+          emoji="⭐"
+          titre="Aucun avis"
+          description="Saisis un avis externe (Google, TripAdvisor…) ou attends les premiers retours via le site."
+          action={{ label: '+ Saisir un avis externe', onClick: () => setCreating(true) }}
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map(a => {
@@ -224,27 +226,27 @@ export default function ReputationClient({ avis }: { avis: AvisPublic[] }) {
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-1 items-end">
-                    <Button size="sm" variant="outline" onClick={() => setRespondingTo(a)} className="gap-1">
-                      <Send className="h-3 w-3" /> {a.reponse ? 'Modifier' : 'Répondre'}
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-stretch sm:items-end shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => setRespondingTo(a)} className="gap-1 min-h-[44px] px-3">
+                      <Send className="h-4 w-4" /> {a.reponse ? 'Modifier' : 'Répondre'}
                     </Button>
                     {a.statut === 'en_attente' && (
-                      <Button size="sm" variant="outline" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'publie' }) })} className="text-emerald-700">
-                        <Eye className="h-3 w-3" /> Publier
+                      <Button size="sm" variant="outline" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'publie' }) })} className="gap-1 min-h-[44px] px-3 text-emerald-700">
+                        <Eye className="h-4 w-4" /> Publier
                       </Button>
                     )}
                     {a.statut !== 'rejete' && (
-                      <Button size="sm" variant="ghost" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'rejete' }) })} className="text-zinc-600">
+                      <Button size="sm" variant="ghost" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'rejete' }) })} className="min-h-[44px] px-3 text-zinc-600">
                         Rejeter
                       </Button>
                     )}
                     {a.statut !== 'signale' && (
-                      <Button size="sm" variant="ghost" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'signale' }) })} className="text-red-600">
-                        <Flag className="h-3 w-3" />
+                      <Button size="sm" variant="ghost" onClick={() => exec(async () => { await modererAvis({ id: a.id, statut: 'signale' }) })} className="gap-1 min-h-[44px] px-3 text-red-600">
+                        <Flag className="h-4 w-4" /> <span className="sm:hidden">Signaler</span>
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => setConfirmDel(a)} className="text-red-600">
-                      <Trash2 className="h-3 w-3" />
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDel(a)} className="gap-1 min-h-[44px] px-3 text-red-600">
+                      <Trash2 className="h-4 w-4" /> <span className="sm:hidden">Supprimer</span>
                     </Button>
                   </div>
                 </div>
@@ -430,8 +432,8 @@ function ReponseModal({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Ta réponse</label>
-            <Button size="sm" variant="outline" onClick={genererBrouillon} disabled={generating} className="gap-1 text-xs">
-              <Sparkles className="h-3 w-3" />
+            <Button size="sm" variant="outline" onClick={genererBrouillon} disabled={generating} className="gap-1 text-sm min-h-[44px] px-3">
+              <Sparkles className="h-4 w-4" />
               {generating ? 'Génération…' : '✨ Brouillon IA'}
             </Button>
           </div>

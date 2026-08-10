@@ -26,6 +26,8 @@ export type Message = {
   expediteur_nom: string | null
   contenu: string
   lu_par: string[]
+  /** Réactions emoji : { "<employe_id>": "<emoji>" } (une par personne). */
+  reactions?: Record<string, string> | null
   created_at: string
 }
 

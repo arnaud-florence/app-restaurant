@@ -54,6 +54,31 @@ export async function marquerMessagesLus(input: unknown) {
   return { ok: true as const }
 }
 
+// ─── Réactions emoji (chat façon Messenger) ─────────────────────────
+const reagirSchema = z.object({
+  message_id: z.string().uuid(),
+  employe_id: z.string().uuid(),
+  emoji:      z.string().trim().min(1).max(8),
+})
+
+export async function reagirMessage(input: unknown) {
+  const p = reagirSchema.parse(input)
+  const supabase = await createClient()
+  const { data: m } = await supabase
+    .from('messages')
+    .select('reactions')
+    .eq('id', p.message_id)
+    .single()
+  const cur = (m?.reactions as Record<string, string> | undefined) ?? {}
+  const next = { ...cur }
+  // Re-tap du même emoji → on retire ; sinon on (re)met (1 réaction / personne).
+  if (next[p.employe_id] === p.emoji) delete next[p.employe_id]
+  else next[p.employe_id] = p.emoji
+  await supabase.from('messages').update({ reactions: next }).eq('id', p.message_id)
+  revalidatePath('/equipes')
+  return { ok: true as const }
+}
+
 // ─── Affichage infos ───────────────────────────────────────────────
 
 const creerInfoSchema = z.object({

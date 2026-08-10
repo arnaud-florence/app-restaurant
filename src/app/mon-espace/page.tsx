@@ -16,22 +16,29 @@ import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import { getMainRoute } from '@/lib/permissions'
 import { TACHES, MOMENT_INFO, POSTE_INFO as POSTE_INFO_WIDGET, type PosteWidget, type Moment } from '@/lib/taches-du-jour'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   CalendarDays, ListTodo, GraduationCap, ShieldCheck,
-  ChefHat, Wine, Utensils, ScrollText, Trophy, Sparkles, ChevronRight,
+  ChefHat, Wine, Utensils, Trophy, Sparkles,
   Rocket, Wallet, Target, TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PointageCard, { type Pointage as PointageRow } from './PointageCard'
 import ShiftsBriefingAlertes from './ShiftsBriefingAlertes'
 import PerformanceCongesMeteo from './PerformanceCongesMeteo'
+import MonEspaceTabs from './MonEspaceTabs'
+import VoirEnTantQue from './VoirEnTantQue'
+import PullToRefresh from '@/components/PullToRefresh'
 import NotificationsBell from '@/components/NotificationsBell'
 import TopActionBar from '@/components/TopActionBar'
 import BackToCategoryButton from '@/components/BackToCategoryButton'
+import StoriesNavServer from '@/components/StoriesNavServer'
+import RappelsSalarieCard from '@/components/RappelsSalarie'
+import { getRappelsPourEmploye } from '@/lib/co-gerant/rappels-salarie'
+import AssistantSalarieChat from './AssistantSalarieChat'
 import { evaluerChallengesEmploye, partSurplusPondereeHeures } from '@/lib/challenges-evaluation'
 import { calculerMetrique, METRIQUE_LABEL, periodeMoisCourant } from '@/lib/challenges-metrics'
 import { leaderboardsPourEmploye, type ChallengeLeaderboard } from '@/lib/challenges-leaderboards'
@@ -84,10 +91,17 @@ function startOfWeek(d: Date) {
 }
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1) }
 
-export default async function MonEspacePage() {
+export default async function MonEspacePage({ searchParams }: { searchParams: { as?: string } }) {
   const profil = await getProfile()
   if (!profil) redirect('/login?next=/mon-espace')
-  if (!profil.employe_id) {
+  const isManager = profil.role === 'manager'
+  const asParam = typeof searchParams?.as === 'string' ? searchParams.as : null
+  // « Voir en tant que » : RÉSERVÉ au gérant. Affiche le mon-espace d'un autre
+  // salarié en lecture seule. Un non-manager ne peut jamais voir un autre.
+  // Priorité au mode « aperçu » persistant (cookie, app-wide) ; sinon ?as= ponctuel.
+  const viewAsId = profil.apercu?.cibleId ?? (isManager && asParam ? asParam : null)
+  const cibleEmployeId = viewAsId ?? profil.employe_id
+  if (!cibleEmployeId) {
     return (
       <div className="min-h-screen bg-stone-50 p-6 flex items-center justify-center">
         <Card className="p-6 max-w-md text-center">
@@ -115,12 +129,19 @@ export default async function MonEspacePage() {
   // ─── 1. Identité ──────────────────────────────────────────────
   const { data: emp } = await supabase.from('employes')
     .select('id, prenom, nom, poste, type_contrat, email, telephone, salaire_horaire, heures_contrat, solde_conges_jours, created_at')
-    .eq('id', profil.employe_id).maybeSingle()
+    .eq('id', cibleEmployeId).maybeSingle()
 
   if (!emp) redirect('/login')
 
   const empId = emp.id as string
+  // Liste des salariés pour le sélecteur « Voir en tant que » (gérant seulement)
+  const { data: employesListe } = isManager
+    ? await supabase.from('employes').select('id, prenom, nom, poste').eq('actif', true).order('prenom')
+    : { data: null }
   const posteWidget = POSTE_TO_WIDGET[emp.poste as string] ?? null
+
+  // Arnaud côté salarié : ses rappels du jour (déterministe, lecture seule)
+  const rappels = await getRappelsPourEmploye(empId, emp.poste as string)
 
   // Ancienneté en mois (depuis created_at)
   const created = new Date(emp.created_at as string)
@@ -135,10 +156,10 @@ export default async function MonEspacePage() {
   // ─── Évaluation des challenges + leaderboards + rémunération ─────────
   const periode = periodeMoisCourant()
   const [evaluations, surplusInfo, configEcoRes, leaderboards, caMoisActuel, pmMoisRes] = await Promise.all([
-    evaluerChallengesEmploye(profil.employe_id, emp?.poste as string ?? null),
-    partSurplusPondereeHeures(profil.employe_id),
+    evaluerChallengesEmploye(cibleEmployeId, emp?.poste as string ?? null),
+    partSurplusPondereeHeures(cibleEmployeId),
     supabase.from('config_economique').select('smic_horaire_brut, pct_redistribution_surplus').limit(1).maybeSingle(),
-    leaderboardsPourEmploye(profil.employe_id, emp?.poste as string ?? null),
+    leaderboardsPourEmploye(cibleEmployeId, emp?.poste as string ?? null),
     calculerMetrique('ca_restaurant', periode),
     supabase.from('point_mort_mensuel')
       .select('ca_seuil_calcule')
@@ -372,6 +393,7 @@ export default async function MonEspacePage() {
   const navProfil: OpsBottomNavProfil = {
     email: profil.email, role: profil.role, poste: profil.poste,
     custom_permissions: profil.custom_permissions,
+        apercu: profil.apercu,
   }
 
   // Couleur pastille principale
@@ -383,11 +405,361 @@ export default async function MonEspacePage() {
   // CTA principal selon poste
   const actionPrincipale = POSTE_TO_ACTION[emp.poste as string] ?? POSTE_TO_ACTION.autre
 
+  // ─── Sections groupées par onglet (façon Facebook/Instagram) ──────
+  // 1) Vue d'ensemble = pointage + ma formation + KPIs flash + historique 7j
+
+  const vueSections = (
+    <>
+      {/* Pointage rapide arrivée/sortie */}
+      <div id="pointage">
+        <PointageCard pointage={pointageJour} readOnly={!!viewAsId} />
+      </div>
+
+      {/* Ma formation en cours — action quotidienne n°2, remontée tout en haut */}
+      {monGuide && (() => {
+        const prog = progressions.find(p => p.guide_id === monGuide.id) ?? null
+        const nbEt = nbEtapesParGuide.get(monGuide.id) ?? 0
+        const nbEv = prog?.etapes_vues_ids.length ?? 0
+        const pct  = nbEt > 0 ? Math.round((nbEv / nbEt) * 100) : 0
+        const fini = prog?.statut === 'reussi'
+        return (
+          <Card className={cn('p-4', fini ? 'bg-emerald-50/60 border-emerald-200' : 'bg-white')}>
+            <div className="flex items-center gap-3">
+              <div className="text-4xl shrink-0">{fini ? '🏆' : '📖'}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                  {fini ? 'Formation validée' : 'Ma formation en cours'}
+                </p>
+                <p className="font-bold text-base truncate">{monGuide.titre}</p>
+                <div className="mt-1.5 h-2 bg-zinc-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-[11px] text-zinc-500 mt-1">{nbEv}/{nbEt} étapes lues · {pct}%</p>
+              </div>
+            </div>
+            <Link
+              href={`/formation/${monGuide.id}?emp=${empId}`}
+              className="mt-3 w-full inline-flex items-center justify-center gap-1.5 min-h-[52px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-base font-bold active:scale-95 transition"
+            >
+              {fini ? '↺ Revoir ma formation' : '▶ Continuer ma formation'}
+            </Link>
+          </Card>
+        )
+      })()}
+
+      {/* KPIs flash en bandeau dense */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <KpiTile
+          icon={<CalendarDays className="h-3.5 w-3.5" />}
+          label="Heures semaine"
+          value={`${heuresSemaine.toFixed(1)}h`}
+          sublabel={`/ ${heuresContrat}h contrat · mois ${heuresMois.toFixed(0)}h`}
+          tone={heuresSemaine >= heuresContrat ? 'emerald' : 'zinc'}
+        />
+        <KpiTile
+          icon={<GraduationCap className="h-3.5 w-3.5" />}
+          label="Quiz formation"
+          value={quizScore != null ? `${quizScore}%` : '—'}
+          sublabel={maProgression?.statut ? statutLabel(maProgression.statut) : 'pas commencé'}
+          tone={quizScore == null ? 'zinc' : quizScore >= (monGuide?.seuil_reussite_pct ?? 80) ? 'emerald' : 'red'}
+        />
+        <KpiTile
+          icon={<ShieldCheck className="h-3.5 w-3.5" />}
+          label="Onboarding"
+          value={onboarded ? 'Validé' : 'En cours'}
+          sublabel={onboardingDate ?? 'à compléter'}
+          tone={onboarded ? 'emerald' : 'amber'}
+        />
+        <KpiTile
+          icon={<Trophy className="h-3.5 w-3.5" />}
+          label="Challenges"
+          value={`${evaluations.filter(e => e.cible_atteinte).length}/${evaluations.length}`}
+          sublabel="atteints ce mois"
+          tone={evaluations.filter(e => e.cible_atteinte).length > 0 ? 'emerald' : 'zinc'}
+        />
+      </section>
+
+      {/* Stats poste + 7 jours en 2 colonnes desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {statsPoste.length > 0 && (
+          <Card className="p-3 lg:col-span-2">
+            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1.5">
+              {iconForPoste(emp.poste as string)}
+              Mon activité — {emp.poste}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {statsPoste.map(s => (
+                <div key={s.label} className="rounded-lg bg-zinc-50 p-2.5">
+                  <p className="text-lg leading-none">{s.emoji}</p>
+                  <p className="text-lg font-black tabular-nums mt-1">{s.value}</p>
+                  <p className="text-[11px] text-zinc-700 font-bold">{s.label}</p>
+                  {s.sublabel && <p className="text-[11px] text-zinc-500 mt-0.5">{s.sublabel}</p>}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        <Card className={cn('p-3', statsPoste.length === 0 && 'lg:col-span-3')}>
+          <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2">
+            7 derniers jours
+          </h2>
+          <div className="grid grid-cols-7 gap-1">
+            {days7.map(d => (
+              <div key={d.iso} className={cn(
+                'rounded-md border p-1.5 text-center',
+                d.iso === todayISO ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 bg-zinc-50',
+              )}>
+                <p className="text-[11px] uppercase font-bold text-zinc-500 leading-none">{d.jour}</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{d.iso.slice(8)}</p>
+                <p className="text-xs font-black mt-0.5">{d.heures > 0 ? `${d.heures.toFixed(1)}h` : '—'}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </>
+  )
+
+  // 2) Présence & shifts = shifts/briefing/alertes
+  const presenceSections = (
+    <details id="shifts" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+      <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+        <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+          📅 Prochains shifts · briefing · alertes perso
+        </h2>
+        <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+      </summary>
+      <div className="p-3 border-t border-zinc-100">
+        <ShiftsBriefingAlertes
+          employeId={empId}
+          poste={emp.poste as string}
+          posteWidget={posteWidget}
+        />
+      </div>
+    </details>
+  )
+
+  // 3) Congés & perf = performance/congés/météo
+  const congesSections = (
+    <details id="conges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+      <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+        <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+          🏖 Performance · congés · météo affluence
+        </h2>
+        <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+      </summary>
+      <div className="p-3 border-t border-zinc-100">
+        <PerformanceCongesMeteo
+          employeId={empId}
+          poste={emp.poste as string}
+          soldeConges={Number((emp as { solde_conges_jours?: number }).solde_conges_jours ?? 0)}
+        />
+      </div>
+    </details>
+  )
+
+  // 4) Paie & récompenses = rémunération estimée + challenges
+  const paieSections = (
+    <>
+      {/* Rémunération du mois — estimation brute (collapsible) */}
+      {(() => {
+        const baseHeures = heuresMois * smic
+        const primesFixes = evaluations
+          .filter(e => e.cible_atteinte && e.challenge.recompense_type === 'fixe')
+          .reduce((s, e) => s + Number(e.prime_estimee_eur), 0)
+        const bonusSurplus = surplusInfo.ma_part
+        const total = baseHeures + primesFixes + bonusSurplus
+        return (
+          <details id="paie" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+            <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+              <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                <Wallet className="h-3.5 w-3.5" /> Ma rémunération brute estimée — ce mois
+                <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-zinc-900 text-white text-[11px] font-black tabular-nums normal-case tracking-normal">
+                  {total.toFixed(0)} €
+                </span>
+              </h2>
+              <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+            </summary>
+            <div className="p-3 border-t border-zinc-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-md bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-500">Heures × SMIC</p>
+                <p className="text-xl font-bold tabular-nums">{baseHeures.toFixed(2)} €</p>
+                <p className="text-[11px] text-zinc-400">{heuresMois.toFixed(1)} h × {smic.toFixed(2)} €/h</p>
+              </div>
+              <div className="rounded-md bg-emerald-50 p-3">
+                <p className="text-xs text-emerald-700">Primes challenges atteintes</p>
+                <p className="text-xl font-bold tabular-nums text-emerald-800">+ {primesFixes.toFixed(2)} €</p>
+                <p className="text-[11px] text-emerald-600">
+                  {evaluations.filter(e => e.cible_atteinte && e.challenge.recompense_type === 'fixe').length} cible(s) atteinte(s)
+                </p>
+              </div>
+              <div className="rounded-md bg-amber-50 p-3">
+                <p className="text-xs text-amber-700">Bonus surplus (point mort)</p>
+                <p className="text-xl font-bold tabular-nums text-amber-800">+ {bonusSurplus.toFixed(2)} €</p>
+                <p className="text-[11px] text-amber-600">
+                  {surplusInfo.surplus > 0
+                    ? `${(surplusInfo.surplus).toFixed(0)} € surplus · ${surplusInfo.pct_redistribution.toFixed(0)}% pool`
+                    : 'pas encore de surplus ce mois'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-md bg-zinc-900 text-white p-3 flex items-center justify-between">
+              <span className="text-sm uppercase tracking-wider opacity-80">Total brut estimé</span>
+              <span className="text-2xl font-bold tabular-nums">{total.toFixed(2)} €</span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500 italic">
+              Estimation live. Le total final sera arrêté à la clôture du mois par le manager.
+            </p>
+            </div>
+          </details>
+        )
+      })()}
+
+      {/* Mes challenges actifs (collapsible) */}
+      <details id="challenges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
+        <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" /> Mes challenges actifs
+            <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-black tabular-nums normal-case tracking-normal">
+              {evaluations.filter(e => e.cible_atteinte).length} / {evaluations.length}
+            </span>
+          </h2>
+          <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
+        </summary>
+        <div className="p-3 border-t border-zinc-100">
+        {evaluations.length === 0 ? (
+          <p className="text-sm text-zinc-500 italic text-center py-6">
+            Aucun challenge actif pour ton poste. Demande au gérant.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {evaluations.map(e => {
+              const c = e.challenge
+
+              // Cas spécial : challenge restaurant CA surplus → viz gamifiée
+              if (c.type === 'restaurant' && c.metrique === 'ca_surplus_point_mort') {
+                return (
+                  <div key={c.id}>
+                    <ChallengeSurplusViz
+                      pctSeuilAtteint={pctSeuilAtteint}
+                      surplusTotal={surplusInfo.surplus}
+                      maPart={surplusInfo.ma_part}
+                      mesHeures={surplusInfo.mes_heures}
+                      totalHeures={surplusInfo.total_heures}
+                      pctRedistribution={surplusInfo.pct_redistribution}
+                      recompenseTitre={c.titre}
+                    />
+                  </div>
+                )
+              }
+              const recompTxt = c.recompense_type === 'fixe'
+                ? `+${Number(c.recompense_montant).toFixed(0)} €`
+                : `${Number(c.recompense_montant).toFixed(0)}% surplus`
+              const couleur =
+                e.cible_atteinte         ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
+                e.progression_pct >= 60  ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                                            'bg-zinc-100 text-zinc-700 border-zinc-300'
+              return (
+                <div key={c.id} className={cn('rounded-md border p-3', couleur)}>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-bold">{c.titre}</p>
+                        <Badge variant="outline" className="text-xs">
+                          {c.type === 'individuel' ? 'Indiv' : c.type === 'equipe' ? 'Équipe' : 'Resto'}
+                        </Badge>
+                        {c.leaderboard_public && <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-xs">🏆</Badge>}
+                        {e.cible_atteinte && <Badge className="bg-emerald-600 text-white text-xs">✓ atteint</Badge>}
+                      </div>
+                      {c.description && <p className="text-xs opacity-80 mt-0.5">{c.description}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold">{recompTxt}</p>
+                      <p className="text-[11px] opacity-70">{c.periode}</p>
+                    </div>
+                  </div>
+                  <div className="mt-1.5">
+                    <div className="flex items-center justify-between text-xs mb-0.5">
+                      <span>{Number(e.valeur_atteinte).toFixed(2)} {c.cible_unite}</span>
+                      <span className="opacity-70">cible : {c.cible_operateur} {Number(c.cible_valeur).toFixed(2)} {c.cible_unite}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/60 rounded-full overflow-hidden">
+                      <div
+                        className={cn('h-full transition-all',
+                          e.cible_atteinte         ? 'bg-emerald-500' :
+                          e.progression_pct >= 60  ? 'bg-amber-500' :
+                                                     'bg-zinc-400',
+                        )}
+                        style={{ width: `${e.progression_pct}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] mt-0.5 opacity-70">{e.progression_pct}% de progression</p>
+                  </div>
+
+                  {/* Leaderboard inline si challenge public */}
+                  {(() => {
+                    const lb = lbByChallenge.get(c.id)
+                    if (!lb || lb.entries.length === 0) return null
+                    const top3 = lb.entries.slice(0, 3)
+                    const moiDansTop3 = top3.some(t => t.employe_id === empId)
+                    const medals = ['🥇', '🥈', '🥉']
+                    return (
+                      <div className="mt-2.5 pt-2.5 border-t border-current/20">
+                        <p className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
+                          🏆 Classement ({lb.total_participants} participants)
+                        </p>
+                        <div className="space-y-0.5">
+                          {top3.map((entry, i) => (
+                            <div
+                              key={entry.employe_id}
+                              className={cn(
+                                'flex items-center justify-between text-xs px-2 py-1 rounded',
+                                entry.employe_id === empId
+                                  ? 'bg-amber-200/60 font-bold'
+                                  : 'bg-white/40',
+                              )}
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-base">{medals[i]}</span>
+                                <span>{entry.prenom} {entry.nom[0]}.</span>
+                              </span>
+                              <span className="tabular-nums">{Number(entry.valeur).toFixed(0)} {c.cible_unite}</span>
+                            </div>
+                          ))}
+                          {!moiDansTop3 && lb.mon_rang && (
+                            <div className="flex items-center justify-between text-xs px-2 py-1 rounded bg-amber-200/60 font-bold mt-1 border border-current/20">
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-base">📍</span>
+                                <span>Toi · {lb.mon_rang}<sup>e</sup>/{lb.total_participants}</span>
+                              </span>
+                              <span className="tabular-nums">{Number(lb.ma_valeur ?? 0).toFixed(0)} {c.cible_unite}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <p className="mt-3 text-[11px] text-zinc-400 italic">
+          🎯 Atteins tes cibles pour décrocher les primes. Mises à jour live à chaque action.
+        </p>
+        </div>
+      </details>
+    </>
+  )
+
   return (
-    <div className="min-h-screen bg-zinc-50 pb-mobile-nav">
-      <OpsBottomNav profil={navProfil} />
+    <div className={cn('min-h-screen bg-zinc-50', profil.apercu ? 'pb-mobile-nav-apercu' : 'pb-mobile-nav')}>
       <TopActionBar theme="light" profil={navProfil} />
       <BackToCategoryButton theme="light" />
+      <StoriesNavServer />
 
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.025]"
@@ -398,7 +770,29 @@ export default async function MonEspacePage() {
         aria-hidden
       />
 
+      <PullToRefresh>
       <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6">
+        {/* Gérant : sélecteur « Voir en tant que… » + bandeau lecture seule */}
+        {isManager && employesListe && employesListe.length > 0 && (
+          <div className="space-y-2">
+            <VoirEnTantQue
+              employes={employesListe as Array<{ id: string; prenom: string; nom: string; poste: string }>}
+              current={cibleEmployeId}
+              soiMemeId={profil.employe_id ?? null}
+            />
+            {viewAsId && (
+              <div className="flex items-center justify-between gap-3 flex-wrap rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-2.5">
+                <p className="text-sm font-bold text-amber-900">
+                  👁 Tu regardes l&apos;espace de <span className="underline">{emp.prenom as string} {emp.nom as string}</span> · lecture seule
+                </p>
+                <a href="/api/apercu/stop" className="inline-flex items-center gap-1 h-9 px-3 rounded-full bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 active:scale-95 transition">
+                  ← Revenir à mon espace
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Header éditorial : avatar gradient + identité Fraunces + résumé + cloche */}
         <header className="flex items-start justify-between flex-wrap gap-4">
           <div className="flex items-stretch gap-4 min-w-0 flex-1">
@@ -407,11 +801,11 @@ export default async function MonEspacePage() {
               {(emp.prenom as string)[0]?.toUpperCase()}
             </div>
             <div className="min-w-0 space-y-1.5">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-1.5">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-600 flex items-center gap-1.5">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {posteWidget ? `${POSTE_INFO_WIDGET[posteWidget].emoji} ${POSTE_INFO_WIDGET[posteWidget].label}` : 'Membre équipe'}
               </p>
-              <h1 className="font-display italic text-3xl sm:text-5xl font-medium text-zinc-900 tracking-[-0.02em] leading-[0.95]">
+              <h1 className="font-display italic text-2xl sm:text-5xl font-medium text-zinc-900 tracking-[-0.02em] leading-tight sm:leading-[0.95]">
                 {emp.prenom} {emp.nom}
               </h1>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
@@ -438,376 +832,21 @@ export default async function MonEspacePage() {
           </div>
         </header>
 
-        {/* Pointage rapide arrivée/sortie */}
-        <div id="pointage">
-          <PointageCard pointage={pointageJour} />
-        </div>
+        {/* 🧑‍💼 Arnaud t'aide aujourd'hui — rappels perso du salarié */}
+        <RappelsSalarieCard data={rappels} prenom={emp.prenom as string} />
 
-        {/* KPIs flash en bandeau dense */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <KpiTile
-            icon={<CalendarDays className="h-3.5 w-3.5" />}
-            label="Heures semaine"
-            value={`${heuresSemaine.toFixed(1)}h`}
-            sublabel={`/ ${heuresContrat}h contrat · mois ${heuresMois.toFixed(0)}h`}
-            tone={heuresSemaine >= heuresContrat ? 'emerald' : 'zinc'}
-          />
-          <KpiTile
-            icon={<GraduationCap className="h-3.5 w-3.5" />}
-            label="Quiz formation"
-            value={quizScore != null ? `${quizScore}%` : '—'}
-            sublabel={maProgression?.statut ? statutLabel(maProgression.statut) : 'pas commencé'}
-            tone={quizScore == null ? 'zinc' : quizScore >= (monGuide?.seuil_reussite_pct ?? 80) ? 'emerald' : 'red'}
-          />
-          <KpiTile
-            icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            label="Onboarding"
-            value={onboarded ? 'Validé' : 'En cours'}
-            sublabel={onboardingDate ?? 'à compléter'}
-            tone={onboarded ? 'emerald' : 'amber'}
-          />
-          <KpiTile
-            icon={<Trophy className="h-3.5 w-3.5" />}
-            label="Challenges"
-            value={`${evaluations.filter(e => e.cible_atteinte).length}/${evaluations.length}`}
-            sublabel="atteints ce mois"
-            tone={evaluations.filter(e => e.cible_atteinte).length > 0 ? 'emerald' : 'zinc'}
-          />
-        </section>
+        {/* 💬 Demande à Arnaud — l'assistant métier du salarié (cloisonné) */}
+        <AssistantSalarieChat />
 
-        {/* Stats poste + 7 jours en 2 colonnes desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          {statsPoste.length > 0 && (
-            <Card className="p-3 lg:col-span-2">
-              <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1.5">
-                {iconForPoste(emp.poste as string)}
-                Mon activité — {emp.poste}
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {statsPoste.map(s => (
-                  <div key={s.label} className="rounded-lg bg-zinc-50 p-2.5">
-                    <p className="text-lg leading-none">{s.emoji}</p>
-                    <p className="text-lg font-black tabular-nums mt-1">{s.value}</p>
-                    <p className="text-[10px] text-zinc-700 font-bold">{s.label}</p>
-                    {s.sublabel && <p className="text-[9px] text-zinc-500 mt-0.5">{s.sublabel}</p>}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          <Card className={cn('p-3', statsPoste.length === 0 && 'lg:col-span-3')}>
-            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 mb-2">
-              7 derniers jours
-            </h2>
-            <div className="grid grid-cols-7 gap-1">
-              {days7.map(d => (
-                <div key={d.iso} className={cn(
-                  'rounded-md border p-1.5 text-center',
-                  d.iso === todayISO ? 'border-emerald-400 bg-emerald-50' : 'border-zinc-200 bg-zinc-50',
-                )}>
-                  <p className="text-[9px] uppercase font-bold text-zinc-500 leading-none">{d.jour}</p>
-                  <p className="text-[9px] text-zinc-400 mt-0.5">{d.iso.slice(8)}</p>
-                  <p className="text-xs font-black mt-0.5">{d.heures > 0 ? `${d.heures.toFixed(1)}h` : '—'}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* Shifts/briefing + Performance/congés — collapsibles */}
-        <details id="shifts" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
-            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-              📅 Prochains shifts · briefing · alertes perso
-            </h2>
-            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
-          </summary>
-          <div className="p-3 border-t border-zinc-100">
-            <ShiftsBriefingAlertes
-              employeId={empId}
-              poste={emp.poste as string}
-              posteWidget={posteWidget}
-            />
-          </div>
-        </details>
-
-        <details id="conges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
-            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-              🏖 Performance · congés · météo affluence
-            </h2>
-            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
-          </summary>
-          <div className="p-3 border-t border-zinc-100">
-            <PerformanceCongesMeteo
-              employeId={empId}
-              poste={emp.poste as string}
-              soldeConges={Number((emp as { solde_conges_jours?: number }).solde_conges_jours ?? 0)}
-            />
-          </div>
-        </details>
-
-        {/* Manuels formation */}
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-              <ScrollText className="h-3.5 w-3.5" /> Mes manuels de formation
-            </h2>
-            <Link href="/formation" className="text-xs text-emerald-700 hover:text-emerald-900 font-bold">
-              Tout voir →
-            </Link>
-          </div>
-          {monGuide ? (
-            (() => {
-              const prog = progressions.find(p => p.guide_id === monGuide.id) ?? null
-              const nbEt = nbEtapesParGuide.get(monGuide.id) ?? 0
-              const nbEv = prog?.etapes_vues_ids.length ?? 0
-              const pct  = nbEt > 0 ? Math.round((nbEv / nbEt) * 100) : 0
-              const nbQ  = nbQuestionsParGuide.get(monGuide.id) ?? 0
-              return (
-                <Link href={`/formation/${monGuide.id}?emp=${empId}`} className="block">
-                  <div className="rounded-md border p-3 hover:bg-emerald-50 transition-colors flex items-center gap-3">
-                    <div className="text-3xl">📖</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{monGuide.titre}</p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
-                        <span>{nbEv}/{nbEt} étapes</span>
-                        {nbQ > 0 && <span>· {nbQ} questions</span>}
-                        {monGuide.duree_minutes && <span>· ~{monGuide.duree_minutes} min</span>}
-                      </div>
-                      <div className="mt-1.5 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-zinc-400" />
-                  </div>
-                </Link>
-              )
-            })()
-          ) : (
-            <p className="text-sm text-zinc-500 italic">Aucun manuel pour ton poste.</p>
-          )}
-        </Card>
-
-        {/* Rémunération du mois — estimation brute (collapsible) */}
-        {(() => {
-          const baseHeures = heuresMois * smic
-          const primesFixes = evaluations
-            .filter(e => e.cible_atteinte && e.challenge.recompense_type === 'fixe')
-            .reduce((s, e) => s + Number(e.prime_estimee_eur), 0)
-          const bonusSurplus = surplusInfo.ma_part
-          const total = baseHeures + primesFixes + bonusSurplus
-          return (
-            <details id="paie" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
-              <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
-                <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                  <Wallet className="h-3.5 w-3.5" /> Ma rémunération brute estimée — ce mois
-                  <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-zinc-900 text-white text-[10px] font-black tabular-nums normal-case tracking-normal">
-                    {total.toFixed(0)} €
-                  </span>
-                </h2>
-                <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
-              </summary>
-              <div className="p-3 border-t border-zinc-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="rounded-md bg-zinc-50 p-3">
-                  <p className="text-xs text-zinc-500">Heures × SMIC</p>
-                  <p className="text-xl font-bold tabular-nums">{baseHeures.toFixed(2)} €</p>
-                  <p className="text-[10px] text-zinc-400">{heuresMois.toFixed(1)} h × {smic.toFixed(2)} €/h</p>
-                </div>
-                <div className="rounded-md bg-emerald-50 p-3">
-                  <p className="text-xs text-emerald-700">Primes challenges atteintes</p>
-                  <p className="text-xl font-bold tabular-nums text-emerald-800">+ {primesFixes.toFixed(2)} €</p>
-                  <p className="text-[10px] text-emerald-600">
-                    {evaluations.filter(e => e.cible_atteinte && e.challenge.recompense_type === 'fixe').length} cible(s) atteinte(s)
-                  </p>
-                </div>
-                <div className="rounded-md bg-amber-50 p-3">
-                  <p className="text-xs text-amber-700">Bonus surplus (point mort)</p>
-                  <p className="text-xl font-bold tabular-nums text-amber-800">+ {bonusSurplus.toFixed(2)} €</p>
-                  <p className="text-[10px] text-amber-600">
-                    {surplusInfo.surplus > 0
-                      ? `${(surplusInfo.surplus).toFixed(0)} € surplus · ${surplusInfo.pct_redistribution.toFixed(0)}% pool`
-                      : 'pas encore de surplus ce mois'
-                    }
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-md bg-zinc-900 text-white p-3 flex items-center justify-between">
-                <span className="text-sm uppercase tracking-wider opacity-80">Total brut estimé</span>
-                <span className="text-2xl font-bold tabular-nums">{total.toFixed(2)} €</span>
-              </div>
-              <p className="mt-2 text-[11px] text-zinc-500 italic">
-                Estimation live. Le total final sera arrêté à la clôture du mois par le manager.
-              </p>
-              </div>
-            </details>
-          )
-        })()}
-
-        {/* Mes challenges actifs (collapsible) */}
-        <details id="challenges" className="group rounded-2xl border border-zinc-200 bg-white overflow-hidden" open>
-          <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer list-none hover:bg-zinc-50">
-            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-              <Target className="h-3.5 w-3.5" /> Mes challenges actifs
-              <span className="ml-1 inline-flex items-center h-5 px-2 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-black tabular-nums normal-case tracking-normal">
-                {evaluations.filter(e => e.cible_atteinte).length} / {evaluations.length}
-              </span>
-            </h2>
-            <span className="text-xs text-zinc-400 group-open:rotate-180 transition">▾</span>
-          </summary>
-          <div className="p-3 border-t border-zinc-100">
-          {evaluations.length === 0 ? (
-            <p className="text-sm text-zinc-500 italic text-center py-6">
-              Aucun challenge actif pour ton poste. Demande au gérant.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {evaluations.map(e => {
-                const c = e.challenge
-
-                // Cas spécial : challenge restaurant CA surplus → viz gamifiée
-                if (c.type === 'restaurant' && c.metrique === 'ca_surplus_point_mort') {
-                  return (
-                    <div key={c.id}>
-                      <ChallengeSurplusViz
-                        pctSeuilAtteint={pctSeuilAtteint}
-                        surplusTotal={surplusInfo.surplus}
-                        maPart={surplusInfo.ma_part}
-                        mesHeures={surplusInfo.mes_heures}
-                        totalHeures={surplusInfo.total_heures}
-                        pctRedistribution={surplusInfo.pct_redistribution}
-                        recompenseTitre={c.titre}
-                      />
-                    </div>
-                  )
-                }
-                const recompTxt = c.recompense_type === 'fixe'
-                  ? `+${Number(c.recompense_montant).toFixed(0)} €`
-                  : `${Number(c.recompense_montant).toFixed(0)}% surplus`
-                const couleur =
-                  e.cible_atteinte         ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
-                  e.progression_pct >= 60  ? 'bg-amber-100 text-amber-900 border-amber-300' :
-                                              'bg-zinc-100 text-zinc-700 border-zinc-300'
-                return (
-                  <div key={c.id} className={cn('rounded-md border p-3', couleur)}>
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold">{c.titre}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {c.type === 'individuel' ? 'Indiv' : c.type === 'equipe' ? 'Équipe' : 'Resto'}
-                          </Badge>
-                          {c.leaderboard_public && <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-xs">🏆</Badge>}
-                          {e.cible_atteinte && <Badge className="bg-emerald-600 text-white text-xs">✓ atteint</Badge>}
-                        </div>
-                        {c.description && <p className="text-xs opacity-80 mt-0.5">{c.description}</p>}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-bold">{recompTxt}</p>
-                        <p className="text-[10px] opacity-70">{c.periode}</p>
-                      </div>
-                    </div>
-                    <div className="mt-1.5">
-                      <div className="flex items-center justify-between text-xs mb-0.5">
-                        <span>{Number(e.valeur_atteinte).toFixed(2)} {c.cible_unite}</span>
-                        <span className="opacity-70">cible : {c.cible_operateur} {Number(c.cible_valeur).toFixed(2)} {c.cible_unite}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-white/60 rounded-full overflow-hidden">
-                        <div
-                          className={cn('h-full transition-all',
-                            e.cible_atteinte         ? 'bg-emerald-500' :
-                            e.progression_pct >= 60  ? 'bg-amber-500' :
-                                                       'bg-zinc-400',
-                          )}
-                          style={{ width: `${e.progression_pct}%` }}
-                        />
-                      </div>
-                      <p className="text-[10px] mt-0.5 opacity-70">{e.progression_pct}% de progression</p>
-                    </div>
-
-                    {/* Leaderboard inline si challenge public */}
-                    {(() => {
-                      const lb = lbByChallenge.get(c.id)
-                      if (!lb || lb.entries.length === 0) return null
-                      const top3 = lb.entries.slice(0, 3)
-                      const moiDansTop3 = top3.some(t => t.employe_id === empId)
-                      const medals = ['🥇', '🥈', '🥉']
-                      return (
-                        <div className="mt-2.5 pt-2.5 border-t border-current/20">
-                          <p className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
-                            🏆 Classement ({lb.total_participants} participants)
-                          </p>
-                          <div className="space-y-0.5">
-                            {top3.map((entry, i) => (
-                              <div
-                                key={entry.employe_id}
-                                className={cn(
-                                  'flex items-center justify-between text-xs px-2 py-1 rounded',
-                                  entry.employe_id === empId
-                                    ? 'bg-amber-200/60 font-bold'
-                                    : 'bg-white/40',
-                                )}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  <span className="text-base">{medals[i]}</span>
-                                  <span>{entry.prenom} {entry.nom[0]}.</span>
-                                </span>
-                                <span className="tabular-nums">{Number(entry.valeur).toFixed(0)} {c.cible_unite}</span>
-                              </div>
-                            ))}
-                            {!moiDansTop3 && lb.mon_rang && (
-                              <div className="flex items-center justify-between text-xs px-2 py-1 rounded bg-amber-200/60 font-bold mt-1 border border-current/20">
-                                <span className="flex items-center gap-1.5">
-                                  <span className="text-base">📍</span>
-                                  <span>Toi · {lb.mon_rang}<sup>e</sup>/{lb.total_participants}</span>
-                                </span>
-                                <span className="tabular-nums">{Number(lb.ma_valeur ?? 0).toFixed(0)} {c.cible_unite}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })()}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          <p className="mt-3 text-[11px] text-zinc-400 italic">
-            🎯 Atteins tes cibles pour décrocher les primes. Mises à jour live à chaque action.
-          </p>
-          </div>
-        </details>
+        <MonEspaceTabs
+          vueSections={vueSections}
+          presenceSections={presenceSections}
+          congesSections={congesSections}
+          paieSections={paieSections}
+        />
       </main>
+      </PullToRefresh>
     </div>
-  )
-}
-
-// ─── Raccourci tactile ────────────────────────────────────────────
-function Raccourci({ href, emoji, label, tone }: {
-  href: string; emoji: string; label: string
-  tone: 'emerald' | 'amber' | 'violet' | 'blue' | 'zinc'
-}) {
-  const tones: Record<typeof tone, string> = {
-    emerald: 'hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-900',
-    amber:   'hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900',
-    violet:  'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-900',
-    blue:    'hover:bg-blue-50 hover:border-blue-300 hover:text-blue-900',
-    zinc:    'hover:bg-zinc-50 hover:border-zinc-300 hover:text-zinc-900',
-  }
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'group flex flex-col items-center justify-center text-center min-h-[64px] p-2 rounded-xl border border-zinc-200 bg-white text-zinc-700 active:scale-95 transition',
-        tones[tone],
-      )}
-    >
-      <span className="text-xl leading-none" aria-hidden>{emoji}</span>
-      <span className="text-[11px] font-bold mt-1">{label}</span>
-    </Link>
   )
 }
 
@@ -828,34 +867,13 @@ function KpiTile({ icon, label, value, sublabel, tone }: {
   const t = tones[tone]
   return (
     <div className={cn('rounded-2xl border p-3', t.bg)}>
-      <div className={cn('flex items-center gap-1 text-[10px] font-black uppercase tracking-wider', t.label)}>
+      <div className={cn('flex items-center gap-1 text-[11px] font-black uppercase tracking-wider', t.label)}>
         {icon}
         <span className="truncate">{label}</span>
       </div>
       <p className={cn('text-xl font-black tabular-nums mt-1 leading-none', t.value)}>{value}</p>
-      {sublabel && <p className="text-[10px] text-zinc-500 mt-1 truncate">{sublabel}</p>}
+      {sublabel && <p className="text-[11px] text-zinc-500 mt-1 truncate">{sublabel}</p>}
     </div>
-  )
-}
-
-function KpiCard({
-  icon, label, value, sublabel, cls,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  sublabel?: string
-  cls?: string
-}) {
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-        {icon}
-        <span className="truncate">{label}</span>
-      </div>
-      <p className={cn('text-2xl font-bold tabular-nums mt-1', cls)}>{value}</p>
-      {sublabel && <p className="text-xs text-zinc-500 mt-0.5">{sublabel}</p>}
-    </Card>
   )
 }
 

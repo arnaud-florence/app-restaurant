@@ -8,6 +8,7 @@
 // Score = % de bonnes réponses. ≥ 80% → validation niveau 2 (progression='reussi').
 
 import { useMemo, useState, useTransition } from 'react'
+import { toast } from '@/lib/toast'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -137,9 +138,9 @@ function ChecklistPlayer({
           score_pct: resultats.score,
           reponses: { clicked, ordreAttendu: ordreAttendu.map(o => o.idx) },
         })
-        router.push(`/formation/${guide.id}`)
+        router.push('/formation')
       } catch (e) {
-        alert(e instanceof Error ? e.message : 'Erreur')
+        toast.error(e instanceof Error ? e.message : 'Erreur')
       }
     })
   }
@@ -241,8 +242,8 @@ function ChecklistPlayer({
 
             <div className="flex items-center justify-between gap-2 pt-2">
               <Button variant="outline" onClick={() => { setShowResults(false); setClicked([]) }}>↺ Recommencer</Button>
-              <Button onClick={envoyer} disabled={pending} className="min-h-[48px]">
-                {pending ? 'Envoi…' : 'Enregistrer et continuer'}
+              <Button onClick={envoyer} disabled={pending} className="min-h-[48px] gap-1">
+                {pending ? 'Envoi…' : <>✓ Enregistrer et retour aux formations</>}
               </Button>
             </div>
           </>
@@ -295,9 +296,9 @@ function ScenarioPlayer({
           score_pct: score,
           reponses,
         })
-        router.push(`/formation/${guide.id}`)
+        router.push('/formation')
       } catch (e) {
-        alert(e instanceof Error ? e.message : 'Erreur')
+        toast.error(e instanceof Error ? e.message : 'Erreur')
       }
     })
   }
@@ -400,8 +401,8 @@ function ScenarioPlayer({
 
             <div className="flex items-center justify-between gap-2 pt-2">
               <Button variant="outline" onClick={() => { setShowResults(false); setReponses({}); setIdxCourant(0) }}>↺ Recommencer</Button>
-              <Button onClick={envoyer} disabled={pending} className="min-h-[48px]">
-                {pending ? 'Envoi…' : 'Enregistrer et continuer'}
+              <Button onClick={envoyer} disabled={pending} className="min-h-[48px] gap-1">
+                {pending ? 'Envoi…' : <>✓ Enregistrer et retour aux formations</>}
               </Button>
             </div>
           </>

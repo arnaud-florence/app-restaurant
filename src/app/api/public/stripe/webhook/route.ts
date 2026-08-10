@@ -58,19 +58,34 @@ export async function POST(req: Request) {
         //   'carte_cadeau' → crée la carte cadeau
 
         if (metadata.type === 'commande' && metadata.commande_id) {
+          // E2 — Idempotence : un rejeu Stripe (même session) ne doit pas ré-insérer
+          // un paiement (sinon CA gonflé). On dédoublonne sur la référence = session.id.
+          const { data: dejaPaye } = await sb.from('paiements_caisse')
+            .select('id').eq('reference', session.id).maybeSingle()
+          if (dejaPaye) break
+
+          // E2 — Vérif montant : le montant réellement payé doit correspondre au
+          // total SERVEUR de la commande. Sinon on n'entérine pas le paiement.
+          const { data: cmd } = await sb.from('commandes')
+            .select('montant_total_ttc').eq('id', metadata.commande_id).maybeSingle()
+          if (!cmd) break
+          const payeCents = session.amount_total ?? 0
+          const attenduCents = Math.round(Number(cmd.montant_total_ttc ?? 0) * 100)
+          if (payeCents !== attenduCents) {
+            console.error(`[stripe-webhook] montant incohérent commande ${metadata.commande_id} : payé ${payeCents} ≠ attendu ${attenduCents} cents — paiement NON enregistré`)
+            break
+          }
+
           // Marque la commande comme payée (mode_paiement='carte_stripe')
-          // La commande est déjà créée par /api/public/commande, on ne la dédoublonne pas.
           await sb.from('commandes').update({
             mode_paiement: 'carte_stripe',
-            // Note : pas encore 'encaisse' — le staff confirmera côté caisse.
-            // Optionnel : on peut marquer 'en_preparation' si paiement = trigger cuisine
           }).eq('id', metadata.commande_id)
 
           // Trace dans paiements_caisse pour la compta
           await sb.from('paiements_caisse').insert({
             commande_id: metadata.commande_id,
             methode: 'carte',
-            montant: (session.amount_total ?? 0) / 100,
+            montant: payeCents / 100,
             pourboire: 0,
             reference: session.id,
           })

@@ -7,10 +7,12 @@ import {
   ListTree, Sparkles, ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PillTab } from '@/components/ui/PillTab'
 import {
   majConfigEconomique, upsertPointMort, supprimerPointMort,
   upsertCharge, supprimerCharge, toggleActifCharge,
@@ -72,6 +74,7 @@ export default function EconomieClient({
   suggestion: SuggestionT
 }) {
   const router = useRouter()
+  const [tab, setTab] = useState<'overview' | 'config' | 'charges' | 'equipe' | 'pointmort'>('overview')
   const [, startTransition] = useTransition()
   const [showChargeForm, setShowChargeForm] = useState<ChargeRow | true | null>(null)
   const [showChargeVarForm, setShowChargeVarForm] = useState<ChargeVarRow | true | null>(null)
@@ -98,16 +101,16 @@ export default function EconomieClient({
     })
   }
 
-  function delPm(id: string) {
-    if (!confirm('Supprimer ce point mort ?')) return
+  async function delPm(id: string) {
+    if (!(await askConfirm({ title: 'Supprimer le point mort', message: 'Supprimer ce point mort ?', confirmLabel: 'Supprimer', danger: true }))) return
     startTransition(async () => {
       try { await supprimerPointMort({ id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
     })
   }
 
-  function delCharge(id: string) {
-    if (!confirm('Supprimer cette charge ?')) return
+  async function delCharge(id: string) {
+    if (!(await askConfirm({ title: 'Supprimer la charge', message: 'Supprimer cette charge ?', confirmLabel: 'Supprimer', danger: true }))) return
     startTransition(async () => {
       try { await supprimerCharge({ id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
@@ -119,8 +122,8 @@ export default function EconomieClient({
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
     })
   }
-  function delChargeVar(id: string) {
-    if (!confirm('Supprimer cette charge variable ?')) return
+  async function delChargeVar(id: string) {
+    if (!(await askConfirm({ title: 'Supprimer la charge variable', message: 'Supprimer cette charge variable ?', confirmLabel: 'Supprimer', danger: true }))) return
     startTransition(async () => {
       try { await supprimerChargeVar({ id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
@@ -152,8 +155,19 @@ export default function EconomieClient({
           description="Point mort, marges, surplus, redistribution — source unique config + charges + contrats."
         />
 
-      {/* ─── 0. Vue d'ensemble live ─────────────────────────────── */}
-      <Card className="p-5 bg-gradient-to-br from-emerald-50 to-stone-50 border-emerald-200">
+      {/* ─── Barre d'onglets sticky ──────────────────────────── */}
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 bg-zinc-50/90 backdrop-blur flex gap-1.5 overflow-x-auto">
+        <PillTab active={tab === 'overview'}  onClick={() => setTab('overview')}>📊 Vue d&apos;ensemble</PillTab>
+        <PillTab active={tab === 'config'}    onClick={() => setTab('config')}>⚙️ Configuration</PillTab>
+        <PillTab active={tab === 'charges'}   onClick={() => setTab('charges')}>💸 Charges</PillTab>
+        <PillTab active={tab === 'equipe'}    onClick={() => setTab('equipe')}>👥 Équipe &amp; coûts</PillTab>
+        <PillTab active={tab === 'pointmort'} onClick={() => setTab('pointmort')}>🎯 Point mort</PillTab>
+      </div>
+
+      {tab === 'overview' && (
+      <>
+      {/* ─── 0. Vue d'ensemble live (masquée sur mobile, place pour le contenu prio) ── */}
+      <Card className="hidden md:block p-5 bg-gradient-to-br from-emerald-50 to-stone-50 border-emerald-200">
         <h2 className="font-bold flex items-center gap-2 mb-3">
           📊 Vue d&apos;ensemble — {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
         </h2>
@@ -199,7 +213,11 @@ export default function EconomieClient({
           </div>
         </div>
       </Card>
+      </>
+      )}
 
+      {tab === 'config' && (
+      <>
       {/* ─── 1. Config économique ─────────────────────────────── */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-4">
@@ -229,7 +247,11 @@ export default function EconomieClient({
           </Button>
         </div>
       </Card>
+      </>
+      )}
 
+      {tab === 'charges' && (
+      <>
       {/* ─── 2. Charges fixes récurrentes ─────────────────────── */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -279,9 +301,40 @@ export default function EconomieClient({
               ))}
             </div>
 
-            {/* Liste détaillée */}
-            <div className="overflow-x-auto -mx-2 mt-3">
-              <table className="w-full text-sm">
+            {/* Liste détaillée — cartes mobile */}
+            <ul className="md:hidden divide-y divide-zinc-100 mt-3">
+              {charges.map(c => (
+                <li key={c.id} className={cn('py-3 flex items-center justify-between gap-3', !c.actif && 'opacity-50')}>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">
+                      <span className="mr-1">{CATEGORIE_INFO[c.categorie].emoji}</span>{c.libelle}
+                    </p>
+                    <p className="text-xs text-zinc-500 truncate">
+                      {CATEGORIE_INFO[c.categorie].label}
+                      {c.fournisseur ? ` · ${c.fournisseur}` : ''}
+                    </p>
+                    <p className="text-lg font-bold tabular-nums text-zinc-900 mt-0.5">
+                      {Number(c.montant_mensuel_eur).toFixed(2)} €
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => toggleCharge(c)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600" title={c.actif ? 'Désactiver' : 'Activer'}>
+                      {c.actif ? <ToggleRight className="h-5 w-5 text-emerald-600" /> : <ToggleLeft className="h-5 w-5" />}
+                    </button>
+                    <button onClick={() => setShowChargeForm(c)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600">
+                      <Pencil className="h-5 w-5" />
+                    </button>
+                    <button onClick={() => delCharge(c.id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-red-50 rounded text-red-600">
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Liste détaillée — table desktop */}
+            <div className="hidden md:block overflow-x-auto -mx-2 mt-3">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-zinc-50">
                   <tr>
                     <th className="text-left px-3 py-2">Catégorie</th>
@@ -350,8 +403,48 @@ export default function EconomieClient({
         {chargesVariables.length === 0 ? (
           <p className="text-sm text-zinc-500 italic text-center py-4">Aucune charge variable.</p>
         ) : (
-          <div className="overflow-x-auto -mx-2 mt-2">
-            <table className="w-full text-sm">
+          <>
+          {/* Cartes mobile */}
+          <ul className="md:hidden divide-y divide-zinc-100 mt-2">
+            {chargesVariables.map(c => {
+              const valTxt = c.mode === 'auto'
+                ? '— auto —'
+                : c.mode === 'manuel_pct'
+                  ? `${Number(c.valeur_pct ?? 0).toFixed(2)} %`
+                  : `${Number(c.valeur_fixe_eur ?? 0).toFixed(2)} €`
+              return (
+                <li key={c.id} className={cn('py-3 flex items-center justify-between gap-3', !c.actif && 'opacity-50')}>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">
+                      <span className="mr-1">{CHARGE_VAR_INFO[c.type].emoji}</span>{c.libelle}
+                    </p>
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5">
+                      <span>{CHARGE_VAR_INFO[c.type].label}</span>
+                      {c.mode === 'auto' && <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px]">AUTO</span>}
+                      {c.mode === 'manuel_pct' && <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 text-[10px]">% saisi</span>}
+                      {c.mode === 'manuel_fixe' && <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px]">€ saisi</span>}
+                    </p>
+                    <p className="text-lg font-bold tabular-nums text-zinc-900 mt-0.5">{valTxt}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => toggleChargeVar(c)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600" title={c.actif ? 'Désactiver' : 'Activer'}>
+                      {c.actif ? <ToggleRight className="h-5 w-5 text-emerald-600" /> : <ToggleLeft className="h-5 w-5" />}
+                    </button>
+                    <button onClick={() => setShowChargeVarForm(c)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600">
+                      <Pencil className="h-5 w-5" />
+                    </button>
+                    <button onClick={() => delChargeVar(c.id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-red-50 rounded text-red-600">
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Table desktop */}
+          <div className="hidden md:block overflow-x-auto -mx-2 mt-2">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="text-left px-3 py-2">Type</th>
@@ -398,9 +491,14 @@ export default function EconomieClient({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
+      </>
+      )}
 
+      {tab === 'equipe' && (
+      <>
       {/* ─── 2.7. Contrats équipe ───────────────────────────── */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -430,8 +528,35 @@ export default function EconomieClient({
         {salariale.par_employe.length === 0 ? (
           <p className="text-sm text-zinc-500 italic text-center py-4">Aucun employé actif.</p>
         ) : (
-          <div className="overflow-x-auto -mx-2">
-            <table className="w-full text-sm">
+          <>
+          {/* Cartes mobile */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {salariale.par_employe.map(e => (
+              <li key={e.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-zinc-900 truncate">{e.prenom} {e.nom}</p>
+                  <p className="text-xs text-zinc-500 truncate">{e.poste} · {e.type_contrat}</p>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 tabular-nums">
+                    {e.heures_mois.toFixed(1)} h/mois · {e.salaire_horaire.toFixed(2)} €/h · coef {e.coef.toFixed(2)} · avantages {e.avantages.toFixed(0)} €
+                  </p>
+                  <p className="text-lg font-bold tabular-nums text-emerald-700 mt-0.5">{e.cout_total_mensuel.toFixed(2)} €</p>
+                </div>
+                <div className="shrink-0">
+                  <button onClick={() => setShowContratForm(e)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600" title="Éditer le contrat">
+                    <Pencil className="h-5 w-5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+            <li className="py-3 flex items-center justify-between gap-3 bg-zinc-50 -mx-1 px-1 rounded">
+              <p className="font-bold text-zinc-900">TOTAL ÉQUIPE</p>
+              <p className="text-lg font-bold tabular-nums text-emerald-700">{salariale.total_eur.toFixed(2)} €</p>
+            </li>
+          </ul>
+
+          {/* Table desktop */}
+          <div className="hidden md:block overflow-x-auto -mx-2">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="text-left px-3 py-2">Employé</th>
@@ -474,9 +599,14 @@ export default function EconomieClient({
               </tfoot>
             </table>
           </div>
+          </>
         )}
       </Card>
+      </>
+      )}
 
+      {tab === 'pointmort' && (
+      <>
       {/* ─── 3. Points mort mensuels ──────────────────────────── */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-4">
@@ -502,8 +632,37 @@ export default function EconomieClient({
             Aucun point mort saisi. Crée celui du mois en cours pour activer les challenges.
           </p>
         ) : (
-          <div className="overflow-x-auto -mx-2 mt-4">
-            <table className="w-full text-sm">
+          <>
+          {/* Cartes mobile */}
+          <ul className="md:hidden divide-y divide-zinc-100 mt-4">
+            {pointsMort.map(p => (
+              <li key={p.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-zinc-900 truncate">
+                    {new Date(p.mois).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-0.5 tabular-nums">
+                    Charges fixes {Number(p.charges_fixes_eur).toFixed(2)} € · variable {Number(p.taux_charges_variables_pct).toFixed(1)} %
+                  </p>
+                  {p.notes && <p className="text-xs text-zinc-500 truncate mt-0.5">{p.notes}</p>}
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-500 mt-1">CA seuil</p>
+                  <p className="text-lg font-bold tabular-nums text-emerald-700">{Number(p.ca_seuil_calcule).toFixed(2)} €</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => setShowPmForm(p)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-zinc-100 rounded text-zinc-600">
+                    <Pencil className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => delPm(p.id)} className="min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-red-50 rounded text-red-600">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Table desktop */}
+          <div className="hidden md:block overflow-x-auto -mx-2 mt-4">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="text-left px-3 py-2">Mois</th>
@@ -539,6 +698,7 @@ export default function EconomieClient({
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         <div className="mt-4 rounded-md bg-zinc-50 border p-3 text-xs text-zinc-600">
@@ -547,6 +707,8 @@ export default function EconomieClient({
           Au-delà, le surplus est partagé entre l'équipe à <strong>{Number(config?.pct_redistribution_surplus ?? 30).toFixed(0)} %</strong>.
         </div>
       </Card>
+      </>
+      )}
       </main>
     </div>
   )

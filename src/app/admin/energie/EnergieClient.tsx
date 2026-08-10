@@ -13,6 +13,7 @@ import {
   TYPE_ENERGIE_INFO, ALERTE_STYLE, fmtPrix, fmtConso, fmtPct, fmtDate,
 } from '@/lib/energie'
 import { creerReleveEnergie, supprimerReleveEnergie } from './actions'
+import { askConfirm } from '@/lib/confirm'
 import type { DataEnergie } from './page'
 
 type Tab = 'dashboard' | 'releves' | 'suggestions'
@@ -47,7 +48,7 @@ export default function EnergieClient({ data }: { data: DataEnergie }) {
           title="Énergie"
           description="Élec/gaz/eau, comparaison N-1, alertes consommation, coût par plat."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Coût mois" value={fmtPrix(data.total_energie_mois)} />
               <KPI label="Coût/plat" value={fmtPrix(data.cout_par_plat_mois)} accent={data.cout_par_plat_mois > 1.5 ? 'rouge' : data.cout_par_plat_mois > 1 ? 'orange' : 'vert'} />
               <KPI label="Alertes" value={nbAlertes} accent={nbAlertes > 0 ? 'orange' : 'vert'} />
@@ -270,48 +271,82 @@ function RelevesTab({ releves, onError, onOk }: { releves: ReleveEnergie[]; onEr
         <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau relevé</button>
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+      <section className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun relevé. Saisis le premier !</p>
         ) : (
-          <table className="responsive-table w-full text-sm">
-            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-              <tr>
-                <th className="text-left px-3 py-1.5">Type</th>
-                <th className="text-left px-3 py-1.5">Période</th>
-                <th className="text-right px-3 py-1.5">Conso</th>
-                <th className="text-right px-3 py-1.5">€ HT</th>
-                <th className="text-right px-3 py-1.5">€ TTC</th>
-                <th className="text-left px-3 py-1.5">Fournisseur</th>
-                <th className="text-right px-3 py-1.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
+          <>
+            {/* MOBILE — cartes */}
+            <ul className="md:hidden divide-y divide-zinc-100">
               {filtered.slice().reverse().map(r => {
                 const info = TYPE_ENERGIE_INFO[r.type]
                 return (
-                  <tr key={r.id}>
-                    <td className="px-3 py-2"><span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span></td>
-                    <td className="px-3 py-2 text-[11px] text-zinc-600">{fmtDate(r.periode_debut)} → {fmtDate(r.periode_fin)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtConso(r.consommation, r.unite)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-zinc-600">{fmtPrix(r.montant_ht)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPrix(r.montant_ttc)}</td>
-                    <td className="px-3 py-2 text-zinc-600">
-                      {r.fournisseur ?? '—'}
-                      {r.num_facture && <p className="text-[10px] text-zinc-400">{r.num_facture}</p>}
-                    </td>
-                    <td className="px-3 py-2 text-right">
+                  <li key={r.id} className="py-3 px-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900 truncate">
+                        <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border align-middle', info.cls)}>{info.emoji} {info.label}</span>
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-1">{fmtDate(r.periode_debut)} → {fmtDate(r.periode_fin)}</p>
+                      <p className="text-xs text-zinc-500">
+                        {fmtConso(r.consommation, r.unite)} · {r.fournisseur ?? '—'}
+                        {r.num_facture && <span className="text-zinc-400"> · {r.num_facture}</span>}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0 flex items-center gap-2">
+                      <span className="text-sm font-bold tabular-nums">{fmtPrix(r.montant_ttc)}</span>
                       <button onClick={async () => {
-                        if (!confirm(`Supprimer ce relevé ${info.label} ?`)) return
+                        if (!(await askConfirm(`Supprimer ce relevé ${info.label} ?`))) return
                         try { await supprimerReleveEnergie(r.id); onOk('Supprimé'); router.refresh() }
                         catch (e) { onError(e) }
-                      }} className="text-zinc-400 hover:text-red-600">×</button>
-                    </td>
-                  </tr>
+                      }} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 text-2xl leading-none" aria-label="Supprimer">×</button>
+                    </div>
+                  </li>
                 )
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            {/* DESKTOP — table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="responsive-table w-full text-sm">
+                <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="text-left px-3 py-1.5">Type</th>
+                    <th className="text-left px-3 py-1.5">Période</th>
+                    <th className="text-right px-3 py-1.5">Conso</th>
+                    <th className="text-right px-3 py-1.5">€ HT</th>
+                    <th className="text-right px-3 py-1.5">€ TTC</th>
+                    <th className="text-left px-3 py-1.5">Fournisseur</th>
+                    <th className="text-right px-3 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {filtered.slice().reverse().map(r => {
+                    const info = TYPE_ENERGIE_INFO[r.type]
+                    return (
+                      <tr key={r.id}>
+                        <td className="px-3 py-2"><span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span></td>
+                        <td className="px-3 py-2 text-[11px] text-zinc-600">{fmtDate(r.periode_debut)} → {fmtDate(r.periode_fin)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtConso(r.consommation, r.unite)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-zinc-600">{fmtPrix(r.montant_ht)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold">{fmtPrix(r.montant_ttc)}</td>
+                        <td className="px-3 py-2 text-zinc-600">
+                          {r.fournisseur ?? '—'}
+                          {r.num_facture && <p className="text-[10px] text-zinc-400">{r.num_facture}</p>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button onClick={async () => {
+                            if (!(await askConfirm(`Supprimer ce relevé ${info.label} ?`))) return
+                            try { await supprimerReleveEnergie(r.id); onOk('Supprimé'); router.refresh() }
+                            catch (e) { onError(e) }
+                          }} className="text-zinc-400 hover:text-red-600">×</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 

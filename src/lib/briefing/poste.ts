@@ -158,6 +158,22 @@ export async function getBriefingForPoste(
   poste: PosteBriefing,
   options: { prenom?: string | null; date?: string } = {},
 ): Promise<Briefing> {
+  // ⛔ Le briefing est désormais MASQUÉ dans l'opérationnel (remplacé par « Le coup
+  // de main d'Arnaud »). On court-circuite ici pour ne plus lancer aucune requête
+  // inutile à chaque ouverture d'écran de service. Réversible : retirer ce bloc.
+  const COURT_CIRCUIT: boolean = true
+  if (COURT_CIRCUIT) {
+    return {
+      date: options.date ?? new Date().toISOString().slice(0, 10),
+      poste,
+      prenom: options.prenom ?? null,
+      meteo: null,
+      platsDuJour: [],
+      alertesStock: [],
+      dlcCritiques: [],
+    }
+  }
+
   const dateStr = options.date ?? new Date().toISOString().slice(0, 10)
   const dayStart = new Date(`${dateStr}T00:00:00`).toISOString()
   const dayEnd = new Date(`${dateStr}T23:59:59`).toISOString()

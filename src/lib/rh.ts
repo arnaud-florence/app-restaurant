@@ -168,6 +168,29 @@ export function coutShift(debut: string, fin: string, salaire_horaire: number): 
   return Math.round(h * salaire_horaire * 100) / 100
 }
 
+/** Date (YYYY-MM-DD) du lundi de la semaine d'une date — pour grouper les heures
+ *  par semaine (les heures sup se calculent à la semaine). */
+export function lundiDeLaSemaine(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  const jour = (d.getUTCDay() + 6) % 7   // 0 = lundi
+  d.setUTCDate(d.getUTCDate() - jour)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Coût d'une semaine de travail avec majoration heures supplémentaires (France) :
+ *  - 35 premières heures : taux normal
+ *  - de la 36ᵉ à la 43ᵉ (8 h) : +25 %
+ *  - au-delà de 43 h : +50 %  */
+export function coutSemaineAvecHeuresSup(heuresSemaine: number, salaire_horaire: number): number {
+  const h = Math.max(0, heuresSemaine)
+  const normales = Math.min(h, 35)
+  const sup25 = Math.min(Math.max(h - 35, 0), 8)   // 36 → 43
+  const sup50 = Math.max(h - 43, 0)                // > 43
+  return normales * salaire_horaire
+       + sup25 * salaire_horaire * 1.25
+       + sup50 * salaire_horaire * 1.5
+}
+
 /** Jours d'un congé (inclusif). */
 export function joursConge(debut: string, fin: string): number {
   const d = new Date(debut).getTime()

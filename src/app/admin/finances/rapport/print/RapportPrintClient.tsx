@@ -76,7 +76,7 @@ export default function RapportPrintClient({
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700 border-b border-zinc-300 pb-1 mb-2">🧾 TVA</h2>
           <table className="w-full text-sm">
             <tbody>
-              <tr><td className="py-1">TVA collectée (vente, taux 10%)</td><td className="py-1 text-right tabular-nums">{fmtPrix(tva.tva_collectee)}</td></tr>
+              <tr><td className="py-1">TVA collectée (ventes, multi-taux)</td><td className="py-1 text-right tabular-nums">{fmtPrix(tva.tva_collectee)}</td></tr>
               <tr><td className="py-1">− TVA déductible (achat)</td><td className="py-1 text-right tabular-nums text-emerald-700">−{fmtPrix(tva.tva_deductible)}</td></tr>
               <tr className="border-t border-zinc-300 font-bold"><td className="py-1.5">= TVA à reverser</td><td className="py-1.5 text-right tabular-nums">{fmtPrix(tva.tva_a_reverser)}</td></tr>
             </tbody>

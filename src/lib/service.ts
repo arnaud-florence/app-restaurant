@@ -13,6 +13,7 @@ export type CommandeService = {
   numero: string
   source: SourceCommande
   numero_table: string | null
+  ardoise_nom?: string | null      // ardoise comptoir bar (tab nommé, sans table)
   statut: StatutCommande
   notes: string | null
   client_nom?: string | null
@@ -42,6 +43,8 @@ export type ArticleService = {
   recette_nom: string                 // joined
   quantite: number
   prix_unitaire_ht: number
+  prix_unitaire_ttc: number           // TTC stocké (multi-taux) — pour l'affichage client
+  tva_taux: number
   tag_destination: TagDestination
   commentaire: string | null
   allergenes_a_eviter: string[]       // Module 12 — alerte cuisine
@@ -100,8 +103,9 @@ export type StatutMinuteur = 'vert' | 'orange' | 'rouge'
 
 export function statutMinuteur(createdAt: string, now: number): StatutMinuteur {
   const diffMin = (now - new Date(createdAt).getTime()) / 60000
-  if (diffMin < 10) return 'vert'
-  if (diffMin <= 20) return 'orange'
+  // Seuils stricts (snacking/service rapide) : alerte tôt, proche de la cible de prep.
+  if (diffMin < 7) return 'vert'
+  if (diffMin <= 12) return 'orange'
   return 'rouge'
 }
 

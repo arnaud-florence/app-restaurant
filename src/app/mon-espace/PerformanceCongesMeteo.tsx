@@ -164,7 +164,7 @@ export default async function PerformanceCongesMeteo({ employeId, poste, soldeCo
               <div key={c.id} className="rounded-md border p-2 text-xs">
                 <div className="flex items-center justify-between gap-2 mb-0.5">
                   <span className="font-medium">{fmtDateRange(c.date_debut, c.date_fin)}</span>
-                  <Badge variant="outline" className={cn('text-[10px]', stat.cls)}>{stat.label}</Badge>
+                  <Badge variant="outline" className={cn('text-[11px]', stat.cls)}>{stat.label}</Badge>
                 </div>
                 <p className="text-[11px] text-zinc-500 capitalize">{c.type}{c.notes ? ` · ${c.notes}` : ''}</p>
               </div>
@@ -199,7 +199,7 @@ export default async function PerformanceCongesMeteo({ employeId, poste, soldeCo
                     {meteoData?.temperature_max != null ? `${Number(meteoData.temperature_max).toFixed(0)}° max` : ''}
                   </p>
                 )}
-                {meteoData?.est_prevision && <p className="text-[10px] text-amber-700">📡 prévision</p>}
+                {meteoData?.est_prevision && <p className="text-[11px] text-amber-700">📡 prévision</p>}
               </div>
             </div>
           </div>
@@ -214,12 +214,12 @@ export default async function PerformanceCongesMeteo({ employeId, poste, soldeCo
           <div className="rounded-md bg-white border p-2 text-center">
             <Calendar className="h-4 w-4 text-emerald-600 mx-auto mb-0.5" />
             <p className="text-lg font-bold tabular-nums">{resas.length}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Résas</p>
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider">Résas</p>
           </div>
           <div className="rounded-md bg-white border p-2 text-center">
             <Users className="h-4 w-4 text-emerald-600 mx-auto mb-0.5" />
             <p className="text-lg font-bold tabular-nums">{couvertsTotal}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Couverts</p>
+            <p className="text-[11px] text-zinc-500 uppercase tracking-wider">Couverts</p>
           </div>
         </div>
 
@@ -254,7 +254,7 @@ function PerfRow({
       </div>
       <div className="flex items-baseline justify-between gap-2 mt-0.5">
         <span className="text-base font-bold tabular-nums">{current}</span>
-        <span className="text-[10px] text-zinc-400">vs {prev}</span>
+        <span className="text-[11px] text-zinc-400">vs {prev}</span>
       </div>
     </div>
   )

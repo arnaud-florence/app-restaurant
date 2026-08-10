@@ -16,6 +16,7 @@ import type { Anomalie } from '@/lib/assistant/anomalies'
 import {
   creerConversation, supprimerConversation, renommerConversation, rafraichirContexte,
 } from './actions'
+import { askConfirm } from '@/lib/confirm'
 
 const NIVEAU_ICON: Record<Anomalie['niveau'], React.ComponentType<{ className?: string }>> = {
   critique: AlertCircle,
@@ -61,7 +62,7 @@ export default function AssistantClient({
   }
 
   async function supprimer(id: string) {
-    if (!confirm('Supprimer cette conversation ?')) return
+    if (!(await askConfirm('Supprimer cette conversation ?'))) return
     startTransition(async () => {
       await supprimerConversation(id)
       router.push('/admin/assistant')

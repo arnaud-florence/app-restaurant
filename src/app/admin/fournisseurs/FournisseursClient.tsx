@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 
@@ -26,7 +27,7 @@ import { type RecetteWithIngredients } from '../recettes/types'
 
 import {
   changerStatutBon, changerStatutFacture, deleteFournisseur, deleteFacture, deleteBonCommande,
-  autoGenererBonsDepuisStock,
+  autoGenererBonsDepuisStock, validerReception,
 } from './actions'
 
 import FournisseurFormModal from './FournisseurFormModal'
@@ -50,6 +51,7 @@ type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
 
 export default function FournisseursClient({
   fournisseurs, bons, factures, ingredients, recettes, entreesPrix,
+  isManager = true, peutVoirPrix = true,
 }: {
   fournisseurs: Fournisseur[]
   bons: BonCommande[]
@@ -57,6 +59,8 @@ export default function FournisseursClient({
   ingredients: Ingredient[]
   recettes: RecetteWithIngredients[]
   entreesPrix: EntreePrix[]
+  isManager?: boolean
+  peutVoirPrix?: boolean
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('fournisseurs')
@@ -160,17 +164,21 @@ export default function FournisseursClient({
             <PillTab active={tab === 'bons'} onClick={() => setTab('bons')}>
               📑 Bons de commande <PillCount n={bons.length} active={tab === 'bons'} />
             </PillTab>
-            <PillTab active={tab === 'factures'} onClick={() => setTab('factures')}>
-              💸 Factures
-              {alertesFac.length > 0 && (
-                <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums bg-rose-500 text-white animate-pulse">
-                  {alertesFac.length}
-                </span>
-              )}
-            </PillTab>
-            <PillTab active={tab === 'comparateur'} onClick={() => setTab('comparateur')}>
-              📊 Comparateur prix
-            </PillTab>
+            {peutVoirPrix && (
+              <PillTab active={tab === 'factures'} onClick={() => setTab('factures')}>
+                💸 Factures
+                {alertesFac.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums bg-rose-500 text-white animate-pulse">
+                    {alertesFac.length}
+                  </span>
+                )}
+              </PillTab>
+            )}
+            {peutVoirPrix && (
+              <PillTab active={tab === 'comparateur'} onClick={() => setTab('comparateur')}>
+                📊 Comparateur prix
+              </PillTab>
+            )}
           </div>
         </AdminPageHeader>
 
@@ -179,31 +187,15 @@ export default function FournisseursClient({
           <KPI label="Fournisseurs"     value={String(stats.nbActifs)}                  icon="👥" />
           <KPI label="Score moyen"       value={`${stats.moyenneScore.toFixed(1)}/5`}    icon="⭐" />
           <KPI label="Bons brouillons"   value={String(stats.bonsBrouillons)}            icon="📝" />
-          <KPI label="Factures à payer"  value={fmtPrix(stats.facturesAPayer)}           icon="💸"
-               tone={stats.facturesAlertes > 0 ? 'orange' : 'default'} />
-          <KPI label="Alertes paiement"  value={String(stats.facturesAlertes)}           icon="🚨"
-               tone={stats.facturesAlertes > 0 ? 'red' : 'default'} pulse={stats.facturesAlertes > 0} />
+          {peutVoirPrix && (
+            <KPI label="Factures à payer"  value={fmtPrix(stats.facturesAPayer)}           icon="💸"
+                 tone={stats.facturesAlertes > 0 ? 'orange' : 'default'} />
+          )}
+          {peutVoirPrix && (
+            <KPI label="Alertes paiement"  value={String(stats.facturesAlertes)}           icon="🚨"
+                 tone={stats.facturesAlertes > 0 ? 'red' : 'default'} pulse={stats.facturesAlertes > 0} />
+          )}
         </div>
-
-        {/* Alertes hausses prix (toujours visible si présentes) */}
-        {haussesPrix.length > 0 && (
-          <Card className="border-amber-300 bg-amber-50">
-            <CardContent className="p-3 sm:p-4 space-y-3">
-              <div>
-                <p className="font-bold text-amber-900">📈 {haussesPrix.length} alerte{haussesPrix.length > 1 ? 's' : ''} hausse de prix &gt; 5%</p>
-                <p className="text-xs text-amber-800">Impact calculé sur les marges des recettes utilisant ces ingrédients.</p>
-              </div>
-              <div className="space-y-2">
-                {haussesPrix.slice(0, 5).map(h => (
-                  <HaussePrixCard key={h.ingredient_id} hausse={h} recettes={recettesPourImpact} />
-                ))}
-                {haussesPrix.length > 5 && (
-                  <p className="text-xs text-muted-foreground italic">… et {haussesPrix.length - 5} autre{haussesPrix.length - 5 > 1 ? 's' : ''}.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Contenu de l'onglet actif */}
         {tab === 'fournisseurs' && (
@@ -213,8 +205,8 @@ export default function FournisseursClient({
             onSearch={setSearch}
             onCreate={() => setCreatingFournisseur(true)}
             onEdit={f => setEditingFournisseur(f)}
-            onDelete={f => {
-              if (confirm(`Supprimer "${f.nom}" ?`)) {
+            onDelete={async f => {
+              if (await askConfirm({ title: 'Supprimer le fournisseur', message: `Supprimer "${f.nom}" ?`, confirmLabel: 'Supprimer', danger: true })) {
                 startTransition(async () => {
                   try { await deleteFournisseur(f.id); flashOk(`${f.nom} supprimé`); router.refresh() }
                   catch (e) { flashKo(e) }
@@ -228,11 +220,13 @@ export default function FournisseursClient({
           <BonsTab
             bons={bons}
             fournisseurs={fournisseurs}
+            isManager={isManager}
+            peutVoirPrix={peutVoirPrix}
             onCreate={() => setCreatingBon(true)}
             onEdit={b => setEditingBon(b)}
             onReception={b => setReceptionBon(b)}
-            onDelete={b => {
-              if (confirm(`Supprimer le bon de commande à ${b.fournisseur_nom} ?`)) {
+            onDelete={async b => {
+              if (await askConfirm({ title: 'Supprimer le bon de commande', message: `Supprimer le bon de commande à ${b.fournisseur_nom} ?`, confirmLabel: 'Supprimer', danger: true })) {
                 startTransition(async () => {
                   try { await deleteBonCommande(b.id); flashOk('Bon supprimé'); router.refresh() }
                   catch (e) { flashKo(e) }
@@ -240,7 +234,15 @@ export default function FournisseursClient({
               }
             }}
             onChangerStatut={(id, statut) => startTransition(async () => {
-              try { await changerStatutBon(id, statut); flashOk('Statut mis à jour'); router.refresh() }
+              try {
+                const res = await changerStatutBon(id, statut)
+                flashOk('aValider' in res && res.aValider ? 'Demande envoyée au gérant pour validation' : 'Statut mis à jour')
+                router.refresh()
+              }
+              catch (e) { flashKo(e) }
+            })}
+            onValiderReception={id => startTransition(async () => {
+              try { await validerReception(id); flashOk('Réception validée'); router.refresh() }
               catch (e) { flashKo(e) }
             })}
           />
@@ -256,8 +258,8 @@ export default function FournisseursClient({
               try { await changerStatutFacture(id, statut); flashOk('Statut facture mis à jour'); router.refresh() }
               catch (e) { flashKo(e) }
             })}
-            onDelete={f => {
-              if (confirm(`Supprimer la facture ${f.numero} ?`)) {
+            onDelete={async f => {
+              if (await askConfirm({ title: 'Supprimer la facture', message: `Supprimer la facture ${f.numero} ?`, confirmLabel: 'Supprimer', danger: true })) {
                 startTransition(async () => {
                   try { await deleteFacture(f.id); flashOk('Facture supprimée'); router.refresh() }
                   catch (e) { flashKo(e) }
@@ -268,7 +270,28 @@ export default function FournisseursClient({
         )}
 
         {tab === 'comparateur' && (
-          <ComparateurTab lignes={comparateur} />
+          <>
+            {/* Alertes hausses prix — affichées dans le contexte du comparateur (sujet prix) */}
+            {peutVoirPrix && haussesPrix.length > 0 && (
+              <Card className="border-amber-300 bg-amber-50">
+                <CardContent className="p-3 sm:p-4 space-y-3">
+                  <div>
+                    <p className="font-bold text-amber-900">📈 {haussesPrix.length} alerte{haussesPrix.length > 1 ? 's' : ''} hausse de prix &gt; 5%</p>
+                    <p className="text-xs text-amber-800">Impact calculé sur les marges des recettes utilisant ces ingrédients.</p>
+                  </div>
+                  <div className="space-y-2">
+                    {haussesPrix.slice(0, 5).map(h => (
+                      <HaussePrixCard key={h.ingredient_id} hausse={h} recettes={recettesPourImpact} />
+                    ))}
+                    {haussesPrix.length > 5 && (
+                      <p className="text-xs text-muted-foreground italic">… et {haussesPrix.length - 5} autre{haussesPrix.length - 5 > 1 ? 's' : ''}.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <ComparateurTab lignes={comparateur} />
+          </>
         )}
       </main>
 
@@ -297,6 +320,7 @@ export default function FournisseursClient({
           bon={editingBon}
           fournisseurs={fournisseurs.filter(f => f.actif)}
           ingredients={ingredients.filter(i => i.actif)}
+          peutVoirPrix={peutVoirPrix}
           onClose={() => { setCreatingBon(false); setEditingBon(null) }}
           onSaved={() => { setCreatingBon(false); setEditingBon(null); router.refresh() }}
         />
@@ -342,20 +366,6 @@ export default function FournisseursClient({
 }
 
 // ─── Helpers UI ──────────────────────────────────────────────────────
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors',
-        active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
 function KPI({ label, value, tone = 'default', icon, pulse }: {
   label: string
   value: string
@@ -492,7 +502,7 @@ function FournisseurCard({ f, onEdit, onDelete }: { f: Fournisseur; onEdit: () =
           {f.adresse && <p className="truncate">📍 {f.adresse}</p>}
         </div>
 
-        <div className="grid grid-cols-3 gap-1 text-[10px]">
+        <div className="grid grid-cols-3 gap-1 text-xs">
           <Stat label="Délai"   value={`${f.delai_livraison_jours}j`} />
           <Stat label="Min."    value={`${f.minimum_commande}€`} />
           <Stat label="Jours"   value={f.jours_livraison.length > 0 ? f.jours_livraison.length + 'j/sem' : '—'} />
@@ -524,15 +534,18 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 // ─── Onglet : Bons de commande ───────────────────────────────────────
 function BonsTab({
-  bons, fournisseurs, onCreate, onEdit, onReception, onDelete, onChangerStatut,
+  bons, fournisseurs, isManager, peutVoirPrix, onCreate, onEdit, onReception, onDelete, onChangerStatut, onValiderReception,
 }: {
   bons: BonCommande[]
   fournisseurs: Fournisseur[]
+  isManager: boolean
+  peutVoirPrix: boolean
   onCreate: () => void
   onEdit: (b: BonCommande) => void
   onReception: (b: BonCommande) => void
   onDelete: (b: BonCommande) => void
-  onChangerStatut: (id: string, statut: 'brouillon'|'envoye'|'recu'|'annule') => void
+  onChangerStatut: (id: string, statut: 'brouillon'|'a_valider'|'envoye'|'recu'|'annule') => void
+  onValiderReception: (id: string) => void
 }) {
   return (
     <>
@@ -552,6 +565,9 @@ function BonsTab({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={cn('border', cfg.cls)}>{cfg.emoji} {cfg.label}</Badge>
+                        {b.reception_a_verifier && (
+                          <Badge className="border border-amber-300 bg-amber-100 text-amber-900">🕓 Réception à vérifier</Badge>
+                        )}
                         <span className="font-bold text-sm">{b.fournisseur_nom ?? '—'}</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-1">
@@ -560,7 +576,7 @@ function BonsTab({
                         {' · '} {b.lignes.length} article{b.lignes.length > 1 ? 's' : ''}
                       </p>
                     </div>
-                    <p className="font-bold tabular-nums shrink-0">{fmtPrix(b.montant_total_ht)}</p>
+                    {peutVoirPrix && <p className="font-bold tabular-nums shrink-0">{fmtPrix(b.montant_total_ht)}</p>}
                   </div>
 
                   {b.notes && <p className="text-xs text-muted-foreground italic">{b.notes}</p>}
@@ -571,10 +587,29 @@ function BonsTab({
                       <Button size="sm" variant="outline">🖨 Imprimer</Button>
                     </Link>
                     {b.statut === 'brouillon' && (
-                      <Button size="sm" variant="default" onClick={() => onChangerStatut(b.id, 'envoye')}>📧 Envoyer</Button>
+                      <Button size="sm" variant="default" onClick={() => onChangerStatut(b.id, 'envoye')}>
+                        {isManager ? '📧 Envoyer' : '📤 Soumettre au gérant'}
+                      </Button>
+                    )}
+                    {b.statut === 'a_valider' && (
+                      isManager ? (
+                        <>
+                          <Button size="sm" variant="success" onClick={() => onChangerStatut(b.id, 'envoye')}>✅ Valider &amp; envoyer</Button>
+                          <Button size="sm" variant="outline" onClick={() => onChangerStatut(b.id, 'brouillon')}>↩ Renvoyer en brouillon</Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-amber-700 italic self-center px-1">🕓 En attente de validation du gérant</span>
+                      )
                     )}
                     {b.statut === 'envoye' && (
                       <Button size="sm" variant="success" onClick={() => onReception(b)}>✓ Réception</Button>
+                    )}
+                    {b.statut === 'recu' && b.reception_a_verifier && (
+                      isManager ? (
+                        <Button size="sm" variant="success" onClick={() => onValiderReception(b.id)}>✅ Valider la réception</Button>
+                      ) : (
+                        <span className="text-xs text-amber-700 italic self-center px-1">🕓 Réception en attente de vérification du gérant</span>
+                      )
                     )}
                     <Button size="sm" variant="ghost" onClick={() => onDelete(b)} className="text-destructive">🗑</Button>
                   </div>
@@ -636,8 +671,38 @@ function FacturesTab({
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="responsive-table w-full text-sm">
+            {/* Mobile : liste de cards (table 7 colonnes illisible à 375px) */}
+            <ul className="md:hidden divide-y">
+              {factures.map(f => {
+                const cfg = STATUT_FACTURE_LABEL[f.statut]
+                return (
+                  <li key={f.id} className="p-3 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold truncate">{f.numero}</span>
+                      <Badge className={cn('border shrink-0', cfg.cls)}>{cfg.emoji} {cfg.label}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{f.fournisseur_nom ?? '—'}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Émise {format(parseISO(f.date_emission), 'd MMM', { locale: fr })}
+                        {f.date_echeance ? ` · éch. ${format(parseISO(f.date_echeance), 'd MMM', { locale: fr })}` : ''}
+                      </span>
+                      <span className="tabular-nums font-bold">{fmtPrix(f.montant_ttc)}</span>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      {f.statut !== 'paye' && (
+                        <Button size="sm" variant="outline" className="flex-1 min-h-[40px]" onClick={() => onChangerStatut(f.id, 'paye')}>✓ Marquer payée</Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="text-destructive min-h-[40px]" onClick={() => onDelete(f)}>🗑</Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Desktop/tablette : table complète */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     <th className="text-left py-2.5 px-3">Numéro</th>

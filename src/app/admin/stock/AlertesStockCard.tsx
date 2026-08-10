@@ -44,7 +44,7 @@ export default async function AlertesStockCard() {
   }
 
   return (
-    <Card className="p-5 bg-amber-50 border-amber-300">
+    <Card className="p-3 sm:p-5 bg-amber-50 border-amber-300">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="text-lg font-bold flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-amber-600" />
@@ -79,12 +79,33 @@ export default async function AlertesStockCard() {
                 </div>
                 <Link
                   href={mailto}
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium min-h-[40px]"
                 >
                   <Mail className="h-3.5 w-3.5" /> Préparer l&apos;email
                 </Link>
               </div>
-              <table className="w-full text-xs">
+
+              {/* Mobile : liste cards (table illisible à 375px) */}
+              <ul className="md:hidden space-y-1.5 text-xs">
+                {lignes.map(i => {
+                  const qty = Math.max(0, Number(i.stock_maximum) - Number(i.stock_actuel))
+                  const estime = qty * Number(i.prix_achat_ht ?? 0)
+                  return (
+                    <li key={i.id} className="rounded border border-amber-100 bg-amber-50/40 p-2">
+                      <div className="font-medium">{i.nom} <span className="text-zinc-500">({i.categorie})</span></div>
+                      <div className="flex items-center justify-between mt-1 tabular-nums">
+                        <span className="text-red-700 font-bold">{Number(i.stock_actuel).toFixed(2)} / min {Number(i.stock_minimum).toFixed(2)} {i.unite}</span>
+                        <span className="font-bold">+{qty.toFixed(2)} {i.unite}</span>
+                      </div>
+                      <div className="text-right text-zinc-500">{fmtEur(estime)}</div>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {/* Desktop/tablette : table */}
+              <div className="hidden md:block -mx-1 sm:mx-0 overflow-x-auto">
+              <table className="w-full text-xs min-w-[520px]">
                 <thead className="bg-amber-50/50">
                   <tr>
                     <th className="text-left px-2 py-1">Produit</th>
@@ -110,6 +131,7 @@ export default async function AlertesStockCard() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )
         })}

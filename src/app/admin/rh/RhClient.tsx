@@ -22,9 +22,10 @@ import {
   creerShift, supprimerShift,
   pointerArrivee, pointerDepart,
   demanderConge, validerConge, refuserConge, ajusterSoldeConges,
-  setEmployePermissions, getEmployePermissions, setAutonomie,
+  setEmployePermissions, getEmployePermissions, setAutonomie, setPinEmploye,
 } from './actions'
 import { canAccess, isReadOnly } from '@/lib/permissions'
+import { askConfirm } from '@/lib/confirm'
 import type { DataRH } from './page'
 
 type Tab = 'equipe' | 'planning' | 'conges' | 'paie' | 'registre'
@@ -59,7 +60,7 @@ export default function RhClient({ data }: { data: DataRH }) {
           title="Ressources humaines"
           description="Fiches, planning, pointage, paie, pourboires, congés, registre légal."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Équipe" value={data.employes.filter(e => e.actif).length} />
               <KPI label="MS / CA" value={`${ratio.toFixed(1)}%`} accent={statutMS} />
               <KPI label="Congés" value={congesEnAttente} accent={congesEnAttente > 0 ? 'orange' : 'zinc'} />
@@ -74,7 +75,7 @@ export default function RhClient({ data }: { data: DataRH }) {
             <PillTab active={tab === 'conges'} onClick={() => setTab('conges')}>
               🏖️ Congés {congesEnAttente > 0 && <PillCount n={congesEnAttente} active={tab === 'conges'} />}
             </PillTab>
-            <PillTab active={tab === 'paie'} onClick={() => setTab('paie')}>💰 Paie & pourboires</PillTab>
+            <PillTab active={tab === 'paie'} onClick={() => setTab('paie')}>💰 Masse salariale & tips</PillTab>
             <PillTab active={tab === 'registre'} onClick={() => setTab('registre')}>📜 Registre</PillTab>
           </div>
         </AdminPageHeader>
@@ -93,15 +94,6 @@ export default function RhClient({ data }: { data: DataRH }) {
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30">✓ {success}</div>
       )}
     </div>
-  )
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
   )
 }
 
@@ -147,7 +139,7 @@ function EquipeTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
             Voir archivés
           </label>
         </div>
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel employé</button>
+        <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvel employé</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -184,11 +176,11 @@ function EquipeTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
                   {e.actif && (
                     <Link
                       href={`/admin/rh/contrat/${e.id}?type=${e.type_contrat ?? 'CDI'}`}
-                      className="text-xs h-7 px-2 inline-flex items-center rounded border border-zinc-300 hover:bg-zinc-50 font-bold"
+                      className="text-sm min-h-[44px] min-w-[44px] px-2 inline-flex items-center justify-center rounded border border-zinc-300 hover:bg-zinc-50 font-bold"
                       title="Générer contrat de travail"
                     >📄</Link>
                   )}
-                  <button onClick={() => setShowForm(e)} className="text-xs h-7 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold" title="Modifier">✏️</button>
+                  <button onClick={() => setShowForm(e)} className="text-sm min-h-[44px] min-w-[44px] px-2 inline-flex items-center justify-center rounded border border-zinc-300 hover:bg-zinc-50 font-bold" title="Modifier">✏️</button>
                 </div>
               </header>
               <div className="px-3 py-2 text-xs text-zinc-600 space-y-0.5">
@@ -202,7 +194,7 @@ function EquipeTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
                 )}
               </div>
               <button onClick={() => setOpenEmpId(isOpen ? null : e.id)}
-                className="w-full px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50 border-t border-zinc-100">
+                className="w-full min-h-[44px] px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-50 border-t border-zinc-100">
                 {isOpen ? '▲ Fermer' : `▼ Documents (${docs.length}) · Formations (${forms.length})`}
               </button>
               {isOpen && (
@@ -241,7 +233,7 @@ function DocsFormationsPanel({
       <section>
         <div className="flex items-center justify-between mb-1.5">
           <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">📄 Documents ({documents.length})</h4>
-          <button onClick={() => setShowDocForm(true)} className="text-[11px] h-7 px-2 rounded border border-zinc-300 hover:bg-white font-bold">+ Ajouter</button>
+          <button onClick={() => setShowDocForm(true)} className="text-xs min-h-[44px] px-3 rounded border border-zinc-300 hover:bg-white font-bold">+ Ajouter</button>
         </div>
         {documents.length === 0 ? (
           <p className="text-[11px] text-zinc-400 italic">Aucun document.</p>
@@ -261,9 +253,9 @@ function DocsFormationsPanel({
                     )}
                   </div>
                   <button onClick={async () => {
-                    if (!confirm(`Supprimer "${d.nom}" ?`)) return
+                    if (!(await askConfirm({ title: 'Supprimer le document', message: `Supprimer "${d.nom}" ?`, confirmLabel: 'Supprimer', danger: true }))) return
                     try { await supprimerDocument(d.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
-                  }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
+                  }} className="shrink-0 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded text-zinc-400 hover:text-red-600 text-sm">×</button>
                 </li>
               )
             })}
@@ -275,7 +267,7 @@ function DocsFormationsPanel({
       <section>
         <div className="flex items-center justify-between mb-1.5">
           <h4 className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">🎓 Formations ({formations.length})</h4>
-          <button onClick={() => setShowFormForm(true)} className="text-[11px] h-7 px-2 rounded border border-zinc-300 hover:bg-white font-bold">+ Ajouter</button>
+          <button onClick={() => setShowFormForm(true)} className="text-xs min-h-[44px] px-3 rounded border border-zinc-300 hover:bg-white font-bold">+ Ajouter</button>
         </div>
         {formations.length === 0 ? (
           <p className="text-[11px] text-zinc-400 italic">Aucune formation enregistrée.</p>
@@ -294,9 +286,9 @@ function DocsFormationsPanel({
                     </p>
                   </div>
                   <button onClick={async () => {
-                    if (!confirm(`Supprimer "${f.titre}" ?`)) return
+                    if (!(await askConfirm({ title: 'Supprimer la formation', message: `Supprimer "${f.titre}" ?`, confirmLabel: 'Supprimer', danger: true }))) return
                     try { await supprimerFormation(f.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
-                  }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
+                  }} className="shrink-0 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded text-zinc-400 hover:text-red-600 text-sm">×</button>
                 </li>
               )
             })}
@@ -319,6 +311,10 @@ function DocsFormationsPanel({
 // ─── TAB 2 — Planning & pointage ───────────────────────────────────
 function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const [showShift, setShowShift] = useState<{ employe_id: string; date: string } | null>(null)
+  const [selectedDay, setSelectedDay] = useState<string>(() => {
+    const t = new Date().toISOString().slice(0, 10)
+    return data.joursSemaine.some(j => j.iso === t) ? t : (data.joursSemaine[0]?.iso ?? t)
+  })
 
   const employesActifs = data.employes.filter(e => e.actif)
 
@@ -327,8 +323,8 @@ function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unkno
 
   return (
     <div className="space-y-4">
-      {/* Grille planning semaine */}
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      {/* Grille planning semaine — desktop/tablette uniquement */}
+      <section className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <header className="px-4 py-2 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📅 Planning de la semaine</h2>
           <div className="text-xs text-zinc-600 tabular-nums">
@@ -388,12 +384,56 @@ function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unkno
         </div>
       </section>
 
+      {/* Mobile : vue par jour (la grille hebdo est illisible au doigt) */}
+      <section className="md:hidden rounded-lg border border-zinc-200 bg-white p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📅 Planning — par jour</h2>
+          <span className="text-xs text-zinc-600 tabular-nums"><b>{fmtHeures(totalHeures)}</b> · <b>{fmtPrix(totalCout)}</b></span>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+          {data.joursSemaine.map(j => (
+            <button
+              key={j.iso}
+              onClick={() => setSelectedDay(j.iso)}
+              className={cn('shrink-0 min-h-[44px] px-3 rounded-full text-xs font-bold border capitalize',
+                selectedDay === j.iso ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300')}
+            >
+              {j.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          {employesActifs.length === 0 ? (
+            <p className="text-center py-6 text-zinc-400 text-sm">Aucun employé actif.</p>
+          ) : employesActifs.map(e => {
+            const dayShifts = data.shiftsSemaine.filter(s => s.employe_id === e.id && s.date_travail === selectedDay)
+            return (
+              <div key={e.id} className="rounded-lg border border-zinc-200 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-sm">{e.prenom} {e.nom.charAt(0)}.</span>
+                  <span className="text-[11px] text-zinc-500 tabular-nums">{e.heures_contrat}h/sem · {fmtPrix(e.salaire_horaire)}/h</span>
+                </div>
+                <div className="mt-1.5 space-y-1">
+                  {dayShifts.map(s => <ShiftCard key={s.id} shift={s} onError={onError} onOk={onOk} />)}
+                  <button
+                    onClick={() => setShowShift({ employe_id: e.id, date: selectedDay })}
+                    className="w-full min-h-[44px] rounded-md border border-dashed border-zinc-300 text-zinc-500 hover:border-zinc-500 hover:text-zinc-700 text-xs font-bold"
+                  >
+                    + Ajouter un shift
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
       {/* Pointage */}
       <section className="rounded-lg border border-zinc-200 bg-white">
         <header className="px-4 py-2 border-b border-zinc-200">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">⏰ Pointage du jour</h2>
         </header>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
           {employesActifs.map(e => {
             const pt = data.pointagesJour.find(p => p.employe_id === e.id)
             return (
@@ -414,15 +454,15 @@ function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unkno
 function ShiftCard({ shift, onError, onOk }: { shift: Shift; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const router = useRouter()
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded p-1 text-[10px] flex items-center justify-between gap-1">
+    <div className="bg-blue-50 border border-blue-200 rounded p-1.5 text-[11px] flex items-center justify-between gap-1">
       <div className="min-w-0">
         <p className="font-bold tabular-nums">{shift.heure_debut.slice(0, 5)}–{shift.heure_fin.slice(0, 5)}</p>
         {shift.poste_jour && <p className="opacity-70 truncate">{shift.poste_jour}</p>}
       </div>
-      <button onClick={async () => {
-        if (!confirm(`Supprimer ce shift ?`)) return
+      <button aria-label="Supprimer le shift" onClick={async () => {
+        if (!(await askConfirm({ title: 'Supprimer le shift', message: 'Supprimer ce shift ?', confirmLabel: 'Supprimer', danger: true }))) return
         try { await supprimerShift(shift.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
-      }} className="text-zinc-400 hover:text-red-600">×</button>
+      }} className="shrink-0 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded text-zinc-400 hover:text-red-600 hover:bg-red-50">×</button>
     </div>
   )
 }
@@ -454,7 +494,7 @@ function PointageCard({ employe, pointage, onError, onOk }: { employe: Employe; 
       }}
         disabled={isPending || isFinished}
         className={cn(
-          'mt-1.5 w-full min-h-[36px] rounded text-xs font-bold',
+          'mt-1.5 w-full min-h-[44px] rounded text-sm font-bold',
           isFinished ? 'bg-zinc-200 text-zinc-500'
             : isArrived ? 'bg-amber-500 hover:bg-amber-400 text-white'
             : 'bg-emerald-500 hover:bg-emerald-400 text-white'
@@ -479,15 +519,15 @@ function CongesTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
       {/* Demandes */}
       <section className="rounded-lg border border-zinc-200 bg-white">
         <header className="px-4 py-2 border-b border-zinc-200 flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">🏖️ Demandes ({data.conges.length})</h2>
-          <div className="flex gap-1.5">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">🏖️ Demandes ({filtered.length})</h2>
+          <div className="flex flex-wrap gap-1.5">
             {(['demande','valide','refuse','tous'] as const).map(f => (
               <button key={f} onClick={() => setFiltre(f)} className={cn(
-                'px-2 h-8 rounded text-[11px] font-bold border',
+                'px-3 min-h-[44px] rounded text-xs font-bold border',
                 filtre === f ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300'
               )}>{f === 'demande' ? 'En attente' : f === 'valide' ? 'Validés' : f === 'refuse' ? 'Refusés' : 'Tous'}</button>
             ))}
-            <button onClick={() => setShowForm(true)} className="ml-2 min-h-[32px] px-3 rounded bg-zinc-900 text-white text-xs font-bold">+ Demande</button>
+            <button onClick={() => setShowForm(true)} className="ml-2 min-h-[44px] px-3 rounded bg-zinc-900 text-white text-sm font-bold">+ Demande</button>
           </div>
         </header>
         <div className="divide-y divide-zinc-100">
@@ -510,9 +550,9 @@ function CongesTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown
                 {c.statut === 'demande' && (
                   <div className="flex gap-1">
                     <button onClick={async () => { try { await validerConge(c.id); onOk('Validé'); router.refresh() } catch (e) { onError(e) } }}
-                      className="text-xs h-8 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓</button>
+                      className="text-sm min-h-[44px] min-w-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓</button>
                     <button onClick={async () => { try { await refuserConge(c.id); onOk('Refusé'); router.refresh() } catch (e) { onError(e) } }}
-                      className="text-xs h-8 px-2 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕</button>
+                      className="text-sm min-h-[44px] min-w-[44px] px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕</button>
                   </div>
                 )}
               </article>
@@ -569,7 +609,31 @@ function PaieTab({ data, ratio, statutMS }: { data: DataRH; ratio: number; statu
         {data.productivite.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun encaissement enregistré ce mois.</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile : 1 card par serveur */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {data.productivite.map(p => (
+              <li key={p.serveur_id ?? '__none__'} className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold truncate">{p.serveur_nom}</span>
+                  <span className="tabular-nums font-bold">{fmtPrix(p.ca_genere)}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 tabular-nums">
+                  <span>{p.heures_pointees > 0 ? fmtHeures(p.heures_pointees) : '—'} pointées</span>
+                  <span>· {p.ca_par_heure > 0 ? fmtPrix(p.ca_par_heure) + '/h' : '—'}</span>
+                  {p.pourboires > 0 && <span className="text-emerald-700 font-bold">· 💶 {fmtPrix(p.pourboires)}</span>}
+                </div>
+              </li>
+            ))}
+            <li className="p-3 bg-zinc-50 flex items-center justify-between font-bold border-t-2 border-zinc-900">
+              <span>TOTAL</span>
+              <span className="tabular-nums">{fmtPrix(data.productivite.reduce((s, p) => s + p.ca_genere, 0))} · 💶 {fmtPrix(data.pourboiresMois)}</span>
+            </li>
+          </ul>
+
+          {/* Desktop/tablette : table complète */}
+          <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm min-w-[520px]">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Serveur</th>
@@ -598,6 +662,8 @@ function PaieTab({ data, ratio, statutMS }: { data: DataRH; ratio: number; statu
               </tr>
             </tbody>
           </table>
+          </div>
+          </>
         )}
       </section>
     </div>
@@ -627,10 +693,32 @@ function RegistreTab({ data }: { data: DataRH }) {
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-600">Registre du personnel obligatoire (Art. L1221-13 du Code du travail).</p>
         <Link href="/admin/rh/registre/print" target="_blank" rel="noopener"
-          className="min-h-[40px] px-3 inline-flex items-center rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">🖨 Vue imprimable</Link>
+          className="min-h-[44px] px-3 inline-flex items-center rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">🖨 Vue imprimable</Link>
       </div>
-      <div className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* Mobile : 1 carte par employé (la table 7 colonnes déborde) */}
+      <ul className="md:hidden rounded-lg border border-zinc-200 bg-white divide-y divide-zinc-100">
+        {data.employes.length === 0 ? (
+          <li className="px-4 py-8 text-center text-sm text-zinc-400">Aucun employé.</li>
+        ) : data.employes.map(e => (
+          <li key={e.id} className={cn('py-3 px-3 flex items-start justify-between gap-3', !e.actif && 'opacity-60')}>
+            <div className="min-w-0">
+              <p className="font-semibold text-zinc-900 truncate">{e.nom.toUpperCase()} {e.prenom}</p>
+              <p className="text-xs text-zinc-500">{e.poste} · {e.type_contrat}</p>
+              <p className="text-xs text-zinc-500 tabular-nums mt-0.5">
+                Embauche {e.date_embauche ? fmtDate(e.date_embauche) : '—'}
+                {e.date_sortie && <> · Sortie {fmtDate(e.date_sortie)}</>}
+              </p>
+            </div>
+            <div className="text-right shrink-0 tabular-nums">
+              <p className="font-bold text-zinc-900">{e.heures_contrat}h/sem</p>
+              <p className="text-xs text-zinc-500">{fmtPrix(e.salaire_horaire)}/h</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
             <tr>
               <th className="text-left px-3 py-1.5">Nom Prénom</th>
@@ -735,7 +823,10 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
       )}
 
       {isEdit && employe && (
-        <AutonomiePanel employe={employe} onError={onError} onOk={onSuccess} />
+        <>
+          <AutonomiePanel employe={employe} onError={onError} onOk={onSuccess} />
+          <PinPanel employe={employe} onError={onError} onOk={onSuccess} />
+        </>
       )}
 
       <div className="flex gap-2 pt-2">
@@ -743,7 +834,7 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
         {isEdit && employe?.actif && (
           <button onClick={async () => {
             const today = new Date().toISOString().slice(0, 10)
-            if (!confirm(`Archiver ${employe.prenom} ${employe.nom} avec sortie au ${today} ?`)) return
+            if (!(await askConfirm({ title: 'Archiver l\'employé', message: `Archiver ${employe.prenom} ${employe.nom} avec sortie au ${today} ?`, confirmLabel: 'Archiver', danger: true }))) return
             try { await archiverEmploye(employe.id, today); onSuccess('Archivé'); router.refresh() }
             catch (e) { onError(e) }
           }} className="min-h-[48px] px-4 rounded-md bg-amber-500 hover:bg-amber-400 text-white font-bold">📦 Archiver</button>
@@ -858,6 +949,46 @@ function AutonomiePanel({
   )
 }
 
+// ─── Code PIN opérateur (pour « prendre le poste » sur tablette partagée) ──
+function PinPanel({
+  employe, onError, onOk,
+}: {
+  employe: Employe
+  onError: (e: unknown) => void
+  onOk: (msg: string) => void
+}) {
+  const [pin, setPin] = useState('')
+  const [pending, startTransition] = useTransition()
+  const aDejaPin = Boolean((employe as unknown as Record<string, unknown>).pin_hash)
+
+  function save() {
+    if (!/^\d{4,6}$/.test(pin)) { onError(new Error('PIN : 4 à 6 chiffres')); return }
+    startTransition(async () => {
+      try { await setPinEmploye({ employe_id: employe.id, pin }); setPin(''); onOk('Code PIN défini') }
+      catch (e) { onError(e) }
+    })
+  }
+
+  return (
+    <details className="rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
+      <summary className="font-bold text-sm cursor-pointer select-none">🔢 Code PIN opérateur {aDejaPin && <span className="text-[11px] font-normal text-emerald-700">· défini ✓</span>}</summary>
+      <p className="text-xs text-zinc-500 mt-1 mb-2">Code à 4–6 chiffres que l&apos;employé tape pour « prendre le poste » sur une tablette partagée. Ses actions sont alors tracées à son nom.</p>
+      <div className="flex gap-2">
+        <input
+          type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+          value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
+          placeholder={aDejaPin ? 'Nouveau code…' : '4 à 6 chiffres'}
+          className="flex-1 h-11 px-3 rounded-md border border-zinc-300 text-lg tracking-widest tabular-nums"
+        />
+        <button onClick={save} disabled={pending || pin.length < 4}
+          className="min-h-[44px] px-4 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 text-white font-bold text-sm">
+          {aDejaPin ? 'Changer' : 'Définir'}
+        </button>
+      </div>
+    </details>
+  )
+}
+
 function PermissionsPanel({
   employe_id, poste, onError, onOk,
 }: {
@@ -930,8 +1061,8 @@ function PermissionsPanel({
     })
   }
 
-  function reset() {
-    if (!confirm('Réinitialiser tous les overrides (employé reprend les droits de son poste) ?')) return
+  async function reset() {
+    if (!(await askConfirm({ title: 'Réinitialiser les overrides', message: 'Réinitialiser tous les overrides (employé reprend les droits de son poste) ?', confirmLabel: 'Réinitialiser', danger: true }))) return
     setOverrides({ allowed: [], readonly: [], denied: [], inherit: [] })
   }
 
@@ -978,7 +1109,7 @@ function PermissionsPanel({
                       <select
                         value={state}
                         onChange={e => setStateOf(it.href, e.target.value as RouteState)}
-                        className="text-xs h-8 px-2 rounded border border-zinc-300 bg-white"
+                        className="text-xs min-h-[44px] px-2 rounded border border-zinc-300 bg-white"
                       >
                         <option value="inherit">Hériter</option>
                         <option value="allowed">Autorisé</option>
@@ -993,10 +1124,10 @@ function PermissionsPanel({
           </div>
 
           <div className="flex gap-2">
-            <button type="button" onClick={reset} disabled={pending} className="text-xs h-9 px-3 rounded border border-zinc-300 hover:bg-zinc-50">
+            <button type="button" onClick={reset} disabled={pending} className="text-sm min-h-[44px] px-3 rounded border border-zinc-300 hover:bg-zinc-50">
               Réinitialiser
             </button>
-            <button type="button" onClick={save} disabled={pending} className="flex-1 text-xs h-9 px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:bg-zinc-300">
+            <button type="button" onClick={save} disabled={pending} className="flex-1 text-sm min-h-[44px] px-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:bg-zinc-300">
               {pending ? '…' : '💾 Enregistrer overrides'}
             </button>
           </div>
@@ -1255,8 +1386,8 @@ function InviterButton({
   onSuccess: (msg: string) => void
 }) {
   const [pending, startTransition] = useTransition()
-  function inviter() {
-    if (!confirm(`Envoyer un email d'invitation à ${prenom} (${email}) ?\n\nL'employé recevra un lien pour se connecter directement à l'application.`)) return
+  async function inviter() {
+    if (!(await askConfirm({ title: 'Envoyer l\'invitation', message: `Envoyer un email d'invitation à ${prenom} (${email}) ?\n\nL'employé recevra un lien pour se connecter directement à l'application.`, confirmLabel: 'Envoyer', danger: false }))) return
     startTransition(async () => {
       try {
         const r = await inviterEmploye({ employe_id })
@@ -1270,7 +1401,7 @@ function InviterButton({
     <button
       onClick={inviter}
       disabled={pending}
-      className="text-xs h-7 px-2 rounded border border-emerald-300 hover:bg-emerald-50 text-emerald-700 font-bold disabled:opacity-50"
+      className="text-sm min-h-[44px] min-w-[44px] px-2 inline-flex items-center justify-center rounded border border-emerald-300 hover:bg-emerald-50 text-emerald-700 font-bold disabled:opacity-50"
       title={`Inviter ${prenom} par email`}
     >
       {pending ? '…' : '📧'}

@@ -35,6 +35,7 @@ export default function StockClient({
   mouvements: Mouvement[]
 }) {
   const router = useRouter()
+  const [tab, setTab] = useState<'stocks' | 'mouvements' | 'bilan'>('stocks')
   const [search, setSearch] = useState('')
   const [filtreCat, setFiltreCat] = useState('')
   const [filtreStock, setFiltreStock] = useState<'tous' | 'rouge' | 'orange' | 'vert'>('tous')
@@ -61,6 +62,18 @@ export default function StockClient({
         return true
       })
   }, [ingredients, search, filtreCat, filtreStock])
+
+  // Base des compteurs de pastilles catégorie : mêmes filtres que la liste (actifs
+  // only + stock + recherche) SAUF la catégorie — sinon le compteur ne correspond
+  // pas à la liste (qui n'affiche jamais les ingrédients inactifs).
+  const baseForCounts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return ingredients.filter(i => i.actif).filter(i => {
+      if (filtreStock !== 'tous' && statutStock(i.stock_actuel, i.stock_minimum) !== filtreStock) return false
+      if (q && !i.nom.toLowerCase().includes(q) && !i.categorie.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [ingredients, search, filtreStock])
 
   // KPIs
   const valeur = useMemo(() => valeurStock(ingredients.filter(i => i.actif)), [ingredients])
@@ -124,7 +137,7 @@ export default function StockClient({
         />
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
           <KPI label="Total actifs" value={String(stats.totalActifs)} icon="📋" />
           <KPI label="Stock OK"     value={String(stats.totalActifs - stats.rouge - stats.orange)} icon="✓" tone="green" />
           <KPI label="Stock faible" value={String(stats.orange)} icon="⚠" tone={stats.orange > 0 ? 'orange' : 'default'} />
@@ -132,6 +145,15 @@ export default function StockClient({
           <KPI label="Valeur stock" value={fmtPrix(valeur)} icon="💰" />
         </div>
 
+        {/* Sélecteur d'onglets sticky */}
+        <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 bg-zinc-50/90 backdrop-blur flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'stocks'} onClick={() => setTab('stocks')}>📦 Stocks</PillTab>
+          <PillTab active={tab === 'mouvements'} onClick={() => setTab('mouvements')}>🔄 Mouvements</PillTab>
+          <PillTab active={tab === 'bilan'} onClick={() => setTab('bilan')}>📉 Bilan mois</PillTab>
+        </div>
+
+        {tab === 'stocks' && (
+        <>
         {/* Bandeau alertes DLC */}
         {dlcAlerts.length > 0 && (
           <Card className="border-amber-300 bg-amber-50">
@@ -154,7 +176,7 @@ export default function StockClient({
         )}
 
         {/* Toolbar premium tactile */}
-        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+        <div className="sticky top-[60px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
           <Input
             type="search"
             placeholder="🔍 Rechercher un ingrédient..."
@@ -165,10 +187,11 @@ export default function StockClient({
           {/* Catégories */}
           <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
             <PillTab active={filtreCat === ''} onClick={() => setFiltreCat('')}>
-              ✦ Toutes <PillCount n={ingredients.length} active={filtreCat === ''} />
+              ✦ Toutes <PillCount n={baseForCounts.length} active={filtreCat === ''} />
             </PillTab>
             {categories.map(c => {
-              const n = ingredients.filter(i => i.categorie === c).length
+              const n = baseForCounts.filter(i => i.categorie === c).length
+              if (n === 0) return null
               return (
                 <PillTab key={c} active={filtreCat === c} onClick={() => setFiltreCat(c)}>
                   {c} <PillCount n={n} active={filtreCat === c} />
@@ -240,7 +263,11 @@ export default function StockClient({
             </Card>
           </>
         )}
+        </>
+        )}
 
+        {tab === 'bilan' && (
+        <>
         {/* Bilan invendus du mois */}
         <Card>
           <CardContent className="p-3 sm:p-4">
@@ -256,7 +283,7 @@ export default function StockClient({
               <ul className="space-y-1.5 text-sm">
                 {invendus.par_ingredient.map(p => (
                   <li key={p.ingredient_id} className="flex items-center justify-between gap-2 bg-red-50/50 border border-red-100 rounded px-2 py-1.5">
-                    <span className="min-w-0 truncate">{p.nom}</span>
+                    <span className="min-w-0 truncate max-w-[60%]">{p.nom}</span>
                     <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                       {fmtQte(p.qte)} unités · <b className="text-red-700">{fmtPrix(p.cout)}</b>
                     </span>
@@ -266,7 +293,11 @@ export default function StockClient({
             )}
           </CardContent>
         </Card>
+        </>
+        )}
 
+        {tab === 'mouvements' && (
+        <>
         {/* Historique récent */}
         <Card>
           <CardContent className="p-3 sm:p-4">
@@ -274,8 +305,38 @@ export default function StockClient({
             {mouvements.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">Aucun mouvement enregistré.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <>
+              {/* Mobile : liste cards (6 colonnes illisibles à 375px) */}
+              <ul className="md:hidden space-y-1.5">
+                {mouvements.slice(0, 30).map(m => {
+                  const cfg = TYPE_MOUVEMENT_LABEL[m.type]
+                  const valeur = m.quantite * m.prix_unitaire_ht
+                  return (
+                    <li key={m.id} className="rounded-md border bg-card p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge className={cn('border shrink-0', cfg.cls)}>{cfg.emoji} {cfg.label}</Badge>
+                        <span className="text-muted-foreground tabular-nums whitespace-nowrap">{format(parseISO(m.created_at), 'd MMM HH:mm', { locale: fr })}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <span className="truncate flex-1">{m.ingredient_nom ?? '—'}</span>
+                        <span className={cn('tabular-nums shrink-0', cfg.signe === '-' ? 'text-red-700' : cfg.signe === '+' ? 'text-emerald-700' : '')}>
+                          {cfg.signe} {fmtQte(m.quantite)} {m.ingredient_unite ?? ''}
+                        </span>
+                      </div>
+                      {(m.motif || valeur > 0) && (
+                        <div className="mt-1 flex items-center justify-between gap-2 text-muted-foreground">
+                          <span className="line-clamp-1 flex-1">{m.motif ?? ''}{m.fournisseur ? ` · ${m.fournisseur}` : ''}</span>
+                          {valeur > 0 && <span className="tabular-nums shrink-0">{fmtPrix(valeur)}</span>}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {/* Desktop/tablette : table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[760px]">
                   <thead>
                     <tr className="border-b text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       <th className="text-left py-2 px-2">Date</th>
@@ -283,7 +344,7 @@ export default function StockClient({
                       <th className="text-left py-2 px-2">Ingrédient</th>
                       <th className="text-right py-2 px-2">Qté</th>
                       <th className="text-right py-2 px-2">Valeur</th>
-                      <th className="text-left py-2 px-2 hidden sm:table-cell">Motif / Source</th>
+                      <th className="text-left py-2 px-2">Motif / Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -315,15 +376,18 @@ export default function StockClient({
                     })}
                   </tbody>
                 </table>
-                {mouvements.length > 30 && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    Affichage des 30 plus récents sur {mouvements.length}.
-                  </p>
-                )}
               </div>
+              {mouvements.length > 30 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Affichage des 30 plus récents sur {mouvements.length}.
+                </p>
+              )}
+              </>
             )}
           </CardContent>
         </Card>
+        </>
+        )}
       </main>
 
       {/* Toasts */}
@@ -390,7 +454,7 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate">{label}</p>
           <span className={cn('text-lg', pulse && 'animate-pulse')}>{icon}</span>
         </div>
-        <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums truncate">{value}</p>
+        <p className="text-lg sm:text-2xl font-bold mt-1 tabular-nums">{value}</p>
       </CardContent>
     </Card>
   )

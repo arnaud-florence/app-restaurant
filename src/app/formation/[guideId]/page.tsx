@@ -5,7 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import GuideClient from './GuideClient'
 import { getProfile } from '@/lib/auth'
 import { guideAccessibleAuPoste, type Guide, type Etape, type Progression } from '@/lib/formation'
-import type { OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 
 export const dynamic = 'force-dynamic'
 

@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Gift, Plus, Trash2, Copy, Check, Search, X, History } from 'lucide-react'
+import { Plus, Trash2, Copy, Check, Search, X, History } from 'lucide-react'
 import { PillTab } from '@/components/ui/PillTab'
+import EmptyState from '@/components/ui/EmptyState'
 import { creerCarteCadeau, annulerCarteCadeau, crediterCarteCadeau, supprimerCarteCadeau } from './actions'
 import { createClient } from '@/lib/supabase/client'
 import type { CarteCadeau, MouvementCarte } from './page'
@@ -142,13 +143,79 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
       {erreur && <Card className="p-3 bg-red-50 border-red-200 text-sm text-red-700">⚠️ {erreur}</Card>}
 
       {filtered.length === 0 ? (
-        <Card className="p-8 text-center text-zinc-500">
-          <Gift className="h-10 w-10 mx-auto text-zinc-300 mb-2" />
-          <p className="text-base font-medium">Aucune carte cadeau</p>
+        <Card className="p-8">
+          <EmptyState
+            emoji="🎁"
+            titre="Aucune carte cadeau"
+            description="Émets ta première carte cadeau pour gâter un client, récompenser le staff ou faire un geste commercial."
+            action={{ label: '+ Émettre une carte', onClick: () => setCreating(true) }}
+          />
         </Card>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="responsive-table w-full text-sm">
+        <>
+        {/* Mobile : liste de cards (table 8 colonnes illisible à 375px) */}
+        <ul className="md:hidden divide-y divide-zinc-100">
+          {filtered.map(c => {
+            const ratio = c.montant_initial > 0 ? c.montant_restant / c.montant_initial : 0
+            const expiree = c.date_validite_fin && new Date(c.date_validite_fin) < new Date()
+            return (
+              <li key={c.id} className="py-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono font-bold">{c.code}</code>
+                      <button onClick={() => copier(c)} className="text-zinc-400 hover:text-emerald-600">
+                        {copiedId === c.id ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap mt-1">
+                      <Badge variant="outline" className={STATUT_INFO[c.statut].cls + ' text-[10px]'}>
+                        {STATUT_INFO[c.statut].label}
+                      </Badge>
+                      {expiree && c.statut === 'active' && (
+                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 text-[10px]">expirée</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold tabular-nums">{fmtPrix(c.montant_restant)}</p>
+                    <p className="text-[10px] text-zinc-500">/ {fmtPrix(c.montant_initial)}</p>
+                    <div className="h-1 bg-zinc-200 rounded mt-0.5 w-20 ml-auto">
+                      <div className="h-full bg-pink-500 rounded" style={{ width: `${ratio * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-zinc-500">
+                  {c.beneficiaire_nom && <>👤 {c.beneficiaire_nom} · </>}
+                  Émise {fmtDate(c.date_emission)}
+                  {c.date_validite_fin ? <> · jusqu&apos;au {fmtDate(c.date_validite_fin)}</> : <> · ∞</>}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => setShowHistory(c)} className="min-h-[44px] min-w-[44px]" title="Historique">
+                    <History className="h-4 w-4" />
+                  </Button>
+                  {c.statut === 'active' && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setCrediter(c)} className="min-h-[44px] px-3 text-sm">
+                        + Créditer
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAnnuler(c)} className="min-h-[44px] px-3 text-sm text-red-600">
+                        Annuler
+                      </Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmDel(c)} className="min-h-[44px] min-w-[44px] text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        {/* Desktop/tablette : table complète */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="hidden md:table w-full text-sm">
             <thead className="text-xs text-zinc-500 uppercase border-b border-zinc-200">
               <tr>
                 <th className="text-left py-2">Code</th>
@@ -210,21 +277,21 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
                     <td className="text-xs">{c.date_validite_fin ? fmtDate(c.date_validite_fin) : <span className="text-zinc-400">∞</span>}</td>
                     <td className="text-right">
                       <div className="inline-flex gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => setShowHistory(c)} title="Historique">
-                          <History className="h-3.5 w-3.5" />
+                        <Button size="sm" variant="ghost" onClick={() => setShowHistory(c)} className="min-h-[44px] min-w-[44px]" title="Historique">
+                          <History className="h-4 w-4" />
                         </Button>
                         {c.statut === 'active' && (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => setCrediter(c)} className="text-xs">
+                            <Button size="sm" variant="outline" onClick={() => setCrediter(c)} className="min-h-[44px] px-3 text-sm">
                               + Créditer
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => setAnnuler(c)} className="text-xs text-red-600">
+                            <Button size="sm" variant="outline" onClick={() => setAnnuler(c)} className="min-h-[44px] px-3 text-sm text-red-600">
                               Annuler
                             </Button>
                           </>
                         )}
-                        <Button size="sm" variant="ghost" onClick={() => setConfirmDel(c)} className="text-red-600">
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmDel(c)} className="min-h-[44px] min-w-[44px] text-red-600">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
@@ -234,6 +301,7 @@ export default function CartesCadeauxClient({ cartes }: { cartes: CarteCadeau[] 
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {creating && <CreerModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); router.refresh() }} />}
@@ -506,7 +574,11 @@ function HistoryModal({ carte, onClose }: { carte: CarteCadeau; onClose: () => v
           {loading ? (
             <p className="text-sm text-zinc-500 text-center py-4">Chargement…</p>
           ) : mouvements.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">Aucun mouvement</p>
+            <EmptyState
+              emoji="📜"
+              titre="Aucun mouvement"
+              description="Les crédits, utilisations et remboursements de cette carte apparaîtront ici au fil de son usage."
+            />
           ) : (
             <ul className="divide-y divide-zinc-100">
               {mouvements.map(m => (

@@ -58,7 +58,7 @@ export default async function AgentDrilldownPage({ params }: { params: { id: str
           </span>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Agent IA · Live</p>
-            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">{def.nom}</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-tight mt-0.5">{def.nom}</h1>
             <p className="text-xs text-zinc-500 mt-1">{def.description}</p>
             <p className="text-[10px] text-zinc-400 mt-0.5">{def.scheduleHuman}</p>
           </div>

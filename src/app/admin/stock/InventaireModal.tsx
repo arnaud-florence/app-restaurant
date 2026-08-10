@@ -64,8 +64,44 @@ export default function InventaireModal({
       </DialogHeader>
 
       <DialogBody className="space-y-3">
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
+        {/* Mobile : carte par ingrédient (5 colonnes illisibles à 375px) */}
+        <ul className="md:hidden space-y-2">
+          {ecarts.map(({ i, ecart, valeurEcart }) => {
+            const couleur =
+              Math.abs(ecart) < 0.0001 ? 'text-muted-foreground' :
+              ecart < 0 ? 'text-red-700 font-semibold' :
+              'text-emerald-700 font-semibold'
+            return (
+              <li key={i.id} className="rounded-md border p-3 text-sm space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{i.nom}</p>
+                    <p className="text-[11px] text-muted-foreground">{i.categorie} · {i.unite}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    Théorique {fmtQte(i.stock_actuel)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground shrink-0">Réel</label>
+                  <Input
+                    type="number" step="0.001" min={0}
+                    value={reels[i.id] ?? ''}
+                    onChange={e => set(i.id, e.target.value)}
+                    className="flex-1 h-10 text-right tabular-nums"
+                  />
+                </div>
+                <div className={cn('flex items-center justify-between text-xs tabular-nums', couleur)}>
+                  <span>Écart : {ecart === 0 ? '0' : (ecart > 0 ? '+' : '') + fmtQte(ecart)}</span>
+                  <span>{Math.abs(valeurEcart) < 0.005 ? '—' : fmtPrix(valeurEcart)}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        <div className="hidden md:block overflow-x-auto rounded-md border">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="text-left py-2 px-3">Ingrédient</th>

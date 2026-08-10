@@ -216,7 +216,7 @@ export default async function ShiftsBriefingAlertes({ employeId, poste, posteWid
                 <li key={m.id} className="rounded-md bg-zinc-50 p-2 text-xs">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <span className="font-medium">{exp}</span>
-                    <span className="text-[10px] text-zinc-400">#{m.canal} · {ago}</span>
+                    <span className="text-[11px] text-zinc-400">#{m.canal} · {ago}</span>
                   </div>
                   <p className="text-zinc-700 line-clamp-2">{m.contenu}</p>
                 </li>
@@ -237,7 +237,7 @@ export default async function ShiftsBriefingAlertes({ employeId, poste, posteWid
           <h3 className="font-bold flex items-center gap-1.5 text-sm">
             <Bell className="h-4 w-4 text-amber-600" /> À faire pour toi
             <Badge variant="outline" className={cn(
-              'ml-1 text-[10px]',
+              'ml-1 text-[11px]',
               totalAlertes >= 3 ? 'bg-red-200 text-red-900 border-red-400' :
                                   'bg-amber-200 text-amber-900 border-amber-400',
             )}>{totalAlertes}</Badge>

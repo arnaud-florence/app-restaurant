@@ -85,6 +85,22 @@ export async function setAutonomie(input: unknown) {
   return { ok: true as const }
 }
 
+// ─── PIN opérateur (tablette partagée) ────────────────────────────
+const pinSchema = z.object({
+  employe_id: z.string().uuid(),
+  pin: z.string().regex(/^\d{4,6}$/, 'PIN : 4 à 6 chiffres'),
+})
+
+/** Définit/réinitialise le code PIN d'un employé (pour « prendre le poste »). */
+export async function setPinEmploye(input: unknown) {
+  await requireManager()
+  const p = pinSchema.parse(input)
+  const { definirPinEmploye } = await import('@/lib/operateur')
+  await definirPinEmploye(p.employe_id, p.pin)
+  revalidatePath('/admin/rh')
+  return { ok: true as const }
+}
+
 // ─── Permissions personnalisées par employé ───────────────────────
 const customPermissionsSchema = z.object({
   employe_id: z.string().uuid(),
@@ -353,15 +369,18 @@ export async function validerConge(conge_id: string) {
   if (cErr || !c) throw new Error('Congé introuvable')
   if (c.statut === 'valide') throw new Error('Déjà validé')
 
-  // Si type=conge, décrémente le solde
+  // Si type=conge, décrémente toujours le solde (peut passer en négatif → dépassement visible)
+  let soldeAvertissement: string | null = null
   if (c.type === 'conge') {
     const j = joursConge(c.date_debut as string, c.date_fin as string)
     const { data: emp } = await supabase.from('employes').select('solde_conges_jours').eq('id', c.employe_id).single()
-    if (emp && Number(emp.solde_conges_jours) >= j) {
+    if (emp) {
+      const nouveauSolde = Number(emp.solde_conges_jours) - j
       await supabase
         .from('employes')
-        .update({ solde_conges_jours: Number(emp.solde_conges_jours) - j })
+        .update({ solde_conges_jours: nouveauSolde })
         .eq('id', c.employe_id)
+      if (nouveauSolde < 0) soldeAvertissement = `Solde de congés dépassé : ${nouveauSolde} j restant(s).`
     }
   }
 
@@ -379,7 +398,7 @@ export async function validerConge(conge_id: string) {
 
   revalidatePath('/admin/rh')
   revalidatePath('/mon-espace')
-  return { ok: true as const }
+  return { ok: true as const, avertissement: soldeAvertissement }
 }
 
 export async function refuserConge(conge_id: string) {

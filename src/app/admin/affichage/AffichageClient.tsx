@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Copy, Check, X, ExternalLink, QrCode, Tv, Bell } 
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { Button } from '@/components/ui/button'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Input } from '@/components/ui/input'
@@ -74,9 +75,9 @@ export default function AffichageClient({
         />
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b overflow-x-auto">
         <TabBtn active={tab === 'menu'}  onClick={() => setTab('menu')}>📋 Menu du jour</TabBtn>
-        <TabBtn active={tab === 'promos'} onClick={() => setTab('promos')}>✨ Promos</TabBtn>
+        <TabBtn active={tab === 'promos'} onClick={() => setTab('promos')}>✨ Promos TV</TabBtn>
         <TabBtn active={tab === 'appels'} onClick={() => setTab('appels')}>
           <Bell className="h-4 w-4 inline mr-1" /> Appels {appelsOuverts.length > 0 && <Badge className="ml-1 bg-red-500">{appelsOuverts.length}</Badge>}
         </TabBtn>
@@ -95,7 +96,7 @@ export default function AffichageClient({
 function TabBtn({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className={cn(
-      'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+      'px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0',
       active ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-zinc-600 hover:text-zinc-900',
     )}>{children}</button>
   )
@@ -121,9 +122,9 @@ function MenuPanel({ menu, today }: { menu: MenuItem[]; today: string }) {
           <div className="flex gap-1 items-center">
             <Input type="date" value={duplDate} onChange={e => setDuplDate(e.target.value)} className="w-40" placeholder="Date cible" />
             <Button size="sm" variant="outline" disabled={!duplDate || menu.length === 0} className="gap-1"
-              onClick={() => {
+              onClick={async () => {
                 if (!duplDate) return
-                if (!confirm(`Dupliquer ce menu sur ${duplDate} ?`)) return
+                if (!(await askConfirm({ message: `Dupliquer ce menu sur ${duplDate} ?`, confirmLabel: 'Dupliquer', danger: false }))) return
                 startTransition(() => dupliquerMenu({ jour_source: today, jour_cible: duplDate }).then(() => { setDuplDate(''); router.refresh() }))
               }}>
               <Copy className="h-4 w-4" /> Dupliquer
@@ -152,7 +153,7 @@ function MenuPanel({ menu, today }: { menu: MenuItem[]; today: string }) {
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                         <button onClick={() => setShowForm(it)} className="p-1 hover:bg-zinc-100 rounded"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => { if (confirm('Supprimer ?')) startTransition(() => supprimerMenuItem(it.id).then(() => router.refresh())) }}
+                        <button onClick={async () => { if (await askConfirm({ message: 'Supprimer cet item du menu ?', confirmLabel: 'Supprimer', danger: true })) startTransition(() => supprimerMenuItem(it.id).then(() => router.refresh())) }}
                           className="p-1 hover:bg-red-50 rounded text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     </li>
@@ -256,7 +257,7 @@ function PromosPanel({ promos }: { promos: Promo[] }) {
                 <h3 className="font-semibold text-sm">{p.titre}</h3>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                   <button onClick={() => setShowForm(p)} className="p-1 hover:bg-zinc-100 rounded"><Pencil className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => { if (confirm('Supprimer ?')) startTransition(() => supprimerPromo(p.id).then(() => router.refresh())) }}
+                  <button onClick={async () => { if (await askConfirm({ message: 'Supprimer cette promo ?', confirmLabel: 'Supprimer', danger: true })) startTransition(() => supprimerPromo(p.id).then(() => router.refresh())) }}
                     className="p-1 hover:bg-red-50 rounded text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>

@@ -12,7 +12,7 @@ import { Search, Loader2, ArrowRight, Command } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { rechercheGlobale, type SearchGroup, type SearchResult } from '@/lib/search-actions'
 
-const HIDE_ON = ['/login', '/wifi-signup', '/menu-allergenes', '/affichage', '/print', '/table']
+const HIDE_ON = ['/login', '/wifi-signup', '/menu-allergenes', '/affichage', '/print', '/table', '/legal', '/client']
 function shouldHide(pathname: string) {
   return HIDE_ON.some(p => pathname === p || pathname.startsWith(p + '/'))
 }
@@ -58,8 +58,14 @@ export default function GlobalSearch() {
         }
       }
     }
+    // Ouverture depuis un bouton (loupe mobile) via événement custom.
+    const onOpen = () => setOpen(true)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('open-global-search', onOpen)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('open-global-search', onOpen)
+    }
   }, [hidden])
 
   // Reset quand on ouvre

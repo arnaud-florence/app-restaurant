@@ -57,6 +57,14 @@
     @apply bg-background text-foreground;
   }
 
+  /* Garde-fou universel anti-débordement horizontal sur mobile : si un élément
+     dépasse la largeur de l'écran (KPI strip, tableau, texte long, drawer), la
+     page ne scrolle PLUS latéralement. `clip` (≠ `hidden`) n'introduit pas de
+     conteneur de défilement → ne casse pas les `position: sticky`. */
+  html, body {
+    overflow-x: clip;
+  }
+
   /* Améliore la zone tactile des contrôles natifs sur mobile (48px conseil WCAG/Apple). */
   button, [role='button'], a.btn, input[type='button'], input[type='submit'], input[type='reset'] {
     touch-action: manipulation;
@@ -80,14 +88,39 @@
     @apply min-w-full;
   }
 
-  /* Padding bas pour laisser place à la TopActionBar en mode mobile
-     (barre flottante h-14 + py-2.5 + border-2 + bottom-3 = ~96px + safe-area).
-     Sur desktop la barre passe en haut (static), donc pas de padding. */
+  /* Tableaux admin portant la classe .responsive-table : sur mobile (<768px) le
+     tableau lui-même devient un conteneur à défilement horizontal pour ne JAMAIS
+     déborder la page (corrige le cas où le parent a overflow-hidden). Sur
+     tablette/desktop il reste un tableau normal pleine largeur.
+     (Avant : classe sans définition CSS = no-op trompeur.) */
+  @media (max-width: 767px) {
+    .responsive-table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+  }
+
+  /* Padding bas pour laisser place à la MobileTabBar (5 onglets, ~58px collée en bas)
+     en mode mobile. Sur desktop la barre passe en haut (static), donc pas de padding. */
+  /* Marge basse confortable : la barre fait ~73px (jusqu'à ~106px avec le
+     home indicator iOS). On réserve 8rem pour que le dernier contenu (ex:
+     dernières catégories de formation) soit bien DÉGAGÉ de la barre, et non
+     collé dessus. 8rem couvre aussi le cas « aperçu » (bandeau ambre ~2.75rem)
+     même si la détection d'aperçu échouait. */
   .pb-mobile-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 6.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8rem);
+  }
+  /* Variante « aperçu employé » : le bandeau ambre « Aperçu de … » s'ajoute
+     AU-DESSUS de la barre du bas. Marge encore plus large par sécurité. */
+  .pb-mobile-nav-apercu {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 10.5rem);
   }
   @media (min-width: 768px) {
-    .pb-mobile-nav { padding-bottom: 0; }
+    .pb-mobile-nav,
+    .pb-mobile-nav-apercu { padding-bottom: 0; }
   }
 
   /* Polices typographiques premium */

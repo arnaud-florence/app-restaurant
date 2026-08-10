@@ -47,40 +47,40 @@ export default async function PilotagePage() {
 
   const initialDone = (tachesCompleteesRes.data ?? []).map(r => (r as { tache_id: string }).tache_id)
 
-  // Sections de l'onglet "Aujourd'hui" — pré-rendues côté serveur
-  const aujourdhuiSections = (
-    <div className="space-y-4">
-      <AgentsAuTravail />
-      <SectionAlertes />
-      <SectionKPIs />
-      <SectionSuggestions />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SectionParAgent
-          agentId="stock"
-          titre="Stock & approvisionnement"
-          emoji="📦"
-          emptyMsg="Stock en ordre — aucune alerte"
-          emptyHint="Le Gestionnaire de Stock tourne toutes les 2 heures."
-          drilldownHref="/admin/stock"
-        />
-        <SectionParAgent
-          agentId="rh"
-          titre="Planning & RH"
-          emoji="👥"
-          emptyMsg="Configurez votre planning pour activer cet espace"
-          emptyHint="Le Manager RH tourne chaque soir à 22h."
-          drilldownHref="/admin/rh"
-        />
-        <SectionParAgent
-          agentId="haccp"
-          titre="HACCP & conformité"
-          emoji="🌡️"
-          emptyMsg="Conformité parfaite aujourd'hui"
-          emptyHint="Le Responsable HACCP tourne toutes les heures."
-          drilldownHref="/admin/hygiene"
-        />
-      </div>
+  // Sections « Aujourd'hui » éclatées par ONGLET (au lieu d'un long scroll
+  // fourre-tout). Chaque groupe est un sujet homogène ; on change d'onglet,
+  // le contenu change — façon Facebook/Instagram.
+  const essentielSections = (<><SectionAlertes /><SectionKPIs /></>)
+  const agentsSections = (<><AgentsAuTravail /><SectionSuggestions /></>)
+  const operationsSections = (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SectionParAgent
+        agentId="stock"
+        titre="Stock & approvisionnement"
+        emoji="📦"
+        emptyMsg="Stock en ordre — aucune alerte"
+        emptyHint="Le Gestionnaire de Stock tourne toutes les 2 heures."
+        drilldownHref="/admin/stock"
+      />
+      <SectionParAgent
+        agentId="haccp"
+        titre="HACCP & conformité"
+        emoji="🌡️"
+        emptyMsg="Conformité parfaite aujourd'hui"
+        emptyHint="Le Responsable HACCP tourne toutes les heures."
+        drilldownHref="/admin/hygiene"
+      />
     </div>
+  )
+  const equipeSections = (
+    <SectionParAgent
+      agentId="rh"
+      titre="Planning & RH"
+      emoji="👥"
+      emptyMsg="Configurez votre planning pour activer cet espace"
+      emptyHint="Le Manager RH tourne chaque soir à 22h."
+      drilldownHref="/admin/rh"
+    />
   )
 
   return (
@@ -93,7 +93,10 @@ export default async function PilotagePage() {
       periode={periode}
       widgetEmployeId={employeIdHint}
       widgetInitialDone={initialDone}
-      aujourdhuiSections={aujourdhuiSections}
+      essentielSections={essentielSections}
+      agentsSections={agentsSections}
+      operationsSections={operationsSections}
+      equipeSections={equipeSections}
       strategieExtras={<><BandeauSetupIncomplet /><TachesEquipeCard /><PerformanceCard /></>}
     />
   )

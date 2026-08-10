@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -71,7 +72,7 @@ export default function FinancesClient({
           title="Finances & TVA"
           description="P&L live, trésorerie 30/60/90j, charges fixes, simulateurs, notes de frais."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label={`Résultat ${moisLibelle}`} value={fmtPrix(cr.resultat_net)} accent={cr.resultat_net >= 0 ? 'vert' : 'rouge'} />
               <KPI label="TVA" value={fmtPrix(tva.tva_a_reverser)} accent={tva.tva_a_reverser > 0 ? 'orange' : 'zinc'} />
               <KPI label="Trésor." value={fmtPrix(tresorSolde)} />
@@ -108,15 +109,6 @@ export default function FinancesClient({
   )
 }
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
-  )
-}
-
 function KPI({ label, value, accent = 'zinc' }: { label: string; value: string; accent?: 'zinc' | 'vert' | 'orange' | 'rouge' }) {
   const cls = {
     zinc:   'bg-zinc-50 text-zinc-700 border-zinc-200',
@@ -146,7 +138,7 @@ function CRTab({ cr, moisLibelle, chargesFixesMensuelles, masseSalariale }: {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <BigStat label="CA TTC" value={fmtPrix(cr.ca_ttc)} accent="zinc" subtitle={moisLibelle} />
         <BigStat label="Food cost" value={fmtPrix(cr.food_cost)} accent={cr.food_cost_pct > 32 ? 'rouge' : cr.food_cost_pct > 28 ? 'orange' : 'vert'} subtitle={fmtPct(cr.food_cost_pct) + ' du CA HT'} />
-        <BigStat label="Masse salariale" value={fmtPrix(cr.masse_salariale)} accent={cr.masse_salariale_pct > 35 ? 'rouge' : cr.masse_salariale_pct > 30 ? 'orange' : 'vert'} subtitle={fmtPct(cr.masse_salariale_pct) + ' du CA TTC'} />
+        <BigStat label="Masse salariale" value={fmtPrix(cr.masse_salariale)} accent={cr.masse_salariale_pct > 35 ? 'rouge' : cr.masse_salariale_pct > 30 ? 'orange' : 'vert'} subtitle={fmtPct(cr.masse_salariale_pct) + ' du CA HT'} />
         <BigStat label="Charges fixes" value={fmtPrix(cr.charges_fixes_mensuelles)} subtitle={fmtPct(cr.charges_fixes_pct) + ' du CA HT'} />
         <BigStat label="Résultat net" value={fmtPrix(cr.resultat_net)} accent={cr.resultat_net < 0 ? 'rouge' : cr.marge_nette_pct < 5 ? 'orange' : 'vert'} subtitle={`Marge ${fmtPct(cr.marge_nette_pct)}`} />
       </div>
@@ -155,7 +147,7 @@ function CRTab({ cr, moisLibelle, chargesFixesMensuelles, masseSalariale }: {
         <header className="px-4 py-2 border-b border-zinc-200">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📋 Compte de résultat détaillé — {moisLibelle}</h2>
         </header>
-        <table className="w-full text-sm min-w-[480px]">
+        <table className="w-full text-sm">
           <tbody className="divide-y divide-zinc-100">
             <tr className="bg-emerald-50">
               <td className="px-4 py-2 font-bold">+ Chiffre d&apos;affaires HT</td>
@@ -166,8 +158,13 @@ function CRTab({ cr, moisLibelle, chargesFixesMensuelles, masseSalariale }: {
               <td className="px-4 py-2 font-bold">− Charges totales</td>
               <td className="px-4 py-2 text-right tabular-nums font-bold text-red-700">{fmtPrix(cr.total_charges)}</td>
             </tr>
-            <tr><td className="px-4 py-2 pl-8 text-zinc-600">Food cost (entrées stock)</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.food_cost)}</td></tr>
-            <tr><td className="px-4 py-2 pl-8 text-zinc-600">Masse salariale (shifts planning)</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.masse_salariale)}</td></tr>
+            <tr><td className="px-4 py-2 pl-8 text-zinc-600">Food cost (réceptions fournisseurs)</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.food_cost)}</td></tr>
+            <tr><td className="px-4 py-2 pl-8 text-zinc-600">Masse salariale (shifts planifiés)</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.masse_salariale)}</td></tr>
+            {cr.ca_ttc > 0 && (cr.food_cost === 0 || cr.masse_salariale === 0) && (
+              <tr><td colSpan={2} className="px-4 py-1.5 pl-8 text-[11px] text-amber-700 bg-amber-50 leading-snug">
+                ⚠ Résultat net surévalué :{cr.food_cost === 0 ? ' food cost à 0 € (saisis tes réceptions fournisseurs)' : ''}{cr.food_cost === 0 && cr.masse_salariale === 0 ? ' ·' : ''}{cr.masse_salariale === 0 ? ' masse salariale à 0 € (planifie les shifts dans RH)' : ''}.
+              </td></tr>
+            )}
             <tr><td className="px-4 py-2 pl-8 text-zinc-600">Charges fixes mensualisées</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.charges_fixes_mensuelles)}</td></tr>
             <tr><td className="px-4 py-2 pl-8 text-zinc-600">Notes de frais remboursées</td><td className="px-4 py-2 text-right tabular-nums">{fmtPrix(cr.notes_de_frais_mois)}</td></tr>
             <tr className={cn('font-bold border-t-2 border-zinc-900', cr.resultat_net >= 0 ? 'bg-emerald-50' : 'bg-red-50')}>
@@ -234,7 +231,44 @@ function ChargesTab({ charges, tva, moisLibelle, onError, onOk }: {
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">💸 Charges fixes ({charges.length})</h2>
           <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle charge</button>
         </header>
-        <div className="overflow-x-auto">
+        {/* Mobile : cartes */}
+        {charges.length === 0 ? (
+          <p className="md:hidden text-center py-8 text-zinc-400 text-sm">Aucune charge fixe.</p>
+        ) : (
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {charges.map(c => {
+              const info = CATEGORIE_CHARGE_INFO[c.categorie]
+              const proche = c.prochaine_echeance && new Date(c.prochaine_echeance) <= new Date(Date.now() + 7 * 86400000)
+              return (
+                <li key={c.id} className={cn('py-3 px-3 flex items-start justify-between gap-3', proche && 'bg-amber-50')}>
+                  <div className="min-w-0">
+                    <p className="font-bold text-zinc-900 truncate">{c.libelle}</p>
+                    {c.fournisseur_nom && <p className="text-[11px] text-zinc-500 truncate">{c.fournisseur_nom}</p>}
+                    <span className={cn('inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded border', info.cls)}>{info.emoji} {info.label}</span>
+                    <p className="text-[11px] text-zinc-600 mt-1">
+                      {c.frequence}
+                      {' · '}
+                      <span className={cn('tabular-nums', proche && 'font-bold text-amber-700')}>
+                        {c.prochaine_echeance ? fmtDate(c.prochaine_echeance) : '—'}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                    <p className="font-bold tabular-nums text-zinc-900">{fmtPrix(c.montant_ttc)}</p>
+                    <p className="text-[11px] text-zinc-500 tabular-nums">{fmtPrix(c.montant_ht)} HT</p>
+                    <button onClick={async () => {
+                      if (!(await askConfirm(`Désactiver "${c.libelle}" ?`))) return
+                      try { await supprimerCharge(c.id); onOk('Désactivée'); router.refresh() } catch (e) { onError(e) }
+                    }} className="min-h-[44px] px-3 text-red-600 font-bold text-sm">Désactiver</button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {/* Desktop : table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
@@ -270,7 +304,7 @@ function ChargesTab({ charges, tva, moisLibelle, onError, onOk }: {
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button onClick={async () => {
-                        if (!confirm(`Désactiver "${c.libelle}" ?`)) return
+                        if (!(await askConfirm(`Désactiver "${c.libelle}" ?`))) return
                         try { await supprimerCharge(c.id); onOk('Désactivée'); router.refresh() } catch (e) { onError(e) }
                       }} className="text-zinc-400 hover:text-red-600">×</button>
                     </td>
@@ -444,7 +478,7 @@ function TresorTab({ solde, date, caJour, projection, cr, onError, onOk }: {
               className="w-full h-14 px-3 rounded-md border border-zinc-300 text-2xl font-bold tabular-nums text-right" />
           </Field>
           <p className="text-[11px] text-zinc-500">
-            Hypothèses : food cost {cr.food_cost_pct}% du CA HT, masse salariale {cr.masse_salariale_pct}% du CA TTC, charges fixes mensuelles {fmtPrix(cr.charges_fixes_mensuelles)} (basé sur le mois en cours)
+            Hypothèses : food cost {cr.food_cost_pct}% du CA HT, masse salariale {cr.masse_salariale_pct}% du CA HT, charges fixes mensuelles {fmtPrix(cr.charges_fixes_mensuelles)} (basé sur le mois en cours)
           </p>
           <div className="rounded bg-zinc-50 border border-zinc-200 p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span>Food cost estimé</span><span className="tabular-nums">{fmtPrix(sim.food_cost_estime)}</span></div>
@@ -528,7 +562,46 @@ function NDFTab({ notes, employes, onError, onOk }: { notes: NoteDeFrais[]; empl
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune note dans ce filtre.</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile : cartes */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {filtered.map(n => {
+              const sInfo = STATUT_NDF_LABEL[n.statut]
+              return (
+                <li key={n.id} className="py-3 px-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-zinc-900 truncate">{n.libelle}</p>
+                    <p className="text-[11px] text-zinc-500">{n.employe_nom} · <span className="tabular-nums">{fmtDate(n.date_depense)}</span></p>
+                    {n.motif && <p className="text-[11px] text-zinc-500 truncate">{n.motif}</p>}
+                    {n.justificatif_url && <a href={n.justificatif_url} target="_blank" rel="noopener" className="text-[11px] text-blue-600 hover:underline">📎 Justificatif</a>}
+                    <div className="mt-1">
+                      <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', sInfo.cls)}>{sInfo.label}</span>
+                      {n.remboursee_at && <p className="text-[10px] text-zinc-500 mt-0.5">par {n.remboursee_par_nom} le {format(parseISO(n.remboursee_at), 'd MMM', { locale: fr })}</p>}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                    <p className="font-bold tabular-nums text-zinc-900">{fmtPrix(n.montant)}</p>
+                    {n.statut === 'en_attente' && (
+                      <div className="flex flex-col gap-1 w-full">
+                        <button onClick={async () => {
+                          try { await rembourserNDF({ ndf_id: n.id, remboursee_par: null, notes_admin: null }); onOk('Remboursée'); router.refresh() }
+                          catch (e) { onError(e) }
+                        }} className="min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm">✓ Rembourser</button>
+                        <button onClick={async () => {
+                          try { await refuserNDF({ ndf_id: n.id, remboursee_par: null, notes_admin: null }); onOk('Refusée'); router.refresh() }
+                          catch (e) { onError(e) }
+                        }} className="min-h-[44px] px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold text-sm">✕ Refuser</button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Desktop : table */}
+          <div className="hidden md:block overflow-x-auto -mx-3 sm:mx-0">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Date</th>
@@ -575,6 +648,8 @@ function NDFTab({ notes, employes, onError, onOk }: { notes: NoteDeFrais[]; empl
               })}
             </tbody>
           </table>
+          </div>
+          </>
         )}
       </section>
 

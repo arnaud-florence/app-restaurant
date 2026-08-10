@@ -45,8 +45,10 @@ export async function declencherAgent(agentId: AgentId): Promise<{ ok: boolean; 
   if (!AGENTS[agentId]) return { ok: false, error: 'Agent inconnu' }
   if (agentId === 'scanner') return { ok: false, error: 'Scanner est event-driven : utilise le bouton Scanner dans /admin/fournisseurs' }
 
-  // Construit l'URL de la route cron de l'agent en restant local (same-origin)
-  const url = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/cron/agents/${agentId}`
+  // Construit l'URL de la route cron de l'agent en restant local (same-origin).
+  // Les agents temps réel vivent sous /realtime/<poste> (cuisine_rt → realtime/cuisine).
+  const route = agentId.endsWith('_rt') ? `realtime/${agentId.replace('_rt', '')}` : agentId
+  const url = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/cron/agents/${route}`
   const cronSecret = process.env.CRON_SECRET
 
   try {

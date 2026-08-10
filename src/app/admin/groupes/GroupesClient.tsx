@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { format, addMonths, subMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -21,6 +20,7 @@ import {
   enregistrerPaiement, supprimerPaiement,
 } from './actions'
 import type { DataGroupes } from './page'
+import { askConfirm } from '@/lib/confirm'
 
 type Tab = 'liste' | 'planning' | 'facturation'
 
@@ -57,7 +57,7 @@ export default function GroupesClient({ data }: { data: DataGroupes }) {
           title="Groupes"
           description="Tour-opérateurs, menus négociés, arrhes/solde, planning événementiel."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="À venir" value={String(aVenir)} />
               <KPI label="CA prévu" value={fmtPrix(totalRevenuPrevu)} />
               <KPI label="À facturer" value={String(aFacturer.length)} accent={aFacturer.length > 0 ? 'orange' : 'zinc'} />
@@ -83,15 +83,6 @@ export default function GroupesClient({ data }: { data: DataGroupes }) {
       {erreur && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30 cursor-pointer" onClick={() => setErreur('')}>⚠️ {erreur}</div>}
       {success && <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl z-30">✓ {success}</div>}
     </div>
-  )
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-      active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-    )}>{children}</button>
   )
 }
 
@@ -176,7 +167,7 @@ function ListeTab({ data, onError, onOk }: { data: DataGroupes; onError: (e: unk
                     <a href={`/admin/groupes/${g.id}/facture/print`} target="_blank" rel="noopener" className="text-xs h-9 px-3 inline-flex items-center rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold">🖨 Facture</a>
                     {g.statut === 'demande' && <button onClick={async () => { try { await changerStatutGroupe(g.id, 'confirme'); onOk('Confirmé') } catch (e) { onError(e) } }} className="text-xs h-9 px-3 rounded bg-blue-500 hover:bg-blue-400 text-white font-bold">✓ Confirmer</button>}
                     {g.statut === 'confirme' && <button onClick={async () => { try { await changerStatutGroupe(g.id, 'realise'); onOk('Réalisé') } catch (e) { onError(e) } }} className="text-xs h-9 px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Marquer réalisé</button>}
-                    {g.statut !== 'annule' && <button onClick={async () => { if (!confirm(`Annuler "${g.nom}" ?`)) return; try { await changerStatutGroupe(g.id, 'annule'); onOk('Annulé') } catch (e) { onError(e) } }} className="text-xs h-9 px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
+                    {g.statut !== 'annule' && <button onClick={async () => { if (!(await askConfirm(`Annuler "${g.nom}" ?`))) return; try { await changerStatutGroupe(g.id, 'annule'); onOk('Annulé') } catch (e) { onError(e) } }} className="text-xs h-9 px-3 rounded bg-red-500 hover:bg-red-400 text-white font-bold">✕ Annuler</button>}
                   </div>
                 </div>
               )}
@@ -263,7 +254,7 @@ function DetailGroupe({ groupe, menus, paiements, recettes, onError, onOk }: {
                   <span className={cn('font-bold tabular-nums', p.type === 'remboursement' ? 'text-red-700' : 'text-emerald-700')}>
                     {p.type === 'remboursement' ? '−' : '+'}{fmtPrix(p.montant)}
                   </span>
-                  <button onClick={async () => { if (!confirm('Supprimer ce paiement ?')) return; try { await supprimerPaiement(p.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) } }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
+                  <button onClick={async () => { if (!(await askConfirm({ title: 'Supprimer ce paiement ?', message: 'Cette action est irréversible.', confirmLabel: 'Supprimer', danger: true }))) return; try { await supprimerPaiement(p.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) } }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
                 </li>
               )
             })}
@@ -287,6 +278,13 @@ function DetailGroupe({ groupe, menus, paiements, recettes, onError, onOk }: {
 function PlanningTab({ groupes }: { groupes: Groupe[] }) {
   const [refDate, setRefDate] = useState(new Date())
   const jours = useMemo(() => joursCalendrier(refDate, groupes), [refDate, groupes])
+  const moisKey = format(refDate, 'yyyy-MM')
+  const groupesMois = useMemo(
+    () => groupes
+      .filter(g => (g.date_visite ?? '').slice(0, 7) === moisKey)
+      .sort((a, b) => (a.date_visite ?? '').localeCompare(b.date_visite ?? '')),
+    [groupes, moisKey],
+  )
 
   return (
     <div className="space-y-3">
@@ -296,7 +294,25 @@ function PlanningTab({ groupes }: { groupes: Groupe[] }) {
         <button onClick={() => setRefDate(addMonths(refDate, 1))} className="h-10 px-4 rounded-md border border-zinc-300 hover:bg-zinc-50">{format(addMonths(refDate, 1), 'MMM', { locale: fr })} →</button>
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      {/* Mobile : agenda liste du mois (le calendrier grille est illisible au doigt) */}
+      <div className="md:hidden space-y-2">
+        {groupesMois.length === 0 ? (
+          <p className="text-center py-8 text-sm text-zinc-400">Aucun groupe ce mois-ci.</p>
+        ) : groupesMois.map(g => {
+          const tInfo = TYPE_GROUPE_INFO[g.type]
+          return (
+            <div key={g.id} className="rounded-lg border border-zinc-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-sm truncate">{tInfo.emoji} {g.nom}</span>
+                <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0', tInfo.cls)}>{tInfo.label}</span>
+              </div>
+              <p className="text-xs text-zinc-600 mt-1">📅 {fmtDate(g.date_visite)} · {g.nb_personnes} pers</p>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <div className="grid grid-cols-7 bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 font-bold">
           {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => <div key={d} className="px-2 py-1.5 text-center">{d}</div>)}
         </div>
@@ -603,13 +619,13 @@ function FiltreBtn({ active, onClick, children }: { active: boolean; onClick: ()
 
 function Modal({ title, onClose, disabled, children }: { title: string; onClose: () => void; disabled: boolean; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !disabled && onClose()}>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !disabled && onClose()}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="h-10 w-10 rounded-full hover:bg-zinc-100">×</button>
         </div>
-        <div className="overflow-y-auto p-5 space-y-3">{children}</div>
+        <div className="overflow-y-auto p-5 space-y-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>
   )

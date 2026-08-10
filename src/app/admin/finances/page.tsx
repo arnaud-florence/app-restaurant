@@ -32,6 +32,10 @@ export default async function FinancesPage() {
     supabase.from('parametres').select('cle, valeur').in('cle', ['tresorerie_solde','tresorerie_solde_date']),
     supabase.from('paiements_caisse')
       .select('montant, encaisse_at')
+      // Fidélité hors CA : une remise points n'est pas une rentrée d'argent réelle.
+      // Cohérent avec pilotage.ts (.neq('methode','fidelite')) — sinon le CA finances
+      // était surévalué du montant des remises fidélité.
+      .neq('methode', 'fidelite')
       .gte('encaisse_at', new Date(Date.now() - 30 * 86400000).toISOString())
       .order('encaisse_at'),
     chargerCRMois(moisIso),

@@ -154,8 +154,44 @@ export default async function CardTvaMensuel({ moisIso }: { moisIso: string }) {
             />
           </div>
 
-          {/* Détail par taux */}
-          <div className="overflow-x-auto -mx-2">
+          {/* Détail par taux — mobile : cartes */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {actuel.par_taux.map(l => (
+              <li key={l.taux} className="py-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className={cn(
+                    'inline-block px-2 py-0.5 rounded-full text-xs font-bold',
+                    l.taux === '20'  ? 'bg-violet-100 text-violet-900'  :
+                    l.taux === '10'  ? 'bg-emerald-100 text-emerald-900' :
+                    l.taux === '5.5' ? 'bg-amber-100 text-amber-900'    :
+                                        'bg-zinc-100 text-zinc-700',
+                  )}>
+                    {l.taux} %
+                  </span>
+                  <span className="text-[11px] text-zinc-500 ml-2">
+                    {l.taux === '20'  ? '(alcool)'    :
+                     l.taux === '10'  ? '(sur place)' :
+                     l.taux === '5.5' ? '(emporter)'  : ''}
+                  </span>
+                  <p className="text-[11px] text-zinc-500 mt-1">{l.nb_articles} article{l.nb_articles > 1 ? 's' : ''} · Base HT {fmtEur(l.ht)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-bold tabular-nums text-emerald-700">{fmtEur(l.tva)}</p>
+                  <p className="text-[11px] text-zinc-500 tabular-nums">TTC {fmtEur(l.ttc)}</p>
+                </div>
+              </li>
+            ))}
+            <li className="py-3 flex items-center justify-between gap-3 bg-zinc-50 -mx-2 px-2 font-bold">
+              <span>TOTAL</span>
+              <div className="text-right">
+                <p className="tabular-nums text-emerald-700">{fmtEur(actuel.total_tva)}</p>
+                <p className="text-[11px] text-zinc-500 tabular-nums">TTC {fmtEur(actuel.total_ttc)}</p>
+              </div>
+            </li>
+          </ul>
+
+          {/* Détail par taux — desktop : table */}
+          <div className="hidden md:block overflow-x-auto -mx-2">
             <table className="w-full text-sm">
               <thead className="bg-zinc-50">
                 <tr>

@@ -14,6 +14,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { requireManager } from '@/lib/auth'
 import {
   hashPin, generateSalt, isValidPinFormat,
   PIN_MAX_ESSAIS, PIN_LOCK_SECONDS, PIN_ESSAIS_WINDOW_MS,
@@ -97,6 +98,9 @@ export async function verifierPinManager(pin: string): Promise<PinResult> {
 
 // ─── Définir un PIN (admin seulement, à protéger côté UI) ──────────────
 export async function definirPinManager(input: { employe_id: string; pin: string }) {
+  // E1 : seul un manager AUTHENTIFIÉ peut (re)définir un PIN — empêche un appel
+  // direct de l'action pour écraser le PIN d'un manager.
+  await requireManager()
   if (!isValidPinFormat(input.pin)) {
     throw new Error('PIN invalide : 4 à 6 chiffres requis')
   }

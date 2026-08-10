@@ -60,10 +60,15 @@ export async function marquerEtapeVue(input: unknown) {
     .select('id', { count: 'exact', head: true }).eq('guide_id', p.guide_id)
   const { count: totalQuestions } = await supabase.from('quiz_questions')
     .select('id', { count: 'exact', head: true }).eq('guide_id', p.guide_id)
+  // Un guide de PRATIQUE (simulation_config) n'est PAS validé en lisant ses étapes :
+  // la réussite vient uniquement de la simulation jouée à ≥ seuil (enregistrerSimulation).
+  const { data: guideRow } = await supabase.from('guides_formation')
+    .select('simulation_config').eq('id', p.guide_id).maybeSingle()
+  const aSimulation = !!guideRow?.simulation_config
 
   const toutesVues = (totalEtapes ?? 0) > 0 && nouvelles.length >= (totalEtapes ?? 0)
   const nouveauStatut = toutesVues
-    ? ((totalQuestions ?? 0) > 0 ? 'quiz_a_passer' : 'reussi')
+    ? ((totalQuestions ?? 0) > 0 || aSimulation ? 'quiz_a_passer' : 'reussi')
     : 'en_cours'
 
   const { error } = await supabase.from('progressions_formation').update({

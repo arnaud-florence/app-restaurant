@@ -13,6 +13,7 @@ import {
   setAllergenesComplementaires,
   creerProcedureUrgence, updateProcedureUrgence, supprimerProcedureUrgence,
 } from './actions'
+import { askConfirm } from '@/lib/confirm'
 import type { RecetteAllergenes } from './page'
 
 type Tab = 'catalogue' | 'procedures' | 'qr'
@@ -332,7 +333,7 @@ function ProceduresTab({
                         <button onClick={() => setEditing(p)}
                           className="text-xs h-8 px-3 rounded border border-current font-bold">Modifier</button>
                         <button onClick={async () => {
-                          if (!confirm(`Désactiver "${p.titre}" ?`)) return
+                          if (!(await askConfirm(`Désactiver "${p.titre}" ?`))) return
                           try { await supprimerProcedureUrgence(p.id); onOk('Désactivée'); router.refresh() }
                           catch (e) { onError(e) }
                         }}

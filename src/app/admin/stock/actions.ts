@@ -4,6 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { type Mouvement } from '@/lib/stock'
+import { logActivite } from '@/lib/operateur'
+
+async function nomIng(id: string): Promise<string> {
+  const sb = await createClient()
+  const { data } = await sb.from('ingredients').select('nom').eq('id', id).maybeSingle()
+  return (data?.nom as string) ?? 'ingrédient'
+}
 
 // ─── Schémas ─────────────────────────────────────────────────────────
 const entreeSchema = z.object({
@@ -77,6 +84,7 @@ export async function entreeStock(input: unknown) {
     motif:            p.motif || 'Livraison fournisseur',
   })
   if (mErr) throw new Error(`insert mouvement: ${mErr.message}`)
+  await logActivite({ action: 'stock_entree', zone: 'Stock', cible: await nomIng(p.ingredient_id), details: { quantite: p.quantite } })
 
   // 2. Met à jour le stock_actuel
   await refreshStockActuel(p.ingredient_id, p.quantite)
@@ -119,6 +127,7 @@ export async function perteStock(input: unknown) {
     motif:            p.motif,
   })
   if (mErr) throw new Error(`insert perte: ${mErr.message}`)
+  await logActivite({ action: 'stock_perte', zone: 'Stock', cible: await nomIng(p.ingredient_id), details: { quantite: p.quantite, motif: p.motif } })
 
   await refreshStockActuel(p.ingredient_id, -p.quantite)
   revalidatePath('/admin/stock')
@@ -149,6 +158,7 @@ export async function sortieManuelle(input: unknown) {
     motif:            p.motif,
   })
   if (mErr) throw new Error(`insert sortie: ${mErr.message}`)
+  await logActivite({ action: 'stock_sortie', zone: 'Stock', cible: await nomIng(p.ingredient_id), details: { quantite: p.quantite, motif: p.motif } })
 
   await refreshStockActuel(p.ingredient_id, -p.quantite)
   revalidatePath('/admin/stock')
@@ -192,6 +202,7 @@ export async function ajusterInventaire(input: unknown) {
       : `Inventaire physique : ${ecart.toFixed(3)} en plus (théorique ${stockTheorique})`,
   })
   if (mErr) throw new Error(`insert inventaire: ${mErr.message}`)
+  await logActivite({ action: 'inventaire', zone: 'Stock', cible: await nomIng(p.ingredient_id), details: { stock_reel: p.stock_reel, ecart } })
 
   // Force le stock à la valeur réelle saisie
   const { error: uErr } = await supabase

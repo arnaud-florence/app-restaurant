@@ -13,9 +13,9 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { type CommandeService, fmtPrix, playDing, STATUT_ARTICLE_LABEL } from '@/lib/service'
 import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
-import { marquerStatutCommandeOnline, avancerCommandeComptoir } from '../actions'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
-import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import { marquerStatutCommandeOnline, avancerCommandeComptoir, annulerCommande } from '../actions'
+import { toast } from '@/lib/toast'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import TachesSequentielles from '@/components/TachesSequentielles'
 import ComptoirOrderModal from '../bar/ComptoirOrderModal'
 import EncaissementModal from '../serveur/EncaissementModal'
@@ -44,10 +44,28 @@ export default function EmporterClient({
 }) {
   const [showComptoir, setShowComptoir] = useState(false)
   const [encaisserCmd, setEncaisserCmd] = useState<CommandeService | null>(null)
+  const [annulationCible, setAnnulationCible] = useState<CommandeService | null>(null)
+  const [motifAnnulation, setMotifAnnulation] = useState('Erreur de saisie')
   const router = useRouter()
   const [commandes, setCommandes] = useState(initial)
   const [now, setNow] = useState(() => Date.now())
   const [, startTransition] = useTransition()
+
+  function demanderAnnulation(c: CommandeService) { setMotifAnnulation('Erreur de saisie'); setAnnulationCible(c) }
+  function confirmerAnnulation() {
+    if (!annulationCible) return
+    const motif = motifAnnulation.trim()
+    if (!motif) { toast.error('Motif obligatoire pour annuler'); return }
+    const cmd = annulationCible
+    startTransition(async () => {
+      try {
+        await annulerCommande(cmd.id, motif)
+        toast.success('Commande annulée')
+        setAnnulationCible(null)
+        router.refresh()
+      } catch (e) { toast.error(e instanceof Error ? e.message : 'Erreur') }
+    })
+  }
   const previousIdsRef = useRef(new Set(initial.filter(c => c.source === 'ONLINE').map(c => c.id)))
   const audioReadyRef = useRef(false)
   const [autoPrint, setAutoPrint] = useState(false)
@@ -258,11 +276,12 @@ export default function EmporterClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav bg-zinc-950">
-      <OpsBottomNav profil={navProfil} />
-
       {/* ═══ HEADER POS UNIFIÉ ═══ */}
-      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-[var(--op-bar-h,0px)] z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center justify-center -mb-1">
+            <h1 className="text-zinc-100 text-xs font-black uppercase tracking-[0.2em]">🛒 Snack · Comptoir</h1>
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-lg shadow-md shrink-0">🥪</span>
             <span className={cn(
@@ -271,7 +290,7 @@ export default function EmporterClient({
             )}>🔔 {nbEnAttente}</span>
             <span className={cn('inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl ring-1 text-xs font-black tabular-nums shrink-0',
               nbPretRetrait > 0 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30' : 'bg-zinc-800 text-zinc-300 ring-zinc-700')}>📦 {nbPretRetrait}</span>
-            <Link href="/caisse" className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-lg shadow-lg shrink-0">💰</Link>
+            <Link href="/service" aria-label="Centre opérationnel" className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-lg shadow-lg shrink-0">⊞</Link>
           </div>
           <div className="flex items-center gap-1.5">
             {!audioReadyRef.current && (
@@ -287,7 +306,7 @@ export default function EmporterClient({
         <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
           <div className="inline-flex items-center gap-2 shrink-0">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white text-xl shadow-md">🥪</span>
-            <div className="hidden lg:block">
+            <div className="block min-w-0 flex-1">
               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 leading-none">Service · Snack</p>
               <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Emporter</h1>
             </div>
@@ -311,8 +330,8 @@ export default function EmporterClient({
             className={cn('inline-flex items-center gap-2 px-2.5 h-10 rounded-xl text-xs font-black transition-colors shrink-0',
               autoPrint ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700')}
           >🖨 Auto : {autoPrint ? 'ON' : 'OFF'}</button>
-          <Link href="/caisse" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
-            <span className="text-lg">💰</span><span>Caisse</span>
+          <Link href="/service" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
+            <span className="text-lg">⊞</span><span>Service</span>
           </Link>
         </div>
       </header>
@@ -404,6 +423,7 @@ export default function EmporterClient({
                   commande={c}
                   now={now}
                   onAvancer={avancer}
+                  onAnnuler={() => demanderAnnulation(c)}
                 />
               ) : (
                 <CommandeComptoirCard
@@ -467,6 +487,46 @@ export default function EmporterClient({
           }}
         />
       )}
+
+      {/* Modale d'annulation (in-app, kiosque-safe) — avertit si la commande est payée */}
+      {annulationCible && (() => {
+        const estPayee = annulationCible.source === 'ONLINE' || annulationCible.source === 'BORNE' || !!annulationCible.mode_paiement
+        return (
+          <div className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setAnnulationCible(null)}>
+            <div className="w-full sm:max-w-sm rounded-3xl bg-zinc-900 ring-1 ring-red-900/60 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-red-400">🗑 Annuler la commande</p>
+                <p className="text-lg font-bold text-white mt-1">
+                  {annulationCible.ardoise_nom?.trim() ? `🧾 ${annulationCible.ardoise_nom}` : `#${(annulationCible.numero ?? annulationCible.id).slice(-4)}`}
+                  <span className="text-sm font-normal text-zinc-400"> · {annulationCible.source}</span>
+                </p>
+                <p className="text-sm text-zinc-400 mt-1">
+                  {annulationCible.articles.length} article(s) · {fmtPrix(Number(annulationCible.montant_total_ttc ?? 0))}
+                </p>
+              </div>
+              {estPayee && (
+                <p className="text-xs text-amber-300 bg-amber-950/40 ring-1 ring-amber-900/60 rounded-xl px-3 py-2">
+                  ⚠ Cette commande est <b>déjà payée</b>{annulationCible.mode_paiement ? ` (${annulationCible.mode_paiement})` : ' en ligne'}. L&apos;annulation ne rembourse pas le client — <b>fais le remboursement séparément</b>.
+                </p>
+              )}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Motif (obligatoire — tracé au journal)</label>
+                <input
+                  type="text" value={motifAnnulation} onChange={e => setMotifAnnulation(e.target.value)} autoFocus
+                  placeholder="Ex : client absent, rupture, erreur…"
+                  className="mt-1 w-full min-h-[48px] px-3 rounded-xl bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600 focus:border-red-500 outline-none text-base"
+                />
+              </div>
+              <button
+                onClick={confirmerAnnulation} disabled={!motifAnnulation.trim()}
+                className="w-full min-h-[56px] rounded-2xl bg-red-600 text-white font-black text-base active:scale-95 transition disabled:opacity-40">
+                🗑 Confirmer l&apos;annulation
+              </button>
+              <button onClick={() => setAnnulationCible(null)} className="w-full min-h-[44px] rounded-2xl text-zinc-400 text-sm font-bold active:scale-95 transition">Retour</button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -480,7 +540,7 @@ function CommandeComptoirCard({
   onEncaisser: () => void
 }) {
   const heureCreation = new Date(commande.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  const total = commande.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+  const total = commande.montant_total_ttc ?? commande.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ttc, 0)
 
   // ─── Affichage créneaux : un par zone si multi (snack 14:30 · pizza 14:45), sinon créneau unique
   const ICONE_TAG: Record<string, string> = { SNACKING: '🥪', PIZZA: '🍕', BAR: '🍷', CUISINE: '👨‍🍳' }
@@ -609,7 +669,7 @@ function CommandeComptoirCard({
                         <span className="text-3xl font-black tabular-nums text-emerald-400 shrink-0 leading-none">×{a.quantite}</span>
                         <span className="text-lg font-bold leading-tight">{a.recette_nom}</span>
                       </div>
-                      <span className="text-[11px] text-zinc-500 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)}</span>
+                      <span className="text-[11px] text-zinc-500 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ttc)}</span>
                     </li>
                   ))}
                 </ul>
@@ -684,11 +744,12 @@ function CommandeComptoirCard({
 
 // ─── Card commande ONLINE ────────────────────────────────────
 function CommandeOnlineCard({
-  commande, now, onAvancer,
+  commande, now, onAvancer, onAnnuler,
 }: {
   commande: CommandeService
   now: number
   onAvancer: (commande_id: string, nouveau: 'en_preparation' | 'pret_pour_retrait' | 'retire_par_client') => void
+  onAnnuler: () => void
 }) {
   const creneauTime = commande.creneau_retrait ? new Date(commande.creneau_retrait).getTime() : null
   const minutesRestantes = creneauTime ? Math.round((creneauTime - now) / 60000) : null
@@ -835,6 +896,9 @@ function CommandeOnlineCard({
             {nextLabel[nextStatut]}
           </button>
         )}
+        <button onClick={onAnnuler} className="mt-1 w-full min-h-[36px] rounded-md bg-red-950/50 text-red-300 ring-1 ring-red-900 text-xs font-bold active:scale-95 transition">
+          🗑 Annuler
+        </button>
       </div>
     </div>
   )
@@ -856,17 +920,3 @@ const ComptoirSnackModalMemo = memo(function ComptoirSnackModalMemo(props: {
   // /emporter avant de partir en cuisine (même flow que la borne).
   return <ComptoirOrderModal {...props} withCreneaux={SNACK_CRENEAUX} tagInitial="SNACKING" paiementAuComptoir />
 })
-
-function KPI({ label, value, accent = 'default', pulse }: { label: string; value: string | number; accent?: 'default' | 'red' | 'orange'; pulse?: boolean }) {
-  const STYLES = {
-    default: 'bg-zinc-800/80 border-zinc-700 text-zinc-100',
-    red:     'bg-gradient-to-br from-rose-500/30 to-red-700/10 border-rose-500/40 text-rose-100 shadow-md shadow-rose-900/30',
-    orange:  'bg-gradient-to-br from-amber-500/30 to-amber-700/10 border-amber-500/40 text-amber-100 shadow-md shadow-amber-900/30',
-  }
-  return (
-    <div className={cn('rounded-xl border px-3 py-1.5 text-center min-w-20 backdrop-blur', STYLES[accent], pulse && 'animate-pulse')}>
-      <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
-      <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
-    </div>
-  )
-}

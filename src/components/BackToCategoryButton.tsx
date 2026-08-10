@@ -1,25 +1,20 @@
 'use client'
 
-// Bouton de retour vers la page catégorie correspondante au pathname courant.
-// Auto-détection via findCategoryByHref + usePathname.
+// Fil d'ariane cliquable « Accueil › Catégorie › Module » — remplace l'ancien
+// simple bouton « Retour à … ». Chaque niveau est navigable (façon grandes apps :
+// on remonte l'arbre à n'importe quel niveau d'un seul tap). Reste collant en
+// haut quand on descend dans les détails.
 //
-// Ne s'affiche PAS sur :
-//   - /admin (home tableau de bord)
-//   - /admin/cat (index catégories)
-//   - /admin/cat/[slug] (page catégorie elle-même)
-//   - /login, /
-//   - tout pathname dont aucune catégorie ne contient le href
-//
-// S'affiche sur toutes les autres pages (sous-modules) avec le label
-// et la couleur de la catégorie correspondante.
+// Ne s'affiche PAS sur : /admin (home), /admin/cat (index), /admin/cat/[slug]
+// (page catégorie elle-même), /login, /, /print/*, ou tout pathname sans catégorie.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  ChevronLeft, BarChart3, Utensils, ChefHat, Users, GraduationCap, Wallet,
+  ChevronRight, Home, Search, BarChart3, Utensils, ChefHat, Users, GraduationCap, Wallet,
   ShieldCheck, Settings, type LucideIcon,
 } from 'lucide-react'
-import { findCategoryByHref, type Category } from '@/lib/navigation'
+import { findCategoryByHref, CATEGORIES, type Category } from '@/lib/navigation'
 
 const ICON_BY_CAT: Record<string, LucideIcon> = {
   pilotage:        BarChart3,
@@ -32,24 +27,36 @@ const ICON_BY_CAT: Record<string, LucideIcon> = {
   systeme:         Settings,
 }
 
-const TONE_BG: Record<Category['tone'], string> = {
-  emerald: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200 hover:border-emerald-400',
-  amber:   'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200 hover:border-amber-400',
-  violet:  'bg-violet-50 hover:bg-violet-100 text-violet-900 border-violet-200 hover:border-violet-400',
-  blue:    'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200 hover:border-blue-400',
-  red:     'bg-red-50 hover:bg-red-100 text-red-900 border-red-200 hover:border-red-400',
-  rose:    'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-200 hover:border-rose-400',
-  zinc:    'bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 hover:border-zinc-500',
+const TONE_TEXT: Record<Category['tone'], string> = {
+  emerald: 'text-emerald-700',
+  amber:   'text-amber-700',
+  violet:  'text-violet-700',
+  blue:    'text-blue-700',
+  red:     'text-red-700',
+  rose:    'text-rose-700',
+  zinc:    'text-zinc-700',
+}
+const TONE_TEXT_DARK: Record<Category['tone'], string> = {
+  emerald: 'text-emerald-300',
+  amber:   'text-amber-300',
+  violet:  'text-violet-300',
+  blue:    'text-blue-300',
+  red:     'text-red-300',
+  rose:    'text-rose-300',
+  zinc:    'text-zinc-300',
 }
 
-const TONE_BG_DARK: Record<Category['tone'], string> = {
-  emerald: 'bg-emerald-900/20 hover:bg-emerald-900/40 text-emerald-300 border-emerald-700/50 hover:border-emerald-500',
-  amber:   'bg-amber-900/20 hover:bg-amber-900/40 text-amber-300 border-amber-700/50 hover:border-amber-500',
-  violet:  'bg-violet-900/20 hover:bg-violet-900/40 text-violet-300 border-violet-700/50 hover:border-violet-500',
-  blue:    'bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border-blue-700/50 hover:border-blue-500',
-  red:     'bg-red-900/20 hover:bg-red-900/40 text-red-300 border-red-700/50 hover:border-red-500',
-  rose:    'bg-rose-900/20 hover:bg-rose-900/40 text-rose-300 border-rose-700/50 hover:border-rose-500',
-  zinc:    'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700 hover:border-zinc-500',
+/** Retrouve le sous-module (label + emoji) correspondant au pathname courant. */
+function findModule(pathname: string): { label: string; emoji: string } | null {
+  let best: { label: string; emoji: string; len: number } | null = null
+  for (const c of CATEGORIES) {
+    for (const it of c.items) {
+      if (it.href === pathname || pathname.startsWith(it.href + '/')) {
+        if (!best || it.href.length > best.len) best = { label: it.label, emoji: it.emoji, len: it.href.length }
+      }
+    }
+  }
+  return best ? { label: best.label, emoji: best.emoji } : null
 }
 
 export default function BackToCategoryButton({
@@ -59,7 +66,6 @@ export default function BackToCategoryButton({
 }) {
   const pathname = usePathname() ?? '/'
 
-  // Pages à exclure : home, cat index, cat slug, public
   if (
     pathname === '/' ||
     pathname === '/admin' ||
@@ -74,22 +80,65 @@ export default function BackToCategoryButton({
   const cat = findCategoryByHref(pathname)
   if (!cat) return null
 
-  const cls = theme === 'dark' ? TONE_BG_DARK[cat.tone] : TONE_BG[cat.tone]
+  const dark = theme === 'dark'
   const CatIcon = ICON_BY_CAT[cat.slug] ?? Settings
+  const mod = findModule(pathname)
+  const toneText = dark ? TONE_TEXT_DARK[cat.tone] : TONE_TEXT[cat.tone]
+  const linkBase = dark ? 'text-zinc-400 hover:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900'
+  const chevron = dark ? 'text-zinc-600' : 'text-zinc-300'
 
   return (
-    <div className="px-3 sm:px-4 pt-3">
-      <Link
-        href={`/admin/cat/${cat.slug}`}
-        className={`group inline-flex items-center gap-2 h-10 pl-1.5 pr-4 rounded-full border-2 text-xs sm:text-sm font-bold active:scale-95 transition ${cls}`}
-        aria-label={`Retour à la catégorie ${cat.label}`}
+    <div className={`relative md:sticky md:top-0 z-20 px-3 sm:px-4 py-2 backdrop-blur ${dark ? 'bg-[#0D0D0D]/85' : 'bg-stone-50/85'}`}>
+     <div className="flex items-center gap-2">
+      <nav
+        className="flex-1 flex items-center gap-1 text-xs sm:text-sm font-semibold overflow-hidden"
+        aria-label="Fil d'ariane"
       >
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/80 text-zinc-900 shadow-sm group-hover:bg-white transition">
-          <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
-        </span>
-        <CatIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-        <span>Retour à {cat.label}</span>
-      </Link>
+        {/* Accueil */}
+        <Link
+          href="/admin/cat"
+          className={`inline-flex items-center gap-1 h-9 px-2 rounded-lg shrink-0 active:scale-95 transition ${linkBase}`}
+          aria-label="Retour à l'accueil"
+        >
+          <Home className="h-4 w-4" strokeWidth={2.4} />
+          <span className="hidden sm:inline">Accueil</span>
+        </Link>
+
+        <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${chevron}`} strokeWidth={2.5} aria-hidden />
+
+        {/* Catégorie */}
+        <Link
+          href={`/admin/cat/${cat.slug}`}
+          className={`inline-flex items-center gap-1.5 h-9 px-2 rounded-lg shrink-0 active:scale-95 transition ${toneText} hover:opacity-80`}
+        >
+          <CatIcon className="h-4 w-4" strokeWidth={2.4} aria-hidden />
+          <span className="truncate max-w-[7rem] sm:max-w-none">{cat.label}</span>
+        </Link>
+
+        {/* Module courant (non cliquable) */}
+        {mod && (
+          <>
+            <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${chevron}`} strokeWidth={2.5} aria-hidden />
+            <span className={`inline-flex items-center gap-1 h-9 px-1 min-w-0 ${dark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+              <span className="shrink-0" aria-hidden>{mod.emoji}</span>
+              <span className="truncate">{mod.label}</span>
+            </span>
+          </>
+        )}
+      </nav>
+
+      {/* Loupe : ouvre la recherche globale (réflexe « je tape, je trouve » façon Insta) */}
+      <button
+        type="button"
+        onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('open-global-search')) }}
+        aria-label="Rechercher"
+        className={`shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full active:scale-90 transition ${
+          dark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 shadow-sm'
+        }`}
+      >
+        <Search className="h-4 w-4" strokeWidth={2.5} />
+      </button>
+     </div>
     </div>
   )
 }

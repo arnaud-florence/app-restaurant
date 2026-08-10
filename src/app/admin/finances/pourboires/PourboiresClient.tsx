@@ -13,6 +13,7 @@ import {
   Calculator, Sparkles, Loader2,
 } from 'lucide-react'
 import { METHODE_LABEL, type Methode } from '@/lib/pourboires-types'
+import { askConfirm } from '@/lib/confirm'
 import { preparerDistribution, cloturerDistribution, reouvrirDistribution, marquerLigneVersee } from './actions'
 
 type Distribution = { id: string; mois: string; pool_total_eur: number; methode: string; cloture_at: string | null; notes: string | null } | null
@@ -76,18 +77,18 @@ export default function PourboiresClient(p: Props) {
     })
   }
 
-  function cloturer() {
+  async function cloturer() {
     if (!p.distribution) return
-    if (!confirm('Clôturer la distribution ? Les montants seront figés (mais tu pourras réouvrir).')) return
+    if (!(await askConfirm({ message: 'Clôturer la distribution ? Les montants seront figés (mais tu pourras réouvrir).', confirmLabel: 'Clôturer', danger: false }))) return
     startTransition(async () => {
       try { await cloturerDistribution({ id: p.distribution!.id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
     })
   }
 
-  function reouvrir() {
+  async function reouvrir() {
     if (!p.distribution) return
-    if (!confirm('Ré-ouvrir la distribution pour modification ?')) return
+    if (!(await askConfirm({ message: 'Ré-ouvrir la distribution pour modification ?', confirmLabel: 'Ré-ouvrir', danger: false }))) return
     startTransition(async () => {
       try { await reouvrirDistribution({ id: p.distribution!.id }); router.refresh() }
       catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
@@ -190,8 +191,60 @@ export default function PourboiresClient(p: Props) {
       ) : (
         <Card className="p-5">
           <h2 className="font-bold mb-3">Répartition par employé</h2>
-          <div className="overflow-x-auto -mx-2">
-            <table className="responsive-table w-full text-sm">
+
+          {/* Mobile : liste de cards (table 5 colonnes illisible à 375px) */}
+          <ul className="md:hidden divide-y divide-zinc-100 -mx-2">
+            {(p.lignes.length > 0 ? p.lignes : p.employes.map(e => ({
+              id: 'preview-' + e.id, employe_id: e.id, heures_mois: 0, part_pct: 0, montant_eur: 0, verse: false,
+              employe: { prenom: e.prenom, nom: e.nom, poste: e.poste },
+            }) as Ligne)).map(l => {
+              const empPrenom = l.employe?.prenom ?? '—'
+              const empNom    = l.employe?.nom ?? ''
+              const empPoste  = l.employe?.poste ?? ''
+              const isManual  = methode === 'manuel' && !isCloture && l.employe_id
+              return (
+                <li key={l.id} className="px-2 py-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{empPrenom} {empNom}</p>
+                      <p className="text-[11px] text-zinc-500">{empPoste}</p>
+                    </div>
+                    {p.lignes.length > 0 && isCloture && (
+                      <button onClick={() => toggleVerse(l)} disabled={pending} className="min-h-[40px] px-1 shrink-0">
+                        {l.verse
+                          ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                          : <span className="inline-block w-5 h-5 rounded-full border-2 border-zinc-300" />
+                        }
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-zinc-500 tabular-nums">{Number(l.heures_mois).toFixed(1)} h · {Number(l.part_pct).toFixed(1)} %</span>
+                    {isManual ? (
+                      <Input
+                        type="number" step="0.01" min="0"
+                        value={manuelMontants[l.employe_id!] ?? ''}
+                        onChange={e => setManuelMontants(prev => ({ ...prev, [l.employe_id!]: e.target.value }))}
+                        className="w-24 text-right"
+                      />
+                    ) : (
+                      <span className="font-bold tabular-nums">{eur(Number(l.montant_eur))}</span>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+            {p.lignes.length > 0 && (
+              <li className="px-2 py-3 bg-zinc-50 font-bold flex items-center justify-between gap-2">
+                <span>TOTAL · {p.lignes.reduce((s, l) => s + Number(l.part_pct ?? 0), 0).toFixed(1)} %</span>
+                <span className="tabular-nums">{eur(totalDistribue)} <span className="text-xs font-normal text-zinc-500">({eur(totalVerse)} versés)</span></span>
+              </li>
+            )}
+          </ul>
+
+          {/* Desktop/tablette : table complète */}
+          <div className="hidden md:block overflow-x-auto -mx-2">
+            <table className="hidden md:table w-full text-sm">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="text-left px-3 py-2">Employé</th>

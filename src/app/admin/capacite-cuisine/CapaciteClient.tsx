@@ -141,8 +141,8 @@ export default function CapaciteClient({ creneaux }: { creneaux: CreneauCapacite
               <Card key={jour} className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-base">{JOURS[jour]}</h3>
-                  <Button size="sm" variant="outline" onClick={() => setCreating({ jour, tag: zoneActive })} className="gap-1 text-xs">
-                    <Plus className="h-3 w-3" /> Créneau
+                  <Button size="sm" variant="outline" onClick={() => setCreating({ jour, tag: zoneActive })} className="gap-1 text-sm min-h-[44px] px-3">
+                    <Plus className="h-4 w-4" /> Créneau
                   </Button>
                 </div>
                 {items.length === 0 ? (
@@ -160,16 +160,16 @@ export default function CapaciteClient({ creneaux }: { creneaux: CreneauCapacite
                               <span className="font-medium text-zinc-700">{c.max_commandes}</span> cmd max / créneau de {c.duree_creneau_min}min
                             </p>
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             {!c.actif && <Badge variant="secondary" className="text-[10px]">inactif</Badge>}
-                            <Button size="sm" variant="ghost" onClick={() => setEditing(c)} className="text-xs">
+                            <Button size="sm" variant="ghost" onClick={() => setEditing(c)} className="text-sm min-h-[44px] px-3">
                               Éditer
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => exec(async () => { await toggleCreneauCapacite(c.id, !c.actif) })} className="text-xs">
+                            <Button size="sm" variant="ghost" onClick={() => exec(async () => { await toggleCreneauCapacite(c.id, !c.actif) })} className="text-sm min-h-[44px] px-3">
                               {c.actif ? 'Off' : 'On'}
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setConfirmDel(c)} className="text-red-600">
-                              <Trash2 className="h-3 w-3" />
+                            <Button size="sm" variant="ghost" onClick={() => setConfirmDel(c)} className="text-red-600 min-h-[44px] min-w-[44px] px-3">
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>

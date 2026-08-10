@@ -21,13 +21,14 @@ type LigneEdit = {
 }
 
 export default function BonCommandeFormModal({
-  bon, fournisseurs, ingredients, onClose, onSaved,
+  bon, fournisseurs, ingredients, onClose, onSaved, peutVoirPrix = true,
 }: {
   bon: BonCommande | null
   fournisseurs: Fournisseur[]
   ingredients: Ingredient[]
   onClose: () => void
   onSaved: () => void
+  peutVoirPrix?: boolean
 }) {
   const isEdit = !!bon
   const [isPending, startTransition] = useTransition()
@@ -142,7 +143,7 @@ export default function BonCommandeFormModal({
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <p><b>Fournisseur :</b> {bon.fournisseur_nom}</p>
             <p><b>Date :</b> {bon.date_commande}{bon.date_livraison_prevue && ` · Livraison ${bon.date_livraison_prevue}`}</p>
-            <p><b>Total HT :</b> {fmtPrix(bon.montant_total_ht)}</p>
+            {peutVoirPrix && <p><b>Total HT :</b> {fmtPrix(bon.montant_total_ht)}</p>}
             {bon.notes && <p className="italic text-muted-foreground">{bon.notes}</p>}
           </div>
         )}
@@ -156,7 +157,7 @@ export default function BonCommandeFormModal({
               <Label>Ajouter un ingrédient</Label>
               <Select value={pickerId} onChange={e => setPickerId(e.target.value)}>
                 {ingredients.map(i => (
-                  <option key={i.id} value={i.id}>{i.nom} — stock {i.stock_actuel} {i.unite} — {fmtPrix(i.prix_achat_ht)}/{i.unite}</option>
+                  <option key={i.id} value={i.id}>{i.nom} — stock {i.stock_actuel} {i.unite}{peutVoirPrix ? ` — ${fmtPrix(i.prix_achat_ht)}/${i.unite}` : ''}</option>
                 ))}
               </Select>
             </div>
@@ -176,8 +177,8 @@ export default function BonCommandeFormModal({
                 <tr>
                   <th className="text-left  py-2 px-3">Ingrédient</th>
                   <th className="text-right py-2 px-2">Quantité</th>
-                  <th className="text-right py-2 px-2">Prix HT</th>
-                  <th className="text-right py-2 px-2">Total</th>
+                  {peutVoirPrix && <th className="text-right py-2 px-2">Prix HT</th>}
+                  {peutVoirPrix && <th className="text-right py-2 px-2">Total</th>}
                   {!isEdit && <th className="text-right py-2 px-3"></th>}
                 </tr>
               </thead>
@@ -202,21 +203,25 @@ export default function BonCommandeFormModal({
                           />
                         )}
                       </td>
-                      <td className="py-2 px-2 text-right">
-                        {isEdit ? (
-                          <span className="tabular-nums">{fmtPrix(l.prix_unitaire_ht)}</span>
-                        ) : (
-                          <Input
-                            type="number" step="0.0001" min={0}
-                            value={l.prix_unitaire_ht}
-                            onChange={e => modifier(l.key, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })}
-                            className="h-9 w-24 ml-auto text-right tabular-nums"
-                          />
-                        )}
-                      </td>
-                      <td className="py-2 px-2 text-right tabular-nums font-semibold">
-                        {fmtPrix(l.quantite_commandee * l.prix_unitaire_ht)}
-                      </td>
+                      {peutVoirPrix && (
+                        <td className="py-2 px-2 text-right">
+                          {isEdit ? (
+                            <span className="tabular-nums">{fmtPrix(l.prix_unitaire_ht)}</span>
+                          ) : (
+                            <Input
+                              type="number" step="0.0001" min={0}
+                              value={l.prix_unitaire_ht}
+                              onChange={e => modifier(l.key, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })}
+                              className="h-9 w-24 ml-auto text-right tabular-nums"
+                            />
+                          )}
+                        </td>
+                      )}
+                      {peutVoirPrix && (
+                        <td className="py-2 px-2 text-right tabular-nums font-semibold">
+                          {fmtPrix(l.quantite_commandee * l.prix_unitaire_ht)}
+                        </td>
+                      )}
                       {!isEdit && (
                         <td className="py-2 px-3 text-right">
                           <Button size="sm" variant="ghost" onClick={() => supprimer(l.key)} className="text-destructive">×</Button>
@@ -225,11 +230,13 @@ export default function BonCommandeFormModal({
                     </tr>
                   )
                 })}
-                <tr className="border-t bg-muted/40 font-bold">
-                  <td colSpan={3} className="py-2 px-3 text-right">Total HT</td>
-                  <td className={cn('py-2 px-2 text-right tabular-nums')}>{fmtPrix(total)}</td>
-                  {!isEdit && <td />}
-                </tr>
+                {peutVoirPrix && (
+                  <tr className="border-t bg-muted/40 font-bold">
+                    <td colSpan={3} className="py-2 px-3 text-right">Total HT</td>
+                    <td className={cn('py-2 px-2 text-right tabular-nums')}>{fmtPrix(total)}</td>
+                    {!isEdit && <td />}
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -108,7 +108,7 @@ export default function EntreeModal({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Quantité reçue *</Label>
             <div className="flex gap-2">
@@ -140,7 +140,7 @@ export default function EntreeModal({
           <span className="font-bold tabular-nums">{fmtPrix(cout)}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>DLC (date de péremption)</Label>
             <Input

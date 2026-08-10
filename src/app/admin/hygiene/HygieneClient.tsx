@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -82,11 +83,17 @@ export default function HygieneClient(props: {
           title="Hygiène & HACCP"
           description="CCP, températures, lots et DLC, checklists, non-conformités."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
-              <KpiBadge label="NC ouvertes" value={ncOuvertes} accent={ncOuvertes > 0 ? 'red' : 'zinc'} />
-              <KpiBadge label="Lots expirés" value={lotsExpires} accent={lotsExpires > 0 ? 'red' : 'zinc'} />
-              <KpiBadge label="DLC < 3j" value={lotsProche} accent={lotsProche > 0 ? 'amber' : 'zinc'} />
-              <KpiBadge label="Checklists" value={`${checklistsTodayCount}/${proceduresJourCount}`} accent="zinc" />
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <div className="hidden sm:flex flex-wrap gap-2">
+                <KpiBadge label="NC ouvertes" value={ncOuvertes} accent={ncOuvertes > 0 ? 'red' : 'zinc'} />
+                <KpiBadge label="Lots expirés" value={lotsExpires} accent={lotsExpires > 0 ? 'red' : 'zinc'} />
+                <KpiBadge label="DLC < 3j" value={lotsProche} accent={lotsProche > 0 ? 'amber' : 'zinc'} />
+                <KpiBadge label="Checklists" value={`${checklistsTodayCount}/${proceduresJourCount}`} accent="zinc" />
+              </div>
+              <a href="/admin/hygiene/registre/print" target="_blank" rel="noopener"
+                 className="inline-flex items-center gap-1.5 h-10 px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold whitespace-nowrap">
+                🖨 Registre HACCP
+              </a>
             </div>
           }
         >
@@ -149,20 +156,6 @@ export default function HygieneClient(props: {
         </div>
       )}
     </div>
-  )
-}
-
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold whitespace-nowrap transition-colors',
-        active ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-      )}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -551,7 +544,7 @@ function HaccpTab({
                   </div>
                   <button
                     onClick={async () => {
-                      if (!confirm(`Désactiver "${h.titre}" ?`)) return
+                      if (!(await askConfirm({ message: `Désactiver "${h.titre}" ?`, confirmLabel: 'Désactiver', danger: true }))) return
                       try { await supprimerPlanHaccp(h.id); onOk('Désactivé'); router.refresh() }
                       catch (e) { onError(e) }
                     }}
@@ -610,7 +603,7 @@ function HaccpTab({
                       className="text-xs px-2 h-8 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Fait</button>
                     <button
                       onClick={async () => {
-                        if (!confirm(`Désactiver "${p.zone}" ?`)) return
+                        if (!(await askConfirm({ message: `Désactiver "${p.zone}" ?`, confirmLabel: 'Désactiver', danger: true }))) return
                         try { await supprimerPlanNettoyage(p.id); onOk('Désactivé'); router.refresh() }
                         catch (e) { onError(e) }
                       }}
@@ -674,7 +667,7 @@ function HaccpModal({ onClose, onError, onSuccess }: { onClose: () => void; onEr
   return (
     <Modal title="Nouveau plan HACCP" onClose={onClose} disabled={isPending}>
       <Field label="Titre"><input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Ex: Cuisson viande hachée" className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Type danger">
           <select value={type} onChange={e => setType(e.target.value as TypeDanger)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
             {(Object.keys(TYPE_DANGER_LABEL) as TypeDanger[]).map(t => <option key={t} value={t}>{TYPE_DANGER_LABEL[t].emoji} {TYPE_DANGER_LABEL[t].label}</option>)}
@@ -787,11 +780,54 @@ function LotsTab({
         </div>
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+      <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun lot.</p>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile : cards (table 7 colonnes + select illisibles à 375px) */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {filtered.map(l => {
+              const a = alerteDLC(l.dlc)
+              const sty = STATUT_LOT_LABEL[l.statut]
+              return (
+                <li key={l.id} className={cn('p-3 space-y-1.5',
+                  a === 'critique' && l.statut === 'en_stock' && 'bg-red-50',
+                  a === 'proche' && l.statut === 'en_stock' && 'bg-amber-50')}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-zinc-500">{l.lot_numero}</span>
+                    <select
+                      value={l.statut}
+                      onChange={async e => {
+                        const newStatut = e.target.value as StatutLot
+                        try { await changerStatutLot({ lot_id: l.id, statut: newStatut, notes: null }); onOk(`Statut → ${STATUT_LOT_LABEL[newStatut].label}`); router.refresh() }
+                        catch (err) { onError(err) }
+                      }}
+                      className={cn('min-h-[36px] px-2 rounded border text-xs font-bold shrink-0', sty.cls)}
+                    >
+                      {(Object.keys(STATUT_LOT_LABEL) as StatutLot[]).map(s => <option key={s} value={s}>{STATUT_LOT_LABEL[s].label}</option>)}
+                    </select>
+                  </div>
+                  <p className="font-medium">{l.ingredient_nom ?? '—'}</p>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-zinc-600 tabular-nums">{l.quantite}{l.unite ? ` ${l.unite}` : ''}</span>
+                    {l.dlc && (
+                      <span className={cn('tabular-nums',
+                        a === 'critique' && l.statut === 'en_stock' && 'font-bold text-red-700',
+                        a === 'proche' && l.statut === 'en_stock' && 'font-bold text-amber-700')}>
+                        DLC {fmtDate(l.dlc)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-500">{l.fournisseur_nom ?? '—'} · reçu {fmtDate(l.date_reception)}</p>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Desktop/tablette : table complète */}
+          <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm min-w-[760px]">
             <thead className="text-xs uppercase tracking-wider text-zinc-500 bg-zinc-50">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">Lot</th>
@@ -844,6 +880,8 @@ function LotsTab({
               })}
             </tbody>
           </table>
+          </div>
+          </>
         )}
       </div>
 
@@ -1077,7 +1115,7 @@ function NCModal({
 
   return (
     <Modal title="Nouvelle non-conformité" onClose={onClose} disabled={isPending}>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Date constat"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Type">
           <select value={type} onChange={e => setType(e.target.value as TypeNC)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
@@ -1199,7 +1237,7 @@ function Intervention3DModal({
       <Field label="Zones (séparées par virgule)"><input value={zones} onChange={e => setZones(e.target.value)} placeholder="cuisine, plonge, réserve sèche" className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       <Field label="Produits utilisés (optionnel)"><input value={produits} onChange={e => setProduits(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       <Field label="Observations"><textarea value={observations} onChange={e => setObservations(e.target.value)} rows={3} className="w-full px-3 py-2 rounded-md border border-zinc-300 resize-none" /></Field>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Prochain passage"><input type="date" value={prochaine} onChange={e => setProchaine(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Coût (€)"><input type="number" step="0.01" value={cout} onChange={e => setCout(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
         <Field label="URL document"><input value={docUrl} onChange={e => setDocUrl(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-xs" /></Field>

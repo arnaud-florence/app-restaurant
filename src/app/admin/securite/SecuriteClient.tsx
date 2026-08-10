@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { logoutAction } from '@/app/login/actions'
+import { askConfirm } from '@/lib/confirm'
 import { activer2FA, desactiver2FA, preparer2FA, changerRole, genererSauvegarde } from './actions'
 
 type Profil = { id: string; email: string; prenom: string | null; nom: string | null; role: 'manager' | 'employe'; totp_enabled: boolean; derniere_connexion: string | null; created_at: string }
@@ -56,7 +57,7 @@ export default function SecuriteClient({
           <div className="flex gap-2 border-b overflow-x-auto">
             <TabBtn a={tab === '2fa'}        on={() => setTab('2fa')}><KeyRound className="h-4 w-4 inline mr-1" /> 2FA</TabBtn>
             <TabBtn a={tab === 'profils'}    on={() => setTab('profils')}>👥 Profils ({profils.length})</TabBtn>
-            <TabBtn a={tab === 'audit'}      on={() => setTab('audit')}>📜 Journal ({audit.length})</TabBtn>
+            <TabBtn a={tab === 'audit'}      on={() => setTab('audit')}>📜 Journal d&apos;audit ({audit.length})</TabBtn>
             <TabBtn a={tab === 'connexions'} on={() => setTab('connexions')}>
               <Lock className="h-4 w-4 inline mr-1" /> Connexions {connexions.some(c => c.inhabituelle) && <Badge className="ml-1 bg-amber-500">⚠</Badge>}
             </TabBtn>
@@ -121,8 +122,8 @@ function Panel2FA({ profilCourant }: { profilCourant: Profil }) {
     })
   }
 
-  function desactiver() {
-    if (!confirm('Désactiver le 2FA ? Votre compte sera moins protégé.')) return
+  async function desactiver() {
+    if (!(await askConfirm('Désactiver le 2FA ? Votre compte sera moins protégé.'))) return
     startTransition(async () => {
       await desactiver2FA(); router.refresh()
     })
@@ -199,8 +200,38 @@ function PanelProfils({ profils, profilCourant }: { profils: Profil[]; profilCou
   const router = useRouter()
   const [, startTransition] = useTransition()
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <Card className="overflow-hidden">
+      {/* Mobile : 1 card par profil */}
+      <ul className="md:hidden divide-y divide-zinc-100">
+        {profils.map(p => (
+          <li key={p.id} className={cn('p-3 space-y-2', p.id === profilCourant.id && 'bg-emerald-50/40')}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold break-all">{p.email} {p.id === profilCourant.id && <Badge variant="outline" className="ml-1">vous</Badge>}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Créé le {format(parseISO(p.created_at), 'd MMM yyyy', { locale: fr })} · 2FA {p.totp_enabled ? '🔐' : '—'}
+                </p>
+              </div>
+              {p.id === profilCourant.id ? (
+                <Badge className={p.role === 'manager' ? 'bg-emerald-600' : 'bg-zinc-500'}>{p.role}</Badge>
+              ) : (
+                <select value={p.role} onChange={e => startTransition(() => changerRole({ id: p.id, role: e.target.value as 'manager' | 'employe' }).then(() => router.refresh()))}
+                  className="text-sm rounded border px-2 min-h-[40px]">
+                  <option value="manager">manager</option>
+                  <option value="employe">employe</option>
+                </select>
+              )}
+            </div>
+            <p className="text-xs text-zinc-600">
+              Dernière connexion : {p.derniere_connexion ? format(parseISO(p.derniere_connexion), 'd MMM HH:mm', { locale: fr }) : '—'}
+            </p>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop/tablette : table complète */}
+      <div className="hidden md:block overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
         <thead className="bg-zinc-50 text-left">
           <tr>
             <th className="px-3 py-2">Email</th>
@@ -232,6 +263,7 @@ function PanelProfils({ profils, profilCourant }: { profils: Profil[]; profilCou
           ))}
         </tbody>
       </table>
+      </div>
       <p className="text-xs text-zinc-500 p-3 border-t">
         Pour ajouter un compte : laissez la personne s'inscrire via /login, puis passez son rôle ici.
       </p>
@@ -243,8 +275,27 @@ function PanelProfils({ profils, profilCourant }: { profils: Profil[]; profilCou
 function PanelAudit({ audit }: { audit: AuditRow[] }) {
   if (audit.length === 0) return <Card className="p-4 text-zinc-500 italic">Aucune action enregistrée.</Card>
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <Card className="overflow-hidden">
+      {/* Mobile : 1 card par action */}
+      <ul className="md:hidden divide-y divide-zinc-100">
+        {audit.map(a => (
+          <li key={a.id} className="p-3 space-y-1">
+            <div className="flex items-start justify-between gap-2">
+              <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-xs">{a.action}</code>
+              <span className="text-xs text-zinc-500 whitespace-nowrap shrink-0">{format(parseISO(a.created_at), 'd MMM HH:mm:ss', { locale: fr })}</span>
+            </div>
+            <p className="text-sm text-zinc-700">{a.email ?? '—'}</p>
+            {(a.ressource_type || a.ressource_id) && (
+              <p className="text-xs text-zinc-600">{a.ressource_type ?? ''} {a.ressource_id ? `· ${a.ressource_id.slice(0, 8)}…` : ''}</p>
+            )}
+            <p className="text-xs text-zinc-500">IP : {a.ip ?? '—'}</p>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop/tablette : table complète */}
+      <div className="hidden md:block overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
         <thead className="bg-zinc-50 text-left">
           <tr>
             <th className="px-3 py-2">Quand</th>
@@ -266,6 +317,7 @@ function PanelAudit({ audit }: { audit: AuditRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </Card>
   )
 }
@@ -274,8 +326,28 @@ function PanelAudit({ audit }: { audit: AuditRow[] }) {
 function PanelConnexions({ connexions }: { connexions: ConnexionRow[] }) {
   if (connexions.length === 0) return <Card className="p-4 text-zinc-500 italic">Aucune connexion enregistrée.</Card>
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <Card className="overflow-hidden">
+      {/* Mobile : 1 card par connexion */}
+      <ul className="md:hidden divide-y divide-zinc-100">
+        {connexions.map(c => (
+          <li key={c.id} className={cn('p-3 space-y-1', c.inhabituelle && 'bg-amber-50')}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold break-all">{c.email ?? '—'}</p>
+              <span className="text-xs text-zinc-500 whitespace-nowrap shrink-0">{format(parseISO(c.created_at), 'd MMM HH:mm:ss', { locale: fr })}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              {c.succes ? <Badge className="bg-emerald-600">✓ OK</Badge> : <Badge className="bg-red-600">✗ Échec</Badge>}
+              {c.inhabituelle && <Badge className="bg-amber-500">⚠ IP nouvelle</Badge>}
+            </div>
+            <p className="text-xs text-zinc-500">IP : {c.ip ?? '—'}</p>
+            <p className="text-xs text-zinc-500 break-all">{c.user_agent ?? '—'}</p>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop/tablette : table complète */}
+      <div className="hidden md:block overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
         <thead className="bg-zinc-50 text-left">
           <tr>
             <th className="px-3 py-2">Quand</th>
@@ -300,6 +372,7 @@ function PanelConnexions({ connexions }: { connexions: ConnexionRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </Card>
   )
 }

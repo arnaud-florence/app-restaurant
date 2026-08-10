@@ -57,6 +57,18 @@ export async function creerResaChambre(input: unknown): Promise<{ id: string }> 
   const p = resaChambreSchema.parse(input)
   if (new Date(p.date_depart) <= new Date(p.date_arrivee)) throw new Error('Date départ > date arrivée')
   const supabase = await createClient()
+  // Anti double-réservation : refuse si la chambre est déjà prise sur des dates qui
+  // chevauchent (arrivée < départ demandé ET départ > arrivée demandée), hors annulées.
+  const { data: conflits } = await supabase.from('reservations_chambres')
+    .select('id')
+    .eq('chambre_id', p.chambre_id)
+    .neq('statut', 'annulee')
+    .lt('date_arrivee', p.date_depart)
+    .gt('date_depart', p.date_arrivee)
+    .limit(1)
+  if (conflits && conflits.length > 0) {
+    throw new Error('Cette chambre est déjà réservée sur ces dates. Choisis une autre chambre ou d\'autres dates.')
+  }
   const { data, error } = await supabase.from('reservations_chambres').insert({ ...p, statut: 'demande' }).select('id').single()
   if (error || !data) throw new Error(error?.message ?? 'Erreur')
   revalidatePath('/admin/reservations')

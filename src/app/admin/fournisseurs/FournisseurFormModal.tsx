@@ -144,7 +144,7 @@ export default function FournisseurFormModal({
                             field.onChange(active ? current.filter(x => x !== j) : [...current, j])
                           }}
                           className={cn(
-                            'h-9 rounded-md border text-[11px] font-bold uppercase transition-colors',
+                            'min-h-[44px] rounded-md border text-[11px] font-bold uppercase transition-colors',
                             active ? 'bg-primary text-primary-foreground border-primary' : 'border-input hover:bg-muted'
                           )}
                         >

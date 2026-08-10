@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { getRecettePhoto } from '@/lib/recettePhoto'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -69,6 +69,24 @@ export default function RecettesClient({
       return true
     })
   }, [enriched, search, filtreTag, filtreFC, filtreStatut, filtreOnline])
+
+  // Base des compteurs de pastilles de TAG : on applique tous les filtres SAUF le
+  // tag lui-même, sinon les compteurs ne correspondraient pas à la liste affichée.
+  // (Ex : filtre « Actifs » → la pastille « Cuisine » doit compter les cuisines
+  // ACTIVES, pas toutes les recettes cuisine.)
+  const baseForCounts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return enriched.filter(({ recette: r, s }) => {
+      if (filtreStatut === 'actifs'   && !r.actif) return false
+      if (filtreStatut === 'inactifs' &&  r.actif) return false
+      if (filtreOnline === 'online'  && !r.vendable_online) return false
+      if (filtreOnline === 'offline' &&  r.vendable_online) return false
+      if (filtreFC === 'alerte' && !s.alerte) return false
+      if (filtreFC !== 'tous' && filtreFC !== 'alerte' && s.statut !== filtreFC) return false
+      if (q && !(r.nom.toLowerCase().includes(q) || r.categorie.toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [enriched, search, filtreFC, filtreStatut, filtreOnline])
 
   const stats = useMemo(() => {
     const actifs = enriched.filter(e => e.recette.actif)
@@ -157,7 +175,7 @@ export default function RecettesClient({
 
         {/* Filtres */}
         {/* Toolbar premium — recherche + 4 segmented controls pills (tactile mobile/tablette) */}
-        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
           <Input
             type="search"
             placeholder="🔍 Rechercher un plat..."
@@ -168,10 +186,10 @@ export default function RecettesClient({
           {/* Niveau 1 : Destination (gros pills tactiles) */}
           <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
             <PillTab active={filtreTag === ''} onClick={() => setFiltreTag('')}>
-              ✦ Toutes <PillCount n={enriched.length} active={filtreTag === ''} />
+              ✦ Toutes <PillCount n={baseForCounts.length} active={filtreTag === ''} />
             </PillTab>
             {TAGS_DESTINATION.map(t => {
-              const n = enriched.filter(e => e.recette.tag_destination === t).length
+              const n = baseForCounts.filter(e => e.recette.tag_destination === t).length
               if (n === 0) return null
               return (
                 <PillTab key={t} active={filtreTag === t} onClick={() => setFiltreTag(t)}>
@@ -448,15 +466,18 @@ function PackDemarrageButton() {
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<{ f: number; i: number; r: number; details: string[] } | null>(null)
 
-  function lancer() {
-    if (!confirm(
-      'Installer le pack démarrage ?\n\n' +
-      'Cela créera :\n' +
-      '• 5 fournisseurs typiques (Metro, Pomona, Sysco...)\n' +
-      '• 50 ingrédients de base avec prix d\'achat\n' +
-      '• 20 recettes prêtes à l\'emploi (pizzas, burgers, salades, plats, desserts, boissons)\n\n' +
-      'Idempotent : ne crée pas de doublons.'
-    )) return
+  async function lancer() {
+    if (!(await askConfirm({
+      title: 'Installer le pack démarrage ?',
+      message:
+        'Cela créera :\n' +
+        '• 5 fournisseurs typiques (Metro, Pomona, Sysco...)\n' +
+        '• 50 ingrédients de base avec prix d\'achat\n' +
+        '• 20 recettes prêtes à l\'emploi (pizzas, burgers, salades, plats, desserts, boissons)\n\n' +
+        'Idempotent : ne crée pas de doublons.',
+      confirmLabel: 'Installer',
+      danger: false,
+    }))) return
     startTransition(async () => {
       try {
         const r = await installerCatalogueDemarrage()
@@ -527,15 +548,18 @@ function SeedOnlineButton() {
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<{ activees: number; creees: number; photos: number; total: number; details: string[] } | null>(null)
 
-  function lancer() {
-    if (!confirm(
-      'Activer le catalogue ONLINE pour le site web ?\n\n' +
-      'Cela va :\n' +
-      '• Activer « vendable_online » sur toutes tes recettes SNACKING/PIZZA/BAR existantes\n' +
-      '• Créer 16 recettes starter manquantes (5 snacking + 5 pizzas + 6 bar) avec photos\n' +
-      '• Ajouter une photo placeholder sur les recettes online sans image\n\n' +
-      'Idempotent : ne crée pas de doublons.'
-    )) return
+  async function lancer() {
+    if (!(await askConfirm({
+      title: 'Activer le catalogue ONLINE pour le site web ?',
+      message:
+        'Cela va :\n' +
+        '• Activer « vendable_online » sur toutes tes recettes SNACKING/PIZZA/BAR existantes\n' +
+        '• Créer 16 recettes starter manquantes (5 snacking + 5 pizzas + 6 bar) avec photos\n' +
+        '• Ajouter une photo placeholder sur les recettes online sans image\n\n' +
+        'Idempotent : ne crée pas de doublons.',
+      confirmLabel: 'Activer',
+      danger: false,
+    }))) return
     startTransition(async () => {
       try {
         const r = await seedCatalogueOnline()

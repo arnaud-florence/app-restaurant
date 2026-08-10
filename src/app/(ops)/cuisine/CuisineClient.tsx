@@ -7,13 +7,12 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   type CommandeService, type StatutArticle,
-  STATUT_ARTICLE_LABEL, SOURCE_LABEL, TAG_DEST_LABEL as TAG_DEST_LABEL_LOCAL, statutMinuteur, STATUT_MINUTEUR_STYLE, formatEcoule, playDing,
+  playDing,
 } from '@/lib/service'
-import { ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import { changerStatutArticle } from '../actions'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import AgendaCreneauxColonnes from '@/components/AgendaCreneauxColonnes'
-import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import TicketCommande from '@/components/ops/TicketCommande'
 import TachesSequentielles from '@/components/TachesSequentielles'
 import type { PosteWidget } from '@/lib/taches-du-jour'
 
@@ -38,16 +37,25 @@ export default function CuisineClient({
   const audioReadyRef = useRef(false)
   const [autoPrint, setAutoPrint] = useState(false)
   const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
+  const [cb, setCb] = useState(false)   // mode daltonien : glyphes de forme
 
   // Persistance auto-print en localStorage (clé séparée par poste)
   const autoPrintKey = role === 'pizzaiolo' ? 'pizza_auto_print' : 'cuisine_auto_print'
   useEffect(() => {
     try { setAutoPrint(localStorage.getItem(autoPrintKey) === '1') } catch { /* ignore */ }
+    try { setCb(localStorage.getItem('cb_mode') === '1') } catch { /* ignore */ }
   }, [autoPrintKey])
   function toggleAutoPrint() {
     setAutoPrint(v => {
       const nv = !v
       try { localStorage.setItem(autoPrintKey, nv ? '1' : '0') } catch { /* ignore */ }
+      return nv
+    })
+  }
+  function toggleCb() {
+    setCb(v => {
+      const nv = !v
+      try { localStorage.setItem('cb_mode', nv ? '1' : '0') } catch { /* ignore */ }
       return nv
     })
   }
@@ -122,7 +130,11 @@ export default function CuisineClient({
         // Une commande BORNE/COMPTOIR non encore payée ne doit PAS apparaître en prep
         // (elle reste sur /emporter jusqu'à encaissement). Cf. règle métier multi-canal.
         if (c.statut === 'en_attente_paiement_comptoir') continue
-        const articlesDuTag = c.articles.filter(a => a.tag_destination === tag && a.statut !== 'servi')
+        // La colonne CUISINE englobe aussi le SNACKING (même poste de prod) —
+        // sinon un article tagué SNACKING n'apparaît sur aucun écran KDS.
+        const articlesDuTag = c.articles.filter(a =>
+          (a.tag_destination === tag || (tag === 'CUISINE' && a.tag_destination === 'SNACKING'))
+          && a.statut !== 'servi')
         if (articlesDuTag.length === 0) continue
         // On indexe via la commande complète pour avoir created_at, source, etc.
         const existing = map.get(c.id)
@@ -140,20 +152,25 @@ export default function CuisineClient({
     return out
   }, [commandes])
 
-  // Compteurs en haut — restreints à la colonne du rôle
-  const nbEnAttente = useMemo(() => {
-    let n = 0
-    for (const c of commandes) for (const a of c.articles) {
-      if (a.tag_destination === monTag && a.statut === 'en_attente') n++
-    }
-    return n
-  }, [commandes, monTag])
+  // Compteurs en haut — comptés sur le MÊME ensemble que les tickets affichés
+  // (articlesParColonne) : hérite de la fusion SNACKING→CUISINE et de l'exclusion
+  // des commandes comptoir non payées. Sinon le badge ne collait pas aux tickets.
+  const nbEnAttente = useMemo(
+    () => articlesParColonne[monTag].reduce(
+      (n, t) => n + t.articles.filter(a => a.statut === 'en_attente').length, 0),
+    [articlesParColonne, monTag],
+  )
 
   const tempsMoyen = useMemo(() => {
-    const articles = articlesParColonne[monTag]
-    if (articles.length === 0) return 0
-    const total = articles.reduce((s, x) => s + (now - new Date(x.commande.created_at).getTime()) / 60000, 0)
-    return total / articles.length
+    // Ne compte que les tickets ENCORE en attente/préparation : un ticket dont tous
+    // les articles sont déjà 'pret' reste affiché (règle d'or) mais n'est plus « en
+    // cuisson », donc l'inclure gonflait artificiellement le temps moyen.
+    const tickets = articlesParColonne[monTag].filter(
+      t => t.articles.some(a => a.statut === 'en_attente' || a.statut === 'en_preparation'),
+    )
+    if (tickets.length === 0) return 0
+    const total = tickets.reduce((s, t) => s + (now - new Date(t.commande.created_at).getTime()) / 60000, 0)
+    return total / tickets.length
   }, [articlesParColonne, monTag, now])
 
   function transition(article_id: string, nouveau: StatutArticle) {
@@ -175,38 +192,42 @@ export default function CuisineClient({
 
   return (
     <div className="min-h-screen flex flex-col pb-mobile-nav">
-      <OpsBottomNav profil={navProfil} />
       {/* ═══ HEADER POS UNIFIÉ (style /serveur) ═══ */}
-      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        {/* Mobile : 2 lignes */}
+      <header className="sticky top-[var(--op-bar-h,0px)] z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        {/* Mobile : titre visible + 2 lignes */}
         <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center justify-center -mb-1">
+            <h1 className="text-zinc-100 text-xs font-black uppercase tracking-[0.2em]">
+              {role === 'pizzaiolo' ? '🍕 Pizza' : '👨‍🍳 Cuisine'}
+            </h1>
+          </div>
           <div className="flex items-center gap-1.5">
             <span className={cn(
-              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-lg shadow-md shrink-0',
+              'inline-flex items-center justify-center w-12 h-12 rounded-xl text-white text-lg shadow-md shrink-0',
               role === 'pizzaiolo'
                 ? 'bg-gradient-to-br from-red-500 to-red-700'
                 : 'bg-gradient-to-br from-amber-500 to-amber-700',
             )}>
               {role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
             </span>
-            <span className="flex-1 inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-red-500/15 text-red-200 ring-1 ring-red-500/30 text-xs font-black tabular-nums">
+            <span className="flex-1 inline-flex items-center gap-1 px-2 h-12 rounded-xl bg-red-500/15 text-red-200 ring-1 ring-red-500/30 text-xs font-black tabular-nums">
               <span className="text-sm">🔔</span>
               <span>{nbEnAttente} en attente</span>
             </span>
-            <span className="inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 h-12 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
               <span className="text-sm">⏱</span>{tempsMoyen.toFixed(0)}m
             </span>
             <Link
-              href="/caisse"
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0"
-              aria-label="Caisse"
-            >💰</Link>
+              href="/service"
+              className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0"
+              aria-label="Centre opérationnel"
+            >⊞</Link>
           </div>
           <div className="flex items-center gap-1.5">
             {!audioReadyRef.current && (
               <button
                 onClick={activerSon}
-                className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700"
+                className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-12 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-black border border-zinc-700"
               >
                 🔔 Activer son
               </button>
@@ -214,7 +235,7 @@ export default function CuisineClient({
             <button
               onClick={toggleAutoPrint}
               className={cn(
-                'flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl text-xs font-black transition-colors',
+                'flex-1 inline-flex items-center justify-center gap-1 px-2 h-12 rounded-xl text-xs font-black transition-colors',
                 autoPrint
                   ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                   : 'bg-zinc-800 text-zinc-300 border border-zinc-700',
@@ -222,6 +243,14 @@ export default function CuisineClient({
             >
               🖨 {autoPrint ? 'Auto ON' : 'Auto OFF'}
             </button>
+            <button
+              onClick={toggleCb}
+              title="Mode daltonien : ajoute des formes (●◆■) aux couleurs"
+              className={cn(
+                'inline-flex items-center justify-center px-3 h-12 rounded-xl text-base font-black transition-colors shrink-0',
+                cb ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-zinc-800 text-zinc-300 border border-zinc-700',
+              )}
+            >◐</button>
           </div>
         </div>
 
@@ -229,14 +258,14 @@ export default function CuisineClient({
         <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
           <div className="inline-flex items-center gap-2 shrink-0">
             <span className={cn(
-              'inline-flex items-center justify-center w-10 h-10 rounded-xl text-white text-xl shadow-md',
+              'inline-flex items-center justify-center w-12 h-12 rounded-xl text-white text-xl shadow-md',
               role === 'pizzaiolo'
                 ? 'bg-gradient-to-br from-red-500 to-red-700'
                 : 'bg-gradient-to-br from-amber-500 to-amber-700',
             )}>
               {role === 'pizzaiolo' ? '🍕' : '👨‍🍳'}
             </span>
-            <div className="hidden lg:block">
+            <div className="block min-w-0 flex-1">
               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 leading-none">Service</p>
               <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">
                 {role === 'pizzaiolo' ? 'Pizzaiolo' : 'Cuisine'}
@@ -245,7 +274,7 @@ export default function CuisineClient({
           </div>
           <div className="inline-flex items-center gap-1.5 shrink-0">
             <span className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              'inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
               nbEnAttente > 0
                 ? 'bg-red-500/15 text-red-200 ring-red-500/30 animate-pulse'
                 : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
@@ -253,7 +282,7 @@ export default function CuisineClient({
               <span className="text-base">🔔</span>{nbEnAttente} en attente
             </span>
             <span className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
+              'inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl ring-1 text-xs font-black tabular-nums whitespace-nowrap',
               tempsMoyen > 15 ? 'bg-red-500/15 text-red-200 ring-red-500/30'
                 : tempsMoyen > 10 ? 'bg-amber-500/15 text-amber-200 ring-amber-500/30'
                 : 'bg-zinc-800 text-zinc-300 ring-zinc-700',
@@ -265,7 +294,7 @@ export default function CuisineClient({
           {!audioReadyRef.current && (
             <button
               onClick={activerSon}
-              className="inline-flex items-center gap-2 px-2.5 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 shrink-0"
+              className="inline-flex items-center gap-2 px-2.5 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-black border border-zinc-700 shrink-0"
               title="Active le son pour les nouvelles commandes"
             >
               🔔 Activer son
@@ -274,7 +303,7 @@ export default function CuisineClient({
           <button
             onClick={toggleAutoPrint}
             className={cn(
-              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl text-xs font-black transition-colors shrink-0',
+              'inline-flex items-center gap-2 px-2.5 h-12 rounded-xl text-xs font-black transition-colors shrink-0',
               autoPrint
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
                 : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700',
@@ -283,12 +312,22 @@ export default function CuisineClient({
           >
             🖨 Auto : {autoPrint ? 'ON' : 'OFF'}
           </button>
-          <Link
-            href="/caisse"
-            className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
+          <button
+            onClick={toggleCb}
+            title="Mode daltonien : ajoute des formes (●◆■) aux couleurs"
+            className={cn(
+              'inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl text-xs font-black transition-colors shrink-0',
+              cb ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700',
+            )}
           >
-            <span className="text-lg">💰</span>
-            <span>Caisse</span>
+            ◐ {cb ? 'Daltonien ON' : 'Daltonien'}
+          </button>
+          <Link
+            href="/service"
+            className="inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
+          >
+            <span className="text-lg">⊞</span>
+            <span>Service</span>
           </Link>
         </div>
       </header>
@@ -325,6 +364,7 @@ export default function CuisineClient({
             articles={articlesParColonne.PIZZA}
             now={now}
             onTransition={transition}
+            cb={cb}
           />
         ) : (
           <ColonneAgenda
@@ -333,6 +373,7 @@ export default function CuisineClient({
             articles={articlesParColonne.CUISINE}
             now={now}
             onTransition={transition}
+            cb={cb}
           />
         )}
       </main>
@@ -342,13 +383,14 @@ export default function CuisineClient({
 
 // ─── Cuisine = Flux FIFO horizontal (gauche → droite, ordre arrivée) ──
 function ColonneAgenda({
-  tag, icone, articles, now, onTransition,
+  tag, icone, articles, now, onTransition, cb,
 }: {
   tag: ColonneTag
   icone: string
   articles: Array<{ commande: CommandeService; articles: CommandeService['articles'] }>
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
+  cb: boolean
 }) {
   // Tri par created_at croissant (FIFO : plus ancien à gauche, plus récent à droite)
   const ordered = useMemo(
@@ -387,16 +429,17 @@ function ColonneAgenda({
         </span>
       </header>
 
-      {/* Flux horizontal : tickets côte à côte par ordre d'arrivée */}
+      {/* Flux : vertical sur mobile (scroll naturel vers le bas, façon fil),
+          horizontal côte-à-côte sur desktop (ordre d'arrivée FIFO gauche→droite). */}
       <div
-        className="overflow-x-auto scroll-visible-dark pb-2"
+        className="overflow-visible md:overflow-x-auto scroll-visible-dark pb-2"
         style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="flex items-stretch gap-3 lg:gap-4 min-w-max">
+        <div className="flex flex-col md:flex-row items-stretch gap-3 lg:gap-4 md:min-w-max">
           {ordered.map(({ commande, articles: arts }, idx) => (
             <div
               key={commande.id}
-              className="w-[280px] sm:w-[320px] lg:w-[360px] shrink-0 relative"
+              className="w-full md:w-[320px] lg:w-[360px] md:shrink-0 relative"
               style={{ scrollSnapAlign: 'start' }}
             >
               {/* Numéro d'ordre dans le flux (1er = le plus ancien) */}
@@ -411,6 +454,7 @@ function ColonneAgenda({
                 articles={arts}
                 now={now}
                 onTransition={onTransition}
+                cb={cb}
               />
             </div>
           ))}
@@ -422,212 +466,25 @@ function ColonneAgenda({
 
 // ─── Ticket ──────────────────────────────────────────────────────────
 function Ticket({
-  commande, articles, now, onTransition,
+  commande, articles, now, onTransition, cb,
 }: {
   commande: CommandeService
   articles: CommandeService['articles']
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
+  cb: boolean
 }) {
-  const min = statutMinuteur(commande.created_at, now)
-  const minSty = STATUT_MINUTEUR_STYLE[min]
-  const sourceSty = SOURCE_LABEL[commande.source]
-
-  // Statuts agrégés du ticket (pour bordure + bouton groupé)
-  const tousEnAttente = articles.every(a => a.statut === 'en_attente')
-  const tousPret = articles.every(a => a.statut === 'pret')
-
-  // Autres articles de la commande (pas mon poste) — pour coordination livraison
-  const idsCePoste = new Set(articles.map(a => a.id))
-  const autresArticles = commande.articles.filter(a => !idsCePoste.has(a.id))
-  const tousLesAutresPrets = autresArticles.length > 0 && autresArticles.every(a => a.statut === 'pret' || a.statut === 'servi')
-
-  // Allergènes agrégés
-  const allergenes = Array.from(new Set(articles.flatMap(a => a.allergenes_a_eviter)))
-
-  // Avance tous les articles non encore au statut cible (action groupée)
-  function avancerTous(cible: StatutArticle) {
-    for (const a of articles) {
-      if (a.statut !== cible && a.statut !== 'servi') onTransition(a.id, cible)
-    }
-  }
-
-  // Border-left épaisse selon source (cohérent avec BarClient)
-  const sourceBorderL =
-    commande.source === 'TABLE'    ? 'border-l-[6px] border-l-blue-500' :
-    commande.source === 'COMPTOIR' ? 'border-l-[6px] border-l-violet-500' :
-    'border-l-[6px] border-l-emerald-500'
-
-  // Bandeau créneau retrait : visible pour TOUTE commande avec un créneau défini.
-  // Pour les commandes multi-zones (panier mixte snack+pizza), on utilise le créneau
-  // SPÉCIFIQUE au tag de ce ticket (pas le créneau global qui est = max des deux).
-  // Ainsi la pizza voit son propre horaire de sortie, pas celui du snack.
-  const isOnline = commande.source === 'ONLINE'
-  const tagDuTicket = articles[0]?.tag_destination
-  const creneauTag = tagDuTicket ? commande.creneaux_par_tag?.[tagDuTicket] : null
-  const creneauIso = creneauTag ?? commande.creneau_retrait ?? null
-  const creneauTime = creneauIso ? new Date(creneauIso).getTime() : null
-  const minutesRestantes = creneauTime ? Math.round((creneauTime - now) / 60000) : null
-  const urgenceCls = !creneauTime || minutesRestantes === null ? null
-    : minutesRestantes < 0 ? 'bg-red-600 animate-pulse'
-    : minutesRestantes < 10 ? 'bg-amber-500'
-    : minutesRestantes < 20 ? 'bg-blue-500'
-    : 'bg-emerald-700'
-
+  // Délègue au composant de ticket PARTAGÉ (cuisine = fond sombre + n° commande).
   return (
-    <div className={cn(
-      'rounded-lg border-2 bg-zinc-900 overflow-hidden',
-      sourceBorderL,
-      tousPret           ? 'border-emerald-500/70' :
-      tousEnAttente      ? 'border-blue-500/50' :
-                           'border-amber-500/50',
-    )}>
-      {/* Bandeau créneau retrait — visible pour ONLINE et COMPTOIR (snack avec réservation) */}
-      {creneauTime && (
-        <div className={cn('px-3 py-2 text-white flex items-center justify-between gap-2', urgenceCls)}>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{isOnline ? '📦' : '🛒'}</span>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider opacity-90 leading-none">
-                Retrait {isOnline ? 'web' : 'comptoir'} à
-              </p>
-              <p className="text-base font-bold tabular-nums leading-tight">
-                {new Date(creneauTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          </div>
-          {minutesRestantes !== null && (
-            <p className="text-xl font-bold tabular-nums">
-              {minutesRestantes < 0 ? `+${Math.abs(minutesRestantes)} min` : `${minutesRestantes} min`}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Header ticket : source + table + minuteur */}
-      <div className="px-3 py-2 flex items-center justify-between gap-2 bg-zinc-950">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded', sourceSty.bg, sourceSty.text)}>
-            {sourceSty.emoji} {commande.source === 'TABLE' && commande.numero_table ? `T${commande.numero_table}` : sourceSty.label}
-          </span>
-          <span className="text-[10px] text-zinc-500 truncate">{commande.numero}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <a
-            href={`/print/bons/${commande.id}?dest=${articles[0].tag_destination}`}
-            target="_blank"
-            rel="noopener"
-            className="text-base min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold"
-            title="Réimprimer le bon de préparation"
-          >🖨</a>
-          <div className={cn('font-bold tabular-nums px-2 py-0.5 rounded', minSty.bg, minSty.text,
-            min === 'rouge' ? 'text-base animate-pulse ring-2 ring-red-300' : 'text-sm')}>
-            ⏱ {formatEcoule(commande.created_at, now)}
-          </div>
-        </div>
-      </div>
-
-      {/* Allergènes agrégés (banner rouge si au moins un article a une allergie) */}
-      {allergenes.length > 0 && (
-        <div className="px-3 py-2 bg-red-600 text-white border-b-4 border-red-300 animate-pulse">
-          <p className="text-[10px] font-black uppercase tracking-wider opacity-90">🚨 ALLERGIE CLIENT</p>
-          <p className="text-sm font-bold mt-0.5">
-            ⛔ Éviter : {allergenes.map(a => {
-              const info = ALLERGENE_INFO[a as Allergene]
-              return info ? `${info.emoji} ${info.label}` : a
-            }).join(' · ')}
-          </p>
-        </div>
-      )}
-
-      {/* Corps : liste des articles du poste avec leur statut individuel */}
-      <ul className="divide-y divide-zinc-800">
-        {articles.map(a => {
-          const aSty = STATUT_ARTICLE_LABEL[a.statut]
-          const next: StatutArticle | null =
-            a.statut === 'en_attente' ? 'en_preparation' :
-            a.statut === 'en_preparation' ? 'pret' :
-            null
-          return (
-            <li key={a.id} className="px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-baseline gap-2 min-w-0 flex-1">
-                  <span className="text-2xl font-bold tabular-nums shrink-0">×{a.quantite}</span>
-                  <p className="text-base font-semibold leading-tight break-words">{a.recette_nom}</p>
-                </div>
-                <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
-                  {aSty.emoji} <span className="hidden sm:inline">{aSty.label}</span>
-                </span>
-                {next && (
-                  <button
-                    onClick={() => onTransition(a.id, next)}
-                    className={cn(
-                      'min-h-[36px] px-3 rounded-md font-bold text-xs transition-colors active:scale-95 shrink-0',
-                      a.statut === 'en_attente' ? 'bg-amber-500 text-white hover:bg-amber-400' : 'bg-emerald-500 text-white hover:bg-emerald-400'
-                    )}
-                  >
-                    {a.statut === 'en_attente' ? '🔥' : '✓'}
-                  </button>
-                )}
-              </div>
-              {a.commentaire && (
-                <p className="mt-1.5 text-xs text-amber-300 bg-amber-900/30 border border-amber-800 rounded px-2 py-1 italic">
-                  ⚠ {a.commentaire}
-                </p>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-
-      {/* Notes de commande + serveur */}
-      {(commande.notes || commande.serveur_nom) && (
-        <div className="px-3 py-2 border-t border-zinc-800 text-xs text-zinc-400 space-y-1">
-          {commande.notes && <p className="italic">📝 {commande.notes}</p>}
-          {commande.serveur_nom && <p className="text-[10px] text-zinc-500">Serveur : {commande.serveur_nom}</p>}
-        </div>
-      )}
-
-      {/* Autres articles de la même commande (autres postes) — coordination livraison */}
-      {autresArticles.length > 0 && (
-        <div className="mx-3 mb-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5">
-          <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold mb-1">
-            📦 Aussi dans cette commande {tousLesAutresPrets && <span className="text-emerald-400">· tout est prêt</span>}
-          </p>
-          <ul className="space-y-0.5">
-            {autresArticles.map(a => {
-              const tagSty = TAG_DEST_LABEL_LOCAL[a.tag_destination] ?? { emoji: '·', label: a.tag_destination }
-              const aSty = STATUT_ARTICLE_LABEL[a.statut]
-              return (
-                <li key={a.id} className="flex items-center justify-between text-[11px] gap-2">
-                  <span className="truncate">
-                    <span className="opacity-70">{tagSty.emoji}</span> <b className="tabular-nums">×{a.quantite}</b> {a.recette_nom}
-                  </span>
-                  <span className={cn('text-[9px] px-1 py-0.5 rounded shrink-0', aSty.bg, aSty.text)}>
-                    {aSty.emoji}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      )}
-
-      {/* Action groupée : avancer tous les articles d'un coup */}
-      {!tousPret && (
-        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-950/50">
-          <button
-            onClick={() => avancerTous(tousEnAttente ? 'en_preparation' : 'pret')}
-            className={cn(
-              'w-full min-h-[48px] rounded-md font-bold text-sm uppercase tracking-wider transition-colors active:scale-[0.98]',
-              tousEnAttente ? 'bg-amber-500 hover:bg-amber-400 text-white' : 'bg-emerald-500 hover:bg-emerald-400 text-white'
-            )}
-          >
-            {tousEnAttente ? '🔥 Prendre tout en préparation' : '✓ Marquer tout prêt'}
-          </button>
-        </div>
-      )}
-    </div>
+    <TicketCommande
+      commande={commande}
+      articles={articles}
+      now={now}
+      onTransition={onTransition}
+      headerTone="plain"
+      subtitle={commande.numero}
+      cb={cb}
+    />
   )
 }
 
@@ -635,11 +492,12 @@ function Ticket({
 // Comme emporter/livreur : tickets placés sous leur créneau de retrait.
 // Les commandes sans créneau (sur place / comptoir) → colonne "Hors créneau".
 function PizzaAgenda({
-  articles, now, onTransition,
+  articles, now, onTransition, cb,
 }: {
   articles: Array<{ commande: CommandeService; articles: CommandeService['articles'] }>
   now: number
   onTransition: (id: string, nouveau: StatutArticle) => void
+  cb: boolean
 }) {
   if (articles.length === 0) {
     return (
@@ -673,6 +531,7 @@ function PizzaAgenda({
             articles={arts}
             now={now}
             onTransition={onTransition}
+            cb={cb}
           />
         )}
         accent="red"
@@ -682,26 +541,6 @@ function PizzaAgenda({
         // (= heure actuelle) par le composant directement. Plus de colonne séparée.
         emptyMessage="Aucune commande pizza dans l'agenda."
       />
-    </div>
-  )
-}
-
-// ─── KPI ─────────────────────────────────────────────────────────────
-function KPI({ label, value, accent = 'default', pulse }: {
-  label: string
-  value: string | number
-  accent?: 'default' | 'red' | 'orange'
-  pulse?: boolean
-}) {
-  const STYLES = {
-    default: 'bg-zinc-800/80 border-zinc-700 text-zinc-100',
-    red:     'bg-gradient-to-br from-rose-500/30 to-red-700/10 border-rose-500/40 text-rose-100 shadow-md shadow-rose-900/30',
-    orange:  'bg-gradient-to-br from-amber-500/30 to-amber-700/10 border-amber-500/40 text-amber-100 shadow-md shadow-amber-900/30',
-  }
-  return (
-    <div className={cn('rounded-xl border px-3 py-1.5 text-center min-w-20 backdrop-blur', STYLES[accent], pulse && 'animate-pulse')}>
-      <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
-      <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
     </div>
   )
 }

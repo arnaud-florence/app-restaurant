@@ -9,12 +9,11 @@ import {
   type CommandeService, type StatutTable, type TagDestination,
   STATUT_TABLE_STYLE, STATUT_ARTICLE_LABEL, TAG_DEST_LABEL, fmtPrix,
 } from '@/lib/service'
-import { creerCommande, changerStatutArticle } from '../actions'
+import { creerCommande, changerStatutArticle, annulerCommande, annulerArticle } from '../actions'
 import EncaissementModal from './EncaissementModal'
 import { ALLERGENES_EU, ALLERGENE_INFO, type Allergene } from '@/lib/allergenes'
 import AppelsServeurBanner from './AppelsServeurBanner'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
-import TachesDuJourWidget from '@/components/TachesDuJourWidget'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import TachesSequentielles from '@/components/TachesSequentielles'
 import ProduitCard from '@/components/ops/ProduitCard'
 
@@ -33,6 +32,7 @@ type Recette = {
   categorie: string
   tag_destination: TagDestination
   prix_vente_ht: number
+  tva?: number | null
   image_url?: string | null
   photo_url?: string | null
   favori?: boolean
@@ -44,13 +44,17 @@ type LignePanier = {
   recette_id: string
   recette_nom: string
   prix_unitaire_ht: number
+  tva: number                        // taux TVA recette (pour affichage TTC)
   tag_destination: TagDestination
   quantite: number
   commentaire: string
   allergenes_a_eviter: Allergene[]   // Module 12 — alerte cuisine
 }
 
-type Tab = 'plan' | 'a_servir' | 'a_encaisser'
+// Prix TTC d'une ligne de panier (sur place, taux de la recette).
+function ligneTTC(l: { prix_unitaire_ht: number; tva: number; quantite: number }): number {
+  return l.quantite * l.prix_unitaire_ht * (1 + (l.tva ?? 10) / 100)
+}
 
 export default function ServeurClient({
   initialCommandes, tables, recettes, employes, navProfil, widgetEmployeId = null, widgetInitialDone = [],
@@ -65,11 +69,15 @@ export default function ServeurClient({
 }) {
   const router = useRouter()
   const [commandes, setCommandes] = useState(initialCommandes)
-  const [tab, setTab] = useState<Tab>('plan')
   const [serveurId, setServeurId] = useState<string>('')
   const [tableSelectionnee, setTableSelectionnee] = useState<Table | null>(null)
+  const [tableChoix, setTableChoix] = useState<Table | null>(null)
   const [panier, setPanier] = useState<LignePanier[]>([])
   const [encaisserCmd, setEncaisserCmd] = useState<CommandeService | null>(null)
+  const [annulationCible, setAnnulationCible] = useState<{ cmd: CommandeService; numeroTable: string } | null>(null)
+  const [motifAnnulation, setMotifAnnulation] = useState('Erreur de saisie')
+  const [art86, setArt86] = useState<{ id: string; nom: string; quantite: number } | null>(null)
+  const [motif86, setMotif86] = useState('Erreur de saisie')
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
   const [, startTransition] = useTransition()
@@ -155,7 +163,7 @@ export default function ServeurClient({
     for (const c of commandes) {
       if (c.statut !== 'encaisse' && c.statut !== 'annule') {
         nbTables++
-        caEnCours += c.montant_total_ttc ?? c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+        caEnCours += c.montant_total_ttc ?? c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ttc, 0)
       }
     }
     return { caEnCours, nbTables }
@@ -170,7 +178,9 @@ export default function ServeurClient({
     // rouge "à encaisser" (évite d'ouvrir le menu de prise de commande).
     const cmd = cmdParTable.get(t.numero)
     if (cmd && cmd.statut === 'servi') {
-      setEncaisserCmd(cmd)
+      // Table servie : on NE force PLUS l'encaissement. On laisse le choix entre
+      // « ajouter une tournée » (apéro → plats…) et « encaisser ».
+      setTableChoix(t)
       return
     }
     setTableSelectionnee(t)
@@ -192,6 +202,7 @@ export default function ServeurClient({
         recette_id: r.id,
         recette_nom: r.nom,
         prix_unitaire_ht: r.prix_vente_ht,
+        tva: Number(r.tva ?? 10),
         tag_destination: r.tag_destination,
         quantite: 1,
         commentaire: '',
@@ -222,7 +233,7 @@ export default function ServeurClient({
     if (panier.length === 0) { flashKo('Panier vide'); return }
     startTransition(async () => {
       try {
-        await creerCommande({
+        const r = await creerCommande({
           source: 'TABLE',
           numero_table: tableSelectionnee.numero,
           serveur_id: serveurId || null,
@@ -235,7 +246,9 @@ export default function ServeurClient({
             allergenes_a_eviter: p.allergenes_a_eviter,
           })),
         })
-        flashOk(`Commande envoyée pour ${tableSelectionnee.numero}`)
+        flashOk(r.ajoute
+          ? `Tournée ajoutée à l'addition de ${tableSelectionnee.numero}`
+          : `Commande envoyée pour ${tableSelectionnee.numero}`)
         fermerCatalogue()
         router.refresh()
       } catch (e) { flashKo(e) }
@@ -279,7 +292,45 @@ export default function ServeurClient({
     })
   }
 
-  const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
+  function annulerCommandeTable(cmd: CommandeService | null, numeroTable: string) {
+    if (!cmd) { flashKo('Aucune commande active sur cette table'); return }
+    setMotifAnnulation('Erreur de saisie')
+    setAnnulationCible({ cmd, numeroTable })
+  }
+  function confirmerAnnulation() {
+    if (!annulationCible) return
+    const motif = motifAnnulation.trim()
+    if (!motif) { flashKo('Motif obligatoire pour annuler'); return }
+    const { cmd, numeroTable } = annulationCible
+    startTransition(async () => {
+      try {
+        await annulerCommande(cmd.id, motif)
+        flashOk(`Commande de la table ${numeroTable} annulée`)
+        setAnnulationCible(null)
+        setTableChoix(null)
+        fermerCatalogue()
+        router.refresh()
+      } catch (e) { flashKo(e) }
+    })
+  }
+  function confirmerAnnulerArticle() {
+    if (!art86) return
+    const motif = motif86.trim()
+    if (!motif) { flashKo('Motif obligatoire pour annuler'); return }
+    const cible = art86
+    startTransition(async () => {
+      try {
+        const r = await annulerArticle({ article_id: cible.id, motif })
+        if (!r.ok) { flashKo(new Error(r.error || 'Erreur annulation article')); return }
+        flashOk(r.commandeAnnulee ? 'Dernier article retiré — commande annulée' : `${cible.nom} retiré de la commande`)
+        setArt86(null)
+        if (r.commandeAnnulee) fermerCatalogue()
+        router.refresh()
+      } catch (e) { flashKo(e) }
+    })
+  }
+
+  const totalPanier = panier.reduce((s, p) => s + ligneTTC(p), 0)
 
   const [modalActif, setModalActif] = useState<null | 'a_servir' | 'a_encaisser'>(null)
 
@@ -292,19 +343,19 @@ export default function ServeurClient({
         <div className="md:hidden p-2 space-y-2">
           {/* Ligne 1 : Logo + Stats compactes + Caisse */}
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-lg shadow-md shrink-0">🪑</span>
-            <span className="flex-1 inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap overflow-hidden">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-lg shadow-md shrink-0">🪑</span>
+            <span className="flex-1 inline-flex items-center gap-1 px-2 h-12 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap overflow-hidden">
               <span className="text-sm shrink-0">💶</span>
               <span className="truncate">{fmtPrix(serveurStats.caEnCours)}</span>
             </span>
-            <span className="inline-flex items-center gap-1 px-2 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
+            <span className="inline-flex items-center gap-1 px-2 h-12 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums shrink-0">
               <span className="text-sm">🪑</span>{serveurStats.nbTables}
             </span>
             <Link
-              href="/caisse"
-              className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0"
-              aria-label="Caisse"
-            >💰</Link>
+              href="/service"
+              className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 text-lg shadow-lg active:scale-95 shrink-0"
+              aria-label="Centre opérationnel"
+            >⊞</Link>
           </div>
 
           {/* Ligne 2 : 🔔 À servir + 💳 À encaisser + Serveur */}
@@ -312,7 +363,7 @@ export default function ServeurClient({
             <button
               onClick={() => setModalActif('a_servir')}
               className={cn(
-                'flex-1 inline-flex items-center justify-center gap-1.5 px-2 h-11 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg',
+                'flex-1 inline-flex items-center justify-center gap-1.5 px-2 h-12 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg',
                 nbArticlesPrets > 0
                   ? 'bg-emerald-500 text-white shadow-emerald-500/40 animate-pulse'
                   : 'bg-zinc-800 text-zinc-400 border border-zinc-700',
@@ -328,7 +379,7 @@ export default function ServeurClient({
             <button
               onClick={() => setModalActif('a_encaisser')}
               className={cn(
-                'flex-1 inline-flex items-center justify-center gap-1.5 px-2 h-11 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg',
+                'flex-1 inline-flex items-center justify-center gap-1.5 px-2 h-12 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg',
                 aEncaisser.length > 0
                   ? 'bg-rose-600 text-white shadow-rose-500/40 animate-pulse'
                   : 'bg-zinc-800 text-zinc-400 border border-zinc-700',
@@ -344,7 +395,7 @@ export default function ServeurClient({
             <select
               value={serveurId}
               onChange={e => setServeurId(e.target.value)}
-              className="text-xs px-2 h-11 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 font-black max-w-[110px]"
+              className="text-xs px-2 h-12 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 font-black max-w-[110px]"
             >
               <option value="">Serveur</option>
               {employes.map(e => (
@@ -357,17 +408,17 @@ export default function ServeurClient({
         {/* ─── DESKTOP (md+) : 1 ligne unique ─── */}
         <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
           <div className="inline-flex items-center gap-2 shrink-0">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-md">🪑</span>
-            <div className="hidden lg:block">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-700 text-white text-xl shadow-md">🪑</span>
+            <div className="block min-w-0 flex-1">
               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 leading-none">Service</p>
               <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Plan de table</h1>
             </div>
           </div>
           <div className="inline-flex items-center gap-1.5 shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums whitespace-nowrap">
               <span className="text-base">💶</span>{fmtPrix(serveurStats.caEnCours)}
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/30 text-xs font-black tabular-nums whitespace-nowrap">
               <span className="text-base">🪑</span>{serveurStats.nbTables}
             </span>
           </div>
@@ -375,7 +426,7 @@ export default function ServeurClient({
           <button
             onClick={() => setModalActif('a_servir')}
             className={cn(
-              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
+              'inline-flex items-center gap-2 px-2.5 h-12 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
               nbArticlesPrets > 0
                 ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/40 animate-pulse'
                 : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
@@ -390,7 +441,7 @@ export default function ServeurClient({
           <button
             onClick={() => setModalActif('a_encaisser')}
             className={cn(
-              'inline-flex items-center gap-2 px-2.5 h-10 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
+              'inline-flex items-center gap-2 px-2.5 h-12 rounded-xl font-black text-sm transition-all active:scale-95 shadow-lg shrink-0',
               aEncaisser.length > 0
                 ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/40 animate-pulse'
                 : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700',
@@ -405,7 +456,7 @@ export default function ServeurClient({
           <select
             value={serveurId}
             onChange={e => setServeurId(e.target.value)}
-            className="text-xs px-2.5 h-10 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 font-black max-w-[160px] shrink-0"
+            className="text-xs px-2.5 h-12 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-100 font-black max-w-[160px] shrink-0"
           >
             <option value="">— Serveur —</option>
             {employes.map(e => (
@@ -413,11 +464,11 @@ export default function ServeurClient({
             ))}
           </select>
           <Link
-            href="/caisse"
-            className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
+            href="/service"
+            className="inline-flex items-center gap-1.5 px-2.5 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0"
           >
-            <span className="text-lg">💰</span>
-            <span>Caisse</span>
+            <span className="text-lg">⊞</span>
+            <span>Service</span>
           </Link>
         </div>
         <AppelsServeurBanner serveurId={serveurId || null} />
@@ -452,7 +503,7 @@ export default function ServeurClient({
               </div>
               <button
                 onClick={() => setModalActif(null)}
-                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
+                className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
                 aria-label="Fermer"
               >✕</button>
             </header>
@@ -486,7 +537,7 @@ export default function ServeurClient({
               </div>
               <button
                 onClick={() => setModalActif(null)}
-                className="w-10 h-10 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
+                className="w-12 h-12 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg font-bold transition-all active:scale-95"
                 aria-label="Fermer"
               >✕</button>
             </header>
@@ -526,11 +577,10 @@ export default function ServeurClient({
           onToggleAllergene={toggleAllergene}
           onClose={fermerCatalogue}
           onEnvoyer={envoyerCommande}
+          onAnnuler={() => annulerCommandeTable(cmdParTable.get(tableSelectionnee.numero) ?? null, tableSelectionnee.numero)}
+          onAnnulerArticle={(id, nom, quantite) => { setMotif86('Erreur de saisie'); setArt86({ id, nom, quantite }) }}
         />
       )}
-
-      {/* Bottom nav mobile + drawer modules admin selon poste utilisateur */}
-      <OpsBottomNav profil={navProfil} />
 
       {/* Modal Encaissement */}
       {encaisserCmd && (
@@ -549,51 +599,113 @@ export default function ServeurClient({
           }}
         />
       )}
-    </div>
-  )
-}
 
-// ─── Tab Button ──────────────────────────────────────────────────────
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 px-4 min-h-[40px] sm:min-h-0 sm:py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border-2',
-        active
-          ? 'bg-white text-zinc-900 border-white shadow-lg shadow-white/10 scale-105'
-          : 'bg-zinc-900/80 text-zinc-300 border-zinc-800 hover:border-zinc-600 backdrop-blur',
+      {/* Choix sur une table SERVIE : ajouter une tournée ou encaisser */}
+      {tableChoix && (() => {
+        const cmd = cmdParTable.get(tableChoix.numero)
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-3" onClick={() => setTableChoix(null)}>
+            <div className="w-full sm:max-w-sm rounded-3xl bg-zinc-900 ring-1 ring-zinc-700 p-5 space-y-3" onClick={e => e.stopPropagation()}>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-wider text-amber-400">Table {tableChoix.numero} · servie</p>
+                <p className="text-sm text-zinc-400 mt-0.5">Que veux-tu faire ?</p>
+              </div>
+              <button
+                onClick={() => { setTableSelectionnee(tableChoix); setPanier([]); setErreur(''); setTableChoix(null) }}
+                className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white font-black text-base active:scale-95 transition">
+                ➕ Ajouter une tournée
+              </button>
+              <button
+                onClick={() => { if (cmd) setEncaisserCmd(cmd); setTableChoix(null) }}
+                disabled={!cmd}
+                className="w-full min-h-[56px] rounded-2xl bg-white text-zinc-900 font-black text-base active:scale-95 transition disabled:opacity-50">
+                💳 Encaisser
+              </button>
+              <button
+                onClick={() => annulerCommandeTable(cmd ?? null, tableChoix.numero)}
+                disabled={!cmd}
+                className="w-full min-h-[48px] rounded-2xl bg-red-950/60 text-red-300 ring-1 ring-red-900 font-bold text-sm active:scale-95 transition disabled:opacity-50">
+                🗑 Annuler la commande
+              </button>
+              <button onClick={() => setTableChoix(null)} className="w-full min-h-[44px] rounded-2xl text-zinc-400 text-sm font-bold active:scale-95 transition">
+                Fermer
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Modale d'annulation de commande (in-app, fonctionne en mode kiosque) */}
+      {annulationCible && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setAnnulationCible(null)}>
+          <div className="w-full sm:max-w-sm rounded-3xl bg-zinc-900 ring-1 ring-red-900/60 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-red-400">🗑 Annuler la commande</p>
+              <p className="text-lg font-bold text-white mt-1">Table {annulationCible.numeroTable}</p>
+              <p className="text-sm text-zinc-400 mt-1">
+                {annulationCible.cmd.articles.length} article(s) ·{' '}
+                {fmtPrix(annulationCible.cmd.montant_total_ttc ?? annulationCible.cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ttc, 0))}
+              </p>
+              <p className="text-xs text-red-300/80 mt-2">
+                Action irréversible : la commande disparaît des écrans cuisine/bar et la table est libérée.
+              </p>
+            </div>
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Motif (obligatoire — tracé au journal)</label>
+              <input
+                type="text"
+                value={motifAnnulation}
+                onChange={e => setMotifAnnulation(e.target.value)}
+                autoFocus
+                placeholder="Ex : erreur de saisie, client parti…"
+                className="mt-1 w-full min-h-[48px] px-3 rounded-xl bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600 focus:border-red-500 outline-none text-base"
+              />
+            </div>
+            <button
+              onClick={confirmerAnnulation}
+              disabled={!motifAnnulation.trim()}
+              className="w-full min-h-[56px] rounded-2xl bg-red-600 text-white font-black text-base active:scale-95 transition disabled:opacity-40">
+              🗑 Confirmer l&apos;annulation
+            </button>
+            <button onClick={() => setAnnulationCible(null)} className="w-full min-h-[44px] rounded-2xl text-zinc-400 text-sm font-bold active:scale-95 transition">
+              Retour
+            </button>
+          </div>
+        </div>
       )}
-    >
-      {children}
-    </button>
-  )
-}
 
-// ─── Header Stat pill ─ Mini KPI tactile pour le header POS ─────────
-function HeaderStat({ icon, value, label, tone, pulse }: {
-  icon: string; value: string; label: string
-  tone: 'emerald' | 'amber' | 'rose' | 'blue' | 'violet'
-  pulse?: boolean
-}) {
-  const tones: Record<typeof tone, string> = {
-    emerald: 'bg-emerald-500/15 text-emerald-200 ring-emerald-500/30',
-    amber:   'bg-amber-500/15 text-amber-200 ring-amber-500/30',
-    rose:    'bg-rose-500/15 text-rose-200 ring-rose-500/30',
-    blue:    'bg-blue-500/15 text-blue-200 ring-blue-500/30',
-    violet:  'bg-violet-500/15 text-violet-200 ring-violet-500/30',
-  }
-  return (
-    <div className={cn(
-      'inline-flex items-center gap-1.5 px-2.5 h-9 rounded-lg ring-1 backdrop-blur whitespace-nowrap',
-      tones[tone],
-      pulse && 'animate-pulse',
-    )}>
-      <span className="text-sm" aria-hidden>{icon}</span>
-      <div className="flex items-baseline gap-1">
-        <span className="text-sm font-black tabular-nums leading-none">{value}</span>
-        <span className="text-[9px] uppercase tracking-wider font-bold opacity-70 leading-none">{label}</span>
-      </div>
+      {/* Modale 86 : retirer UN article (in-app, kiosque-safe) */}
+      {art86 && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setArt86(null)}>
+          <div className="w-full sm:max-w-sm rounded-3xl bg-zinc-900 ring-1 ring-red-900/60 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-wider text-red-400">🗑 86 — retirer un article</p>
+              <p className="text-lg font-bold text-white mt-1">×{art86.quantite} {art86.nom}</p>
+              <p className="text-xs text-red-300/80 mt-2">Retiré de l&apos;addition (totaux recalculés). Le plat sort des écrans cuisine/bar.</p>
+            </div>
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Motif (obligatoire — tracé au journal)</label>
+              <input
+                type="text"
+                value={motif86}
+                onChange={e => setMotif86(e.target.value)}
+                autoFocus
+                placeholder="Ex : erreur de saisie, rupture…"
+                className="mt-1 w-full min-h-[48px] px-3 rounded-xl bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600 focus:border-red-500 outline-none text-base"
+              />
+            </div>
+            <button
+              onClick={confirmerAnnulerArticle}
+              disabled={!motif86.trim()}
+              className="w-full min-h-[56px] rounded-2xl bg-red-600 text-white font-black text-base active:scale-95 transition disabled:opacity-40">
+              🗑 Retirer l&apos;article
+            </button>
+            <button onClick={() => setArt86(null)} className="w-full min-h-[44px] rounded-2xl text-zinc-400 text-sm font-bold active:scale-95 transition">
+              Retour
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -690,37 +802,6 @@ function PlanSalle({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones, cmdParTable])
 
-  // Stats globales de l'établissement (tous postes confondus, calculées en live)
-  const globalStats = useMemo(() => {
-    let caEnCours = 0
-    let nbCouvertsOccupes = 0
-    let nbTablesOuvertes = 0
-    let totalDureeMin = 0
-    let nbTablesAvecCmd = 0
-    let nbPretsAservir = 0
-    let nbTablesAEncaisser = 0
-    for (const [, ts] of zones) {
-      for (const t of ts) {
-        const cmd = cmdParTable.get(t.numero)
-        if (cmd) {
-          nbTablesAvecCmd++
-          const total = cmd.montant_total_ttc ?? cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
-          caEnCours += total
-          nbCouvertsOccupes += t.capacite
-          if (cmd.statut !== 'encaisse' && cmd.statut !== 'annule') nbTablesOuvertes++
-          totalDureeMin += Math.max(0, Math.round((now - new Date(cmd.created_at).getTime()) / 60_000))
-          const se = statutEffectif(t)
-          if (se === 'a_encaisser') nbTablesAEncaisser++
-        }
-        nbPretsAservir += pretsParTable.get(t.numero) ?? 0
-      }
-    }
-    const ticketMoyen = nbTablesAvecCmd > 0 ? caEnCours / nbTablesAvecCmd : 0
-    const dureeMoy = nbTablesAvecCmd > 0 ? Math.round(totalDureeMin / nbTablesAvecCmd) : 0
-    return { caEnCours, nbCouvertsOccupes, nbTablesOuvertes, ticketMoyen, dureeMoy, nbPretsAservir, nbTablesAEncaisser }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zones, cmdParTable, pretsParTable, now])
-
   // Filtre les tables affichées
   function shouldShow(t: Table): boolean {
     if (searchT.trim() && !t.numero.toLowerCase().includes(searchT.toLowerCase().trim())) return false
@@ -758,7 +839,7 @@ function PlanSalle({
                   key={zone}
                   onClick={() => setActiveZone(zone)}
                   className={cn(
-                    'inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 h-8 sm:h-9 rounded-full text-xs font-bold whitespace-nowrap transition-all',
+                    'inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 h-11 sm:h-12 rounded-full text-xs font-bold whitespace-nowrap transition-all',
                     isActive
                       ? 'bg-white text-zinc-900 shadow-md'
                       : 'text-zinc-400 hover:text-zinc-200',
@@ -788,7 +869,7 @@ function PlanSalle({
               key={f.k}
               onClick={() => setFiltre(f.k)}
               className={cn(
-                'inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 h-8 sm:h-9 rounded-full text-xs font-bold transition-all',
+                'inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 h-11 sm:h-12 rounded-full text-xs font-bold transition-all',
                 filtre === f.k
                   ? 'bg-white text-zinc-900 shadow-md'
                   : 'text-zinc-400 hover:text-zinc-200',
@@ -808,7 +889,7 @@ function PlanSalle({
           value={searchT}
           onChange={e => setSearchT(e.target.value)}
           placeholder="N° table"
-          className="hidden sm:block w-[140px] h-9 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-xs shrink-0"
+          className="block w-[104px] sm:w-[140px] h-11 sm:h-12 px-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-emerald-500 outline-none text-sm shrink-0"
         />
       </div>
 
@@ -820,7 +901,7 @@ function PlanSalle({
             <p className="font-bold">Aucune table ne correspond aux filtres</p>
             <button
               onClick={() => { setFiltre('tous'); setSearchT('') }}
-              className="mt-3 px-4 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold"
+              className="mt-3 px-4 h-11 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold"
             >
               Réinitialiser
             </button>
@@ -852,7 +933,7 @@ function PlanSalle({
                 const dureeUrgent = dureeMin !== null && dureeMin > 90  // > 1h30 = potentiel oubli
 
                 // Total addition
-                const totalCmd = cmd ? (cmd.montant_total_ttc ?? cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)) : 0
+                const totalCmd = cmd ? (cmd.montant_total_ttc ?? cmd.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ttc, 0)) : 0
 
                 return (
                   <button
@@ -969,68 +1050,6 @@ function PlanSalle({
   )
 }
 
-// ─── Mini chip (mobile compact) ─────────────────────────────────────────
-function MiniChip({
-  icon, value, label, accent = 'zinc', pulse = false,
-}: {
-  icon: string
-  value: string
-  label: string
-  accent?: 'emerald' | 'amber' | 'rose' | 'zinc'
-  pulse?: boolean
-}) {
-  const ACCENTS: Record<string, { value: string; bg: string }> = {
-    emerald: { value: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    amber:   { value: 'text-amber-300',   bg: 'bg-amber-500/10 border-amber-500/20' },
-    rose:    { value: 'text-rose-300',    bg: 'bg-rose-500/10 border-rose-500/20' },
-    zinc:    { value: 'text-zinc-100',    bg: 'bg-zinc-800 border-zinc-700' },
-  }
-  const a = ACCENTS[accent]
-  return (
-    <div className={cn('rounded-lg px-2 py-1.5 border flex items-center gap-1.5', a.bg, pulse && 'ring-1 ring-rose-500/50')}>
-      <span className="text-base shrink-0" aria-hidden>{icon}</span>
-      <div className="min-w-0">
-        <p className={cn('text-sm font-black tabular-nums leading-none', a.value, pulse && 'animate-pulse')}>{value}</p>
-        <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold mt-0.5 truncate">{label}</p>
-      </div>
-    </div>
-  )
-}
-
-// ─── Tuile statistique pour le dashboard plan de salle ─────────────────
-function StatTile({
-  icon, label, value, sub, accent = 'zinc', pulse = false,
-}: {
-  icon: string
-  label: string
-  value: string | number
-  sub?: string
-  accent?: 'emerald' | 'amber' | 'rose' | 'blue' | 'violet' | 'zinc'
-  pulse?: boolean
-}) {
-  const ACCENTS: Record<string, { iconBg: string; valueText: string; border: string }> = {
-    emerald: { iconBg: 'bg-emerald-500/15 text-emerald-300', valueText: 'text-emerald-300', border: 'border-emerald-500/20' },
-    amber:   { iconBg: 'bg-amber-500/15 text-amber-300',     valueText: 'text-amber-200',   border: 'border-amber-500/20' },
-    rose:    { iconBg: 'bg-rose-500/15 text-rose-300',       valueText: 'text-rose-200',    border: 'border-rose-500/20' },
-    blue:    { iconBg: 'bg-blue-500/15 text-blue-300',       valueText: 'text-blue-200',    border: 'border-blue-500/20' },
-    violet:  { iconBg: 'bg-violet-500/15 text-violet-300',   valueText: 'text-violet-200',  border: 'border-violet-500/20' },
-    zinc:    { iconBg: 'bg-zinc-800 text-zinc-300',          valueText: 'text-zinc-100',    border: 'border-zinc-800' },
-  }
-  const a = ACCENTS[accent]
-  return (
-    <div className={cn('rounded-xl p-3 bg-zinc-900/50 border backdrop-blur-sm transition-all hover:scale-[1.02]', a.border, pulse && 'ring-2 ring-rose-500/30')}>
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className={cn('inline-flex items-center justify-center w-8 h-8 rounded-lg text-base', a.iconBg)}>{icon}</span>
-        <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold leading-tight">{label}</p>
-      </div>
-      <p className={cn('text-xl lg:text-2xl font-black tabular-nums leading-tight', a.valueText, pulse && 'animate-pulse')}>
-        {value}
-      </p>
-      {sub && <p className="text-[10px] text-zinc-500 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
 // ─── Liste à servir ──────────────────────────────────────────────────
 function ListeAServir({
   commandes, onMarquerServi, onMarquerToutServi,
@@ -1082,12 +1101,12 @@ function ListeAServir({
                       <span className="text-emerald-400 font-bold tabular-nums">×{a.quantite}</span> {a.recette_nom}
                     </p>
                     {a.commentaire && (
-                      <p className="text-[10px] text-amber-300 italic truncate">⚠ {a.commentaire}</p>
+                      <p className="text-[11px] text-amber-300 italic truncate">⚠ {a.commentaire}</p>
                     )}
                   </div>
                   <button
                     onClick={() => onMarquerServi(a.id)}
-                    className="h-8 px-2.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-black text-[11px] transition-colors active:scale-95 whitespace-nowrap shrink-0"
+                    className="min-h-[44px] px-3 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm transition-colors active:scale-95 whitespace-nowrap shrink-0"
                   >
                     ✓
                   </button>
@@ -1099,7 +1118,7 @@ function ListeAServir({
             {articlesPrets.length > 1 && (
               <button
                 onClick={() => onMarquerToutServi(c)}
-                className="w-full h-8 bg-emerald-500/80 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-[10px] transition-colors active:scale-[0.98] border-t border-emerald-400/30"
+                className="w-full min-h-[44px] bg-emerald-500/80 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-xs transition-colors active:scale-[0.98] border-t border-emerald-400/30"
               >
                 ✓ Tout servi ({articlesPrets.length})
               </button>
@@ -1130,7 +1149,7 @@ function ListeAEncaisser({
   return (
     <div className="space-y-2">
       {commandes.map(c => {
-        const total = c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ht, 0)
+        const total = c.montant_total_ttc ?? c.articles.reduce((s, a) => s + a.quantite * a.prix_unitaire_ttc, 0)
         return (
           <div key={c.id} className="rounded-lg border border-rose-500/40 bg-rose-950/30 overflow-hidden">
             {/* Header ULTRA-COMPACT */}
@@ -1155,7 +1174,7 @@ function ListeAEncaisser({
               {c.articles.slice(0, 3).map(a => (
                 <li key={a.id} className="py-1 flex justify-between gap-1 text-[11px]">
                   <span className="truncate"><b>×{a.quantite}</b> {a.recette_nom}</span>
-                  <span className="text-zinc-400 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ht)}</span>
+                  <span className="text-zinc-400 tabular-nums shrink-0">{fmtPrix(a.quantite * a.prix_unitaire_ttc)}</span>
                 </li>
               ))}
               {c.articles.length > 3 && (
@@ -1166,7 +1185,7 @@ function ListeAEncaisser({
             {/* Bouton encaisser ULTRA-COMPACT */}
             <button
               onClick={() => onEncaisser(c)}
-              className="w-full h-9 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-xs transition-colors active:scale-[0.98] border-t border-emerald-400/30"
+              className="w-full min-h-[48px] bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-wider text-sm transition-colors active:scale-[0.98] border-t border-emerald-400/30"
             >
               💰 Encaisser
             </button>
@@ -1180,7 +1199,7 @@ function ListeAEncaisser({
 // ─── Catalogue (Modal) ───────────────────────────────────────────────
 function CatalogueModal({
   table, recettes, panier, totalPanier, commandeExistante,
-  onAjouter, onModifierQte, onModifierCommentaire, onToggleAllergene, onClose, onEnvoyer,
+  onAjouter, onModifierQte, onModifierCommentaire, onToggleAllergene, onClose, onEnvoyer, onAnnuler, onAnnulerArticle,
 }: {
   table: Table
   recettes: Recette[]
@@ -1193,6 +1212,8 @@ function CatalogueModal({
   onToggleAllergene: (id: string, a: Allergene) => void
   onClose: () => void
   onEnvoyer: () => void
+  onAnnuler: () => void
+  onAnnulerArticle: (id: string, nom: string, quantite: number) => void
 }) {
   // Onglet destination (CUISINE / PIZZA / BAR / SNACKING) en premier niveau,
   // puis filtre catégorie (entrées, plats, vins, cocktails…) en second niveau.
@@ -1248,23 +1269,37 @@ function CatalogueModal({
       {/* Commande existante */}
       {commandeExistante && (
         <div className="bg-amber-900/30 border-b border-amber-800 px-4 py-2 text-sm">
-          <p className="font-bold text-amber-200">⚠ Commande déjà ouverte sur cette table ({commandeExistante.numero})</p>
+          <p className="font-bold text-amber-200">🧾 Addition en cours sur cette table ({commandeExistante.numero})</p>
           <ul className="mt-1 text-xs space-y-0.5">
             {commandeExistante.articles.map(a => {
               const sta = STATUT_ARTICLE_LABEL[a.statut]
               return (
-                <li key={a.id} className="flex justify-between">
-                  <span><b>×{a.quantite}</b> {a.recette_nom}</span>
-                  <span className={cn('text-[10px] px-1.5 py-0.5 rounded', sta.bg, sta.text)}>
-                    {sta.emoji} {sta.label}
+                <li key={a.id} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate"><b>×{a.quantite}</b> {a.recette_nom}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded', sta.bg, sta.text)}>
+                      {sta.emoji} {sta.label}
+                    </span>
+                    {a.statut !== 'servi' && (
+                      <button
+                        onClick={() => onAnnulerArticle(a.id, a.recette_nom, a.quantite)}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/70 text-red-300 ring-1 ring-red-900 font-bold active:scale-95 transition"
+                        aria-label={`Annuler ${a.recette_nom}`}
+                      >🗑 86</button>
+                    )}
                   </span>
                 </li>
               )
             })}
           </ul>
-          <p className="mt-1 text-[11px] text-amber-300">
-            Ajouter de nouveaux articles créera une commande supplémentaire — préviens la cuisine si c&apos;est volontaire.
+          <p className="mt-1 text-[11px] text-emerald-300">
+            ✓ Les nouveaux articles s&apos;ajoutent à cette même addition (un seul encaissement à la fin). Ils partent en cuisine comme une nouvelle tournée.
           </p>
+          <button
+            onClick={onAnnuler}
+            className="mt-2 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg bg-red-950/60 text-red-300 ring-1 ring-red-900 text-xs font-bold active:scale-95 transition">
+            🗑 Annuler toute la commande
+          </button>
         </div>
       )}
 
@@ -1284,7 +1319,7 @@ function CatalogueModal({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg leading-none"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-lg leading-none"
                 aria-label="Effacer recherche"
               >×</button>
             )}
@@ -1484,7 +1519,7 @@ function CatalogueModal({
                 <div key={p.recette_id} className="rounded-md bg-zinc-900 border border-zinc-800 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm flex-1 min-w-0 truncate">{p.recette_nom}</p>
-                    <p className="text-emerald-400 font-bold tabular-nums shrink-0">{fmtPrix(p.quantite * p.prix_unitaire_ht)}</p>
+                    <p className="text-emerald-400 font-bold tabular-nums shrink-0">{fmtPrix(ligneTTC(p))}</p>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
                     <div className="flex items-center gap-1">
@@ -1503,7 +1538,7 @@ function CatalogueModal({
                   {/* Allergènes à éviter (Module 12) */}
                   <details className="mt-1.5">
                     <summary className={cn(
-                      'text-[10px] cursor-pointer px-2 py-1 rounded font-bold',
+                      'text-xs cursor-pointer px-2.5 py-2 rounded font-bold',
                       p.allergenes_a_eviter.length > 0
                         ? 'bg-red-900/40 text-red-300 border border-red-800'
                         : 'text-zinc-400 hover:text-zinc-200',
@@ -1519,7 +1554,7 @@ function CatalogueModal({
                         return (
                           <button key={a} onClick={() => onToggleAllergene(p.recette_id, a)}
                             className={cn(
-                              'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                              'inline-flex items-center min-h-[44px] px-2.5 rounded-md text-xs font-bold border',
                               sel
                                 ? 'bg-red-600 text-white border-red-400'
                                 : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:bg-zinc-800',
@@ -1638,7 +1673,7 @@ function MobileCartFooter({
                 <div key={p.recette_id} className="rounded-md bg-zinc-900 border border-zinc-800 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-sm flex-1 min-w-0 truncate">{p.recette_nom}</p>
-                    <p className="text-emerald-400 font-bold tabular-nums shrink-0">{fmtPrix(p.quantite * p.prix_unitaire_ht)}</p>
+                    <p className="text-emerald-400 font-bold tabular-nums shrink-0">{fmtPrix(ligneTTC(p))}</p>
                   </div>
                   <div className="flex items-center gap-1 mt-1.5">
                     <button onClick={() => onModifierQte(p.recette_id, -1)} className="min-h-[44px] min-w-[44px] rounded-md bg-zinc-800 font-bold">−</button>
@@ -1654,7 +1689,7 @@ function MobileCartFooter({
                   />
                   <details className="mt-1.5">
                     <summary className={cn(
-                      'text-[10px] cursor-pointer px-2 py-1 rounded font-bold',
+                      'text-xs cursor-pointer px-2.5 py-2 rounded font-bold',
                       p.allergenes_a_eviter.length > 0
                         ? 'bg-red-900/40 text-red-300 border border-red-800'
                         : 'text-zinc-400',
@@ -1668,7 +1703,7 @@ function MobileCartFooter({
                         return (
                           <button key={a} onClick={() => onToggleAllergene(p.recette_id, a)}
                             className={cn(
-                              'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                              'inline-flex items-center min-h-[44px] px-2.5 rounded-md text-xs font-bold border',
                               sel
                                 ? 'bg-red-600 text-white border-red-400'
                                 : 'bg-zinc-900 text-zinc-500 border-zinc-700',

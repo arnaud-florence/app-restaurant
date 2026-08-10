@@ -30,7 +30,7 @@ export default function AutoBdcButton() {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
       <Button
         type="button"
         size="sm"

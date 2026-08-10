@@ -11,6 +11,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from '@/lib/toast'
+import { askConfirm } from '@/lib/confirm'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -99,7 +101,7 @@ export default function CaisseBorneBanner({
       const full = await getCommandeServiceById(c.id)
       setEncaisserCmd(full as CommandeService)
     } catch (e) {
-      alert('Erreur chargement commande : ' + (e instanceof Error ? e.message : String(e)))
+      toast.error('Erreur chargement commande : ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setChargement(false)
     }
@@ -114,12 +116,12 @@ export default function CaisseBorneBanner({
       void chargerEtOuvrir(c)
     }
   }
-  function refuser(c: CommandeBorne) {
+  async function refuser(c: CommandeBorne) {
     if (c.source === 'BORNE') {
       setPinAction({ type: 'refuser', cmd: c })
     } else {
       // Annulation directe (avec confirm)
-      if (confirm(`Annuler la commande #${c.numero?.slice(-4)} ?`)) {
+      if (await askConfirm(`Annuler la commande #${c.numero?.slice(-4)} ?`)) {
         void annulerCommandeBorne({ commande_id: c.id, raison: 'manuel', borne_id: c.borne_id ?? undefined })
           .then(() => router.refresh())
       }
@@ -140,7 +142,7 @@ export default function CaisseBorneBanner({
         router.refresh()
       }
     } catch (e) {
-      alert(`Erreur (${employeNom}) : ` + (e instanceof Error ? e.message : String(e)))
+      toast.error(`Erreur (${employeNom}) : ` + (e instanceof Error ? e.message : String(e)))
     }
   }
 

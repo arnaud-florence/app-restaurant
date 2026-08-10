@@ -114,8 +114,55 @@ export default function TableClientsFideliteClient({ clients }: { clients: Clien
           {query && `pour « ${query} »`}.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="responsive-table w-full text-sm">
+        <>
+        {/* Mobile : liste de cards (table 8 colonnes illisible à 375px) */}
+        <ul className="md:hidden divide-y divide-zinc-100">
+          {filteredAndSorted.map(c => {
+            const k = (c.niveau_fidelite as NiveauFidelite) ?? 'standard'
+            const ni = NIVEAU_INFO[k] ?? NIVEAU_INFO.standard
+            const prochain = visitesPourProchainPalier(c)
+            return (
+              <li key={c.id} className="flex items-center gap-3 py-3">
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-black shrink-0">
+                  {((c.prenom || c.nom || '?'))[0]?.toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold truncate">{c.prenom ? c.prenom + ' ' : ''}{c.nom}</p>
+                    <Badge variant="outline" className={ni.cls + ' text-[10px] whitespace-nowrap'}>
+                      {ni.emoji} {ni.label}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-zinc-500 truncate">
+                    <span className="font-bold text-zinc-700 tabular-nums">{c.points_fidelite} pts</span>
+                    {' · '}{c.nb_visites} visite{c.nb_visites > 1 ? 's' : ''}
+                    {' · '}<span className="tabular-nums">{c.total_depense.toFixed(0)} €</span>
+                  </p>
+                  <p className="text-[11px] text-zinc-500 truncate">
+                    {fmtDate(c.derniere_visite)}
+                    {prochain ? (
+                      <> · → <span className="font-medium">{prochain.label}</span> ({prochain.restantes} visite{prochain.restantes > 1 ? 's' : ''})</>
+                    ) : (
+                      <> · <span className="text-violet-700 font-medium">Niveau max</span></>
+                    )}
+                  </p>
+                </div>
+                <Link
+                  href={`/client/${c.id}`}
+                  target="_blank"
+                  className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-zinc-300 hover:bg-zinc-50 shrink-0 text-emerald-700"
+                  aria-label="Voir la fiche client"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+
+        {/* Desktop/tablette : table complète */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="hidden md:table w-full text-sm">
             <thead className="text-xs text-zinc-500 uppercase border-b border-zinc-200">
               <tr>
                 <th className="text-left py-2">Client</th>
@@ -173,6 +220,7 @@ export default function TableClientsFideliteClient({ clients }: { clients: Clien
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   )

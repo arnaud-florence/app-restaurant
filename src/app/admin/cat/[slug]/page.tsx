@@ -3,12 +3,13 @@
 // Niveau 2 de la navigation hiérarchique (le niveau 1 = chips catégorie dans la TopActionBar).
 
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { CATEGORIES, type Category } from '@/lib/navigation'
 import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+import SystemeFooterActions from './SystemeFooterActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -200,6 +201,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function CategoriePage({ params }: { params: { slug: string } }) {
+  // « Service » n'est plus une grille admin : c'est le hub opérationnel /service.
+  if (params.slug === 'service') redirect('/service')
   const cat = CATEGORIES.find(c => c.slug === params.slug)
   if (!cat) notFound()
 
@@ -428,6 +431,9 @@ export default async function CategoriePage({ params }: { params: { slug: string
             })}
           </div>
         </section>
+
+        {/* Catégorie Système : actions appareil & session (déplacées depuis l'ancien drawer Modules) */}
+        {params.slug === 'systeme' && <SystemeFooterActions />}
       </main>
     </div>
   )

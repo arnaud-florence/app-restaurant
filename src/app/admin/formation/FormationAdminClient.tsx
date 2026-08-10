@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, BookOpen, GraduationCap, Users, ExternalLink, Printer, RotateCcw } from 'lucide-react'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import { askConfirm } from '@/lib/confirm'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -16,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   type Guide, type Etape, type Question, type Progression, type Poste, type StatutFormation,
   POSTE_INFO, STATUT_INFO,
+  posteFamille, FAMILLE_INFO, FAMILLE_ORDRE, niveauGuide,
 } from '@/lib/formation'
 import {
   creerGuide, updateGuide, supprimerGuide,
@@ -36,6 +38,13 @@ type QuestionIaRow = {
 }
 type BadgeRow = { employe_id: string; badge_code: string; badge_titre: string; badge_emoji: string; obtenu_le: string }
 
+// Libellé/emoji par FAMILLE de poste (Cuisine, Bar, Salle…) — on regroupe les
+// variantes (cuisinier/second → Cuisine, barman → Bar, snack/livreur/réception →
+// Snack·Livraison·Réception) pour ne plus avoir de petits groupes « en vrac ».
+function familleMetaAdmin(f: string): { label: string; emoji: string; cls: string } {
+  return FAMILLE_INFO[f] ?? { label: f, emoji: '•', cls: 'bg-zinc-100 text-zinc-700 border-zinc-300' }
+}
+
 export default function FormationAdminClient({
   guides, etapes, questions, progressions, employes,
   certifications = [], questionsIa = [], badges = [],
@@ -49,8 +58,45 @@ export default function FormationAdminClient({
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'guides' | 'progressions' | 'certifications' | 'questions_ia'>('guides')
+  const [filtrePoste, setFiltrePoste] = useState<string | null>(null)
+
+  // Regroupement des guides par FAMILLE de poste (ordre FAMILLE_ORDRE, « À
+  // commencer » en tête). Au sein d'une famille : Manuel (n1) → Pratique (n2) →
+  // Certif/Quiz (n3), puis ordre, puis titre.
+  const groupesGuides = useMemo(() => {
+    const m = new Map<string, Guide[]>()
+    for (const g of guides) {
+      const fam = posteFamille(g.poste)
+      if (!m.has(fam)) m.set(fam, [])
+      m.get(fam)!.push(g)
+    }
+    for (const [, gs] of m) {
+      gs.sort((a, b) =>
+        (niveauGuide(a) - niveauGuide(b)) ||
+        ((a.ordre ?? 0) - (b.ordre ?? 0)) ||
+        a.titre.localeCompare(b.titre))
+    }
+    const idx = (f: string) => { const i = FAMILLE_ORDRE.indexOf(f); return i < 0 ? 999 : i }
+    return Array.from(m.entries()).sort((a, b) => idx(a[0]) - idx(b[0]))
+  }, [guides])
   const [showGuideForm, setShowGuideForm] = useState<Guide | true | null>(null)
   const [openGuideId, setOpenGuideId] = useState<string | null>(guides[0]?.id ?? null)
+  // Groupes de poste repliables (fermés par défaut → moins de scroll). On ouvre
+  // seulement le premier groupe au départ ; le reste se déplie d'un tap.
+  const [groupesOuverts, setGroupesOuverts] = useState<Set<string> | null>(null)
+  const ouvertsDefaut = useMemo(() => {
+    const s = new Set<string>()
+    if (groupesGuides[0]) s.add(groupesGuides[0][0])
+    return s
+  }, [groupesGuides])
+  const estGroupeOuvert = (p: string) => filtrePoste === p || (groupesOuverts ?? ouvertsDefaut).has(p)
+  function toggleGroupe(p: string) {
+    setGroupesOuverts(prev => {
+      const next = new Set(prev ?? ouvertsDefaut)
+      if (next.has(p)) next.delete(p); else next.add(p)
+      return next
+    })
+  }
   const [, startTransition] = useTransition()
 
   return (
@@ -71,7 +117,7 @@ export default function FormationAdminClient({
           title="Formation"
           description="Guides interactifs par poste, quiz QCM, simulations, certifications, suivi progressions."
           actions={
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden sm:flex items-center gap-2 flex-wrap">
               <Link href="/admin/allergenes" className="text-xs text-zinc-600 hover:text-emerald-700 inline-flex items-center gap-1 underline whitespace-nowrap">
                 🆘 Procédures urgence
               </Link>
@@ -118,21 +164,55 @@ export default function FormationAdminClient({
             <Button size="sm" onClick={() => setShowGuideForm(true)} className="gap-1"><Plus className="h-4 w-4" /> Nouveau guide</Button>
           </div>
           {guides.length === 0 && <Card className="p-6 text-center text-zinc-500 italic">Aucun guide. Créez-en un pour commencer.</Card>}
-          {guides.map(g => (
-            <GuideAccordion
-              key={g.id}
-              guide={g}
-              etapes={etapes.filter(e => e.guide_id === g.id)}
-              questions={questions.filter(q => q.guide_id === g.id)}
-              open={openGuideId === g.id}
-              onToggle={() => setOpenGuideId(openGuideId === g.id ? null : g.id)}
-              onEdit={() => setShowGuideForm(g)}
-              onDelete={() => {
-                if (!confirm(`Supprimer le guide "${g.titre}" et toutes ses étapes/questions ?`)) return
-                startTransition(() => supprimerGuide(g.id).then(() => router.refresh()))
-              }}
-            />
-          ))}
+
+          {/* Filtres rapides par famille de poste */}
+          {groupesGuides.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setFiltrePoste(null)}
+                className={cn('inline-flex items-center gap-1 min-h-[36px] px-3 rounded-full text-xs font-semibold border transition-colors',
+                  filtrePoste === null ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-300 hover:border-emerald-300')}>
+                👀 Tout
+              </button>
+              {groupesGuides.map(([f]) => (
+                <button key={f} onClick={() => setFiltrePoste(f)}
+                  className={cn('inline-flex items-center gap-1 min-h-[36px] px-3 rounded-full text-xs font-semibold border transition-colors',
+                    filtrePoste === f ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-300 hover:border-emerald-300')}>
+                  {familleMetaAdmin(f).emoji} {f === 'tous' ? 'À commencer' : familleMetaAdmin(f).label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sections par famille de poste */}
+          {groupesGuides.map(([famille, gs]) => {
+            if (filtrePoste && filtrePoste !== famille) return null
+            const info = familleMetaAdmin(famille)
+            return (
+              <section key={famille} className="space-y-2">
+                <button type="button" onClick={() => toggleGroupe(famille)} className="w-full flex items-center gap-2 pt-1 text-left active:opacity-70">
+                  <span className={cn('inline-flex items-center justify-center rounded-md px-2 py-0.5 text-base border', info.cls)}>{info.emoji}</span>
+                  <h2 className="text-sm font-black uppercase tracking-wider text-zinc-700">{famille === 'tous' ? 'À commencer' : info.label}</h2>
+                  <span className="text-xs text-zinc-400">{gs.length} guide{gs.length > 1 ? 's' : ''}</span>
+                  <ChevronDown className={cn('h-4 w-4 text-zinc-400 ml-auto transition-transform', estGroupeOuvert(famille) ? 'rotate-180' : '')} />
+                </button>
+                {estGroupeOuvert(famille) && gs.map(g => (
+                  <GuideAccordion
+                    key={g.id}
+                    guide={g}
+                    etapes={etapes.filter(e => e.guide_id === g.id)}
+                    questions={questions.filter(q => q.guide_id === g.id)}
+                    open={openGuideId === g.id}
+                    onToggle={() => setOpenGuideId(openGuideId === g.id ? null : g.id)}
+                    onEdit={() => setShowGuideForm(g)}
+                    onDelete={async () => {
+                      if (!(await askConfirm({ title: 'Supprimer le guide', message: `Supprimer le guide "${g.titre}" et toutes ses étapes/questions ?`, confirmLabel: 'Supprimer', danger: true }))) return
+                      startTransition(() => supprimerGuide(g.id).then(() => router.refresh()))
+                    }}
+                  />
+                ))}
+              </section>
+            )
+          })}
         </div>
       )}
 
@@ -220,10 +300,10 @@ function EtapesPanel({ guide_id, etapes }: { guide_id: string; etapes: Etape[] }
                 {e.image_url && <span className="text-xs text-zinc-500">🖼 image</span>}
                 {e.video_url && <span className="text-xs text-zinc-500"> 🎥 vidéo</span>}
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                <button onClick={() => setShowForm(e)} className="text-zinc-500 hover:text-zinc-900 p-1"><Pencil className="h-3.5 w-3.5" /></button>
-                <button onClick={() => { if (confirm('Supprimer ?')) startTransition(() => supprimerEtape(e.id).then(() => router.refresh())) }}
-                  className="text-red-600 hover:bg-red-50 p-1"><Trash2 className="h-3.5 w-3.5" /></button>
+              <div className="flex gap-1 shrink-0">
+                <button onClick={() => setShowForm(e)} aria-label="Modifier l'étape" className="inline-flex items-center justify-center h-11 w-11 rounded text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"><Pencil className="h-4 w-4" /></button>
+                <button onClick={async () => { if (await askConfirm({ message: 'Supprimer cette étape ?', confirmLabel: 'Supprimer', danger: true })) startTransition(() => supprimerEtape(e.id).then(() => router.refresh())) }}
+                  aria-label="Supprimer l'étape" className="inline-flex items-center justify-center h-11 w-11 rounded text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
               </div>
             </li>
           ))}
@@ -271,10 +351,10 @@ function QuestionsPanel({ guide_id, questions, seuil }: { guide_id: string; ques
                   ))}
                 </ul>
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                <button onClick={() => setShowForm(q)} className="text-zinc-500 hover:text-zinc-900 p-1"><Pencil className="h-3.5 w-3.5" /></button>
-                <button onClick={() => { if (confirm('Supprimer ?')) startTransition(() => supprimerQuestion(q.id).then(() => router.refresh())) }}
-                  className="text-red-600 hover:bg-red-50 p-1"><Trash2 className="h-3.5 w-3.5" /></button>
+              <div className="flex gap-1 shrink-0">
+                <button onClick={() => setShowForm(q)} aria-label="Modifier la question" className="inline-flex items-center justify-center h-11 w-11 rounded text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"><Pencil className="h-4 w-4" /></button>
+                <button onClick={async () => { if (await askConfirm({ message: 'Supprimer cette question ?', confirmLabel: 'Supprimer', danger: true })) startTransition(() => supprimerQuestion(q.id).then(() => router.refresh())) }}
+                  aria-label="Supprimer la question" className="inline-flex items-center justify-center h-11 w-11 rounded text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
               </div>
             </li>
           ))}
@@ -326,7 +406,8 @@ function ProgressionsPanel({ progressions, guides, employes }: {
       {list.length === 0 ? (
         <p className="text-sm text-zinc-500 italic">Aucune progression.</p>
       ) : (
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-2 px-2">
+        <table className="w-full text-sm min-w-[560px]">
           <thead className="text-left bg-zinc-50">
             <tr>
               <th className="px-3 py-2">Employé</th>
@@ -348,7 +429,7 @@ function ProgressionsPanel({ progressions, guides, employes }: {
                   <td className="px-3 py-2 text-right">{p.dernier_score_pct != null ? `${p.dernier_score_pct} %` : '—'}</td>
                   <td className="px-3 py-2 text-xs text-zinc-600">{p.derniere_tentative_le ? format(parseISO(p.derniere_tentative_le), 'd MMM HH:mm', { locale: fr }) : '—'}</td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => { if (confirm('Réinitialiser cette progression ?')) startTransition(() => resetProgression(p.guide_id, p.employe_id).then(() => router.refresh())) }}
+                    <button onClick={async () => { if (await askConfirm('Réinitialiser cette progression ?')) startTransition(() => resetProgression(p.guide_id, p.employe_id).then(() => router.refresh())) }}
                       className="text-amber-700 hover:bg-amber-50 p-1 rounded inline-flex" title="Reset">
                       <RotateCcw className="h-4 w-4" />
                     </button>
@@ -358,6 +439,7 @@ function ProgressionsPanel({ progressions, guides, employes }: {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </Card>
   )

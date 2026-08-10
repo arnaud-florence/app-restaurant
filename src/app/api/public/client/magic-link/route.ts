@@ -46,6 +46,18 @@ export async function POST(req: Request) {
     return Response.json({ error: captcha.reason }, { status: 400, headers: cors })
   }
 
+  // M1 — redirect_to doit pointer vers une origine autorisée (outil 2). Sinon un
+  // magic-link légitime pourrait rediriger le token de session vers un domaine
+  // pirate. En dev (allowlist vide), on s'en remet à l'allowlist Supabase.
+  const allowedOrigins = (process.env.PUBLIC_API_ALLOWED_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  if (allowedOrigins.length > 0) {
+    let okRedirect = false
+    try { okRedirect = allowedOrigins.includes(new URL(p.redirect_to).origin) } catch { okRedirect = false }
+    if (!okRedirect) {
+      return Response.json({ error: 'redirect_to non autorisé' }, { status: 400, headers: cors })
+    }
+  }
+
   try {
     const sb = createAdminClient()
     const { error } = await sb.auth.signInWithOtp({

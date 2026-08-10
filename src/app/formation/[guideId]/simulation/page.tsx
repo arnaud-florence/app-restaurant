@@ -13,7 +13,8 @@ export default async function SimulationPage({
   params, searchParams,
 }: {
   params: { guideId: string }
-  searchParams: { employe?: string }
+  // Accepte `emp` (convention de l'app, passé par les liens /formation) ET `employe`.
+  searchParams: { emp?: string; employe?: string }
 }) {
   const supabase = await createClient()
 
@@ -31,7 +32,7 @@ export default async function SimulationPage({
 
   // Détermine l'employé : auth manager/employé prioritaire, sinon param URL (kiosk)
   const profil = await getProfile()
-  let employeId = searchParams.employe ?? null
+  let employeId = searchParams.emp ?? searchParams.employe ?? null
   if (profil && profil.role !== 'manager' && profil.employe_id) {
     employeId = profil.employe_id
   }

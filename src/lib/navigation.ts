@@ -46,8 +46,9 @@ export const CATEGORIES: Category[] = [
     items: [
       { href: '/mon-espace',         emoji: '🏠', label: 'Mon espace',       description: 'Tableau de bord personnel : pointage, paie, planning, challenges.', imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin',              emoji: '📊', label: 'Tableau de bord',  description: 'Vue manager : alertes urgentes, KPIs flash, accès rapide.',        imageUrl: u('1551288049-bebda4e38f71') },
+      { href: '/admin/supervision',  emoji: '🟢', label: 'Équipe en direct',  description: 'Qui travaille, qui est connecté, activité service temps réel + récap par employé.', imageUrl: u('1521737711867-e3b97375f902') },
       { href: '/admin/pilotage',     emoji: '🎯', label: 'Pilotage',         description: '10 KPIs, objectifs, plan d\'action mensuel, saisonnalité.',         imageUrl: u('1460925895917-afdab827c52f') },
-      { href: '/admin/assistant',    emoji: '🤖', label: 'Assistant IA',     description: 'Chat Claude connecté à toutes tes données live.',                   imageUrl: u('1677442136019-21780ecad995') },
+      { href: '/admin/co-gerant',     emoji: '🧑‍💼', label: 'Arnaud — co-gérant', description: 'Ton co-gérant IA : il audite, propose, tu valides — il agit.',       imageUrl: u('1556157382-97eda2d62296') },
       { href: '/admin/journal',      emoji: '📓', label: 'Journal de bord',  description: 'Notes humeurs + photos + analyse IA sur 6 mois.',                   imageUrl: u('1517842645767-c639042777db') },
       { href: '/admin/previsionnel', emoji: '🌤', label: 'Prévisionnel',     description: 'Météo + prévision CA 7j + suggestions IA.',                         imageUrl: u('1504608524841-42fe6f032b4b') },
     ],
@@ -103,10 +104,10 @@ export const CATEGORIES: Category[] = [
       { href: '/admin/reservations',     emoji: '📅', label: 'Réservations',      description: 'Tables, terrasse, chambres, événementiel.',              imageUrl: u('1517248135467-4c7edcad34c4') },
       { href: '/admin/chambres',         emoji: '🛏',  label: 'Chambres',          description: 'Calendrier multi-chambres, check-in, facture PDF.',      imageUrl: u('1582719478250-c89cae4dc85b') },
       { href: '/admin/groupes',          emoji: '👥', label: 'Groupes',           description: 'Tours-opérateurs, menus négociés, arrhes/solde.',        imageUrl: u('1559339352-11d035aa65de') },
-      { href: '/admin/clients',          emoji: '🧑', label: 'Clients / CRM',     description: 'Historique, allergies, segmentation, WiFi.',             imageUrl: u('1521737711867-e3b97375f902') },
-      { href: '/admin/clients/fidelite', emoji: '⭐', label: 'Programme fidélité', description: 'Points, niveaux, parrainage, campagnes.',                imageUrl: u('1556742393-d5066b0a7894') },
-      { href: '/admin/promotions',       emoji: '🎁', label: 'Promotions',        description: 'Codes promo, happy hours, offres temporaires.',          imageUrl: u('1607082348824-0a96f2a4b9da') },
-      { href: '/admin/codes-promo',      emoji: '🏷',  label: 'Codes promo',       description: 'Création + suivi performance par code.',                 imageUrl: u('1607082349566-187342175e2f') },
+      { href: '/admin/clients',          emoji: '🧑', label: 'Clients / CRM',     description: 'Historique, allergies, segmentation, parrainage, campagnes, WiFi.', imageUrl: u('1521737711867-e3b97375f902') },
+      { href: '/admin/clients/fidelite', emoji: '⭐', label: 'Programme fidélité', description: 'Points, niveaux, paramètres, analytics, historique.',    imageUrl: u('1556742393-d5066b0a7894') },
+      { href: '/admin/promotions',       emoji: '🎁', label: 'Promotions',        description: 'Bannières site web & happy hours (côté site public).',   imageUrl: u('1607082348824-0a96f2a4b9da') },
+      { href: '/admin/codes-promo',      emoji: '🏷',  label: 'Codes réduction',   description: 'Codes de réduction à l\'encaissement : création + suivi par code.', imageUrl: u('1607082349566-187342175e2f') },
       { href: '/admin/cartes-cadeaux',   emoji: '🎫', label: 'Cartes cadeaux',    description: 'Émission, suivi solde, conformité (Phase 1).',           imageUrl: u('1549465220-1a8b9238cd48') },
       { href: '/admin/reputation',       emoji: '🏆', label: 'Réputation / Avis', description: 'Collecte avis post-commande J+1, alertes notes basses.', imageUrl: u('1530021232320-687d8e3dba54') },
       { href: '/admin/marketing',        emoji: '📢', label: 'Marketing IA',      description: 'Génération posts Claude, calendrier éditorial.',         imageUrl: u('1551434678-e076c223a692') },
@@ -137,8 +138,10 @@ export const CATEGORIES: Category[] = [
     imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=75',
     items: [
       { href: '/admin/finances', emoji: '💰', label: 'Finances / TVA',    description: 'P&L live, trésorerie 30/60/90j, simulateurs.',  imageUrl: u('1554224155-6726b3ff858f') },
+      { href: '/admin/ventes-pdv', emoji: '📊', label: 'Ventes — 2 activités', description: 'Vision consolidée Restaurant + Fournil, CA ventilé par point de vente + commissions.', imageUrl: u('1460925895917-afdab827c52f') },
       { href: '/admin/economie', emoji: '🧮', label: 'Centre économique', description: 'Point mort, marges, surplus, redistribution.', imageUrl: u('1611532736597-de2d4265fba3') },
       { href: '/admin/energie',  emoji: '⚡', label: 'Énergie',           description: 'Élec/gaz/eau, comparaison N-1, alertes +20%.', imageUrl: u('1473341304170-971dccb5ac1e') },
+      { href: '/admin/commissions', emoji: '🤝', label: 'Commissions tiers', description: 'FDJ, tabac, relais colis — commissions hors CA principal.', imageUrl: u('1518186285589-2f7649de83e0') },
     ],
   },
   {
@@ -163,8 +166,11 @@ export const CATEGORIES: Category[] = [
     tone: 'zinc',
     imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=75',
     items: [
+      { href: '/admin/etablissements', emoji: '🏪', label: 'Points de vente', description: 'Restauration, bar, fournil, snack + services tiers (FDJ, tabac, colis).', imageUrl: u('1497366216548-37526070297c') },
+      { href: '/admin/caisse-agreee', emoji: '🔌', label: 'Connecteur caisse agréée', description: 'Synchro des encaissements de la caisse agréée (NF525) + contrat d\'intégration.', imageUrl: u('1556742502-ec7c0e9f34b1') },
       { href: '/admin/setup',    emoji: '⚙️', label: 'Configuration', description: 'Setup wizard, info établissement, intégrations.', imageUrl: u('1581090464777-f3220bbe1b8b') },
       { href: '/admin/securite', emoji: '🔐', label: 'Sécurité',      description: 'RBAC, 2FA, audit, connexions, sauvegardes.',     imageUrl: u('1563013544-824ae1b704d3') },
+      { href: '/admin/borne',    emoji: '🛍', label: 'Borne kiosk',   description: 'Configuration des bornes self-service en salle.', imageUrl: u('1556909114-f6e7ad7d3136') },
     ],
   },
 ]

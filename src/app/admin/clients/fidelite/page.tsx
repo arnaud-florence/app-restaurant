@@ -11,6 +11,8 @@ import { Star, TrendingUp, Settings, History, Gift, Users } from 'lucide-react'
 import TableClientsFideliteClient from './TableClientsFideliteClient'
 import Link from 'next/link'
 import ConfigFideliteForm from './ConfigFideliteForm'
+import EmptyState from '@/components/ui/EmptyState'
+import FideliteTabs from './FideliteTabs'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Fidélité — Admin' }
@@ -75,26 +77,9 @@ export default async function FidelitePage() {
     telephone: (r.telephone as string) ?? null,
   }))
 
-  return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6">
-      <header>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Star className="h-6 w-6 text-amber-500" />
-              Programme fidélité
-            </h1>
-            <p className="text-sm text-zinc-500">Top clients, mouvements de points, configuration des paliers.</p>
-          </div>
-          <Link
-            href="/admin/clients"
-            className="text-sm text-emerald-700 hover:text-emerald-900 underline"
-          >
-            ← Retour au CRM clients
-          </Link>
-        </div>
-      </header>
-
+  // ───────── Groupe ⚙️ Paramètres : config paliers + programme de récompenses ─────────
+  const tabParametres = (
+    <>
       {/* Configuration */}
       <Card className="p-5">
         <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
@@ -132,11 +117,13 @@ export default async function FidelitePage() {
             )
           })}
         </div>
-        <p className="text-[11px] text-zinc-500 italic mt-3">
-          💡 Pour modifier ces récompenses, édite <code>src/lib/clients.ts</code> → <code>NIVEAU_INFO</code>.
-        </p>
       </Card>
+    </>
+  )
 
+  // ───────── Groupe 🧑 Clients : table de tous les clients ─────────
+  const tabClients = (
+    <>
       {/* Tableau récap tous les clients */}
       <Card className="p-5">
         <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
@@ -145,7 +132,12 @@ export default async function FidelitePage() {
         </h2>
         <TableClientsFideliteClient clients={allClients} />
       </Card>
+    </>
+  )
 
+  // ───────── Groupe 📈 Analytics : top 20 points + top 20 CA ─────────
+  const tabAnalytics = (
+    <>
       {/* Tops */}
       <div className="grid lg:grid-cols-2 gap-4">
         <Card className="p-5">
@@ -154,9 +146,13 @@ export default async function FidelitePage() {
             Top 20 par points
           </h2>
           {topPoints.length === 0 ? (
-            <p className="text-sm text-zinc-500 italic">Aucun client avec des points.</p>
+            <EmptyState
+              emoji="⭐"
+              titre="Aucun point pour l'instant"
+              description="Dès qu'un client cumulera des points fidélité, ton top 20 apparaîtra ici."
+            />
           ) : (
-            <table className="w-full text-sm">
+            <div className="-mx-3 sm:mx-0 overflow-x-auto"><table className="w-full text-sm min-w-[560px]">
               <thead className="text-xs text-zinc-500 uppercase">
                 <tr><th className="text-left">Client</th><th className="text-left">Niveau</th><th className="text-right">Points</th><th className="text-right">Visites</th></tr>
               </thead>
@@ -179,7 +175,7 @@ export default async function FidelitePage() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
 
@@ -189,9 +185,13 @@ export default async function FidelitePage() {
             Top 20 par CA
           </h2>
           {topCa.length === 0 ? (
-            <p className="text-sm text-zinc-500 italic">Aucun client avec des achats.</p>
+            <EmptyState
+              emoji="🧑"
+              titre="Aucun achat enregistré"
+              description="Encaisse les premières commandes rattachées à un client pour voir ton classement par chiffre d'affaires."
+            />
           ) : (
-            <table className="w-full text-sm">
+            <div className="-mx-3 sm:mx-0 overflow-x-auto"><table className="w-full text-sm min-w-[560px]">
               <thead className="text-xs text-zinc-500 uppercase">
                 <tr><th className="text-left">Client</th><th className="text-left">Niveau</th><th className="text-right">Total</th><th className="text-right">Visites</th></tr>
               </thead>
@@ -214,11 +214,16 @@ export default async function FidelitePage() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </Card>
       </div>
+    </>
+  )
 
+  // ───────── Groupe 📜 Historique : derniers mouvements de points ─────────
+  const tabHistorique = (
+    <>
       {/* Derniers mouvements */}
       <Card className="p-5">
         <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
@@ -226,9 +231,13 @@ export default async function FidelitePage() {
           Derniers mouvements de points
         </h2>
         {mouvements.length === 0 ? (
-          <p className="text-sm text-zinc-500 italic">Aucun mouvement.</p>
+          <EmptyState
+            emoji="🎁"
+            titre="Aucun mouvement de points"
+            description="Les gains et utilisations de points fidélité de tes clients s'afficheront ici au fil du service."
+          />
         ) : (
-          <table className="w-full text-sm">
+          <div className="-mx-3 sm:mx-0 overflow-x-auto"><table className="w-full text-sm min-w-[560px]">
             <thead className="text-xs text-zinc-500 uppercase">
               <tr>
                 <th className="text-left">Date</th>
@@ -256,9 +265,38 @@ export default async function FidelitePage() {
                 )
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </Card>
+    </>
+  )
+
+  return (
+    <div className="max-w-7xl mx-auto p-4 space-y-6">
+      <header>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Star className="h-6 w-6 text-amber-500" />
+              Programme fidélité
+            </h1>
+            <p className="text-sm text-zinc-500">Top clients, mouvements de points, configuration des paliers.</p>
+          </div>
+          <Link
+            href="/admin/clients"
+            className="text-sm text-emerald-700 hover:text-emerald-900 underline"
+          >
+            ← Retour au CRM clients
+          </Link>
+        </div>
+      </header>
+
+      <FideliteTabs
+        clients={tabClients}
+        parametres={tabParametres}
+        analytics={tabAnalytics}
+        historique={tabHistorique}
+      />
     </div>
   )
 }

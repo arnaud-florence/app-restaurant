@@ -6,7 +6,6 @@ import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import BriefingPoste from '@/components/BriefingPoste'
-import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 
 export const metadata = { title: 'Pizza — Service' }
@@ -40,7 +39,6 @@ export default async function PizzaPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['stock', 'haccp', 'cuisine_rt']} />
       <CuisineClient
         initial={commandes}
         role="pizzaiolo"

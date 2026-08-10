@@ -113,12 +113,13 @@ export default function TicketClientPrintClient({
           <table className="w-full text-[11px]">
             <tbody>
               {articles.map(a => {
-                const lineHT = a.quantite * a.prix_unitaire_ht
+                // Ligne en TTC (ce que le client paie) — la ventilation HT/TVA reste en pied de ticket.
+                const lineTTC = a.quantite * (a.prix_unitaire_ttc || a.prix_unitaire_ht)
                 return (
                   <tr key={a.id} className="align-top">
                     <td className="pr-1.5 tabular-nums w-6">{a.quantite}×</td>
                     <td className="pr-1.5">{a.recette_nom}</td>
-                    <td className="text-right tabular-nums whitespace-nowrap">{fmtPrix(lineHT)}</td>
+                    <td className="text-right tabular-nums whitespace-nowrap">{fmtPrix(lineTTC)}</td>
                   </tr>
                 )
               })}

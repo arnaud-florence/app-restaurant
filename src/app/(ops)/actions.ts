@@ -6,6 +6,55 @@ import { createClient } from '@/lib/supabase/server'
 import { type StatutArticle, type StatutCommande, type SourceCommande } from '@/lib/service'
 import { sendPushToPostes } from '@/lib/push'
 import { tauxTvaArticle, calculerLigneTva, agregerVentilation, type Consommation } from '@/lib/tva'
+import { logActivite } from '@/lib/operateur'
+import { getOrCreateSessionCaisseId } from '@/lib/caisse'
+
+// Marque 'servi' les articles d'une commande pas encore servis → déclenche la
+// déduction de stock (trigger tg_deduire_stock_article). Le .neq évite toute
+// double déduction (idempotent). À appeler quand la commande est consommée
+// (servie/retirée/encaissée) pour les canaux comptoir/online/borne qui ne
+// passent pas par le marquage article-par-article du serveur.
+async function deduireStockCommande(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  commande_id: string,
+): Promise<void> {
+  try {
+    await supabase.from('commande_articles')
+      .update({ statut: 'servi' })
+      .eq('commande_id', commande_id)
+      .neq('statut', 'servi')
+  } catch { /* best-effort */ }
+}
+
+// Libellé de zone à partir de la source d'une commande (pour le journal).
+function zoneSource(source?: string | null): string {
+  switch (source) {
+    case 'TABLE': return 'Salle'
+    case 'ONLINE': return 'En ligne'
+    case 'COMPTOIR': return 'Comptoir'
+    case 'BORNE': return 'Borne'
+    default: return 'Service'
+  }
+}
+
+// Attribue une commande à son POINT DE VENTE (etablissements.slug) selon la source
+// + le tag majoritaire des articles. Permet à la caisse agréée / aux dashboards de
+// ventiler le CA par point de vente. Best-effort (renvoie null si introuvable).
+function etablissementSlugPour(source: string | null | undefined, tags: (string | null | undefined)[]): string {
+  if (source === 'ONLINE') return 'snack-emporter'
+  if (source === 'COMPTOIR') {
+    const counts = new Map<string, number>()
+    for (const t of tags) if (t) counts.set(t, (counts.get(t) ?? 0) + 1)
+    const dominant = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+    switch (dominant) {
+      case 'BAR': return 'bar'
+      case 'SNACKING': return 'snack-emporter'
+      case 'FOURNIL': return 'fournil'
+      default: return 'le-relais-des-saveurs'   // CUISINE / PIZZA / mixte
+    }
+  }
+  return 'le-relais-des-saveurs'                 // TABLE / BORNE / défaut = restauration
+}
 
 // ─── Articles : transitions de statut ────────────────────────────────
 const transitionArticleSchema = z.object({
@@ -80,27 +129,32 @@ export async function changerStatutArticle(input: unknown) {
     }
   }
 
-  // 3. Push notif : article passe à 'pret' → ping tous les serveurs/salle
+  // 3. Push notif : article d'une commande DE TABLE passe à 'pret' → ping serveurs/salle.
+  //    On ne notifie QUE les commandes de table (numero_table présent) : les commandes
+  //    ONLINE (emporter/livraison) et COMPTOIR ont leurs propres écrans (/emporter,
+  //    /livreur, onglet comptoir) et ne sont pas portées par un serveur en salle —
+  //    les pousser ici générait du bruit inutile pour la salle.
   if (p.nouveau_statut === 'pret') {
     try {
       const { data: art } = await supabase
         .from('commande_articles')
-        .select('recette_nom, quantite, commande:commandes(numero_table, source)')
+        .select('quantite, recette:recettes(nom), commande:commandes(numero_table, source)')
         .eq('id', p.article_id)
         .maybeSingle()
       if (art) {
         type CmdRow = { numero_table?: string | null; source?: string | null }
         const cmd = (art.commande ?? null) as CmdRow | null
-        const tableTxt = cmd?.numero_table ? `T${cmd.numero_table}` : (cmd?.source === 'COMPTOIR' ? 'Comptoir' : '')
-        const qty = (art.quantite as number) ?? 1
-        const nom = (art.recette_nom as string) ?? 'plat'
-        const body = tableTxt ? `${tableTxt} · ×${qty} ${nom}` : `×${qty} ${nom}`
-        await sendPushToPostes(['serveur', 'salle'], {
-          title: '🍽 Plat prêt',
-          body,
-          tag: `art-${p.article_id}`,
-          url:  '/serveur',
-        })
+        if (cmd?.numero_table) {
+          const qty = (art.quantite as number) ?? 1
+          const recJoin = art.recette as unknown as { nom?: string } | { nom?: string }[] | null
+          const nom = (Array.isArray(recJoin) ? recJoin[0]?.nom : recJoin?.nom) ?? 'plat'
+          await sendPushToPostes(['serveur', 'salle'], {
+            title: '🍽 Plat prêt',
+            body: `T${cmd.numero_table} · ×${qty} ${nom}`,
+            tag: `art-${p.article_id}`,
+            url:  '/serveur',
+          })
+        }
       }
     } catch { /* best-effort */ }
   }
@@ -144,9 +198,13 @@ const creerCommandeSchema = z.object({
   // dans le banner d'encaissement /emporter), bascule en cuisine APRÈS encaissement.
   // Utilisé pour les commandes snack comptoir (mêmes règles que la borne).
   paiement_au_comptoir: z.boolean().optional().default(false),
+  // Ardoise comptoir bar : nom du « tab » d'un client debout au comptoir. Les
+  // tournées suivantes portant le même nom s'ajoutent à la même commande (une
+  // seule addition, un seul encaissement à la fin).
+  ardoise_nom: z.string().trim().max(60).optional().nullable(),
 })
 
-export async function creerCommande(input: unknown): Promise<{ id: string; numero: string }> {
+export async function creerCommande(input: unknown): Promise<{ id: string; numero: string; ajoute: boolean }> {
   const p = creerCommandeSchema.parse(input)
   const supabase = await createClient()
 
@@ -158,6 +216,60 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     .eq('date_session', new Date().toISOString().slice(0, 10))
     .maybeSingle()
 
+  // ─── Addition unique par table : on AJOUTE à la commande active ───────
+  // Règle métier service réel : une table = UNE seule addition qui se construit
+  // par étapes (apéro → entrées → plats → desserts → café → digestifs). Tant que
+  // la table n'est pas encaissée, un nouvel envoi s'ajoute à la commande existante
+  // au lieu d'en créer une 2ᵉ — sinon on aurait plusieurs encaissements obligatoires.
+  // (Ne concerne QUE les commandes de table ; ONLINE/COMPTOIR/borne restent séparées.)
+  let appendCmd: {
+    id: string; numero: string
+    montant_total_ht: number; montant_total_ttc: number; tva_total: number
+    ventilation_tva: Record<string, number>
+    consommation: Consommation
+    tousServis: boolean
+  } | null = null
+  if (p.paiement_au_comptoir !== true) {
+    // Cas 1 — table : on suit la commande active de la table.
+    // Cas 2 — ardoise comptoir : on suit la commande COMPTOIR ouverte du même nom.
+    let activeId: string | null = null
+    if (p.source === 'TABLE' && p.numero_table) {
+      const { data: tbl } = await supabase.from('tables_restaurant')
+        .select('commande_active_id').eq('numero', p.numero_table).maybeSingle()
+      activeId = (tbl?.commande_active_id as string | null) ?? null
+    } else if (p.source === 'COMPTOIR' && p.ardoise_nom) {
+      const { data: ard } = await supabase.from('commandes')
+        .select('id')
+        .eq('source', 'COMPTOIR').eq('ardoise_nom', p.ardoise_nom)
+        .not('statut', 'in', '(encaisse,annule,en_attente_paiement_comptoir)')
+        .order('created_at', { ascending: true }).limit(1).maybeSingle()
+      activeId = (ard?.id as string | null) ?? null
+    }
+    if (activeId) {
+      const { data: ac } = await supabase.from('commandes')
+        .select('id, numero, statut, montant_total_ht, montant_total_ttc, tva_total, ventilation_tva, consommation')
+        .eq('id', activeId).maybeSingle()
+      // On ajoute uniquement si la commande est encore « ouverte » (ni payée, ni annulée,
+      // ni en attente de paiement comptoir).
+      if (ac && !['encaisse', 'annule', 'en_attente_paiement_comptoir'].includes(ac.statut as string)) {
+        const { data: existArts } = await supabase.from('commande_articles')
+          .select('statut').eq('commande_id', activeId)
+        const arts = existArts ?? []
+        const tousServis = arts.length > 0 && arts.every(a => a.statut === 'servi')
+        appendCmd = {
+          id: ac.id as string,
+          numero: ac.numero as string,
+          montant_total_ht: Number(ac.montant_total_ht ?? 0),
+          montant_total_ttc: Number(ac.montant_total_ttc ?? 0),
+          tva_total: Number(ac.tva_total ?? 0),
+          ventilation_tva: (ac.ventilation_tva ?? {}) as Record<string, number>,
+          consommation: (ac.consommation ?? 'sur_place') as Consommation,
+          tousServis,
+        }
+      }
+    }
+  }
+
   // Récupère contient_alcool pour chaque recette de la commande
   const recetteIds = Array.from(new Set(p.articles.map(a => a.recette_id)))
   const { data: recettes } = await supabase.from('recettes')
@@ -166,8 +278,9 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
   const alcoolMap = new Map<string, boolean>()
   for (const r of (recettes ?? [])) alcoolMap.set(r.id as string, !!r.contient_alcool)
 
-  // Calcule TVA par article + agrège
-  const consommation: Consommation = p.consommation
+  // Calcule TVA par article + agrège. Si on ajoute à une commande existante, on
+  // reprend SA consommation (sur place / emporter) pour rester cohérent sur l'addition.
+  const consommation: Consommation = appendCmd ? appendCmd.consommation : p.consommation
   const lignesTva = p.articles.map(a => {
     const alcool = alcoolMap.get(a.recette_id) ?? false
     const taux   = tauxTvaArticle(alcool, consommation)
@@ -178,6 +291,65 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
   const total_ttc = lignesTva.reduce((s, l) => s + l.ttc, 0)
   const tva_total = lignesTva.reduce((s, l) => s + l.tva_eur, 0)
   const ventilation = agregerVentilation(lignesTva.map(l => ({ tva_taux: l.tva_taux, tva_eur: l.tva_eur })))
+
+  // ─── AJOUT à la commande active de la table (addition unique) ─────────
+  if (appendCmd) {
+    // 1. Ajoute les nouveaux articles à la commande existante
+    const { error: aErr } = await supabase.from('commande_articles').insert(
+      lignesTva.map(a => ({
+        commande_id: appendCmd!.id,
+        recette_id: a.recette_id,
+        quantite: a.quantite,
+        prix_unitaire_ht: a.prix_unitaire_ht,
+        prix_unitaire_ttc: a.prix_unitaire_ttc,
+        tva_taux: a.tva_taux,
+        tva_eur:  a.tva_eur,
+        tag_destination: a.tag_destination,
+        commentaire: a.commentaire || null,
+        allergenes_a_eviter: a.allergenes_a_eviter ?? [],
+        statut: 'en_attente',
+      }))
+    )
+    if (aErr) throw new Error(`Erreur ajout articles : ${aErr.message}`)
+
+    // 2. Recalcule les totaux = existant + nouveaux ; fusionne la ventilation TVA
+    const mergedVent: Record<string, number> = { ...appendCmd.ventilation_tva }
+    for (const [taux, eur] of Object.entries(ventilation)) {
+      mergedVent[taux] = Math.round(((mergedVent[taux] ?? 0) + Number(eur)) * 100) / 100
+    }
+    const upd: Record<string, unknown> = {
+      montant_total_ht:  Math.round((appendCmd.montant_total_ht  + total_ht)  * 100) / 100,
+      montant_total_ttc: Math.round((appendCmd.montant_total_ttc + total_ttc) * 100) / 100,
+      tva_total:         Math.round((appendCmd.tva_total         + tva_total) * 100) / 100,
+      ventilation_tva:   mergedVent,
+      statut: 'en_attente',
+    }
+    // Si la tournée précédente était entièrement servie, on redémarre le minuteur
+    // cuisine (created_at = maintenant) pour que la nouvelle tournée parte « au vert ».
+    // Sinon on garde le created_at (le minuteur reflète le plus ancien plat en cours).
+    if (appendCmd.tousServis) upd.created_at = new Date().toISOString()
+    await supabase.from('commandes').update(upd).eq('id', appendCmd.id)
+
+    // 3. Pour une table : elle redevient « occupée » (elle pouvait être 'a_encaisser'
+    //    si tout était servi). Pour une ardoise comptoir : pas de table à mettre à jour.
+    if (p.numero_table) {
+      await supabase.from('tables_restaurant')
+        .update({ statut: 'occupee', commande_active_id: appendCmd.id })
+        .eq('numero', p.numero_table)
+    }
+
+    await logActivite({
+      action: 'commande_articles_ajoutes',
+      zone: zoneSource(p.source),
+      cible: p.numero_table ? `Table ${p.numero_table}` : `Ardoise ${p.ardoise_nom ?? ''}`,
+      details: { commande: appendCmd.numero, nb_articles: lignesTva.length },
+    })
+
+    revalidatePath('/cuisine')
+    revalidatePath('/bar')
+    revalidatePath('/serveur')
+    return { id: appendCmd.id, numero: appendCmd.numero, ajoute: true }
+  }
 
   // ─── Anti-race par tag : vérifie chaque créneau distinct n'est pas déjà pris ───
   // On consolide creneau_retrait (legacy) + creneaux_par_tag dans une map à vérifier.
@@ -262,11 +434,20 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     ? 'en_attente_paiement_comptoir'
     : 'en_attente'
 
+  // Attribution au point de vente (best-effort, jamais bloquant).
+  let etablissementId: string | null = null
+  try {
+    const slugPdv = etablissementSlugPour(p.source, p.articles.map(a => a.tag_destination))
+    const { data: etab } = await supabase.from('etablissements').select('id').eq('slug', slugPdv).maybeSingle()
+    etablissementId = (etab?.id as string) ?? null
+  } catch { /* colonne/table absente → on ignore */ }
+
   const { data: cmd, error } = await supabase.from('commandes').insert({
     numero,
     source: p.source,
     numero_table: p.numero_table || null,
     statut: statutInitial,
+    etablissement_id: etablissementId,
     montant_total_ht: Math.round(total_ht * 100) / 100,
     montant_total_ttc: Math.round(total_ttc * 100) / 100,
     tva_total: Math.round(tva_total * 100) / 100,
@@ -277,6 +458,7 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     session_caisse_id: session?.id ?? null,
     creneau_retrait: creneauRetraitFinal,
     creneaux_par_tag: creneauxParTagFinal,
+    ardoise_nom: p.ardoise_nom || null,
   }).select('id, numero').single()
   if (error || !cmd) throw new Error(error?.message ?? 'Erreur création commande')
 
@@ -333,11 +515,18 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
     }
   }
 
+  await logActivite({
+    action: 'commande_creee',
+    zone: zoneSource(p.source),
+    cible: p.numero_table ? `Table ${p.numero_table}` : `Cmd #${cmd.numero ?? cmd.id.slice(-6)}`,
+    details: { source: p.source },
+  })
+
   revalidatePath('/cuisine')
   revalidatePath('/bar')
   revalidatePath('/serveur')
   revalidatePath('/emporter')
-  return { id: cmd.id as string, numero: cmd.numero as string }
+  return { id: cmd.id as string, numero: cmd.numero as string, ajoute: false }
 }
 
 // ─── Toggle sur_place / emporter (recalcule TVA) ────────────────────
@@ -346,7 +535,7 @@ const setConsoSchema = z.object({
   consommation: z.enum(['sur_place', 'emporter']),
 })
 
-export async function setConsommationCommande(input: unknown): Promise<{ ok: true }> {
+export async function setConsommationCommande(input: unknown): Promise<{ ok: true; montant_total_ht: number; montant_total_ttc: number; tva_total: number }> {
   const p = setConsoSchema.parse(input)
   const supabase = await createClient()
 
@@ -402,7 +591,12 @@ export async function setConsommationCommande(input: unknown): Promise<{ ok: tru
   revalidatePath('/serveur')
   revalidatePath('/caisse')
   revalidatePath('/cuisine')
-  return { ok: true as const }
+  return {
+    ok: true as const,
+    montant_total_ht:  Math.round(total_ht * 100) / 100,
+    montant_total_ttc: Math.round(total_ttc * 100) / 100,
+    tva_total:         Math.round(tva_total * 100) / 100,
+  }
 }
 
 // ─── Encaissement : Multi-paiements + tips + libère table ────────────
@@ -446,13 +640,9 @@ export async function encaisserCommande(input: unknown) {
   // pour partir en cuisine, AU LIEU de 'encaisse' (qui clôt le cycle).
   const modePreCuisine = cmd.statut === 'en_attente_paiement_comptoir'
 
-  // Récupère la session caisse ouverte
-  const { data: session } = await supabase
-    .from('sessions_caisse')
-    .select('id')
-    .is('fermee_at', null)
-    .eq('date_session', new Date().toISOString().slice(0, 10))
-    .maybeSingle()
+  // Session caisse : on récupère l'ouverte du jour, ou on en CRÉE une (filet de
+  // sécurité) pour ne jamais produire de paiement orphelin hors Z-report.
+  const sessionId = await getOrCreateSessionCaisseId(supabase)
 
   const totalPaye = p.paiements.reduce((s, x) => s + x.montant, 0)
   const totalTips = p.paiements.reduce((s, x) => s + x.pourboire, 0)
@@ -465,7 +655,7 @@ export async function encaisserCommande(input: unknown) {
   const { error: pErr } = await supabase.from('paiements_caisse').insert(
     p.paiements.map(x => ({
       commande_id: p.commande_id,
-      session_caisse_id: session?.id ?? null,
+      session_caisse_id: sessionId,
       methode: x.methode,
       montant: x.montant,
       pourboire: x.pourboire,
@@ -482,6 +672,10 @@ export async function encaisserCommande(input: unknown) {
     statut: modePreCuisine ? 'en_attente' : 'encaisse',
     mode_paiement: p.paiements.map(x => x.methode).join('+'),
     pourboire_total: totalTips,
+    // Rattache la commande à la session caisse de l'encaissement : sinon le Z-report
+    // (qui compte les commandes + agrège la TVA par session_caisse_id) la manquerait
+    // si elle avait été créée avant l'ouverture de la session.
+    session_caisse_id: sessionId,
     ...(modePreCuisine ? { borne_expire_at: null } : {}),
   }
   if (p.client_id) updateCmd.client_id = p.client_id
@@ -491,12 +685,33 @@ export async function encaisserCommande(input: unknown) {
     .eq('id', p.commande_id)
   if (uErr) throw new Error(`Erreur maj commande : ${uErr.message}`)
 
-  // 3. Libère la table (sauf en mode pré-cuisine : pas de table en borne/snack)
+  // 3. Libère la table — mais SEULEMENT s'il ne reste plus aucune autre commande
+  //    non réglée sur cette table (cas multi-tournées : apéro encaissé alors que
+  //    les plats ne le sont pas encore). Sinon on garderait la table « libre »
+  //    avec une tournée impayée orpheline → perte d'argent.
   if (cmd.numero_table && !modePreCuisine) {
-    await supabase
-      .from('tables_restaurant')
-      .update({ statut: 'libre', commande_active_id: null })
-      .eq('numero', cmd.numero_table)
+    const { data: restantes } = await supabase
+      .from('commandes')
+      .select('id, statut')
+      .eq('numero_table', cmd.numero_table)
+      .not('statut', 'in', '(encaisse,annule)')
+      .neq('id', p.commande_id)
+      .order('created_at', { ascending: true })
+      .limit(10)
+    const reste = restantes ?? []
+    if (reste.length === 0) {
+      await supabase
+        .from('tables_restaurant')
+        .update({ statut: 'libre', commande_active_id: null })
+        .eq('numero', cmd.numero_table)
+    } else {
+      // Il reste des tournées à régler → la table N'EST PAS libérée.
+      const tousServis = reste.every(c => c.statut === 'servi')
+      await supabase
+        .from('tables_restaurant')
+        .update({ statut: tousServis ? 'a_encaisser' : 'occupee', commande_active_id: reste[0].id })
+        .eq('numero', cmd.numero_table)
+    }
   }
 
   // 4. Fidélité — si paiement par points, on consomme + on crédite normalement
@@ -524,8 +739,11 @@ export async function encaisserCommande(input: unknown) {
       }
     }
 
-    // 4b. Crédit normal sur le total HT (gain) — toujours appliqué si client lié
-    const r = await crediterPointsCommande(p.commande_id, p.serveur_id ?? null)
+    // 4b. Crédit (gain) sur la part de l'addition réglée en argent réel — PAS sur la
+    // part payée en points (sinon le client gagne des points sur ses propres points).
+    const redemptionTTC = p.paiements.filter(x => x.methode === 'fidelite').reduce((s, x) => s + x.montant, 0)
+    const ratioEligible = totalAttendu > 0 ? Math.max(0, 1 - redemptionTTC / totalAttendu) : 1
+    const r = await crediterPointsCommande(p.commande_id, p.serveur_id ?? null, ratioEligible)
     if (r) {
       fidelite = {
         points: r.points,
@@ -536,6 +754,18 @@ export async function encaisserCommande(input: unknown) {
   } catch (e) {
     console.error('[fidelite] erreur globale :', e)
   }
+
+  // Filet de sécurité : déduit le stock si la commande est encaissée sans être
+  // passée par 'servi' (ex. comptoir encaissé directement). Idempotent.
+  await deduireStockCommande(supabase, p.commande_id)
+
+  const totalEncaisse = p.paiements.reduce((s, x) => s + Number(x.montant ?? 0), 0)
+  await logActivite({
+    action: 'encaissement',
+    zone: 'Caisse',
+    cible: `${totalEncaisse.toFixed(2)} €`,
+    details: { montant: totalEncaisse, commande_id: p.commande_id, modes: p.paiements.map(x => x.methode) },
+  })
 
   revalidatePath('/cuisine')
   revalidatePath('/bar')
@@ -568,6 +798,12 @@ export async function marquerStatutCommandeOnline(input: unknown) {
     .update({ statut: p.nouveau_statut })
     .eq('id', p.commande_id)
   if (error) throw new Error(error.message)
+
+  // Déduction de stock quand la commande ONLINE est préparée/retirée
+  // (sinon le stock ne bougerait jamais pour le canal en ligne).
+  if (p.nouveau_statut === 'pret_pour_retrait' || p.nouveau_statut === 'retire_par_client') {
+    await deduireStockCommande(supabase, p.commande_id)
+  }
 
   // ─── Hook email client si commande prête à retirer ──────────────
   // Best-effort, jamais bloquant.
@@ -643,6 +879,10 @@ export async function avancerCommandeComptoir(input: unknown) {
     .update({ statut: statutCible })
     .eq('id', p.commande_id)
   if (error) throw new Error(error.message)
+  // « Donné au client » (comptoir/snack/borne) = consommé → déduction stock.
+  if (p.nouveau_statut === 'servi') {
+    await deduireStockCommande(supabase, p.commande_id)
+  }
   revalidatePath('/emporter')
   revalidatePath('/bar')
   revalidatePath('/caisse')
@@ -772,10 +1012,122 @@ export async function annulerCommande(commande_id: string, motif: string) {
   if (cmd?.numero_table) {
     await supabase.from('tables_restaurant').update({ statut: 'libre', commande_active_id: null }).eq('numero', cmd.numero_table)
   }
+  await logActivite({
+    action: 'annulation',
+    zone: 'Service',
+    cible: cmd?.numero_table ? `Table ${cmd.numero_table}` : `Cmd ${commande_id.slice(-6)}`,
+    details: { motif },
+  })
   revalidatePath('/cuisine')
   revalidatePath('/bar')
   revalidatePath('/serveur')
   return { ok: true as const }
+}
+
+// ─── 86 : annuler UN SEUL article d'une commande (sans annuler la table) ──
+// Supprime la ligne (commande_articles n'a pas de FK enfant), recalcule les
+// totaux + ventilation TVA et re-synchronise le statut commande. N'autorise
+// que les articles NON servis (le stock se déduit au passage 'servi' — un
+// article déjà servi a déjà impacté le stock et ne doit pas être retiré ici).
+const annulerArticleSchema = z.object({
+  article_id: z.string().uuid(),
+  motif: z.string().min(1).max(500),
+})
+
+export async function annulerArticle(input: unknown): Promise<{ ok: boolean; commandeAnnulee: boolean; error?: string }> {
+  try {
+    return await annulerArticleImpl(input)
+  } catch (e) {
+    return { ok: false, commandeAnnulee: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function annulerArticleImpl(input: unknown): Promise<{ ok: true; commandeAnnulee: boolean }> {
+  const p = annulerArticleSchema.parse(input)
+  const supabase = await createClient()
+
+  const { data: art } = await supabase
+    .from('commande_articles')
+    .select('id, commande_id, statut, quantite, recette:recettes(nom)')
+    .eq('id', p.article_id)
+    .single()
+  if (!art) throw new Error('Article introuvable')
+  if (art.statut === 'servi') throw new Error('Article déjà servi — annulation impossible ici')
+  const recJoin = art.recette as unknown as { nom?: string } | { nom?: string }[] | null
+  const nomArticle = (Array.isArray(recJoin) ? recJoin[0]?.nom : recJoin?.nom) ?? 'article'
+
+  const commande_id = art.commande_id as string
+  const { data: cmd0 } = await supabase
+    .from('commandes')
+    .select('statut, consommation, numero_table')
+    .eq('id', commande_id)
+    .single()
+  if (!cmd0) throw new Error('Commande introuvable')
+  if (cmd0.statut === 'encaisse' || cmd0.statut === 'annule') throw new Error('Commande déjà clôturée')
+
+  // Supprime la ligne (non servie → pas de stock à reverser)
+  const { error: delErr } = await supabase.from('commande_articles').delete().eq('id', p.article_id)
+  if (delErr) throw new Error(delErr.message)
+
+  const { data: restants } = await supabase
+    .from('commande_articles')
+    .select('id, recette_id, quantite, prix_unitaire_ht, statut')
+    .eq('commande_id', commande_id)
+
+  const cibleLog = cmd0.numero_table ? `Table ${cmd0.numero_table}` : `Cmd ${commande_id.slice(-6)}`
+
+  // Plus aucun article → annule la commande + libère la table
+  if (!restants || restants.length === 0) {
+    await supabase.from('commandes').update({ statut: 'annule', notes: `86 dernier article — ${p.motif}` }).eq('id', commande_id)
+    if (cmd0.numero_table) {
+      await supabase.from('tables_restaurant').update({ statut: 'libre', commande_active_id: null }).eq('numero', cmd0.numero_table)
+    }
+    await logActivite({ action: 'annulation', zone: 'Service', cible: cibleLog, details: { motif: p.motif, type: '86_article_dernier', article: nomArticle } })
+    revalidatePath('/cuisine'); revalidatePath('/bar'); revalidatePath('/serveur'); revalidatePath('/caisse')
+    return { ok: true as const, commandeAnnulee: true }
+  }
+
+  // Recalcule totaux + ventilation (même logique que setConsommationCommande)
+  const consommation = (cmd0.consommation as 'sur_place' | 'emporter' | null) ?? 'sur_place'
+  const recetteIds = Array.from(new Set(restants.map(a => a.recette_id as string)))
+  const { data: recettes } = await supabase.from('recettes').select('id, contient_alcool').in('id', recetteIds)
+  const alcoolMap = new Map<string, boolean>()
+  for (const r of (recettes ?? [])) alcoolMap.set(r.id as string, !!r.contient_alcool)
+  let total_ht = 0, total_ttc = 0, tva_total = 0
+  const ventInput: Array<{ tva_taux: number; tva_eur: number }> = []
+  for (const a of restants) {
+    const alcool = alcoolMap.get(a.recette_id as string) ?? false
+    const taux = tauxTvaArticle(alcool, consommation)
+    const calc = calculerLigneTva(Number(a.quantite ?? 0), Number(a.prix_unitaire_ht ?? 0), taux)
+    total_ht += calc.ht; total_ttc += calc.ttc; tva_total += calc.tva_eur
+    ventInput.push({ tva_taux: taux, tva_eur: calc.tva_eur })
+  }
+  const ventilation = agregerVentilation(ventInput)
+
+  // Re-synchronise le statut commande depuis l'agrégat restant
+  const statuts = restants.map(a => a.statut as StatutArticle)
+  let nouveauStatutCmd: StatutCommande = 'en_attente'
+  if (statuts.every(s => s === 'servi'))                      nouveauStatutCmd = 'servi'
+  else if (statuts.every(s => s === 'pret' || s === 'servi')) nouveauStatutCmd = 'pret'
+  else if (statuts.some(s => s === 'en_preparation'))         nouveauStatutCmd = 'en_preparation'
+  else                                                         nouveauStatutCmd = 'en_attente'
+
+  await supabase.from('commandes').update({
+    statut: nouveauStatutCmd,
+    montant_total_ht:  Math.round(total_ht * 100) / 100,
+    montant_total_ttc: Math.round(total_ttc * 100) / 100,
+    tva_total:         Math.round(tva_total * 100) / 100,
+    ventilation_tva:   ventilation,
+  }).eq('id', commande_id)
+
+  // Si l'agrégat restant est 'servi' → la table passe à 'a_encaisser'
+  if (nouveauStatutCmd === 'servi' && cmd0.numero_table) {
+    await supabase.from('tables_restaurant').update({ statut: 'a_encaisser' }).eq('numero', cmd0.numero_table)
+  }
+
+  await logActivite({ action: 'annulation', zone: 'Service', cible: cibleLog, details: { motif: p.motif, type: '86_article', article: nomArticle, quantite: art.quantite } })
+  revalidatePath('/cuisine'); revalidatePath('/bar'); revalidatePath('/serveur'); revalidatePath('/caisse')
+  return { ok: true as const, commandeAnnulee: false }
 }
 
 // ─── Caisse : ouvrir / clôturer / résumé Z ───────────────────────────
@@ -790,15 +1142,28 @@ export async function ouvrirSessionCaisse(input: unknown) {
   const p = ouvrirSessionSchema.parse(input)
   const supabase = await createClient()
 
-  // Refuse si une session est déjà ouverte aujourd'hui
   const today = new Date().toISOString().slice(0, 10)
   const { data: deja } = await supabase
     .from('sessions_caisse')
-    .select('id')
+    .select('id, notes')
     .is('fermee_at', null)
     .eq('date_session', today)
     .maybeSingle()
-  if (deja) throw new Error('Une session est déjà ouverte aujourd\'hui')
+  if (deja) {
+    // Si la session ouverte a été créée AUTOMATIQUEMENT (1er encaissement avant
+    // ouverture manuelle, fond 0), l'ouverture manuelle la RÉGULARISE avec le vrai
+    // fond au lieu d'échouer. Sinon, c'est une vraie session déjà ouverte → refus.
+    const estAuto = typeof deja.notes === 'string' && deja.notes.startsWith('Ouverture automatique')
+    if (!estAuto) throw new Error('Une session est déjà ouverte aujourd\'hui')
+    const { error: updErr } = await supabase
+      .from('sessions_caisse')
+      .update({ fond_initial: p.fond_initial, ouverte_par: p.ouverte_par || null, notes: p.notes || null })
+      .eq('id', deja.id)
+    if (updErr) throw new Error(updErr.message)
+    await logActivite({ action: 'ouverture_caisse', zone: 'Caisse', cible: `Fond ${Number(p.fond_initial).toFixed(2)} € (session auto régularisée)` })
+    revalidatePath('/caisse')
+    return { id: deja.id as string }
+  }
 
   const { data, error } = await supabase
     .from('sessions_caisse')
@@ -811,6 +1176,8 @@ export async function ouvrirSessionCaisse(input: unknown) {
     .select('id')
     .single()
   if (error || !data) throw new Error(error?.message ?? 'Erreur ouverture session')
+
+  await logActivite({ action: 'ouverture_caisse', zone: 'Caisse', cible: `Fond ${Number(p.fond_initial).toFixed(2)} €` })
 
   revalidatePath('/caisse')
   return { id: data.id as string }
@@ -844,8 +1211,20 @@ export async function fermerSessionCaisse(input: unknown) {
     .eq('session_caisse_id', p.session_id)
     .eq('methode', 'especes')
   const caAttendu = (especes ?? []).reduce((s, x) => s + Number(x.montant ?? 0), 0)
-  // Le "ca_compte" attendu en caisse = fond_initial + sum especes
-  const caisseAttendue = Number(sess.fond_initial ?? 0) + caAttendu
+  // Mouvements d'espèces hors encaissement (sorties tiroir / apports).
+  // Tolérant : si la table n'existe pas encore (migration 0107 non exécutée),
+  // la requête renvoie data=null → sommes à 0, la clôture ne casse pas.
+  const { data: mvts } = await supabase
+    .from('mouvements_caisse')
+    .select('type, montant')
+    .eq('session_id', p.session_id)
+  let sumSorties = 0, sumEntrees = 0
+  for (const m of (mvts ?? [])) {
+    if (m.type === 'sortie') sumSorties += Number(m.montant ?? 0)
+    else                     sumEntrees += Number(m.montant ?? 0)
+  }
+  // Le "ca_compte" attendu en caisse = fond + espèces encaissées − sorties + apports
+  const caisseAttendue = Number(sess.fond_initial ?? 0) + caAttendu - sumSorties + sumEntrees
   const ecart = Math.round((p.ca_compte - caisseAttendue) * 100) / 100
 
   const { error } = await supabase
@@ -862,8 +1241,67 @@ export async function fermerSessionCaisse(input: unknown) {
     .eq('id', p.session_id)
   if (error) throw new Error(error.message)
 
+  await logActivite({
+    action: 'cloture_caisse', zone: 'Caisse',
+    cible: `CA ${Number(p.ca_compte).toFixed(2)} €`,
+    details: { ca_compte: p.ca_compte, ecart },
+  })
+
   revalidatePath('/caisse')
   return { ok: true as const, ecart }
+}
+
+// ─── Mouvement d'espèces (sortie tiroir / apport) — nécessite migration 0107 ──
+const mouvementCaisseSchema = z.object({
+  type: z.enum(['sortie', 'entree']),
+  montant: z.number().positive(),
+  motif: z.string().min(1, 'Motif obligatoire').max(200),
+  cree_par: z.string().uuid().optional().nullable(),
+})
+
+export async function enregistrerMouvementCaisse(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const p = mouvementCaisseSchema.parse(input)
+    const supabase = await createClient()
+    // Session de caisse ouverte (une seule par jour, fermee_at IS NULL)
+    const { data: sess } = await supabase
+      .from('sessions_caisse')
+      .select('id')
+      .is('fermee_at', null)
+      .order('ouverte_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!sess) throw new Error('Aucune session de caisse ouverte — ouvre la caisse d\'abord')
+    const { error } = await supabase.from('mouvements_caisse').insert({
+      session_id: sess.id,
+      type: p.type,
+      montant: Math.round(p.montant * 100) / 100,
+      motif: p.motif.trim(),
+      created_by: p.cree_par || null,
+    })
+    if (error) throw new Error(error.message)
+    await logActivite({
+      action: p.type === 'sortie' ? 'sortie_caisse' : 'entree_caisse',
+      zone: 'Caisse',
+      cible: `${p.type === 'sortie' ? '−' : '+'}${p.montant.toFixed(2)} €`,
+      details: { motif: p.motif.trim() },
+    })
+    revalidatePath('/caisse')
+    return { ok: true as const }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Mouvements d'espèces d'une session (pour l'affichage caisse + rapport Z). */
+export async function listMouvementsCaisse(session_id: string): Promise<Array<{ id: string; type: 'sortie' | 'entree'; montant: number; motif: string; created_at: string }>> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('mouvements_caisse')
+    .select('id, type, montant, motif, created_at')
+    .eq('session_id', session_id)
+    .order('created_at', { ascending: false })
+  return ((data ?? []) as Array<{ id: string; type: 'sortie' | 'entree'; montant: number; motif: string; created_at: string }>)
 }
 
 export type ResumeSession = {
@@ -883,10 +1321,14 @@ export type ResumeSession = {
   }
   paiements_par_methode: Array<{ methode: string; nb: number; montant: number; pourboire: number }>
   tips_par_serveur: Array<{ serveur_id: string | null; serveur_nom: string; nb: number; pourboire: number }>
+  ventilation_tva: Array<{ taux: number; ht: number; tva: number; ttc: number }>
   nb_commandes_encaissees: number
   ca_total_ttc: number
   pourboires_total: number
-  caisse_attendue: number  // fond_initial + sum especes
+  caisse_attendue: number  // fond_initial + espèces − sorties + apports
+  mouvements: Array<{ id: string; type: 'sortie' | 'entree'; montant: number; motif: string; created_at: string }>
+  sorties_total: number
+  entrees_total: number
 }
 
 export async function getResumeSession(session_id?: string): Promise<ResumeSession | null> {
@@ -949,12 +1391,54 @@ export async function getResumeSession(session_id?: string): Promise<ResumeSessi
     .eq('session_caisse_id', sess.id)
     .eq('statut', 'encaisse')
 
+  // Ventilation TVA agrégée sur les commandes encaissées de la session.
+  // ventilation_tva stocke {taux: tva_eur}. On reconstruit HT et TTC par taux
+  // (HT = tva / (taux/100) car tva = HT × taux/100 — exact).
+  const { data: cmdsTva } = await supabase
+    .from('commandes')
+    .select('ventilation_tva')
+    .eq('session_caisse_id', sess.id)
+    .eq('statut', 'encaisse')
+
+  const mTva = new Map<string, number>()
+  for (const c of cmdsTva ?? []) {
+    const v = (c.ventilation_tva ?? {}) as Record<string, number>
+    for (const [taux, eur] of Object.entries(v)) {
+      mTva.set(taux, (mTva.get(taux) ?? 0) + Number(eur ?? 0))
+    }
+  }
+  const ventilationTva = Array.from(mTva.entries())
+    .map(([taux, tva]) => {
+      const t = Number(taux)
+      const ht = t > 0 ? tva / (t / 100) : 0
+      return {
+        taux: t,
+        ht:  Math.round(ht * 100) / 100,
+        tva: Math.round(tva * 100) / 100,
+        ttc: Math.round((ht + tva) * 100) / 100,
+      }
+    })
+    .sort((a, b) => a.taux - b.taux)
+
   const especes = mMethodes.get('especes')?.montant ?? 0
-  const caTotal = Array.from(mMethodes.values()).reduce((s, m) => s + m.montant, 0)
+  // Le CA exclut la « fidélité » : ce n'est pas un encaissement réel mais une
+  // remise par points (sinon le CA et le ticket moyen seraient gonflés).
+  const caTotal = Array.from(mMethodes.entries()).reduce((s, [meth, m]) => meth === 'fidelite' ? s : s + m.montant, 0)
   const tipsTotal = Array.from(mMethodes.values()).reduce((s, m) => s + m.pourboire, 0)
 
   const ouvR = sess.ouverte as { prenom?: string; nom?: string } | null
   const ferR = sess.fermee as { prenom?: string; nom?: string } | null
+
+  // Mouvements d'espèces (tolérant : table absente → liste vide).
+  const { data: mvtsRaw } = await supabase
+    .from('mouvements_caisse')
+    .select('id, type, montant, motif, created_at')
+    .eq('session_id', sess.id)
+    .order('created_at', { ascending: false })
+  const mouvements = ((mvtsRaw ?? []) as Array<{ id: string; type: 'sortie' | 'entree'; montant: number; motif: string; created_at: string }>)
+    .map(m => ({ ...m, montant: Number(m.montant ?? 0) }))
+  const sortiesTotal = mouvements.filter(m => m.type === 'sortie').reduce((s, m) => s + m.montant, 0)
+  const entreesTotal = mouvements.filter(m => m.type === 'entree').reduce((s, m) => s + m.montant, 0)
 
   return {
     session: {
@@ -975,10 +1459,14 @@ export async function getResumeSession(session_id?: string): Promise<ResumeSessi
       .map(([methode, v]) => ({ methode, ...v }))
       .sort((a, b) => b.montant - a.montant),
     tips_par_serveur: Array.from(mTips.values()).sort((a, b) => b.pourboire - a.pourboire),
+    ventilation_tva: ventilationTva,
     nb_commandes_encaissees: nbCmd ?? 0,
     ca_total_ttc: caTotal,
     pourboires_total: tipsTotal,
-    caisse_attendue: Number(sess.fond_initial ?? 0) + especes,
+    caisse_attendue: Math.round((Number(sess.fond_initial ?? 0) + especes - sortiesTotal + entreesTotal) * 100) / 100,
+    mouvements,
+    sorties_total: Math.round(sortiesTotal * 100) / 100,
+    entrees_total: Math.round(entreesTotal * 100) / 100,
   }
 }
 
@@ -1016,10 +1504,10 @@ export async function listCommandesActives() {
   const { data, error } = await supabase
     .from('commandes')
     .select(`
-      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
+      id, numero, source, numero_table, ardoise_nom, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
       montant_total_ttc, tva_total, consommation, mode_paiement,
       serveur:employes!serveur_id(prenom, nom),
-      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
+      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, prix_unitaire_ttc, tva_taux, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
     .not('statut', 'in', '(encaisse,annule,retire_par_client)')
     .order('created_at', { ascending: true })
@@ -1032,6 +1520,7 @@ export async function listCommandesActives() {
       numero: r.numero as string,
       source: r.source as SourceCommande,
       numero_table: (r.numero_table as string) ?? null,
+      ardoise_nom: (r.ardoise_nom as string) ?? null,
       statut: r.statut as StatutCommande,
       notes: (r.notes as string) ?? null,
       created_at: r.created_at as string,
@@ -1049,6 +1538,8 @@ export async function listCommandesActives() {
         recette_nom: a.recette?.nom ?? '— recette supprimée —',
         quantite: Number(a.quantite ?? 1),
         prix_unitaire_ht: Number(a.prix_unitaire_ht ?? 0),
+        prix_unitaire_ttc: Number(a.prix_unitaire_ttc ?? a.prix_unitaire_ht ?? 0),
+        tva_taux: Number(a.tva_taux ?? 10),
         tag_destination: a.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
         commentaire: (a.commentaire as string) ?? null,
         allergenes_a_eviter: (a.allergenes_a_eviter as string[] | undefined) ?? [],
@@ -1067,10 +1558,10 @@ export async function getCommandeServiceById(id: string) {
   const { data: r, error } = await supabase
     .from('commandes')
     .select(`
-      id, numero, source, numero_table, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
+      id, numero, source, numero_table, ardoise_nom, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
       montant_total_ttc, tva_total, consommation, client_nom,
       serveur:employes!serveur_id(prenom, nom),
-      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
+      commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, prix_unitaire_ttc, tva_taux, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
     .eq('id', id)
     .single()
@@ -1082,6 +1573,7 @@ export async function getCommandeServiceById(id: string) {
     numero: r.numero as string,
     source: r.source as SourceCommande,
     numero_table: (r.numero_table as string) ?? null,
+    ardoise_nom: (r.ardoise_nom as string) ?? null,
     statut: r.statut as StatutCommande,
     notes: (r.notes as string) ?? null,
     client_nom: (r.client_nom as string) ?? null,

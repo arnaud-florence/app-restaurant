@@ -2,12 +2,27 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Lock, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { loginAction, signupAction } from './actions'
 import FooterLegal from '@/components/FooterLegal'
+
+// Accès rapide « tablette partagée » : ces écrans sont accessibles sans
+// connexion (mode kiosk). Permet aux employés (qui n'ont pas de compte)
+// d'entrer directement sur leur poste — utile en formation ET en service.
+const POSTES_RAPIDES = [
+  { href: '/cuisine',  emoji: '👨‍🍳', label: 'Cuisine' },
+  { href: '/pizza',    emoji: '🍕',   label: 'Pizza' },
+  { href: '/bar',      emoji: '🍷',   label: 'Bar' },
+  { href: '/serveur',  emoji: '🍽️',   label: 'Salle' },
+  { href: '/emporter', emoji: '🛒',   label: 'Comptoir' },
+  { href: '/livreur',  emoji: '🛵',   label: 'Livreur' },
+  { href: '/reception', emoji: '🛎️',  label: 'Réception' },
+  { href: '/equipes',  emoji: '💬',   label: 'Équipes' },
+]
 
 export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: string; error: string | null; nbManagers: number }) {
   const router = useRouter()
@@ -44,7 +59,8 @@ export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: s
   return (
     <div className="min-h-screen bg-gradient-to-br from-stone-100 to-emerald-50 flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-6">
+      <div className="w-full max-w-md space-y-4">
+      <Card className="w-full p-6">
         <div className="text-center mb-6">
           <Lock className="h-10 w-10 mx-auto text-emerald-600 mb-2" />
           <h1 className="text-2xl font-bold">{mode === 'signup' ? 'Créer un compte' : 'Connexion'}</h1>
@@ -107,6 +123,33 @@ export default function LoginClient({ nextUrl, error, nbManagers }: { nextUrl: s
           )}
         </div>
       </Card>
+
+      {/* Accès rapide poste — sans connexion (tablette partagée / formation) */}
+      <Card className="w-full p-5">
+        <div className="text-center mb-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">Accès rapide — mon poste</h2>
+          <p className="text-xs text-zinc-500">Sans connexion · choisis ton écran</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {POSTES_RAPIDES.map(p => (
+            <Link
+              key={p.href}
+              href={p.href}
+              className="flex flex-col items-center justify-center gap-1 min-h-[64px] rounded-xl border border-zinc-200 bg-white hover:bg-emerald-50 hover:border-emerald-300 active:scale-95 transition text-zinc-800"
+            >
+              <span className="text-2xl leading-none">{p.emoji}</span>
+              <span className="text-xs font-semibold">{p.label}</span>
+            </Link>
+          ))}
+        </div>
+        <Link
+          href="/formation"
+          className="mt-2 flex items-center justify-center gap-2 min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition text-white font-bold"
+        >
+          🎓 Mes formations &amp; manuels
+        </Link>
+      </Card>
+      </div>
       </div>
       <FooterLegal />
     </div>

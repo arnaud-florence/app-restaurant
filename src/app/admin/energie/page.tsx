@@ -67,8 +67,12 @@ export default async function EnergiePage() {
     .filter(c => c.statut !== 'annule')
     .reduce((s, c) => s + (c.commande_articles ?? []).reduce((ss, a) => ss + Number(a.quantite ?? 0), 0), 0)
 
+  // Total = somme des MÊMES types que la ventilation affichée (élec/gaz/eau), pour
+  // que le « Total énergie mois » réconcilie avec les cartes par type. (Si un jour on
+  // saisit des relevés type 'autre', il faudra aussi les afficher dans la ventilation.)
+  const TYPES_ENERGIE_AFFICHES = ['electricite', 'gaz', 'eau']
   const total_energie_mois = releves
-    .filter(r => r.periode_debut.slice(0, 7) === moisCourant)
+    .filter(r => r.periode_debut.slice(0, 7) === moisCourant && TYPES_ENERGIE_AFFICHES.includes(r.type))
     .reduce((s, r) => s + r.montant_ttc, 0)
 
   const cout_par_plat_mois = coutEnergetiqueParPlat(releves, moisCourant, nb_plats_mois)

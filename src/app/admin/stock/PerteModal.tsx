@@ -118,7 +118,7 @@ export default function PerteModal({
                 key={m}
                 type="button"
                 onClick={() => setMotif(m)}
-                className="text-[11px] px-2 py-0.5 rounded-full border hover:bg-muted"
+                className="text-xs min-h-[40px] px-3 py-1 rounded-full border hover:bg-muted"
               >
                 {m}
               </button>

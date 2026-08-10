@@ -8,26 +8,27 @@ import { fr } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { playDing } from '@/lib/service'
+import { askConfirm } from '@/lib/confirm'
 import TopActionBar from '@/components/TopActionBar'
-import BackToCategoryButton from '@/components/BackToCategoryButton'
 import {
-  type Canal, CANAUX, CANAL_INFO,
+  type Canal,
   type Employe, type Message, type InfoAffichage, type CompteRendu, type Materiel,
   type Priorite, PRIORITE_INFO, type TypeMateriel, type EtatMateriel,
   TYPE_MATERIEL_LABEL, ETAT_MATERIEL_LABEL,
 } from './types'
 import {
-  envoyerMessage, marquerMessagesLus,
+  envoyerMessage, marquerMessagesLus, reagirMessage,
   creerInfoAffichage, supprimerInfo,
   creerCompteRendu, supprimerCompteRendu,
   creerMateriel, attribuerMateriel, restituerMateriel, changerEtatMateriel,
 } from './actions'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 
 type Tab = 'messages' | 'affichage' | 'cr' | 'materiel'
 
 export default function EquipesClient({
   employes, initialMessages, initialInfos, initialCRs, initialMateriels, navProfil = null,
+  connectedEmployeId = null, storiesSlot = null,
 }: {
   employes: Employe[]
   initialMessages: Message[]
@@ -35,6 +36,10 @@ export default function EquipesClient({
   initialCRs: CompteRendu[]
   initialMateriels: Materiel[]
   navProfil?: OpsBottomNavProfil
+  /** Nav « stories » (rendue côté serveur) — présente même dans le chat plein écran. */
+  storiesSlot?: React.ReactNode
+  /** Employé connecté (si session) → pré-sélectionne « Je suis » sans demander. */
+  connectedEmployeId?: string | null
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('messages')
@@ -45,13 +50,34 @@ export default function EquipesClient({
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
 
-  // "Je suis..." persistant en localStorage
+  // Plan B clavier mobile : on suit la ZONE VISIBLE (visualViewport) pour que le
+  // chat occupe pile l'espace au-dessus du clavier — pas de zoom, pas de scroll
+  // de page, le composer reste verrouillé en bas.
+  const [vp, setVp] = useState<{ top: number; height: number } | null>(null)
   useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const update = () => setVp({ top: vv.offsetTop, height: vv.height })
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+
+  // "Je suis..." : priorité à l'employé connecté (zéro friction), sinon localStorage.
+  useEffect(() => {
+    // 1) Si une session est ouverte et liée à un employé → on le sélectionne d'office.
+    if (connectedEmployeId && employes.some(e => e.id === connectedEmployeId)) {
+      setMoiId(connectedEmployeId)
+      try { localStorage.setItem('equipes_moi_id', connectedEmployeId) } catch { /* ignore */ }
+      return
+    }
+    // 2) Sinon (kiosk) → dernier choix mémorisé.
     try {
       const v = localStorage.getItem('equipes_moi_id')
       if (v && employes.some(e => e.id === v)) setMoiId(v)
     } catch { /* ignore */ }
-  }, [employes])
+  }, [employes, connectedEmployeId])
   function changerMoi(id: string) {
     setMoiId(id)
     try { localStorage.setItem('equipes_moi_id', id) } catch { /* ignore */ }
@@ -97,73 +123,84 @@ export default function EquipesClient({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 pb-mobile-nav">
-      <OpsBottomNav profil={navProfil} />
+    <div
+      className="fixed inset-x-0 flex flex-col overflow-hidden bg-zinc-50 text-zinc-900"
+      style={{ top: vp?.top ?? 0, height: vp ? `${vp.height}px` : '100dvh' }}
+    >
       <TopActionBar theme="light" profil={navProfil} />
-      <BackToCategoryButton theme="light" />
-      {/* Header premium (mode clair) */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-zinc-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-900 font-semibold whitespace-nowrap">← Accueil</Link>
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl shadow-lg shadow-emerald-500/30">
-              👥
-            </span>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Communication interne</p>
-              <h1 className="text-xl sm:text-2xl font-black text-zinc-900 tracking-tight leading-none mt-0.5">Équipes</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* Nav « stories » — présente même dans le chat (un clic vers chaque
+          catégorie). Topmost en mobile : c'est elle qui gère l'encoche iOS. */}
+      <div className="shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        {storiesSlot}
+      </div>
+      {/* En-tête COMPACT façon conversation Messenger (1 ligne fine + onglets fins). */}
+      <header className="shrink-0 bg-white border-b border-zinc-200">
+        <div className="flex items-center gap-2 px-2.5 h-12">
+          <Link href="/admin/cat" aria-label="Retour à l'accueil"
+            className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-zinc-100 text-zinc-700 text-xl">←</Link>
+          <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-sm shadow shrink-0" aria-hidden>👥</span>
+          <h1 className="font-black text-zinc-900 text-base leading-none flex-1 truncate">Équipes</h1>
+          {connectedEmployeId ? (() => {
+            const moi = employes.find(e => e.id === connectedEmployeId)
+            const ini = ((moi?.prenom ?? '?').trim()[0] ?? '?').toUpperCase()
+            return (
+              <span className="shrink-0 inline-flex items-center gap-1.5 max-w-[46%]" title={moi ? `${moi.prenom} ${moi.nom}` : ''}>
+                <span className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white inline-flex items-center justify-center text-xs font-black shrink-0">{ini}</span>
+                <span className="text-xs font-bold text-zinc-700 truncate">{moi?.prenom}</span>
+              </span>
+            )
+          })() : (
             <select
               value={moiId}
               onChange={e => changerMoi(e.target.value)}
-              className="text-sm h-10 px-3 rounded-md border border-zinc-300 bg-white"
-              title="Identifie-toi pour envoyer des messages et marquer les lectures"
+              className="max-w-[44%] h-9 px-2 rounded-full border border-zinc-300 bg-white text-xs font-semibold text-zinc-700"
+              title="Identifie-toi pour envoyer et marquer les lectures"
             >
-              <option value="">— Je suis… —</option>
+              <option value="">👤 Je suis…</option>
               {employes.map(e => (
-                <option key={e.id} value={e.id}>{e.prenom} {e.nom} ({e.poste})</option>
+                <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>
               ))}
             </select>
-            {!audioReadyRef.current && (
-              <button onClick={activerSon} className="text-xs h-10 px-3 rounded-md border border-zinc-300 bg-white hover:bg-zinc-50">
-                🔔 Activer son
-              </button>
-            )}
-          </div>
+          )}
+          {!audioReadyRef.current && (
+            <button onClick={activerSon} title="Activer le son"
+              className="shrink-0 h-9 w-9 rounded-full hover:bg-zinc-100 text-base">🔔</button>
+          )}
         </div>
-        {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+        {/* Onglets compacts, scrollables */}
+        <div className="flex gap-1 px-2 pb-1.5 overflow-x-auto">
           <TabBtn active={tab === 'messages'} onClick={() => setTab('messages')}>
             💬 Messages
             {nbNonLus > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">
-                {nbNonLus}
-              </span>
+              <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold">{nbNonLus}</span>
             )}
           </TabBtn>
-          <TabBtn active={tab === 'affichage'} onClick={() => setTab('affichage')}>📢 Affichage ({initialInfos.length})</TabBtn>
-          <TabBtn active={tab === 'cr'} onClick={() => setTab('cr')}>📝 Comptes-rendus ({initialCRs.length})</TabBtn>
-          <TabBtn active={tab === 'materiel'} onClick={() => setTab('materiel')}>📦 Matériel ({initialMateriels.length})</TabBtn>
+          <TabBtn active={tab === 'affichage'} onClick={() => setTab('affichage')}>📢 Affichage</TabBtn>
+          <TabBtn active={tab === 'cr'} onClick={() => setTab('cr')}>📝 CR</TabBtn>
+          <TabBtn active={tab === 'materiel'} onClick={() => setTab('materiel')}>📦 Matériel</TabBtn>
         </div>
       </header>
 
-      {/* Contenu */}
-      <main className="max-w-6xl mx-auto p-4">
-        {tab === 'messages' && (
+      {/* Contenu : remplit tout l'espace restant. Le chat est plein écran façon
+          Messenger (liste qui scrolle + composer ancré) ; les autres onglets
+          scrollent normalement à l'intérieur de la zone. */}
+      <div className="flex-1 min-h-0 w-full max-w-6xl mx-auto">
+        {tab === 'messages' ? (
           <MessagesTab moiId={moiId} employes={employes} messages={messages} onError={flashKo} onOk={flashOk} />
+        ) : (
+          <div className="h-full overflow-y-auto p-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+            {tab === 'affichage' && (
+              <AffichageTab moiId={moiId} infos={initialInfos} onError={flashKo} onOk={flashOk} />
+            )}
+            {tab === 'cr' && (
+              <CRTab moiId={moiId} employes={employes} crs={initialCRs} onError={flashKo} onOk={flashOk} />
+            )}
+            {tab === 'materiel' && (
+              <MaterielTab employes={employes} mats={initialMateriels} onError={flashKo} onOk={flashOk} />
+            )}
+          </div>
         )}
-        {tab === 'affichage' && (
-          <AffichageTab moiId={moiId} infos={initialInfos} onError={flashKo} onOk={flashOk} />
-        )}
-        {tab === 'cr' && (
-          <CRTab moiId={moiId} employes={employes} crs={initialCRs} onError={flashKo} onOk={flashOk} />
-        )}
-        {tab === 'materiel' && (
-          <MaterielTab employes={employes} mats={initialMateriels} onError={flashKo} onOk={flashOk} />
-        )}
-      </main>
+      </div>
 
       {/* Toasts */}
       {erreur && (
@@ -204,16 +241,37 @@ function MessagesTab({
   onError: (e: unknown) => void
   onOk: (m: string) => void
 }) {
-  const [canal, setCanal] = useState<Canal>('tous')
+  // Plus de canaux : un seul fil commun (canal 'tous').
+  const canal: Canal = 'tous'
   const [contenu, setContenu] = useState('')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const lastTap = useRef<{ id: string; t: number } | null>(null)
 
-  const filtered = useMemo(
-    () => messages.filter(m => m.canal === canal),
-    [messages, canal]
-  )
+  // Réaction emoji (façon Messenger / Insta : double-tap = ❤️)
+  function reagir(id: string, emoji = '❤️') {
+    if (!moiId) { onError(new Error('Identifie-toi avant de réagir (sélecteur en haut)')); return }
+    startTransition(async () => {
+      try { await reagirMessage({ message_id: id, employe_id: moiId, emoji }) }
+      catch (e) { onError(e) }
+    })
+  }
+  function onBubbleTap(id: string) {
+    const now = Date.now()
+    if (lastTap.current && lastTap.current.id === id && now - lastTap.current.t < 320) {
+      lastTap.current = null
+      reagir(id, '❤️')
+    } else {
+      lastTap.current = { id, t: now }
+    }
+  }
+
+  // Fil unique : tous les messages (tous canaux confondus) dans une seule conversation.
+  const filtered = useMemo(() => messages, [messages])
+  // Les messages arrivent déjà en ordre chronologique (page.tsx reverse) :
+  // plus ancien en haut, plus récent en bas, façon Messenger.
+  const ordered = filtered
 
   // Auto-scroll en bas + marque les lus pour l'utilisateur courant
   useEffect(() => {
@@ -251,49 +309,71 @@ function MessagesTab({
   )
 
   return (
-    <div className="space-y-3">
-      {/* Sélecteur canal */}
-      <div className="flex flex-wrap gap-1.5">
-        {CANAUX.map(c => {
-          const info = CANAL_INFO[c]
-          return (
-            <button
-              key={c}
-              onClick={() => setCanal(c)}
-              className={cn(
-                'inline-flex items-center px-3 h-10 rounded-full text-sm font-bold border transition-colors',
-                canal === c ? info.color + ' border-current' : 'bg-white text-zinc-500 border-zinc-300 hover:bg-zinc-50',
-              )}
-            >
-              {info.emoji} #{info.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Liste messages */}
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div ref={scrollRef} className="h-[55vh] overflow-y-auto p-3 space-y-2">
-          {filtered.length === 0 ? (
-            <p className="text-center py-12 text-zinc-400 text-sm">Aucun message dans ce canal pour le moment.</p>
+    <div className="flex flex-col h-full bg-white">
+      {/* Liste messages — un seul fil, scrolle SEULE, remplit tout l'espace */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+          {ordered.length === 0 ? (
+            <p className="text-center py-12 text-zinc-400 text-sm">Aucun message pour le moment. Lance la conversation 👋</p>
           ) : (
-            filtered.map(m => {
+            ordered.map(m => {
               const isMoi = m.expediteur_id === moiId
               const date = format(parseISO(m.created_at), 'HH:mm', { locale: fr })
               const datePleine = format(parseISO(m.created_at), 'd MMM HH:mm', { locale: fr })
               return (
-                <div key={m.id} className={cn('flex', isMoi ? 'justify-end' : 'justify-start')}>
-                  <div className={cn(
-                    'max-w-[80%] rounded-2xl px-3 py-2 text-sm',
-                    isMoi ? 'bg-zinc-900 text-white rounded-br-sm' : 'bg-zinc-100 text-zinc-900 rounded-bl-sm'
-                  )}>
-                    {!isMoi && (
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">
-                        {empNomById.get(m.expediteur_id ?? '') ?? '— Anonyme —'}
+                <div key={m.id} className={cn('flex items-end gap-2', isMoi ? 'justify-end' : 'justify-start')}>
+                  {!isMoi && (
+                    <span className="shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-[11px] font-black shadow-sm" aria-hidden>
+                      {((empNomById.get(m.expediteur_id ?? '') ?? '?').trim()[0] ?? '?').toUpperCase()}
+                    </span>
+                  )}
+                  <div className={cn('max-w-[78%]', isMoi && 'flex flex-col items-end')}>
+                    <div
+                      onClick={() => onBubbleTap(m.id)}
+                      title="Double-tap pour réagir ❤️"
+                      className={cn(
+                        'rounded-2xl px-3 py-2 text-sm cursor-pointer select-none active:scale-[0.99] transition',
+                        isMoi ? 'bg-zinc-900 text-white rounded-br-sm' : 'bg-zinc-100 text-zinc-900 rounded-bl-sm'
+                      )}>
+                      {!isMoi && (
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-0.5">
+                          {empNomById.get(m.expediteur_id ?? '') ?? '— Anonyme —'}
+                        </p>
+                      )}
+                      <p className="whitespace-pre-line break-words">{m.contenu}</p>
+                      <p className={cn('text-[10px] mt-1', isMoi ? 'text-zinc-300 text-right' : 'text-zinc-500')} title={datePleine}>{date}</p>
+                    </div>
+                    {/* Réactions emoji (chips agrégées) */}
+                    {(() => {
+                      const reacts = m.reactions ?? {}
+                      const vals = Object.values(reacts)
+                      if (vals.length === 0) return null
+                      const byEmoji: Record<string, number> = {}
+                      for (const e of vals) byEmoji[e] = (byEmoji[e] ?? 0) + 1
+                      const mien = moiId ? reacts[moiId] : undefined
+                      return (
+                        <div className={cn('flex gap-1 mt-1 flex-wrap', isMoi ? 'justify-end' : 'justify-start')}>
+                          {Object.entries(byEmoji).map(([emoji, n]) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => reagir(m.id, emoji)}
+                              className={cn(
+                                'inline-flex items-center gap-0.5 rounded-full px-1.5 h-6 text-xs border active:scale-95 transition',
+                                mien === emoji ? 'bg-red-50 border-red-300 text-red-700' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50',
+                              )}
+                            >
+                              <span>{emoji}</span>{n > 1 && <span className="font-bold tabular-nums">{n}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                    {/* Accusé de lecture façon Messenger sous mes messages */}
+                    {isMoi && (
+                      <p className="text-[10px] text-zinc-400 mt-0.5 pr-1">
+                        {(m.lu_par ?? []).filter(id => id && id !== m.expediteur_id).length > 0 ? '✓✓ Vu' : '✓ Envoyé'}
                       </p>
                     )}
-                    <p className="whitespace-pre-line break-words">{m.contenu}</p>
-                    <p className={cn('text-[10px] mt-1', isMoi ? 'text-zinc-300 text-right' : 'text-zinc-500')} title={datePleine}>{date}</p>
                   </div>
                 </div>
               )
@@ -301,26 +381,31 @@ function MessagesTab({
           )}
         </div>
 
-        {/* Composer */}
-        <div className="border-t border-zinc-200 p-2 flex gap-2">
+        {/* Composer — ANCRÉ en bas (au-dessus de la barre d'onglets), reste
+            visible quand le clavier s'ouvre (hauteur fixe 100dvh + flex). */}
+        <div
+          className="shrink-0 border-t border-zinc-200 bg-white p-2 flex gap-2"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}
+        >
           <input
             type="text"
             value={contenu}
             onChange={e => setContenu(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer() } }}
-            placeholder={moiId ? `Message dans #${CANAL_INFO[canal].label}…` : 'Identifie-toi pour écrire'}
+            onFocus={() => { setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight }, 120) }}
+            placeholder={moiId ? 'Écris un message…' : 'Identifie-toi pour écrire'}
             disabled={!moiId || isPending}
-            className="flex-1 h-12 px-3 rounded-md border border-zinc-300 bg-white text-sm outline-none focus:border-zinc-900 disabled:bg-zinc-100"
+            // text-base = 16px : empêche le zoom automatique d'iOS au focus.
+            className="flex-1 h-12 px-4 rounded-full border border-zinc-300 bg-zinc-50 text-base outline-none focus:border-zinc-900 focus:bg-white disabled:bg-zinc-100"
           />
           <button
             onClick={envoyer}
             disabled={!moiId || !contenu.trim() || isPending}
-            className="min-h-[48px] px-4 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 disabled:text-zinc-500 text-white font-bold text-sm"
+            className="min-h-[48px] min-w-[48px] px-4 rounded-full bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 disabled:text-zinc-500 text-white font-bold text-sm active:scale-95 transition"
           >
-            {isPending ? '…' : '➤ Envoyer'}
+            {isPending ? '…' : '➤'}
           </button>
         </div>
-      </div>
     </div>
   )
 }
@@ -367,7 +452,7 @@ function AffichageTab({
                   </div>
                   <button
                     onClick={async () => {
-                      if (!confirm(`Supprimer "${i.titre}" ?`)) return
+                      if (!(await askConfirm(`Supprimer "${i.titre}" ?`))) return
                       try { await supprimerInfo(i.id); onOk('Info supprimée'); router.refresh() }
                       catch (e) { onError(e) }
                     }}
@@ -520,7 +605,7 @@ function CRTab({
                     </div>
                     <button
                       onClick={async () => {
-                        if (!confirm(`Supprimer "${c.titre}" ?`)) return
+                        if (!(await askConfirm(`Supprimer "${c.titre}" ?`))) return
                         try { await supprimerCompteRendu(c.id); onOk('Compte-rendu supprimé'); setOpenId(null); router.refresh() }
                         catch (e) { onError(e) }
                       }}
@@ -681,7 +766,7 @@ function MaterielTab({
                       </div>
                       <button
                         onClick={async () => {
-                          if (!confirm(`Restituer "${m.nom}" ?`)) return
+                          if (!(await askConfirm(`Restituer "${m.nom}" ?`))) return
                           try { await restituerMateriel(m.id); onOk('Restitué'); router.refresh() }
                           catch (e) { onError(e) }
                         }}

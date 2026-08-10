@@ -8,6 +8,8 @@ import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { PillTab, PillCount } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import EmptyState from '@/components/ui/EmptyState'
+import { askConfirm } from '@/lib/confirm'
 import {
   type Client, type Campagne, type Reclamation, type RetourPlat,
   type SegmentClient, type SegmentCampagne, type TypeCampagne, type StatutCampagne,
@@ -56,7 +58,7 @@ export default function ClientsClient({ data }: { data: DataClients }) {
           title="Clients"
           description="CRM, fidélité, campagnes, réclamations et parrainage."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="Total" value={data.clients.length} />
               <KPI label="Opt-in" value={optinCount} accent={optinCount > 0 ? 'vert' : 'zinc'} />
               <KPI label="Réclam." value={reclamOuvertes} accent={reclamOuvertes > 0 ? 'rouge' : 'vert'} />
@@ -127,7 +129,7 @@ function FichierTab({ clients, onError, onOk }: { clients: Client[]; onError: (e
 
   return (
     <div className="space-y-3">
-      <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <input
             value={search}
@@ -157,11 +159,44 @@ function FichierTab({ clients, onError, onOk }: { clients: Client[]; onError: (e
         </div>
       </div>
 
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+      <section className="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         {filtered.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun client.</p>
+          <EmptyState
+            emoji="🧑"
+            titre="Aucun client"
+            description="Ajoute ton premier client pour suivre sa fidélité, ses visites et ses allergies."
+            action={{ label: '+ Nouveau client', onClick: () => setShowForm(true) }}
+          />
         ) : (
-          <table className="responsive-table w-full text-sm">
+          <>
+          {/* Mobile : liste de cards type contact (table 8 colonnes illisible à 375px) */}
+          <ul className="md:hidden divide-y divide-zinc-100">
+            {filtered.map(c => {
+              const niv = calculerNiveau(c.nb_visites)
+              const nivInfo = NIVEAU_INFO[niv]
+              return (
+                <li key={c.id} className="flex items-center gap-3 p-3">
+                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-black shrink-0">
+                    {((c.prenom || c.nom || '?') as string)[0]?.toUpperCase()}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold truncate">{c.prenom} {c.nom}</p>
+                      {c.allergies.length > 0 && <span className="text-[10px] text-red-700 font-bold shrink-0">⚠{c.allergies.length}</span>}
+                      {c.opt_in_marketing && <span className="text-[10px] text-emerald-600 shrink-0">✉</span>}
+                    </div>
+                    <p className="text-xs text-zinc-500 truncate">
+                      {nivInfo.emoji} {nivInfo.label} · {c.nb_visites} visite{c.nb_visites > 1 ? 's' : ''} · {fmtPrix(c.total_depense)}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowForm(c)} className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-zinc-300 hover:bg-zinc-50 shrink-0" aria-label="Modifier">✏️</button>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Desktop/tablette : table complète */}
+          <table className="hidden md:table w-full text-sm">
             <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th className="text-left px-3 py-1.5">Client</th>
@@ -192,17 +227,20 @@ function FichierTab({ clients, onError, onOk }: { clients: Client[]; onError: (e
                     <td className="px-3 py-2 text-[10px]">{c.allergies.length > 0 ? <span className="text-red-700">⚠ {c.allergies.length}</span> : '—'}</td>
                     <td className="px-3 py-2 text-[10px]">{c.opt_in_marketing ? '✓' : '—'}</td>
                     <td className="px-3 py-2 text-right">
-                      <button onClick={() => setShowForm(c)} className="text-xs h-8 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️</button>
-                      <button onClick={async () => {
-                        try { await recalculerStatsClient(c.id); onOk('Stats recalculées'); router.refresh() }
-                        catch (e) { onError(e) }
-                      }} className="text-xs h-8 px-2 rounded text-zinc-500 hover:text-blue-700" title="Recalculer nb visites + total + niveau depuis commandes">↻</button>
+                      <div className="inline-flex gap-1">
+                        <button onClick={() => setShowForm(c)} className="text-sm min-h-[44px] min-w-[44px] px-3 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">✏️</button>
+                        <button onClick={async () => {
+                          try { await recalculerStatsClient(c.id); onOk('Stats recalculées'); router.refresh() }
+                          catch (e) { onError(e) }
+                        }} className="text-sm min-h-[44px] min-w-[44px] px-3 rounded text-zinc-500 hover:text-blue-700" title="Recalculer nb visites + total + niveau depuis commandes">↻</button>
+                      </div>
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          </>
         )}
       </section>
 
@@ -285,7 +323,7 @@ function ClientModal({ client, clients, onClose, onError, onSuccess }: { client:
         <button onClick={onClose} disabled={isPending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
         {isEdit && (
           <button onClick={async () => {
-            if (!confirm(`Supprimer définitivement "${client!.prenom} ${client!.nom}" ?`)) return
+            if (!(await askConfirm({ title: 'Supprimer le client', message: `Supprimer définitivement "${client!.prenom} ${client!.nom}" ?`, confirmLabel: 'Supprimer', danger: true }))) return
             try { await supprimerClient(client!.id); onSuccess('Supprimé'); router.refresh() } catch (e) { onError(e) }
           }} className="min-h-[48px] px-4 rounded-md bg-red-500 hover:bg-red-400 text-white font-bold">🗑</button>
         )}
@@ -304,12 +342,17 @@ function CampagnesTab({ campagnes, clients, onError, onOk }: { campagnes: Campag
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle campagne</button>
+        <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle campagne</button>
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white">
         {campagnes.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune campagne. Crée la première !</p>
+          <EmptyState
+            emoji="📨"
+            titre="Aucune campagne"
+            description="Crée ta première campagne email ou SMS pour fidéliser tes clients opt-in."
+            action={{ label: '+ Nouvelle campagne', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <ul className="divide-y divide-zinc-100">
             {campagnes.map(c => {
@@ -329,18 +372,18 @@ function CampagnesTab({ campagnes, clients, onError, onOk }: { campagnes: Campag
                       {c.date_envoi && ` · envoyée le ${format(parseISO(c.date_envoi), 'd MMM HH:mm', { locale: fr })}`}
                     </p>
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setShowDestinataires(c)} className="text-xs h-8 px-2 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">📋 Destinataires</button>
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <button onClick={() => setShowDestinataires(c)} className="text-sm min-h-[44px] px-3 rounded border border-zinc-300 hover:bg-zinc-50 font-bold">📋 Destinataires</button>
                     {c.statut === 'brouillon' && (
                       <button onClick={async () => {
-                        if (!confirm('Marquer comme envoyée ? (Pas d\'envoi réel — à faire manuellement via Mailchimp/Brevo/Twilio)')) return
+                        if (!(await askConfirm('Marquer comme envoyée ? (Pas d\'envoi réel — à faire manuellement via Mailchimp/Brevo/Twilio)'))) return
                         try { await marquerCampagneEnvoyee(c.id); onOk('Marquée envoyée'); router.refresh() } catch (e) { onError(e) }
-                      }} className="text-xs h-8 px-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Envoyée</button>
+                      }} className="text-sm min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Envoyée</button>
                     )}
                     <button onClick={async () => {
-                      if (!confirm('Supprimer cette campagne ?')) return
+                      if (!(await askConfirm({ title: 'Supprimer la campagne', message: 'Supprimer cette campagne ?', confirmLabel: 'Supprimer', danger: true }))) return
                       try { await supprimerCampagne(c.id); onOk('Supprimée'); router.refresh() } catch (e) { onError(e) }
-                    }} className="text-xs h-8 px-2 text-zinc-400 hover:text-red-600">×</button>
+                    }} className="text-sm min-h-[44px] min-w-[44px] px-3 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50">×</button>
                   </div>
                 </li>
               )
@@ -453,7 +496,7 @@ function DestinatairesModal({ campagne, clients, onClose }: { campagne: Campagne
     <Modal title={`Destinataires — ${campagne.titre}`} onClose={onClose} disabled={false}>
       <div className="flex justify-between items-center">
         <p className="text-sm">{dests.length} destinataires</p>
-        <button onClick={copier} className="text-xs h-8 px-3 rounded bg-zinc-900 text-white font-bold">📋 Copier emails</button>
+        <button onClick={copier} className="text-sm min-h-[44px] px-3 rounded bg-zinc-900 text-white font-bold">📋 Copier emails</button>
       </div>
       <div className="max-h-96 overflow-y-auto border border-zinc-200 rounded">
         <table className="responsive-table w-full text-xs">
@@ -482,12 +525,17 @@ function ReclamTab({ reclamations, clients, employes, onError, onOk }: {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réclamation</button>
+        <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouvelle réclamation</button>
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white">
         {reclamations.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucune réclamation.</p>
+          <EmptyState
+            emoji="😟"
+            titre="Aucune réclamation"
+            description="Tout roule pour l'instant. Enregistre une réclamation ici pour en suivre la résolution."
+            action={{ label: '+ Nouvelle réclamation', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <ul className="divide-y divide-zinc-100">
             {reclamations.map(r => {
@@ -511,7 +559,7 @@ function ReclamTab({ reclamations, clients, employes, onError, onOk }: {
                       {r.responsable_nom && <p className="text-[10px] text-zinc-500 mt-1">Résolue par {r.responsable_nom}</p>}
                     </div>
                     {r.statut !== 'resolue' && (
-                      <button onClick={() => setResoudre(r)} className="text-xs h-8 px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold">✓ Résoudre</button>
+                      <button onClick={() => setResoudre(r)} className="text-sm min-h-[44px] px-3 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-bold shrink-0">✓ Résoudre</button>
                     )}
                   </div>
                 </li>
@@ -569,7 +617,7 @@ function ReclamModal({ clients, onClose, onError, onSuccess }: { clients: Client
       {!clientId && (
         <Field label="OU nom libre"><input value={nomLibre} onChange={e => setNomLibre(e.target.value)} placeholder="M. Dupont" className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       )}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <Field label="Date"><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
         <Field label="Type">
           <select value={type} onChange={e => setType(e.target.value as TypeReclamation)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
@@ -644,7 +692,7 @@ function RetoursTab({ retours, clients, recettes, employes, onError, onOk }: {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau retour</button>
+        <button onClick={() => setShowForm(true)} className="min-h-[44px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau retour</button>
       </div>
 
       {topRetours.length > 0 && (
@@ -663,7 +711,12 @@ function RetoursTab({ retours, clients, recettes, employes, onError, onOk }: {
 
       <section className="rounded-lg border border-zinc-200 bg-white">
         {retours.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun retour de plat. ✓</p>
+          <EmptyState
+            emoji="🍽️"
+            titre="Aucun retour de plat"
+            description="Aucun plat retourné pour l'instant. Enregistre un retour pour suivre le coût matière perdu."
+            action={{ label: '+ Nouveau retour', onClick: () => setShowForm(true) }}
+          />
         ) : (
           <ul className="divide-y divide-zinc-100">
             {retours.map(r => {
@@ -685,9 +738,9 @@ function RetoursTab({ retours, clients, recettes, employes, onError, onOk }: {
                     </p>
                   </div>
                   <button onClick={async () => {
-                    if (!confirm('Supprimer ce retour ?')) return
+                    if (!(await askConfirm({ title: 'Supprimer le retour', message: 'Supprimer ce retour ?', confirmLabel: 'Supprimer', danger: true }))) return
                     try { await supprimerRetour(r.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
-                  }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
+                  }} className="text-zinc-400 hover:text-red-600 hover:bg-red-50 text-sm min-h-[44px] min-w-[44px] rounded shrink-0 inline-flex items-center justify-center" aria-label="Supprimer">×</button>
                 </li>
               )
             })}
@@ -806,7 +859,11 @@ function ParrainageTab({ clients }: { clients: Client[] }) {
       </p>
       <section className="rounded-lg border border-zinc-200 bg-white">
         {parrains.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun parrainage actif.</p>
+          <EmptyState
+            emoji="🤝"
+            titre="Aucun parrainage actif"
+            description="Renseigne « Parrainé par » sur une fiche client pour lier filleul et parrain."
+          />
         ) : (
           <ul className="divide-y divide-zinc-100">
             {parrains.map(p => (
@@ -842,24 +899,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function FiltreBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} className={cn(
-      'px-3 h-9 rounded-full text-xs font-bold border whitespace-nowrap',
-      active ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300 hover:bg-zinc-50'
-    )}>{children}</button>
-  )
-}
-
 function Modal({ title, onClose, disabled, children }: { title: string; onClose: () => void; disabled: boolean; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !disabled && onClose()}>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !disabled && onClose()}>
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-lg font-bold">{title}</h2>
           <button onClick={onClose} className="h-10 w-10 rounded-full hover:bg-zinc-100">×</button>
         </div>
-        <div className="overflow-y-auto p-5 space-y-3">{children}</div>
+        <div className="overflow-y-auto p-5 space-y-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>
   )

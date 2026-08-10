@@ -55,6 +55,19 @@ export default function IngredientsClient({ initial, readOnly = false, peutVoirP
     })
   }, [initial, search, filtreCat, filtreStatut, filtreStock])
 
+  // Base des compteurs de pastilles catégorie : tous les filtres SAUF la catégorie,
+  // pour que le compteur colle à la liste (ex : « Actifs » → ne compte que les actifs).
+  const baseForCounts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return initial.filter(i => {
+      if (filtreStatut === 'actifs'   && !i.actif) return false
+      if (filtreStatut === 'inactifs' &&  i.actif) return false
+      if (filtreStock !== 'tous' && statutStock(i.stock_actuel, i.stock_minimum) !== filtreStock) return false
+      if (q && !(i.nom.toLowerCase().includes(q) || i.categorie.toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [initial, search, filtreStatut, filtreStock])
+
   const stats = useMemo(() => {
     const actifs = initial.filter(i => i.actif)
     const rouge  = actifs.filter(i => statutStock(i.stock_actuel, i.stock_minimum) === 'rouge').length
@@ -119,7 +132,7 @@ export default function IngredientsClient({ initial, readOnly = false, peutVoirP
         </div>
 
         {/* Toolbar premium tactile — recherche + 3 niveaux pills */}
-        <div className="sticky top-[64px] z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
+        <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
           <Input
             type="search"
             placeholder="🔍 Rechercher un ingrédient..."
@@ -130,10 +143,10 @@ export default function IngredientsClient({ initial, readOnly = false, peutVoirP
           {/* Niveau 1 : Catégorie (gros pills tactiles) */}
           <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1">
             <PillTab active={filtreCat === ''} onClick={() => setFiltreCat('')}>
-              ✦ Toutes <PillCount n={initial.length} active={filtreCat === ''} />
+              ✦ Toutes <PillCount n={baseForCounts.length} active={filtreCat === ''} />
             </PillTab>
             {categories.map(c => {
-              const n = initial.filter(i => i.categorie === c).length
+              const n = baseForCounts.filter(i => i.categorie === c).length
               if (n === 0) return null
               return (
                 <PillTab key={c} active={filtreCat === c} onClick={() => setFiltreCat(c)}>

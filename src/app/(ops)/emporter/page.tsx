@@ -6,7 +6,6 @@
 import { listCommandesActives } from '../actions'
 import EmporterClient from './EmporterClient'
 import BriefingPoste from '@/components/BriefingPoste'
-import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import CaisseBorneBanner from '@/components/CaisseBorneBanner'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -26,7 +25,7 @@ export default async function EmporterPage() {
     listCommandesActives(),
     supabase
       .from('recettes')
-      .select('id, nom, categorie, tag_destination, prix_vente_ht, image_url, photo_url, favori')
+      .select('id, nom, categorie, tag_destination, prix_vente_ht, tva, image_url, photo_url, favori')
       .eq('actif', true)
       .or('tag_destination.in.(SNACKING,PIZZA,BAR),categorie.ilike.dessert%')
       .order('categorie')
@@ -65,6 +64,7 @@ export default async function EmporterPage() {
     categorie: r.categorie as string,
     tag_destination: r.tag_destination as 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR',
     prix_vente_ht: Number(r.prix_vente_ht ?? 0),
+    tva: Number(r.tva ?? 10),
     image_url: (r.image_url as string) ?? null,
     photo_url: (r.photo_url as string) ?? null,
     favori: r.favori === true,
@@ -99,7 +99,6 @@ export default async function EmporterPage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['stock', 'haccp', 'snack_rt']} />
       <div className="px-3 pt-3">
         <CaisseBorneBanner
           initial={commandesBorne}

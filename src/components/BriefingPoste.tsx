@@ -31,6 +31,10 @@ function bonjourSelonHeure(): string {
 }
 
 export default function BriefingPoste({ briefing }: { briefing: Briefing }) {
+  // ⛔ Briefing retiré de l'opérationnel — remplacé par « Le coup de main d'Arnaud » (anti-doublon).
+  const MASQUE_OPS: boolean = true
+  if (MASQUE_OPS) return null
+
   const info = POSTE_INFO[briefing.poste]
   const allergiesAggregees = (briefing.reservations ?? [])
     .flatMap(r => r.allergies)
@@ -38,7 +42,7 @@ export default function BriefingPoste({ briefing }: { briefing: Briefing }) {
   const allergiesUniques = [...new Set(allergiesAggregees)]
 
   return (
-    <section className="bg-[#0D0D0D] text-zinc-100 border-b border-zinc-800 px-4 py-3 space-y-2.5">
+    <section className="hidden md:block bg-[#0D0D0D] text-zinc-100 border-b border-zinc-800 px-4 py-3 space-y-2.5">
       {/* En-tête : salutation + jour + poste */}
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <div>

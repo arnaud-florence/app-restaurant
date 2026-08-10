@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Printer, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { PillTab } from '@/components/ui/PillTab'
+
+type Tab = 'synthese' | 'ca' | 'masse' | 'charges' | 'zreports'
 
 type Props = {
   moisIso: string
@@ -39,6 +43,7 @@ type Props = {
 export default function BilanClient(p: Props) {
   const router = useRouter()
   const params = useSearchParams()
+  const [tab, setTab] = useState<Tab>('synthese')
 
   const moisLabel = useMemo(
     () => new Date(p.moisIso + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
@@ -121,6 +126,17 @@ export default function BilanClient(p: Props) {
           </div>
         </header>
 
+        {/* Barre d'onglets — cachée à l'impression (tout s'imprime via print:block) */}
+        <div className="print:hidden sticky top-0 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-2 mb-4 bg-zinc-50/90 backdrop-blur flex gap-1.5 overflow-x-auto">
+          <PillTab active={tab === 'synthese'} onClick={() => setTab('synthese')}>📊 Synthèse</PillTab>
+          <PillTab active={tab === 'ca'} onClick={() => setTab('ca')}>🧾 CA &amp; TVA</PillTab>
+          <PillTab active={tab === 'masse'} onClick={() => setTab('masse')}>👥 Masse sal.</PillTab>
+          <PillTab active={tab === 'charges'} onClick={() => setTab('charges')}>💸 Charges &amp; NDF</PillTab>
+          <PillTab active={tab === 'zreports'} onClick={() => setTab('zreports')}>🧮 Z-Reports</PillTab>
+        </div>
+
+        {/* Onglet Synthèse */}
+        <div className={cn(tab === 'synthese' ? 'block' : 'hidden', 'print:block')}>
         {/* Synthèse */}
         <section className="bilan-section mb-6">
           <h2 className="font-bold text-lg mb-2">📊 Synthèse</h2>
@@ -136,7 +152,10 @@ export default function BilanClient(p: Props) {
             Résultat = CA HT − masse sal. − charges fixes − notes de frais. Estimation hors charges variables (food cost, commissions CB) et hors charges sociales/impôts.
           </p>
         </section>
+        </div>
 
+        {/* Onglet CA & TVA */}
+        <div className={cn(tab === 'ca' ? 'block' : 'hidden', 'print:block')}>
         {/* CA & TVA */}
         <section className="bilan-section mb-6">
           <h2 className="font-bold text-lg mb-2">💰 Chiffre d&apos;affaires & TVA</h2>
@@ -159,7 +178,10 @@ export default function BilanClient(p: Props) {
             </tbody>
           </table>
         </section>
+        </div>
 
+        {/* Onglet Masse salariale */}
+        <div className={cn(tab === 'masse' ? 'block' : 'hidden', 'print:block')}>
         {/* Masse salariale */}
         <section className="bilan-section mb-6">
           <h2 className="font-bold text-lg mb-2">👥 Masse salariale (heures pointées × tarif × coef)</h2>
@@ -200,7 +222,10 @@ export default function BilanClient(p: Props) {
             </table>
           )}
         </section>
+        </div>
 
+        {/* Onglet Charges & NDF */}
+        <div className={cn(tab === 'charges' ? 'block' : 'hidden', 'print:block')}>
         {/* Charges fixes */}
         <section className="bilan-section mb-6">
           <h2 className="font-bold text-lg mb-2">🌳 Charges fixes mensuelles</h2>
@@ -234,6 +259,38 @@ export default function BilanClient(p: Props) {
           )}
         </section>
 
+        {/* Notes de frais */}
+        {p.ndfs.lignes.length > 0 && (
+          <section className="bilan-section mb-6">
+            <h2 className="font-bold text-lg mb-2">📋 Notes de frais ({eur(p.ndfs.total)} dont remboursé {eur(p.ndfs.rembourse)})</h2>
+            <table className="w-full text-sm border-collapse bilan-table">
+              <thead className="bg-zinc-100">
+                <tr>
+                  <th className="text-left px-2 py-1 border">Date</th>
+                  <th className="text-left px-2 py-1 border">Employé</th>
+                  <th className="text-left px-2 py-1 border">Libellé</th>
+                  <th className="text-right px-2 py-1 border">Montant</th>
+                  <th className="text-left px-2 py-1 border">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {p.ndfs.lignes.map((n, i) => (
+                  <tr key={i}>
+                    <td className="px-2 py-1 border">{n.date}</td>
+                    <td className="px-2 py-1 border">{n.employe_nom}</td>
+                    <td className="px-2 py-1 border">{n.libelle}</td>
+                    <td className="px-2 py-1 border text-right tabular-nums">{eur(n.montant)}</td>
+                    <td className="px-2 py-1 border capitalize">{n.statut}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+        </div>
+
+        {/* Onglet Z-Reports */}
+        <div className={cn(tab === 'zreports' ? 'block' : 'hidden', 'print:block')}>
         {/* Z-reports */}
         <section className="bilan-section mb-6">
           <h2 className="font-bold text-lg mb-2">🧾 Z-reports caisse ({p.zReports.nb} session{p.zReports.nb > 1 ? 's' : ''})</h2>
@@ -270,35 +327,7 @@ export default function BilanClient(p: Props) {
             </table>
           )}
         </section>
-
-        {/* Notes de frais */}
-        {p.ndfs.lignes.length > 0 && (
-          <section className="bilan-section mb-6">
-            <h2 className="font-bold text-lg mb-2">📋 Notes de frais ({eur(p.ndfs.total)} dont remboursé {eur(p.ndfs.rembourse)})</h2>
-            <table className="w-full text-sm border-collapse bilan-table">
-              <thead className="bg-zinc-100">
-                <tr>
-                  <th className="text-left px-2 py-1 border">Date</th>
-                  <th className="text-left px-2 py-1 border">Employé</th>
-                  <th className="text-left px-2 py-1 border">Libellé</th>
-                  <th className="text-right px-2 py-1 border">Montant</th>
-                  <th className="text-left px-2 py-1 border">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.ndfs.lignes.map((n, i) => (
-                  <tr key={i}>
-                    <td className="px-2 py-1 border">{n.date}</td>
-                    <td className="px-2 py-1 border">{n.employe_nom}</td>
-                    <td className="px-2 py-1 border">{n.libelle}</td>
-                    <td className="px-2 py-1 border text-right tabular-nums">{eur(n.montant)}</td>
-                    <td className="px-2 py-1 border capitalize">{n.statut}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
+        </div>
 
         {/* Pied */}
         <footer className="border-t pt-3 text-[10px] text-zinc-500">

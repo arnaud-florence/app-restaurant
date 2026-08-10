@@ -33,8 +33,9 @@ const GROUPES: Group[] = [
   {
     label: 'Pilotage', emoji: '📊',
     items: [
-      { href: '/admin/pilotage',     label: 'Tableau de bord', icon: BarChart3 },
-      { href: '/admin/assistant',    label: 'Assistant IA',    icon: Sparkles },
+      { href: '/admin/pilotage',     label: 'Pilotage',        icon: BarChart3 },
+      { href: '/admin/supervision',  label: 'Équipe en direct', icon: Users },
+      { href: '/admin/co-gerant',    label: 'Arnaud — co-gérant', icon: Sparkles },
       { href: '/admin/journal',      label: 'Journal de bord', icon: NotebookPen },
       { href: '/admin/previsionnel', label: 'Prévisionnel',    icon: CloudSun },
     ],
@@ -61,7 +62,7 @@ const GROUPES: Group[] = [
       { href: '/admin/clients',      label: 'Clients / CRM', icon: Users },
       { href: '/admin/clients/fidelite', label: 'Programme fidélité', icon: Star },
       { href: '/admin/promotions',   label: 'Promotions',          icon: Sparkles },
-      { href: '/admin/codes-promo',  label: 'Codes promo',         icon: BookOpen },
+      { href: '/admin/codes-promo',  label: 'Codes réduction',     icon: BookOpen },
       { href: '/admin/cartes-cadeaux', label: 'Cartes cadeaux',     icon: Sparkles },
       { href: '/admin/reputation',   label: 'Réputation / Avis',   icon: Trophy },
       { href: '/admin/marketing',    label: 'Marketing IA',        icon: Sparkles },
@@ -72,6 +73,7 @@ const GROUPES: Group[] = [
     label: 'Gestion équipe & finances', emoji: '💼',
     items: [
       { href: '/admin/rh',           label: 'Ressources humaines', icon: Users },
+      { href: '/equipes',            label: 'Chat équipe',         icon: Users },
       { href: '/formation',          label: 'Mes manuels',         icon: BookOpen },
       { href: '/admin/formation',    label: 'Gérer guides',        icon: GraduationCap },
       { href: '/admin/challenges',   label: 'Challenges',          icon: Trophy },
@@ -179,7 +181,7 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
 
       {/* Sidebar (desktop uniquement — masquée sur mobile car la TopActionBar fixed bottom prend le relais) */}
       <aside className={cn(
-        'bg-stone-900 text-stone-100 flex flex-col w-72 shrink-0 z-50 transition-transform hidden md:flex',
+        'bg-stone-900 text-stone-100 flex flex-col w-72 shrink-0 z-50 transition-transform hidden md:flex print:hidden',
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">

@@ -19,6 +19,7 @@ export type Poste =
   | 'extra'
   | 'snack'          // poste polyvalent comptoir + borne + emporter
   | 'livreur'        // livraisons commandes ONLINE
+  | 'polyvalent'     // tous les postes de service (formation / extra / équipier polyvalent)
   | 'autre'
 
 export type Permissions = {
@@ -219,6 +220,26 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     ],
   },
 
+  polyvalent: {
+    label: 'Polyvalent (tous postes)',
+    main: '/mon-espace',
+    allowed: [
+      // Tous les écrans de service
+      '/cuisine', '/pizza', '/bar', '/serveur', '/caisse', '/emporter', '/livreur', '/reception',
+      // Back-office opérationnel (union des postes employés, hors gérant-only)
+      '/admin/recettes', '/admin/ingredients', '/admin/stock', '/admin/fournisseurs',
+      '/admin/boissons', '/admin/hygiene', '/admin/allergenes', '/admin/dechets',
+      '/admin/clients', '/admin/reservations', '/admin/evenements', '/admin/chambres',
+      '/admin/groupes', '/admin/borne',
+      ...COMMUN_EMPLOYE,
+    ],
+    readonly: [
+      // Consultation seule : édition recettes/prix/allergènes réservée au gérant
+      '/admin/recettes', '/admin/ingredients', '/admin/allergenes', '/admin/boissons',
+      '/admin/borne',
+    ],
+  },
+
   autre: {
     label: 'Autre',
     main: '/mon-espace',
@@ -328,7 +349,7 @@ export function filterNavItems<T extends { href: string }>(
 export type PosteContentFilter = {
   /** Tags de tag_destination autorisés sur les recettes (et ingrédients
    *  utilisés par ces recettes). null = tous tags autorisés. */
-  recetteTags: Array<'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'> | null
+  recetteTags: Array<'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR' | 'FOURNIL'> | null
 }
 
 export function getPosteFilter(poste: string | null | undefined): PosteContentFilter {

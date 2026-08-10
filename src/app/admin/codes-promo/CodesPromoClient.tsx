@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Ticket, Plus, Trash2, Copy, Check } from 'lucide-react'
+import { Plus, Trash2, Copy, Check } from 'lucide-react'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import EmptyState from '@/components/ui/EmptyState'
 import { creerCodePromo, modifierCodePromo, toggleCodePromo, supprimerCodePromo } from './actions'
 import type { CodePromo } from './page'
 import { NIVEAU_INFO, type NiveauFidelite } from '@/lib/clients'
@@ -113,11 +114,12 @@ export default function CodesPromoClient({ codes }: { codes: CodePromo[] }) {
       )}
 
       {codes.length === 0 ? (
-        <Card className="p-8 text-center text-zinc-500">
-          <Ticket className="h-10 w-10 mx-auto text-zinc-300 mb-2" />
-          <p className="text-base font-medium">Aucun code promo</p>
-          <p className="text-xs mt-1">Crée ton premier code pour démarrer une campagne.</p>
-        </Card>
+        <EmptyState
+          emoji="🏷️"
+          titre="Aucun code promo"
+          description="Crée ton premier code promo pour offrir une réduction au panier en ligne et lancer une campagne."
+          action={{ label: '+ Nouveau code promo', onClick: () => setCreating(true) }}
+        />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           {codes.map(c => {

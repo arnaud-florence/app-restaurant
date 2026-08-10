@@ -6,6 +6,10 @@ import "./globals.css";
 import ContextualHelp from "@/components/ContextualHelp";
 import GlobalSearch from "@/components/GlobalSearch";
 import OfflineIndicator from "@/components/OfflineIndicator";
+import FormationBanner from "@/components/FormationBanner";
+import PresenceHeartbeat from "@/components/PresenceHeartbeat";
+import { Toaster } from "@/lib/toast";
+import { ConfirmHost } from "@/lib/confirm";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -42,7 +46,7 @@ export const metadata: Metadata = {
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+    apple: [{ url: "/icon-180.png", sizes: "180x180" }],
   },
 };
 
@@ -63,8 +67,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
       >
+        <FormationBanner />
+        <PresenceHeartbeat />
         <OfflineIndicator />
         {children}
+        <Toaster />
+        <ConfirmHost />
         <GlobalSearch />
         <ContextualHelp />
         <Script id="register-sw" strategy="afterInteractive">

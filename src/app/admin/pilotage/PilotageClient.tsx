@@ -11,6 +11,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { askConfirm } from '@/lib/confirm'
 import { PillTab } from '@/components/ui/PillTab'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,9 @@ const PRIORITE_BG: Record<ActionRow['priorite'], string> = {
 export default function PilotageClient({
   kpis, saisonnier, objectifs, actions, employes, periode,
   widgetEmployeId = null, widgetInitialDone = [],
-  aujourdhuiSections = null, strategieExtras = null,
+  essentielSections = null, agentsSections = null,
+  operationsSections = null, equipeSections = null,
+  strategieExtras = null,
 }: {
   kpis: Kpi[]
   saisonnier: AnalyseMois[]
@@ -71,8 +74,14 @@ export default function PilotageClient({
   periode: Periode
   widgetEmployeId?: string | null
   widgetInitialDone?: string[]
-  /** Onglet "Aujourd'hui" : 7 sections agents pré-rendues côté serveur. */
-  aujourdhuiSections?: React.ReactNode
+  /** Onglet "Essentiel" : alertes + KPIs live (tâches du jour ajoutées côté client). */
+  essentielSections?: React.ReactNode
+  /** Onglet "Agents & IA" : agents au travail + suggestions. */
+  agentsSections?: React.ReactNode
+  /** Onglet "Opérations" : stock + HACCP. */
+  operationsSections?: React.ReactNode
+  /** Onglet "Équipe" : planning RH. */
+  equipeSections?: React.ReactNode
   /** Onglet "Stratégie" : bandeau setup, tâches équipe, performance. */
   strategieExtras?: React.ReactNode
 }) {
@@ -80,7 +89,7 @@ export default function PilotageClient({
   const [, startTransition] = useTransition()
   const [showObjForm, setShowObjForm] = useState<{ kpi: KpiCode } | null>(null)
   const [showActForm, setShowActForm] = useState<ActionRow | true | null>(null)
-  const [vue, setVue] = useState<'aujourdhui' | 'strategie'>('aujourdhui')
+  const [vue, setVue] = useState<'essentiel' | 'agents' | 'operations' | 'equipe' | 'strategie'>('essentiel')
 
   // Map objectifs du mois courant pour vue par KPI
   const objMois = useMemo(() => {
@@ -133,23 +142,31 @@ export default function PilotageClient({
           }
         />
 
-      {/* Onglets PillTab tactiles 44px */}
-      <div className="flex gap-1.5">
-        <PillTab active={vue === 'aujourdhui'} onClick={() => setVue('aujourdhui')}>
-          📅 Aujourd&apos;hui
-        </PillTab>
-        <PillTab active={vue === 'strategie'} onClick={() => setVue('strategie')}>
-          🎯 Stratégie
-        </PillTab>
+      {/* Onglets PillTab tactiles 44px — sticky : on change de sujet sans scroller */}
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 bg-zinc-50/90 backdrop-blur flex gap-1.5 overflow-x-auto">
+        <PillTab active={vue === 'essentiel'} onClick={() => setVue('essentiel')}>🎯 Essentiel</PillTab>
+        <PillTab active={vue === 'agents'} onClick={() => setVue('agents')}>🤖 Agents &amp; IA</PillTab>
+        <PillTab active={vue === 'operations'} onClick={() => setVue('operations')}>📦 Opérations</PillTab>
+        <PillTab active={vue === 'equipe'} onClick={() => setVue('equipe')}>👥 Équipe</PillTab>
+        <PillTab active={vue === 'strategie'} onClick={() => setVue('strategie')}>📈 Stratégie</PillTab>
       </div>
 
-      {/* Onglet "Aujourd'hui" : 7 sections agents */}
-      {vue === 'aujourdhui' && (
+      {/* Onglet "Essentiel" : la vue 2 minutes — alertes + KPIs live + tâches du jour */}
+      {vue === 'essentiel' && (
         <div className="space-y-4">
           <TachesDuJourWidget poste="gerant" defaultOpen employeId={widgetEmployeId} initialDone={widgetInitialDone} />
-          {aujourdhuiSections}
+          {essentielSections}
         </div>
       )}
+
+      {/* Onglet "Agents & IA" */}
+      {vue === 'agents' && <div className="space-y-4">{agentsSections}</div>}
+
+      {/* Onglet "Opérations" : stock + HACCP */}
+      {vue === 'operations' && <div className="space-y-4">{operationsSections}</div>}
+
+      {/* Onglet "Équipe" : planning RH */}
+      {vue === 'equipe' && <div className="space-y-4">{equipeSections}</div>}
 
       {/* Onglet "Stratégie" : contenu historique (KPIs charts, objectifs, kanban, saisonnier) */}
       {vue === 'strategie' && (<>
@@ -213,38 +230,64 @@ export default function PilotageClient({
         {objectifs.length === 0 ? (
           <p className="text-sm text-zinc-500 italic">Aucun objectif défini. Cliquez sur 🎯 dans une carte KPI ci-dessus.</p>
         ) : (
-          <Card className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-left">
-                <tr>
-                  <th className="px-3 py-2">Période</th>
-                  <th className="px-3 py-2">KPI</th>
-                  <th className="px-3 py-2 text-right">Cible</th>
-                  <th className="px-3 py-2">Notes</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {objectifs.map(o => (
-                  <tr key={o.id} className="border-t">
-                    <td className="px-3 py-2">
-                      <Badge variant="outline">{o.periode}</Badge>{' '}
-                      {o.mois ?? o.annee}
-                    </td>
-                    <td className="px-3 py-2 font-medium">{KPI_LABELS[o.kpi]}</td>
-                    <td className="px-3 py-2 text-right">{Number(o.valeur_cible).toLocaleString('fr-FR')} {o.unite}</td>
-                    <td className="px-3 py-2 text-zinc-600">{o.notes ?? ''}</td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => { if (confirm('Supprimer cet objectif ?')) startTransition(() => supprimerObjectif(o.id).then(() => router.refresh())) }}
-                        className="text-red-600 hover:bg-red-50 p-1 rounded"
-                        title="Supprimer"
-                      ><Trash2 className="h-4 w-4" /></button>
-                    </td>
+          <Card>
+            {/* Cartes mobile */}
+            <ul className="md:hidden divide-y divide-zinc-100">
+              {objectifs.map(o => (
+                <li key={o.id} className="py-3 px-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-zinc-900 truncate">{KPI_LABELS[o.kpi]}</p>
+                    <p className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5">
+                      <Badge variant="outline">{o.periode}</Badge>
+                      <span>{o.mois ?? o.annee}</span>
+                    </p>
+                    {o.notes && <p className="text-xs text-zinc-500 mt-0.5 truncate">{o.notes}</p>}
+                  </div>
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    <span className="font-bold tabular-nums text-zinc-900">{Number(o.valeur_cible).toLocaleString('fr-FR')} {o.unite}</span>
+                    <button
+                      onClick={async () => { if (await askConfirm('Supprimer cet objectif ?')) startTransition(() => supprimerObjectif(o.id).then(() => router.refresh())) }}
+                      className="text-red-600 hover:bg-red-50 rounded inline-flex items-center justify-center min-h-[44px] min-w-[44px]"
+                      title="Supprimer"
+                    ><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {/* Table desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-zinc-50 text-left">
+                  <tr>
+                    <th className="px-3 py-2">Période</th>
+                    <th className="px-3 py-2">KPI</th>
+                    <th className="px-3 py-2 text-right">Cible</th>
+                    <th className="px-3 py-2">Notes</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {objectifs.map(o => (
+                    <tr key={o.id} className="border-t">
+                      <td className="px-3 py-2">
+                        <Badge variant="outline">{o.periode}</Badge>{' '}
+                        {o.mois ?? o.annee}
+                      </td>
+                      <td className="px-3 py-2 font-medium">{KPI_LABELS[o.kpi]}</td>
+                      <td className="px-3 py-2 text-right">{Number(o.valeur_cible).toLocaleString('fr-FR')} {o.unite}</td>
+                      <td className="px-3 py-2 text-zinc-600">{o.notes ?? ''}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={async () => { if (await askConfirm('Supprimer cet objectif ?')) startTransition(() => supprimerObjectif(o.id).then(() => router.refresh())) }}
+                          className="text-red-600 hover:bg-red-50 p-1 rounded"
+                          title="Supprimer"
+                        ><Trash2 className="h-4 w-4" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         )}
         </div>
@@ -285,13 +328,13 @@ export default function PilotageClient({
                     {a.kpi_lie && <p className="text-xs mt-1 opacity-80">🎯 {KPI_LABELS[a.kpi_lie as KpiCode]}</p>}
                     <div className="mt-2 flex gap-1">
                       {col !== 'a_faire' && (
-                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'a_faire').then(() => router.refresh()))} className="text-xs px-2 py-0.5 bg-white/60 hover:bg-white rounded">← À faire</button>
+                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'a_faire').then(() => router.refresh()))} className="text-xs px-3 min-h-[44px] inline-flex items-center justify-center bg-white/60 hover:bg-white rounded">← À faire</button>
                       )}
                       {col !== 'en_cours' && (
-                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'en_cours').then(() => router.refresh()))} className="text-xs px-2 py-0.5 bg-white/60 hover:bg-white rounded">En cours</button>
+                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'en_cours').then(() => router.refresh()))} className="text-xs px-3 min-h-[44px] inline-flex items-center justify-center bg-white/60 hover:bg-white rounded">En cours</button>
                       )}
                       {col !== 'fait' && (
-                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'fait').then(() => router.refresh()))} className="text-xs px-2 py-0.5 bg-white/60 hover:bg-white rounded inline-flex items-center gap-1"><Check className="h-3 w-3" /> Fait</button>
+                        <button onClick={() => startTransition(() => changerStatutAction(a.id, 'fait').then(() => router.refresh()))} className="text-xs px-3 min-h-[44px] inline-flex items-center justify-center bg-white/60 hover:bg-white rounded inline-flex items-center gap-1"><Check className="h-3 w-3" /> Fait</button>
                       )}
                     </div>
                   </div>
@@ -439,9 +482,9 @@ function ActionModal({ action, employes, onClose, onSaved }: {
     })
   }
 
-  function remove() {
+  async function remove() {
     if (!action) return
-    if (!confirm('Supprimer cette action ?')) return
+    if (!(await askConfirm('Supprimer cette action ?'))) return
     startTransition(() => supprimerAction(action.id).then(onSaved).catch(e => alert(e.message)))
   }
 

@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Megaphone, Plus, Trash2, ExternalLink, Eye, EyeOff } from 'lucide-react'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
+import EmptyState from '@/components/ui/EmptyState'
 import { creerPromotion, modifierPromotion, togglePromotion, supprimerPromotion } from './actions'
 import type { Promotion } from './page'
 
@@ -96,11 +97,12 @@ export default function PromotionsClient({ promotions }: { promotions: Promotion
       )}
 
       {promotions.length === 0 ? (
-        <Card className="p-8 text-center text-zinc-500">
-          <Megaphone className="h-10 w-10 mx-auto text-zinc-300 mb-2" />
-          <p className="text-base font-medium">Aucune promotion configurée</p>
-          <p className="text-xs mt-1">Clique « Nouvelle promotion » pour démarrer.</p>
-        </Card>
+        <EmptyState
+          emoji="🏷️"
+          titre="Aucune promotion"
+          description="Crée ta première promotion pour afficher une bannière, un code promo ou une happy hour sur ton site web."
+          action={{ label: '+ Nouvelle promotion', onClick: () => setCreating(true) }}
+        />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           {promotions.map(p => {

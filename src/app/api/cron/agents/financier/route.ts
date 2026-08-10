@@ -14,6 +14,7 @@
 
 import { NextResponse } from 'next/server'
 import { runAgent, emitFinding, authCron, type AgentContext } from '@/lib/agents/runner'
+import { lundiDeLaSemaine, coutSemaineAvecHeuresSup } from '@/lib/rh'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -182,16 +183,28 @@ async function analyseMasseSalariale(ctx: AgentContext) {
 
   const { data: pointages } = await ctx.supabase
     .from('pointage')
-    .select('employe_id, heures_travaillees')
+    .select('employe_id, date_pointage, heures_travaillees')
     .gte('date_pointage', moisDebut.toISOString().slice(0, 10))
+  // Heures par (employé, semaine) → coût avec majoration heures sup (35h · +25% · +50%)
+  const heuresParEmpSem = new Map<string, Map<string, number>>()
+  for (const p of (pointages ?? []) as Array<{ employe_id: string; date_pointage: string; heures_travaillees: number | null }>) {
+    const h = Number(p.heures_travaillees ?? 0)
+    if (h <= 0) continue
+    const sem = lundiDeLaSemaine(p.date_pointage)
+    let m = heuresParEmpSem.get(p.employe_id)
+    if (!m) { m = new Map(); heuresParEmpSem.set(p.employe_id, m) }
+    m.set(sem, (m.get(sem) ?? 0) + h)
+  }
   let masseSalBrute = 0
   let masseSalCh = 0   // charges patronales incluses
-  for (const p of (pointages ?? []) as Array<{ employe_id: string; heures_travaillees: number | null }>) {
-    const h = Number(p.heures_travaillees ?? 0)
-    const taux = tauxParId.get(p.employe_id) ?? 0
-    const coef = coefParId.get(p.employe_id) ?? 1.42
-    masseSalBrute += h * taux
-    masseSalCh    += h * taux * coef
+  for (const [empId, parSem] of heuresParEmpSem) {
+    const taux = tauxParId.get(empId) ?? 0
+    const coef = coefParId.get(empId) ?? 1.42
+    for (const hSem of parSem.values()) {
+      const brut = coutSemaineAvecHeuresSup(hSem, taux)
+      masseSalBrute += brut
+      masseSalCh    += brut * coef
+    }
   }
 
   const ratio = ca > 0 ? (masseSalCh / ca) * 100 : 0

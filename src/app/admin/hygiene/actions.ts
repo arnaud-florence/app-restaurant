@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { creerNotification } from '@/lib/notifications'
+import { logActivite } from '@/lib/operateur'
 import { TYPE_EQUIPEMENT_LABEL, type TypeEquipement } from './types'
 
 // ─── Relevés température ───────────────────────────────────────────
@@ -66,6 +67,7 @@ export async function creerReleveTemperature(input: unknown): Promise<{ id: stri
     if (nc) nc_id = nc.id as string
   }
 
+  await logActivite({ action: 'hygiene', zone: 'Hygiène', cible: 'Relevé température', details: { conforme: data.conforme } })
   revalidatePath('/admin/hygiene')
   return { id: data.id as string, conforme: data.conforme as boolean | null, nc_id }
 }

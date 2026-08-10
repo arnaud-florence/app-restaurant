@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { tauxTvaArticle } from '@/lib/tva'
 import { getPaymentProvider, type PaymentProvider, type PaymentResult } from '@/lib/borne/paymentProvider'
 import {
   creerCommandeBorne, marquerBornePayee, annulerCommandeBorne,
@@ -11,6 +12,11 @@ import {
   type PanierBorneItem, type ClientFidelite,
 } from './actions'
 import QRCode from 'qrcode'
+import { Search, X } from 'lucide-react'
+
+// Normalise une chaîne pour la recherche : sans accents, en minuscule.
+const normaliserRecherche = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 // ─── Types ─────────────────────────────────────────────────────────────
 type Produit = {
@@ -21,6 +27,8 @@ type Produit = {
   tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   description: string | null
   prix_vente_ht: number
+  tva?: number | null
+  contient_alcool?: boolean
   image_url: string | null
   favori: boolean
 }
@@ -33,7 +41,6 @@ type LignePanier = {
   quantite: number
 }
 
-const TVA = 0.10
 const NFC_TIMEOUT_S = 60
 const COMPTOIR_TIMEOUT_S = 10 * 60
 const HEARTBEAT_MS = 60_000
@@ -61,6 +68,8 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
   const [panier, setPanier] = useState<LignePanier[]>([])
   // null = écran "choisis ta catégorie" en grand / sinon = grille produits de la cat
   const [cat, setCat] = useState<string | null>(null)
+  // Recherche produit (vide = navigation par catégorie inchangée)
+  const [recherche, setRecherche] = useState('')
   // null = aucune fiche produit ouverte / sinon = fiche détaillée d'un produit
   const [ficheProduit, setFicheProduit] = useState<Produit | null>(null)
   const [provider, setProvider] = useState<PaymentProvider | null>(null)
@@ -123,10 +132,19 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
     return produits.filter(p => p.categorie === cat)
   }, [produits, cat])
 
+  // Résultats de recherche À PLAT (toutes catégories) — filtre sur le nom,
+  // insensible à la casse et aux accents.
+  const rechercheActive = recherche.trim().length >= 1
+  const produitsRecherche = useMemo(() => {
+    if (!rechercheActive) return []
+    const q = normaliserRecherche(recherche.trim())
+    return produits.filter(p => normaliserRecherche(p.nom).includes(q))
+  }, [produits, recherche, rechercheActive])
+
   // ─── Panier ──────────────────────────────────────────────────────────
   const totalTTC = useMemo(
-    () => panier.reduce((s, l) => s + l.produit.prix_vente_ht * l.quantite * (1 + TVA), 0),
-    [panier],
+    () => panier.reduce((s, l) => s + l.produit.prix_vente_ht * l.quantite * (1 + tauxTvaArticle(l.produit.contient_alcool ?? false, consommation) / 100), 0),
+    [panier, consommation],
   )
   const nbArticles = useMemo(() => panier.reduce((s, l) => s + l.quantite, 0), [panier])
   // Remise fidélité = pointsAUtiliser / config.points_par_euro_remise, capée au total
@@ -278,6 +296,10 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
           categoriesAvecMeta={categoriesAvecMeta}
           cat={cat}
           setCat={setCat}
+          recherche={recherche}
+          setRecherche={setRecherche}
+          rechercheActive={rechercheActive}
+          produitsRecherche={produitsRecherche}
           panier={panier}
           nbArticles={nbArticles}
           totalTTC={totalTTC}
@@ -410,13 +432,19 @@ export default function BorneClient({ produits }: { produits: Produit[] }) {
 // ÉCRAN 1 — CATALOGUE
 // ═══════════════════════════════════════════════════════════════════════
 function EcranCatalogue({
-  produitsFiltres, categoriesAvecMeta, cat, setCat, panier, nbArticles, totalTTC,
+  produitsFiltres, categoriesAvecMeta, cat, setCat,
+  recherche, setRecherche, rechercheActive, produitsRecherche,
+  panier, nbArticles, totalTTC,
   onOuvrirFiche, onAjouter, onRetirer, onSupprimer, onVider, onAllerCaisse,
 }: {
   produitsFiltres: Produit[]
   categoriesAvecMeta: Array<{ nom: string; count: number; firstImage: string | null; firstProduit: Produit }>
   cat: string | null
   setCat: (c: string | null) => void
+  recherche: string
+  setRecherche: (s: string) => void
+  rechercheActive: boolean
+  produitsRecherche: Produit[]
   panier: LignePanier[]
   nbArticles: number
   totalTTC: number
@@ -449,7 +477,7 @@ function EcranCatalogue({
       {/* Header */}
       <header className="shrink-0 px-6 h-16 flex items-center justify-between bg-zinc-900 border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          {cat && (
+          {cat && !rechercheActive && (
             <button
               onClick={() => setCat(null)}
               className="inline-flex items-center gap-1 h-10 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-black"
@@ -461,7 +489,7 @@ function EcranCatalogue({
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 leading-none">Borne self-service</p>
             <h1 className="font-display italic text-xl font-medium text-white tracking-tight leading-none mt-0.5">
-              {cat ? `${iconeCat(cat)} ${cat}` : 'Choisissez une catégorie'}
+              {rechercheActive ? '🔎 Résultats de recherche' : cat ? `${iconeCat(cat)} ${cat}` : 'Choisissez une catégorie'}
             </h1>
           </div>
         </div>
@@ -475,7 +503,84 @@ function EcranCatalogue({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_360px] overflow-hidden min-h-0">
         {/* Colonne principale */}
         <div className="overflow-y-auto scroll-visible-dark p-4 sm:p-6">
-          {cat === null ? (
+          {/* ═══ Barre de recherche produit (sticky) ═══ */}
+          <div className="sticky -top-4 sm:-top-6 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1 pb-3 mb-1 bg-[#0D0D0D]/95 backdrop-blur-sm">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
+              <input
+                type="text"
+                value={recherche}
+                onChange={e => setRecherche(e.target.value)}
+                placeholder="🔎 Chercher un plat, une boisson…"
+                className="w-full h-12 pl-12 pr-12 rounded-2xl bg-zinc-900 border-2 border-zinc-800 focus:border-emerald-500 text-white placeholder:text-zinc-500 text-base font-medium outline-none transition-colors"
+              />
+              {recherche.length > 0 && (
+                <button
+                  onClick={() => setRecherche('')}
+                  aria-label="Effacer la recherche"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-90 text-zinc-300 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {rechercheActive ? (
+            /* ═══ MODE RECHERCHE : résultats à plat, toutes catégories ═══ */
+            produitsRecherche.length === 0 ? (
+              <div className="text-center py-20">
+                <span className="text-6xl">🔍</span>
+                <p className="text-zinc-400 italic mt-4 text-lg">
+                  Aucun plat trouvé pour «&nbsp;{recherche.trim()}&nbsp;»
+                </p>
+                <button
+                  onClick={() => setRecherche('')}
+                  className="mt-5 inline-flex items-center gap-1 h-12 px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-black"
+                >
+                  Effacer la recherche
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {produitsRecherche.map(p => {
+                  const enPanier = panier.find(l => l.produit.id === p.id)?.quantite ?? 0
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => onOuvrirFiche(p)}
+                      className={cn(
+                        'group relative rounded-2xl bg-zinc-900 border-2 overflow-hidden text-left transition-all active:scale-95',
+                        enPanier > 0 ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-zinc-800 hover:border-zinc-600',
+                      )}
+                    >
+                      {p.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.image_url} alt={p.nom} className="w-full aspect-[4/3] object-cover bg-zinc-950" />
+                      ) : (
+                        <div className="w-full aspect-[4/3] bg-zinc-800 flex items-center justify-center text-4xl">
+                          {p.tag_destination === 'BAR' ? '🥤' : '🍽'}
+                        </div>
+                      )}
+                      {enPanier > 0 && (
+                        <span className="absolute top-2 right-2 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-full bg-emerald-500 text-white text-sm font-black tabular-nums shadow-lg">
+                          ×{enPanier}
+                        </span>
+                      )}
+                      {p.favori && (
+                        <span className="absolute top-2 left-2 inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-500 text-white text-sm shadow">⭐</span>
+                      )}
+                      <div className="p-3">
+                        <p className="font-display italic text-base font-medium text-white line-clamp-2 leading-tight">{p.nom}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">{p.categorie}</p>
+                        <p className="font-black tabular-nums text-emerald-400 mt-2">{fmtPrix(p.prix_vente_ht * (1 + tauxTvaArticle(p.contient_alcool ?? false, 'sur_place') / 100))}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          ) : cat === null ? (
             /* ═══ ÉTAPE A : Grille de catégories en grand ═══ */
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
               {categoriesAvecMeta.map(c => (
@@ -545,7 +650,7 @@ function EcranCatalogue({
                     <div className="p-3">
                       <p className="font-display italic text-base font-medium text-white line-clamp-2 leading-tight">{p.nom}</p>
                       <p className="text-[10px] uppercase tracking-widest text-zinc-500 mt-1">{p.categorie}</p>
-                      <p className="font-black tabular-nums text-emerald-400 mt-2">{fmtPrix(p.prix_vente_ht * (1 + TVA))}</p>
+                      <p className="font-black tabular-nums text-emerald-400 mt-2">{fmtPrix(p.prix_vente_ht * (1 + tauxTvaArticle(p.contient_alcool ?? false, 'sur_place') / 100))}</p>
                     </div>
                   </button>
                 )
@@ -687,7 +792,7 @@ function PanierContenu({
                   <span className="w-8 text-center font-black tabular-nums text-base">{l.quantite}</span>
                   <button onClick={() => onAjouter(l.produit, 1)} className="w-9 h-9 rounded-lg bg-zinc-800 active:bg-zinc-700 text-white font-bold text-lg">+</button>
                 </div>
-                <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + TVA))}</p>
+                <p className="text-sm font-black tabular-nums text-emerald-400">{fmtPrix(l.produit.prix_vente_ht * l.quantite * (1 + tauxTvaArticle(l.produit.contient_alcool ?? false, 'sur_place') / 100))}</p>
               </div>
             </div>
           </div>
@@ -1566,7 +1671,7 @@ function FicheProduitModal({
 }) {
   const initial = quantiteActuelle > 0 ? quantiteActuelle : 1
   const [qty, setQty] = useState<number>(initial)
-  const prixUnit = produit.prix_vente_ht * (1 + TVA)
+  const prixUnit = produit.prix_vente_ht * (1 + tauxTvaArticle(produit.contient_alcool ?? false, 'sur_place') / 100)
   const prixTotal = prixUnit * qty
   const dejaPresent = quantiteActuelle > 0
 

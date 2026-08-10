@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { toast } from '@/lib/toast'
+import { askConfirm } from '@/lib/confirm'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import AgendaCreneauxColonnes from '@/components/AgendaCreneauxColonnes'
 import type { CommandeLivreur } from './page'
 import { marquerEnLivraison, marquerLivree, envoyerEmailRetard } from './actions'
@@ -44,10 +46,12 @@ export default function LivreurClient({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [tab, setTab] = useState<'a_livrer' | 'en_tournee' | 'livrees'>('a_livrer')
   const [now, setNow] = useState(() => Date.now())
-  // tick simple toutes les 30s pour rafraichir les compteurs
-  useMemo(() => {
-    if (typeof window === 'undefined') return
+  // tick simple toutes les 30s pour rafraichir les compteurs.
+  // useEffect (et non useMemo) : useMemo ignore la fonction de cleanup retournée,
+  // donc l'intervalle fuyait (jamais nettoyé). useEffect le nettoie au démontage.
+  useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(i)
   }, [])
@@ -96,16 +100,16 @@ export default function LivreurClient({
   function handlePartir(commande_id: string) {
     startTransition(async () => {
       const r = await marquerEnLivraison(commande_id)
-      if (!r.ok) alert('Erreur : ' + r.error)
+      if (!r.ok) toast.error('Erreur : ' + r.error)
       else router.refresh()
     })
   }
 
-  function handleLivree(commande_id: string) {
-    if (!confirm('Confirmer la livraison ?')) return
+  async function handleLivree(commande_id: string) {
+    if (!(await askConfirm('Confirmer la livraison ?'))) return
     startTransition(async () => {
       const r = await marquerLivree(commande_id)
-      if (!r.ok) alert('Erreur : ' + r.error)
+      if (!r.ok) toast.error('Erreur : ' + r.error)
       else router.refresh()
     })
   }
@@ -114,9 +118,9 @@ export default function LivreurClient({
     startTransition(async () => {
       const r = await envoyerEmailRetard(commande_id)
       if (!r.ok) {
-        alert(r.alreadySent ? 'Email retard déjà envoyé.' : 'Erreur : ' + r.error)
+        toast.error(r.alreadySent ? 'Email retard déjà envoyé.' : 'Erreur : ' + r.error)
       } else {
-        alert('✓ Email retard envoyé au client.')
+        toast.success('✓ Email retard envoyé au client.')
         router.refresh()
       }
     })
@@ -125,8 +129,11 @@ export default function LivreurClient({
   return (
     <div className="bg-[#0D0D0D] text-zinc-100 min-h-screen pb-32">
       {/* ═══ HEADER POS UNIFIÉ ═══ */}
-      <header className="sticky top-0 z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <header className="sticky top-[var(--op-bar-h,0px)] z-20 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border-b border-zinc-800 shadow-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="md:hidden p-2 space-y-2">
+          <div className="flex items-center justify-center -mb-1">
+            <h1 className="text-zinc-100 text-xs font-black uppercase tracking-[0.2em]">🛵 Livreur</h1>
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-lg shadow-md shrink-0">🛵</span>
             <span className={cn(
@@ -136,6 +143,7 @@ export default function LivreurClient({
             <span className="inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-blue-500/15 text-blue-200 ring-1 ring-blue-500/30 text-xs font-black tabular-nums shrink-0">🛵 {enTournee.length}</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <Link href="/service" className="inline-flex items-center justify-center gap-1 px-2.5 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-sm font-black shadow-lg shrink-0" aria-label="Centre opérationnel">⊞ <span className="text-xs">Service</span></Link>
             <span className="inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/30 text-xs font-black tabular-nums">✓ {livrees.length}</span>
             <span className="flex-1 inline-flex items-center justify-center gap-1 px-2 h-10 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black tabular-nums">
               💰 {fmtPrix(caJour)}
@@ -150,7 +158,7 @@ export default function LivreurClient({
         <div className="hidden md:flex px-3 h-14 items-center gap-2 overflow-x-auto whitespace-nowrap">
           <div className="inline-flex items-center gap-2 shrink-0">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 text-white text-xl shadow-md">🛵</span>
-            <div className="hidden lg:block">
+            <div className="block min-w-0 flex-1">
               <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-400 leading-none">Service</p>
               <h1 className="font-display italic text-base font-medium text-white tracking-tight leading-none mt-0.5">Livraisons</h1>
             </div>
@@ -179,13 +187,34 @@ export default function LivreurClient({
               📍 Itinéraire Maps · {adressesTournee.length} arrêts
             </a>
           )}
-          <Link href="/caisse" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
-            <span className="text-lg">💰</span><span>Caisse</span>
+          <Link href="/service" className="inline-flex items-center gap-1.5 px-2.5 h-10 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg transition-all active:scale-95 whitespace-nowrap shrink-0">
+            <span className="text-lg">⊞</span><span>Service</span>
           </Link>
         </div>
       </header>
 
+      {/* ═══ SÉLECTEUR D'ONGLETS STICKY ═══ */}
+      <div className="sticky top-[var(--op-bar-h,0px)] z-20 px-3 py-2 bg-zinc-950/90 backdrop-blur flex gap-1.5 overflow-x-auto border-b border-zinc-800">
+        {([
+          ['a_livrer', `📦 À livrer${aLivrer.length ? ` (${aLivrer.length})` : ''}`],
+          ['en_tournee', `🛵 En tournée${enTournee.length ? ` (${enTournee.length})` : ''}`],
+          ['livrees', `✅ Livrées${livrees.length ? ` (${livrees.length})` : ''}`],
+        ] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={cn(
+              'min-h-[44px] px-3 rounded-xl text-xs font-black whitespace-nowrap transition active:scale-95',
+              tab === k ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-zinc-300',
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <main className="p-3 space-y-4">
+        {tab === 'a_livrer' && (<>
         {/* À LIVRER — AGENDA COLONNES 15min (priorité) */}
         <section>
           <div className="flex items-center justify-between mb-2 px-1">
@@ -218,8 +247,32 @@ export default function LivreurClient({
           />
         </section>
 
+        {/* EN CUISINE — informatif (reste dans l'onglet "À livrer") */}
+        {enCuisine.length > 0 && (
+          <section>
+            <h2 className="text-zinc-400 font-bold text-sm uppercase tracking-wider mb-2 px-1">
+              🍳 En cours de préparation ({enCuisine.length})
+            </h2>
+            <ul className="text-xs space-y-1 px-2">
+              {enCuisine.map(c => {
+                const sty = STATUT_INFO[c.statut] ?? { label: c.statut, cls: '', ordre: 0 }
+                return (
+                  <li key={c.id} className="flex justify-between text-zinc-300">
+                    <span>
+                      <b className="text-white">#{c.numero}</b> {c.client_nom ?? '—'}
+                    </span>
+                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded', sty.cls)}>{sty.label}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+        </>)}
+
+        {tab === 'en_tournee' && (<>
         {/* EN TOURNÉE (commandes parties chez le client) */}
-        {enTournee.length > 0 && (
+        {enTournee.length > 0 ? (
           <section>
             <h2 className="text-blue-400 font-bold text-sm uppercase tracking-wider mb-2 px-1">
               🛵 En tournée ({enTournee.length})
@@ -280,32 +333,14 @@ export default function LivreurClient({
               })}
             </div>
           </section>
+        ) : (
+          <p className="text-center text-zinc-500 text-sm py-12">Aucune commande en tournée pour l'instant.</p>
         )}
+        </>)}
 
-        {/* EN CUISINE — informatif */}
-        {enCuisine.length > 0 && (
-          <section>
-            <h2 className="text-zinc-400 font-bold text-sm uppercase tracking-wider mb-2 px-1">
-              🍳 En cours de préparation ({enCuisine.length})
-            </h2>
-            <ul className="text-xs space-y-1 px-2">
-              {enCuisine.map(c => {
-                const sty = STATUT_INFO[c.statut] ?? { label: c.statut, cls: '', ordre: 0 }
-                return (
-                  <li key={c.id} className="flex justify-between text-zinc-300">
-                    <span>
-                      <b className="text-white">#{c.numero}</b> {c.client_nom ?? '—'}
-                    </span>
-                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded', sty.cls)}>{sty.label}</span>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        )}
-
+        {tab === 'livrees' && (<>
         {/* LIVRÉES — historique */}
-        {livrees.length > 0 && (
+        {livrees.length > 0 ? (
           <section>
             <h2 className="text-emerald-400 font-bold text-sm uppercase tracking-wider mb-2 px-1">
               ✓ {livrees.length} livrée{livrees.length > 1 ? 's' : ''} aujourd'hui
@@ -319,24 +354,12 @@ export default function LivreurClient({
               ))}
             </ul>
           </section>
+        ) : (
+          <p className="text-center text-zinc-500 text-sm py-12">Aucune livraison effectuée aujourd'hui.</p>
         )}
+        </>)}
 
       </main>
-
-      {navProfil && <OpsBottomNav profil={navProfil} />}
-    </div>
-  )
-}
-
-function KPI({ label, value, accent = 'default', pulse }: { label: string; value: string | number; accent?: 'default' | 'red'; pulse?: boolean }) {
-  const STYLES = {
-    default: 'bg-zinc-800/80 border-zinc-700 text-zinc-100',
-    red:     'bg-gradient-to-br from-rose-500/30 to-red-700/10 border-rose-500/40 text-rose-100 shadow-md shadow-rose-900/30',
-  }
-  return (
-    <div className={cn('rounded-xl border px-3 py-1.5 text-center min-w-20 backdrop-blur', STYLES[accent], pulse && 'animate-pulse')}>
-      <p className="text-[10px] uppercase tracking-widest opacity-75 font-bold">{label}</p>
-      <p className="text-base font-black tabular-nums leading-tight mt-0.5">{value}</p>
     </div>
   )
 }

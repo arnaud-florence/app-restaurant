@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { askConfirm } from '@/lib/confirm'
 import { cloturerMoisAction } from './actions'
 
 export default function ClotureMoisButton({
@@ -16,12 +17,12 @@ export default function ClotureMoisButton({
   const [pending, startTransition] = useTransition()
   const [last, setLast] = useState<{ nb: number; total: number } | null>(null)
 
-  function handleClick() {
+  async function handleClick() {
     const moisLabel = new Date(mois).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     const msg = dejaCloture
       ? `Re-clôturer ${moisLabel} ? Les résultats actuels écraseront ceux déjà figés.`
       : `Clôturer ${moisLabel} ? Tous les résultats challenges seront persistés. Tu pourras toujours re-cliquer pour mettre à jour.`
-    if (!confirm(msg)) return
+    if (!(await askConfirm(msg))) return
 
     startTransition(async () => {
       try {

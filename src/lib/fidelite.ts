@@ -129,6 +129,9 @@ async function recalculerStatutsClient(client_id: string): Promise<NiveauFidelit
 export async function crediterPointsCommande(
   commande_id: string,
   employe_id?: string | null,
+  // Part de l'addition HT éligible aux points (0..1). < 1 quand une partie a été
+  // réglée AVEC des points : on ne gagne pas de points sur ses propres points.
+  ratioEligible: number = 1,
 ): Promise<{ points: number; niveau: NiveauFidelite; client_id: string } | null> {
   const sb = await createClient()
 
@@ -147,7 +150,8 @@ export async function crediterPointsCommande(
     .eq('type', 'gain')
   if ((count ?? 0) > 0) return null
 
-  const points = pointsPourMontant(Number(cmd.montant_total_ht ?? 0), config.points_par_euro)
+  const ratio = Math.min(1, Math.max(0, ratioEligible))
+  const points = pointsPourMontant(Number(cmd.montant_total_ht ?? 0) * ratio, config.points_par_euro)
   if (points <= 0) return null
 
   // Insert mouvement

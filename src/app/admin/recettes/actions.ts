@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireWritable } from '@/lib/auth'
 import { getPosteFilter } from '@/lib/permissions'
+import { logActivite } from '@/lib/operateur'
 import {
   type Recette, type RecetteIngredient, type RecetteWithIngredients,
   TAGS_DESTINATION, isNewId,
@@ -190,6 +191,7 @@ export async function createRecette(payload: unknown): Promise<{ id: string }> {
     }
   }
 
+  await logActivite({ action: 'recette_creee', zone: 'Recettes', cible: recette.nom })
   revalidatePath('/admin/recettes')
   return { id: data.id as string }
 }
@@ -233,6 +235,7 @@ export async function updateRecette(id: string, payload: unknown) {
     })
     .eq('id', id)
   if (rErr) throw new Error(rErr.message)
+  await logActivite({ action: 'recette_modifiee', zone: 'Recettes', cible: recette.nom })
 
   // Diff ingrédients
   const { data: existants, error: lErr } = await supabase

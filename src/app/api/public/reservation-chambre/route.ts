@@ -58,11 +58,12 @@ export async function POST(req: Request) {
 
   const sb = await createClient()
 
-  // Vérifie dispo (pas de conflit avec autres réservations confirmées)
+  // Vérifie dispo : conflit avec toute réservation non annulée (demande, confirmée,
+  // ou client déjà arrivé) sur des dates qui chevauchent.
   const { data: conflits } = await sb.from('reservations_chambres')
     .select('id')
     .eq('chambre_id', p.chambre_id)
-    .in('statut', ['demande', 'confirmee'])
+    .neq('statut', 'annulee')
     .lt('date_arrivee', p.date_depart)
     .gt('date_depart', p.date_arrivee)
 

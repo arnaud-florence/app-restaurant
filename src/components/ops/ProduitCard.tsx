@@ -22,10 +22,16 @@ export type ProduitCardData = {
   id: string
   nom: string
   prix_vente_ht: number
+  tva?: number | null        // taux TVA de la recette (défaut 10 % sur place)
   tag_destination: 'CUISINE' | 'SNACKING' | 'PIZZA' | 'BAR'
   image_url?: string | null
   photo_url?: string | null
   favori?: boolean
+}
+
+/** Prix TTC affiché au client/serveur (menu sur place). */
+export function prixTTCAffiche(p: { prix_vente_ht: number; tva?: number | null }): number {
+  return p.prix_vente_ht * (1 + (p.tva ?? 10) / 100)
 }
 
 const FALLBACK_BY_DEST: Record<string, { emoji: string; bg: string }> = {
@@ -129,7 +135,7 @@ export default function ProduitCard({
           {produit.nom}
         </p>
         <p className="text-emerald-400 font-bold text-base tabular-nums mt-1">
-          {fmtPrix(produit.prix_vente_ht)} <span className="text-[10px] font-medium text-emerald-400/60">HT</span>
+          {fmtPrix(prixTTCAffiche(produit))}
         </p>
       </div>
     </button>

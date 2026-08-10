@@ -22,6 +22,7 @@ type Recette = {
   id: string; nom: string; categorie: string;
   tag_destination: TagPanier
   prix_vente_ht: number
+  tva?: number | null
   image_url?: string | null
   photo_url?: string | null
   favori?: boolean
@@ -31,9 +32,15 @@ type LignePanier = {
   recette_id: string
   recette_nom: string
   prix_unitaire_ht: number
+  tva: number
   tag_destination: TagPanier
   quantite: number
   commentaire: string
+}
+
+// Prix TTC d'une ligne (sur place, taux de la recette).
+function ligneTTC(l: { prix_unitaire_ht: number; tva: number; quantite: number }): number {
+  return l.quantite * l.prix_unitaire_ht * (1 + (l.tva ?? 10) / 100)
 }
 
 type Slot = { heure: string; iso: string; disponible: boolean; count: number; max: number }
@@ -54,12 +61,15 @@ const TAG_LABEL_COURT: Record<TagPlanning, { emoji: string; label: string }> = {
 
 export default function ComptoirOrderModal({
   recettes, barmanId, onClose, onSuccess, withCreneaux = null, tagInitial = 'BAR',
-  paiementAuComptoir = false,
+  paiementAuComptoir = false, ardoisesOuvertes = null,
 }: {
   recettes: Recette[]
   barmanId: string | null
   onClose: () => void
   onSuccess: (commandeId: string) => void
+  // Ardoises comptoir bar : si fourni (non null), affiche le champ « Ardoise » pour
+  // ouvrir/continuer un tab nommé. La liste sert de quick-pick des ardoises ouvertes.
+  ardoisesOuvertes?: string[] | null
   // Si fourni : la modal proposera un sélecteur de créneau pour chaque tag du
   // panier qui figure dans `tagsAvecPlanning`. Si null/absent : commande
   // immédiate (pas de creneau_retrait, pas de creneaux_par_tag).
@@ -72,6 +82,8 @@ export default function ComptoirOrderModal({
 }) {
   const [tagActif, setTagActif] = useState<TagPanier>(tagInitial)
   const [panier, setPanier] = useState<LignePanier[]>([])
+  const [ardoiseNom, setArdoiseNom] = useState('')
+  const ardoiseActive = ardoisesOuvertes !== null
   const [erreur, setErreur] = useState('')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isPending, startTransition] = useTransition()
@@ -201,7 +213,7 @@ export default function ComptoirOrderModal({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [recettesAffichees])
 
-  const totalPanier = panier.reduce((s, p) => s + p.quantite * p.prix_unitaire_ht, 0)
+  const totalPanier = panier.reduce((s, p) => s + ligneTTC(p), 0)
   const nbArticles = panier.reduce((s, p) => s + p.quantite, 0)
 
   function ajouter(r: Recette) {
@@ -216,6 +228,7 @@ export default function ComptoirOrderModal({
         recette_id: r.id,
         recette_nom: r.nom,
         prix_unitaire_ht: r.prix_vente_ht,
+        tva: Number(r.tva ?? 10),
         tag_destination: r.tag_destination,
         quantite: 1,
         commentaire: '',
@@ -242,17 +255,21 @@ export default function ComptoirOrderModal({
     startTransition(async () => {
       try {
         // Pour chaque tag à réserver : si pas de choix explicite, on prend le
-        // PROCHAIN slot libre de ce tag. Si rien de libre → on échoue
-        // explicitement (la cuisine est saturée pour ce jour).
+        // PROCHAIN slot libre de ce tag.
+        //  - Zone SANS aucun créneau planifié (ex: boissons au comptoir) → service
+        //    IMMÉDIAT, on ne bloque pas (pas de créneau requis).
+        //  - Zone AVEC des créneaux mais tous pris → saturée → on échoue explicitement.
         const creneauxFinaux: Record<TagPlanning, string> = {} as Record<TagPlanning, string>
         for (const t of tagsAReserver) {
+          const slots = slotsParTag[t] ?? []
+          if (slots.length === 0) continue   // pas de planning pour cette zone → immédiat
           let iso = creneauxParTag[t] ?? null
           if (!iso) {
-            const prochain = (slotsParTag[t] ?? []).find(s => s.disponible)
+            const prochain = slots.find(s => s.disponible)
             if (prochain) iso = prochain.iso
           }
           if (!iso) {
-            throw new Error(`Aucun créneau libre pour ${TAG_LABEL_COURT[t].label.toLowerCase()} à cette date.`)
+            throw new Error(`Plus de créneau libre pour ${TAG_LABEL_COURT[t].label.toLowerCase()} à cette date (zone complète). Choisis une autre date ou retire ces articles.`)
           }
           creneauxFinaux[t] = iso
         }
@@ -263,6 +280,8 @@ export default function ComptoirOrderModal({
           numero_table: null,
           serveur_id: barmanId || null,
           paiement_au_comptoir: paiementAuComptoir,
+          // Ardoise bar (tab nommé) — vide = note ponctuelle classique.
+          ...(ardoiseActive && ardoiseNom.trim() ? { ardoise_nom: ardoiseNom.trim() } : {}),
           // Multi-créneaux (envoyé seulement s'il y en a)
           ...(hasCreneaux ? { creneaux_par_tag: creneauxFinaux } : {}),
           articles: panier.map(p => ({
@@ -322,6 +341,50 @@ export default function ComptoirOrderModal({
             </button>
           ))}
         </div>
+
+        {/* Bande ARDOISE bar — ouvrir/continuer un tab nommé (client debout au comptoir) */}
+        {ardoiseActive && (
+          <div className="flex-shrink-0 bg-violet-950/30 border-b border-violet-800/50 px-3 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-violet-300 whitespace-nowrap">🧾 Ardoise</span>
+              <input
+                type="text"
+                value={ardoiseNom}
+                onChange={e => setArdoiseNom(e.target.value)}
+                placeholder="Nom du client (optionnel) — ex. Marc, table haute 2…"
+                className="flex-1 min-w-[160px] min-h-[40px] px-3 rounded-md bg-zinc-900 border border-violet-700/50 text-zinc-100 placeholder:text-zinc-500 text-sm outline-none focus:border-violet-400"
+              />
+              {ardoiseNom.trim() && (
+                <button type="button" onClick={() => setArdoiseNom('')} className="text-[11px] text-zinc-400 hover:text-zinc-200 px-2">effacer</button>
+              )}
+            </div>
+            {(ardoisesOuvertes ?? []).length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span className="text-[10px] text-violet-400/80">Ardoises ouvertes :</span>
+                {(ardoisesOuvertes ?? []).map(nom => (
+                  <button
+                    key={nom}
+                    type="button"
+                    onClick={() => setArdoiseNom(nom)}
+                    className={cn(
+                      'text-[11px] px-2 py-1 rounded-full border transition-colors',
+                      ardoiseNom.trim() === nom
+                        ? 'bg-violet-500 text-white border-violet-400'
+                        : 'bg-zinc-900 text-violet-200 border-violet-700/50 hover:bg-violet-900/40',
+                    )}
+                  >
+                    {nom}
+                  </button>
+                ))}
+              </div>
+            )}
+            {ardoiseNom.trim() && (
+              <p className="text-[10px] text-violet-300/80 mt-1">
+                ➕ Les articles s&apos;ajoutent à l&apos;ardoise de <b>{ardoiseNom.trim()}</b> — un seul encaissement à la fin.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Bande créneaux MOBILE — visible si au moins un tag à réserver. Empile un sélecteur par tag. */}
         {hasAnyPlanning && (
@@ -507,7 +570,7 @@ function SelecteurDate({
             key={d.key}
             onClick={() => setDateChoisie(d.date)}
             className={cn(
-              'inline-flex items-center px-3 min-h-[36px] rounded text-xs font-bold whitespace-nowrap border transition-colors',
+              'inline-flex items-center px-3 min-h-[44px] rounded text-xs font-bold whitespace-nowrap border transition-colors',
               dateChoisie === d.date
                 ? 'bg-emerald-500 text-white border-emerald-400'
                 : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:bg-zinc-800',
@@ -556,7 +619,7 @@ function SelecteurSlotTag({
           disabled={slots.length > 0 && !slots.some(s => s.disponible)}
           className={cn(
             'w-full rounded-md text-xs font-bold mb-1 transition-colors border',
-            compact ? 'min-h-[32px]' : 'min-h-[40px]',
+            compact ? 'min-h-[40px]' : 'min-h-[44px]',
             'bg-zinc-900 text-emerald-300 border-emerald-700 hover:bg-emerald-950',
             'disabled:opacity-50 disabled:cursor-not-allowed',
           )}
@@ -567,8 +630,8 @@ function SelecteurSlotTag({
       {loading ? (
         <p className="text-xs text-zinc-500 italic text-center py-2">Chargement créneaux…</p>
       ) : slots.length === 0 ? (
-        <p className="text-[11px] text-zinc-500 italic text-center py-1">
-          Aucun créneau planifié {isToday ? "aujourd'hui" : 'ce jour'} pour {lib.label.toLowerCase()}.
+        <p className="text-[11px] text-emerald-400/90 italic text-center py-1">
+          ✓ {lib.label} servi tout de suite — aucun créneau requis.
         </p>
       ) : (
         <div className={cn('grid grid-cols-4 sm:grid-cols-3 gap-1 overflow-y-auto', slotsMax)}>
@@ -581,7 +644,7 @@ function SelecteurSlotTag({
                 disabled={!s.disponible}
                 className={cn(
                   'rounded text-xs font-bold tabular-nums transition-colors border flex flex-col items-center justify-center px-1 py-0.5',
-                  compact ? 'min-h-[34px]' : 'min-h-[40px]',
+                  compact ? 'min-h-[40px]' : 'min-h-[44px]',
                   !s.disponible
                     ? 'bg-zinc-900 text-zinc-600 border-zinc-800 line-through cursor-not-allowed opacity-50'
                     : isActive
@@ -661,7 +724,7 @@ function PanierContent({
                   >+</button>
                 </div>
                 <span className="text-sm tabular-nums text-zinc-400">
-                  {fmtPrix(p.prix_unitaire_ht * p.quantite)}
+                  {fmtPrix(ligneTTC(p))}
                 </span>
               </div>
             </div>

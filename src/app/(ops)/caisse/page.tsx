@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { getResumeSession, listSessionsFermees } from '../actions'
 import CaisseClient from './CaisseClient'
 import BriefingPoste from '@/components/BriefingPoste'
-import AlertesAgentsOps from '@/components/ops/AlertesAgentsOps'
 import { getProfile } from '@/lib/auth'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 
@@ -52,7 +51,6 @@ export default async function CaissePage() {
   return (
     <>
       <BriefingPoste briefing={briefing} />
-      <AlertesAgentsOps agentIds={['financier', 'securite']} />
       <CaisseClient
         initialResume={resume}
         sessionsFermees={sessionsFermees}

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
+import OperateurBar from '@/components/ops/OperateurBar'
+import CoupDeMainArnaud from './CoupDeMainArnaud'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -29,6 +31,7 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
         role: profil.role,
         poste: profil.poste,
         custom_permissions: profil.custom_permissions,
+        apercu: profil.apercu,
       }
     : null
 
@@ -48,6 +51,8 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
           - Mobile : fixed bottom (CSS interne du composant)
           - Desktop : static au top, scroll horizontal */}
       <TopActionBar theme="dark" profil={navProfil} initialFindingsRouges={(findingsRouges ?? []) as any} />
+      <OperateurBar />
+      <CoupDeMainArnaud />
       {children}
     </div>
   )

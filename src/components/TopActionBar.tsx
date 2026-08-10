@@ -16,19 +16,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Menu, X, LogOut, Search, AlertTriangle, Loader2, Flame, Star,
+  X, LogOut, Search, AlertTriangle, Loader2, Flame, Star,
   Home, BarChart3, Utensils, ChefHat, Users, Wallet, ShieldCheck, Settings,
   Wine, Pizza, ShoppingBag, Bike, BellRing, Receipt, GraduationCap,
   Target, Sparkles, Notebook, CloudSun, Leaf, Package, Truck,
   Calendar, BedDouble, User, Gift, Tag, Ticket, Award, Megaphone,
   MessageSquare, BookOpen, Trophy, Calculator, Zap, Trash2, ScrollText,
   Wrench, Lock, Tv,
+  Bot, UtensilsCrossed, UsersRound, GlassWater, Tablet,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { canAccess, type CustomPermissions } from '@/lib/permissions'
 import { logoutAction } from '@/app/login/actions'
 import PushNotifSwitch from '@/components/PushNotifSwitch'
+import InstallPWAButton from '@/components/InstallPWAButton'
+import MobileTabBar from '@/components/MobileTabBar'
 import { useLiveFindings, type Finding } from '@/hooks/useLiveFindings'
 import { usePinnedModules, MAX_PINNED } from '@/hooks/usePinnedModules'
 import { CATEGORIES, resolveActiveCategory, POSTE_PRIORITES_CATEGORIES, type Category } from '@/lib/navigation'
@@ -40,6 +43,12 @@ export type TopActionBarProfil = {
   role: string
   poste: string | null
   custom_permissions: CustomPermissions | null
+  apercu?: {
+    ciblePoste: string | null
+    ciblePerms: CustomPermissions | null
+    ciblePrenom: string
+    cibleNom: string
+  } | null
 } | null
 
 type Tone = 'emerald' | 'amber' | 'violet' | 'blue' | 'red' | 'rose' | 'zinc'
@@ -74,22 +83,22 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   '/mon-espace':              Home,
   '/admin':                   BarChart3,
   '/admin/pilotage':          Target,
-  '/admin/assistant':         Sparkles,
+  '/admin/assistant':         Bot,
   '/admin/journal':           Notebook,
   '/admin/previsionnel':      CloudSun,
   // Cuisine & stock
-  '/admin/recettes':          ChefHat,
-  '/admin/plats-du-jour':     Sparkles,
+  '/admin/recettes':          BookOpen,
+  '/admin/plats-du-jour':     UtensilsCrossed,
   '/admin/capacite-cuisine':  Settings,
   '/admin/ingredients':       Leaf,
   '/admin/stock':             Package,
   '/admin/fournisseurs':      Truck,
-  '/admin/boissons':          Wine,
+  '/admin/boissons':          GlassWater,
   '/admin/allergenes':        AlertTriangle,
   // Clientèle
   '/admin/reservations':      Calendar,
   '/admin/chambres':          BedDouble,
-  '/admin/groupes':           Users,
+  '/admin/groupes':           UsersRound,
   '/admin/clients':           User,
   '/admin/clients/fidelite':  Star,
   '/admin/promotions':        Gift,
@@ -109,14 +118,14 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   '/admin/economie':          Calculator,
   '/admin/energie':           Zap,
   // Conformité
-  '/admin/hygiene':           Sparkles,
+  '/admin/hygiene':           ShieldCheck,
   '/admin/dechets':           Trash2,
   '/admin/legal':             ScrollText,
   '/admin/maintenance':       Wrench,
   // Système
   '/admin/setup':             Settings,
   '/admin/securite':          Lock,
-  '/admin/borne':             ShoppingBag,
+  '/admin/borne':             Tablet,
   '/admin/borne-pin':         Lock,
 }
 
@@ -190,7 +199,8 @@ const ALL_GROUPES: Group[] = [
       { href: '/mon-espace',         label: 'Mon espace',      emoji: '🏠' },
       { href: '/admin',              label: 'Tableau de bord', emoji: '🏠' },
       { href: '/admin/pilotage',     label: 'Pilotage',        emoji: '📊' },
-      { href: '/admin/assistant',    label: 'Assistant IA',    emoji: '🤖' },
+      { href: '/admin/supervision',  label: 'Équipe en direct', emoji: '🟢' },
+      { href: '/admin/co-gerant',    label: 'Arnaud — co-gérant', emoji: '🧑‍💼' },
       { href: '/admin/journal',      label: 'Journal',         emoji: '📓' },
       { href: '/admin/previsionnel', label: 'Prévisionnel',    emoji: '🌤' },
     ],
@@ -198,15 +208,9 @@ const ALL_GROUPES: Group[] = [
   {
     groupe: 'Service opérationnel', emoji: '🍽',
     items: [
-      { href: '/serveur',     label: 'Salle / Serveur',  emoji: '🍽' },
-      { href: '/caisse',      label: 'Caisse',           emoji: '💰' },
-      { href: '/cuisine',     label: 'Cuisine',          emoji: '👨‍🍳' },
-      { href: '/pizza',       label: 'Pizza',            emoji: '🍕' },
-      { href: '/bar',         label: 'Bar',              emoji: '🍷' },
-      { href: '/emporter',    label: 'Snack / Emporter', emoji: '🛒' },
-      { href: '/livreur',     label: 'Livreur',          emoji: '🛵' },
-      { href: '/reception',   label: 'Réception',        emoji: '🛎' },
-      { href: '/admin/affichage', label: 'Affichage TV', emoji: '📺' },
+      // Les postes ne sont plus accessibles en direct : tout passe par le hub.
+      { href: '/service',         label: 'Centre opérationnel', emoji: '⊞' },
+      { href: '/admin/affichage', label: 'Affichage TV',        emoji: '📺' },
     ],
   },
   {
@@ -231,7 +235,7 @@ const ALL_GROUPES: Group[] = [
       { href: '/admin/clients',         label: 'Clients / CRM',   emoji: '🧑' },
       { href: '/admin/clients/fidelite', label: 'Fidélité',       emoji: '⭐' },
       { href: '/admin/promotions',      label: 'Promotions',      emoji: '🎁' },
-      { href: '/admin/codes-promo',     label: 'Codes promo',     emoji: '🏷' },
+      { href: '/admin/codes-promo',     label: 'Codes réduction', emoji: '🏷' },
       { href: '/admin/cartes-cadeaux',  label: 'Cartes cadeaux',  emoji: '🎫' },
       { href: '/admin/reputation',      label: 'Réputation',      emoji: '🏆' },
       { href: '/admin/marketing',       label: 'Marketing IA',    emoji: '📢' },
@@ -348,33 +352,25 @@ export default function TopActionBar({
       }
     }
     const byHref = new Map(allItems.map(i => [i.href, i]))
-    return pinned.map(href => byHref.get(href)).filter(Boolean) as Array<{ href: string; emoji: string; label: string; tone: Tone }>
+    // Les postes opérationnels ne sont JAMAIS des chips directs : on passe par /service.
+    const OPS_POSTES = new Set(['/serveur', '/caisse', '/cuisine', '/pizza', '/bar', '/emporter', '/livreur', '/reception'])
+    return pinned
+      .map(href => byHref.get(href))
+      .filter(Boolean)
+      .filter(i => !OPS_POSTES.has((i as { href: string }).href)) as Array<{ href: string; emoji: string; label: string; tone: Tone }>
   }, [pinned])
 
   /** Mode "Service intensif" : remplace les chips catégorie par les écrans ops directs.
    *  Persisté en localStorage 'service_intense_mode' (boolean).
    *  Utile pendant le rush où on veut accéder à Salle/Caisse/Cuisine en 1 clic
    *  sans s'embarrasser des catégories admin (Finances, Conformité, etc.). */
-  const [serviceMode, setServiceMode] = useState(false)
+  // « Mode service intensif » retiré : les écrans de poste passent désormais par le
+  // hub /service (centre opérationnel). serviceMode reste toujours false ; on purge
+  // l'ancienne préférence pour ne plus afficher d'anciennes chips postes directes.
+  const [serviceMode] = useState(false)
   useEffect(() => {
-    try {
-      const v = localStorage.getItem('service_intense_mode')
-      if (v === '1') { setServiceMode(true); return }
-      if (v === '0') return // choix explicite "mode complet" respecté
-      // Aucune préférence enregistrée : on active le mode service par défaut si
-      // l'employé arrive sur un écran de service (cuisine/bar/salle/caisse…),
-      // pour lui montrer les écrans ops directs plutôt que la nav admin.
-      const opsPrefixes = ['/serveur', '/cuisine', '/bar', '/caisse', '/emporter', '/livreur', '/pizza', '/reception']
-      if (opsPrefixes.some(p => pathname === p || pathname.startsWith(p + '/'))) setServiceMode(true)
-    } catch { /* SSR / private mode */ }
-  }, [pathname])
-  function toggleServiceMode() {
-    setServiceMode(prev => {
-      const next = !prev
-      try { localStorage.setItem('service_intense_mode', next ? '1' : '0') } catch { /* ignore */ }
-      return next
-    })
-  }
+    try { localStorage.removeItem('service_intense_mode') } catch { /* ignore */ }
+  }, [])
 
   // Quand le pathname change, on est arrivés à destination : reset pending.
   useEffect(() => { setPendingHref(null) }, [pathname])
@@ -434,9 +430,15 @@ export default function TopActionBar({
     { href: '/livreur',   emoji: '🛵',   label: 'Livreur',   tone: 'emerald' },
     { href: '/reception', emoji: '🛎',   label: 'Réception', tone: 'blue' },
   ]
+  // On exclut les hrefs déjà épinglés (affichés en chips épinglées plus haut)
+  // pour éviter le doublon en mode service intensif (ex: Caisse épinglé + Caisse ops).
   const opsChipsVisibles = useMemo(
-    () => opsChipsBruts.filter(c => peutVoir(c.href)),
-    [profil?.poste, profil?.custom_permissions, isManager],
+    () => {
+      const pinnedHrefs = new Set(pinnedItems.map(p => p.href))
+      return opsChipsBruts.filter(c => peutVoir(c.href) && !pinnedHrefs.has(c.href))
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profil?.poste, profil?.custom_permissions, isManager, pinnedItems],
   )
 
   // Catégories visibles filtrées (au moins 1 sous-module visible) et réordonnées par poste
@@ -543,6 +545,8 @@ export default function TopActionBar({
   // Mode service intensif : bordure ambre + ring glow
   const wrapperCls = theme === 'dark'
     ? cn(
+        // Mobile : masquée (remplacée par MobileTabBar 5 onglets). Desktop : barre riche en haut.
+        'hidden md:block',
         // Page sombre → barre CLAIRE en frosted glass
         'fixed bottom-3 inset-x-3 z-30 rounded-[28px] overflow-hidden',
         'bg-white/95 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/85',
@@ -553,6 +557,8 @@ export default function TopActionBar({
         'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-200 md:shadow-none md:overflow-visible md:ring-0 md:bg-white md:backdrop-blur-0',
       )
     : cn(
+        // Mobile : masquée (remplacée par MobileTabBar 5 onglets). Desktop : barre riche en haut.
+        'hidden md:block',
         // Page claire → barre SOMBRE en frosted glass premium
         'fixed bottom-3 inset-x-3 z-30 rounded-[28px] overflow-hidden',
         'bg-zinc-900/95 backdrop-blur-2xl supports-[backdrop-filter]:bg-zinc-900/85',
@@ -563,11 +569,11 @@ export default function TopActionBar({
         'md:static md:inset-auto md:rounded-none md:border-0 md:border-b md:border-zinc-800 md:shadow-none md:overflow-visible md:ring-0 md:bg-zinc-900 md:backdrop-blur-0',
       )
 
-  // Bouton "☰ Modules" : couleur accent emerald, ressort dans les 2 thèmes
-  const plusBtnCls = 'bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-400 shadow-lg shadow-emerald-500/30'
-
   return (
     <>
+      {/* Mobile : barre 5 onglets fixes façon Facebook (md:hidden interne) */}
+      <MobileTabBar theme={theme} profil={profil} nbAlertesRouges={nbAlertesRouges} />
+
       <div className={wrapperCls}>
         <div
           ref={scrollContainerRef}
@@ -610,10 +616,19 @@ export default function TopActionBar({
               )
             })()}
 
-            {/* Toggle "Mode service intensif" — bouton flamme visible juste après Accueil */}
+            {/* Bouton "Service" — flamme.
+                • Sur un écran de service (ops) : NAVIGUE vers le hub service pour
+                  changer de mode (cuisine → salle…), au lieu de toggler les chips.
+                • Ailleurs : toggle le mode service intensif (comportement d'origine). */}
             <button
               type="button"
-              onClick={() => { tapHaptic(); toggleServiceMode() }}
+              onClick={() => {
+                // Le bouton Service mène TOUJOURS au hub /service (centre opérationnel),
+                // entrée et retour uniques vers/depuis tous les postes.
+                tapHaptic()
+                setPendingHref('/service')
+                router.push('/service')
+              }}
               className={cn(
                 'group inline-flex items-center gap-2 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
                 'h-14 pl-2 pr-4 text-[13px] md:h-10 md:pl-1.5 md:pr-3.5 md:text-xs',
@@ -749,34 +764,9 @@ export default function TopActionBar({
               )
             })}
 
-            {/* Bouton "☰ Modules" — ouvre le drawer complet, avec badge alerte rouge live */}
-            <button
-              type="button"
-              onClick={() => { tapHaptic(); setOpen(true) }}
-              className={cn(
-                'relative inline-flex items-center gap-1.5 rounded-full border-2 font-bold whitespace-nowrap active:scale-95 transition shrink-0',
-                'h-14 px-4 text-[13px] md:h-10 md:px-3.5 md:text-xs',
-                plusBtnCls,
-              )}
-              aria-label={`Tous les modules${nbAlertesRouges > 0 ? ` — ${nbAlertesRouges} alerte${nbAlertesRouges > 1 ? 's' : ''} urgente${nbAlertesRouges > 1 ? 's' : ''}` : ''}`}
-            >
-              <Menu className="h-5 w-5 md:h-4 md:w-4" />
-              <span>Modules</span>
-              {nbAlertesRouges > 0 && (
-                <>
-                  <span
-                    className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-red-600 border-2 border-white text-white text-[10px] font-black tabular-nums shadow-lg shadow-red-600/40"
-                    aria-hidden
-                  >
-                    {nbAlertesRouges > 9 ? '9+' : nbAlertesRouges}
-                  </span>
-                  <span
-                    className="absolute -top-1.5 -right-1.5 inline-flex w-5 h-5 rounded-full bg-red-500 animate-ping opacity-60"
-                    aria-hidden
-                  />
-                </>
-              )}
-            </button>
+            {/* Bouton "☰ Modules" retiré : la navigation se fait via la chip Accueil
+                (→ /admin/cat, vue de tous les modules) et les chips de catégories.
+                Les actions Appareil/Session/Déconnexion sont dans la catégorie Système. */}
           </div>
         </div>
 
@@ -832,31 +822,21 @@ export default function TopActionBar({
               </button>
             </div>
 
-            {/* Lien "Vue d'ensemble" — page index toutes catégories */}
-            <Link
-              href="/admin/cat"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] transition"
-            >
-              <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/20 text-2xl shrink-0">🧭</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black tracking-tight leading-none">Vue d&apos;ensemble</p>
-                <p className="text-[11px] text-emerald-100 mt-0.5">Toutes les catégories en grand format</p>
-              </div>
-              <span className="text-xl">→</span>
-            </Link>
+            {/* (Lien « Vue d'ensemble » retiré : la chip Accueil dans la barre principale
+                pointe déjà vers /admin/cat — évite le doublon dans le drawer.) */}
 
             {/* Barre de recherche sticky */}
             <div className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-3 py-2.5">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+                {/* Pas d'autoFocus : sur mobile il ouvrirait le clavier d'emblée et
+                    décalerait la grille des modules. L'utilisateur tape la barre s'il veut chercher. */}
                 <input
                   type="search"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Chercher un module… (ex: stock, TVA, allergènes)"
                   className="w-full h-11 pl-10 pr-9 rounded-full border-2 border-zinc-200 bg-zinc-50 text-sm font-medium placeholder:text-zinc-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition"
-                  autoFocus
                 />
                 {query && (
                   <button
@@ -1047,9 +1027,10 @@ export default function TopActionBar({
                 </>
               )}
 
-              {/* Notifications push (si profil) */}
+              {/* Installation PWA + notifications push (si profil) */}
               {profil && !query && (
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
+                  <InstallPWAButton />
                   <PushNotifSwitch />
                 </div>
               )}

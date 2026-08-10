@@ -13,6 +13,7 @@ import {
   CONDITION_INFO, fmtPrix, fmtDate,
 } from '@/lib/previsionnel'
 import { creerReleveMeteo, supprimerReleveMeteo, importerPrevisionsOWM } from './actions'
+import { askConfirm } from '@/lib/confirm'
 import type { DataPrevisionnel } from './page'
 
 type Tab = 'meteo' | 'previsions' | 'correlations'
@@ -46,7 +47,7 @@ export default function PrevisionnelClient({ data }: { data: DataPrevisionnel })
           title="Prévisionnel"
           description="Météo, prévision CA 7 jours, corrélations, suggestions IA."
           actions={
-            <div className="flex flex-wrap gap-2 text-sm">
+            <div className="hidden sm:flex flex-wrap gap-2 text-sm">
               <KPI label="CA 7j" value={fmtPrix(totalCA)} />
               <KPI label="Couverts" value={String(totalCouverts)} />
               <KPI label="Risque" value={String(alertes)} accent={alertes > 0 ? 'orange' : 'vert'} />
@@ -98,55 +99,91 @@ function KPI({ label, value, accent = 'zinc' }: { label: string; value: string; 
 function PrevisionsTab({ data }: { data: DataPrevisionnel }) {
   return (
     <div className="space-y-4">
-      <section className="rounded-lg border border-zinc-200 bg-white overflow-x-auto">
+      <section className="rounded-lg border border-zinc-200 bg-white">
         <header className="px-4 py-2 border-b border-zinc-200">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📊 Prévisions par jour (7 prochains jours)</h2>
         </header>
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
-            <tr>
-              <th className="text-left px-3 py-1.5">Jour</th>
-              <th className="text-left px-3 py-1.5">Météo</th>
-              <th className="text-right px-3 py-1.5">CA base</th>
-              <th className="text-right px-3 py-1.5">CA prévu</th>
-              <th className="text-right px-3 py-1.5">Couverts</th>
-              <th className="text-left px-3 py-1.5">Alerte</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {data.prevision.map(p => {
-              const meteoInfo = p.meteo ? CONDITION_INFO[p.meteo] : null
-              const ecart = p.ca_base > 0 ? ((p.ca_prevision - p.ca_base) / p.ca_base) * 100 : 0
-              return (
-                <tr key={p.date} className={cn(
-                  p.alerte === 'critique' && 'bg-red-50',
-                  p.alerte === 'faible' && 'bg-amber-50',
-                  p.alerte === 'forte' && 'bg-emerald-50',
-                )}>
-                  <td className="px-3 py-2">
-                    <p className="font-bold capitalize">{fmtDate(p.date)}</p>
-                  </td>
-                  <td className="px-3 py-2">
-                    {meteoInfo ? (
-                      <span className="text-sm">{meteoInfo.emoji} {meteoInfo.label}</span>
-                    ) : (
-                      <span className="text-zinc-400 text-xs italic">— pas de prévision —</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-zinc-500">{fmtPrix(p.ca_base)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-bold">
-                    {fmtPrix(p.ca_prevision)}
-                    {Math.abs(ecart) > 1 && <span className={cn('text-[10px] ml-1', ecart < 0 ? 'text-red-700' : 'text-emerald-700')}>({ecart > 0 ? '+' : ''}{ecart.toFixed(1)}%)</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{p.nb_couverts_prevu}</td>
-                  <td className="px-3 py-2 text-[11px]">
-                    {p.alerte && <span className={cn('font-bold', p.alerte === 'critique' && 'text-red-700', p.alerte === 'faible' && 'text-amber-700', p.alerte === 'forte' && 'text-emerald-700')}>{p.raison}</span>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+
+        {/* MOBILE — cartes */}
+        <ul className="md:hidden divide-y divide-zinc-100">
+          {data.prevision.map(p => {
+            const meteoInfo = p.meteo ? CONDITION_INFO[p.meteo] : null
+            const ecart = p.ca_base > 0 ? ((p.ca_prevision - p.ca_base) / p.ca_base) * 100 : 0
+            return (
+              <li key={p.date} className={cn(
+                'px-4 py-3 flex items-center justify-between gap-3',
+                p.alerte === 'critique' && 'bg-red-50',
+                p.alerte === 'faible' && 'bg-amber-50',
+                p.alerte === 'forte' && 'bg-emerald-50',
+              )}>
+                <div className="min-w-0">
+                  <p className="font-bold capitalize text-zinc-900 truncate">
+                    {meteoInfo && <span className="mr-1">{meteoInfo.emoji}</span>}{fmtDate(p.date)}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    {meteoInfo ? meteoInfo.label : 'pas de prévision'} · {p.nb_couverts_prevu} couv.
+                  </p>
+                  {p.alerte && p.raison && (
+                    <p className={cn('text-[11px] font-bold mt-0.5', p.alerte === 'critique' && 'text-red-700', p.alerte === 'faible' && 'text-amber-700', p.alerte === 'forte' && 'text-emerald-700')}>{p.raison}</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-bold tabular-nums text-zinc-900">{fmtPrix(p.ca_prevision)}</p>
+                  {Math.abs(ecart) > 1 && <p className={cn('text-[10px] tabular-nums', ecart < 0 ? 'text-red-700' : 'text-emerald-700')}>{ecart > 0 ? '+' : ''}{ecart.toFixed(1)}%</p>}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        {/* DESKTOP — table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-zinc-50 text-[11px] uppercase tracking-wider text-zinc-500">
+              <tr>
+                <th className="text-left px-3 py-1.5">Jour</th>
+                <th className="text-left px-3 py-1.5">Météo</th>
+                <th className="text-right px-3 py-1.5">CA base</th>
+                <th className="text-right px-3 py-1.5">CA prévu</th>
+                <th className="text-right px-3 py-1.5">Couverts</th>
+                <th className="text-left px-3 py-1.5">Alerte</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {data.prevision.map(p => {
+                const meteoInfo = p.meteo ? CONDITION_INFO[p.meteo] : null
+                const ecart = p.ca_base > 0 ? ((p.ca_prevision - p.ca_base) / p.ca_base) * 100 : 0
+                return (
+                  <tr key={p.date} className={cn(
+                    p.alerte === 'critique' && 'bg-red-50',
+                    p.alerte === 'faible' && 'bg-amber-50',
+                    p.alerte === 'forte' && 'bg-emerald-50',
+                  )}>
+                    <td className="px-3 py-2">
+                      <p className="font-bold capitalize">{fmtDate(p.date)}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      {meteoInfo ? (
+                        <span className="text-sm">{meteoInfo.emoji} {meteoInfo.label}</span>
+                      ) : (
+                        <span className="text-zinc-400 text-xs italic">— pas de prévision —</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-zinc-500">{fmtPrix(p.ca_base)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-bold">
+                      {fmtPrix(p.ca_prevision)}
+                      {Math.abs(ecart) > 1 && <span className={cn('text-[10px] ml-1', ecart < 0 ? 'text-red-700' : 'text-emerald-700')}>({ecart > 0 ? '+' : ''}{ecart.toFixed(1)}%)</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{p.nb_couverts_prevu}</td>
+                    <td className="px-3 py-2 text-[11px]">
+                      {p.alerte && <span className={cn('font-bold', p.alerte === 'critique' && 'text-red-700', p.alerte === 'faible' && 'text-amber-700', p.alerte === 'forte' && 'text-emerald-700')}>{p.raison}</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Suggestions */}
@@ -259,7 +296,7 @@ function ReleveItem({ releve, onError, onOk }: { releve: ReleveMeteo; onError: (
         </p>
       </div>
       <button onClick={async () => {
-        if (!confirm('Supprimer ce relevé ?')) return
+        if (!(await askConfirm('Supprimer ce relevé ?'))) return
         try { await supprimerReleveMeteo(releve.id); onOk('Supprimé'); router.refresh() } catch (e) { onError(e) }
       }} className="text-zinc-400 hover:text-red-600 text-sm">×</button>
     </li>
@@ -324,7 +361,7 @@ function ReleveModal({ onClose, onError, onSuccess }: { onClose: () => void; onE
             })}
           </div>
         </Field>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Field label="T° min"><input type="number" step="0.1" value={tempMin} onChange={e => setTempMin(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
           <Field label="T° max"><input type="number" step="0.1" value={tempMax} onChange={e => setTempMax(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
           <Field label="Pluie mm"><input type="number" step="0.1" value={precip} onChange={e => setPrecip(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>

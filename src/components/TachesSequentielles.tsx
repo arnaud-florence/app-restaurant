@@ -81,6 +81,10 @@ export default function TachesSequentielles({
   // Mode kiosk (aucun employé rattaché) : on n'affiche RIEN plutôt qu'une
   // consigne "Sélectionne ton nom" sans sélecteur (qui faisait croire à un bug).
   // Les tickets de commande restent affichés normalement par ailleurs.
+  // ⛔ Tâches retirées de l'opérationnel — remplacées par les rappels d'Arnaud (/mon-espace) (anti-doublon).
+  const MASQUE_OPS: boolean = true
+  if (MASQUE_OPS) return null
+
   if (!employeId) return null
 
   // ─── Tout fini : félicitations ────────────────────────────────────

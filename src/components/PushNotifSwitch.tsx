@@ -23,12 +23,26 @@ function urlBase64ToUint8Array(base64: string) {
   return out
 }
 
+// iOS (iPhone/iPad) — y compris iPadOS 13+ qui se fait passer pour un Mac.
+function isIOS() {
+  if (typeof navigator === 'undefined') return false
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+// L'app tourne-t-elle en PWA installée (écran d'accueil) plutôt qu'en onglet Safari ?
+function isStandalone() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(display-mode: standalone)').matches === true ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true
+}
+
 export default function PushNotifSwitch() {
   const [supported, setSupported] = useState(false)
   const [subscribed, setSubscribed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState<string | null>(null)
+  const [iosInstallHint, setIosInstallHint] = useState(false)
 
   useEffect(() => {
     const ok =
@@ -38,7 +52,13 @@ export default function PushNotifSwitch() {
       'PushManager' in window &&
       !!VAPID_PUBLIC_KEY
     setSupported(ok)
-    if (!ok) return
+    if (!ok) {
+      // Sur iPhone/iPad, le Push n'est exposé qu'une fois l'app installée sur
+      // l'écran d'accueil (iOS ≥ 16.4). En onglet Safari, PushManager est absent
+      // → on affiche une aide d'installation plutôt que de masquer le bouton.
+      if (isIOS() && !isStandalone() && !!VAPID_PUBLIC_KEY) setIosInstallHint(true)
+      return
+    }
 
     // Vérifie si déjà souscrit ET si le backend connaît la souscription
     // (sinon : browser dit OK, mais DB peut être vide après login d'un nouvel
@@ -71,7 +91,19 @@ export default function PushNotifSwitch() {
     })()
   }, [])
 
-  if (!supported) return null
+  if (!supported) {
+    if (iosInstallHint) {
+      return (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 space-y-1">
+          <p className="font-semibold flex items-center gap-1.5"><Bell className="h-4 w-4" /> Notifications sur iPhone</p>
+          <p>
+            Pour recevoir les alertes, installe d&apos;abord l&apos;app : appuie sur <b>Partager</b> (le carré avec une flèche ↑) en bas de Safari, puis <b>« Sur l&apos;écran d&apos;accueil »</b>. Rouvre l&apos;app depuis sa nouvelle icône, puis reviens ici pour activer les notifications.
+          </p>
+        </div>
+      )
+    }
+    return null
+  }
 
   function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -81,6 +113,11 @@ export default function PushNotifSwitch() {
   }
 
   async function subscribe() {
+    // Garde-fou iOS : hors PWA installée, l'abonnement échoue en silence.
+    if (isIOS() && !isStandalone()) {
+      setError("Sur iPhone, installe d'abord l'app : Partager → « Sur l'écran d'accueil », puis rouvre-la depuis l'icône avant d'activer les notifications.")
+      return
+    }
     setBusy(true); setError(null); setStep('Démarrage…')
     try {
       // 1. Permission browser

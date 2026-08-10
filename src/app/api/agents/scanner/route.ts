@@ -225,7 +225,7 @@ async function analyserExtraction(ctx: AgentContext, extracted: FactureExtraite)
       `Confiance OCR : ${(extracted.confiance * 100).toFixed(0)}%`,
     ].filter(Boolean).join(' · '),
     action_label: 'Valider l\'import',
-    action_url:   '/admin/fournisseurs/factures',
+    action_url:   '/admin/fournisseurs?tab=factures',
     data: { extracted, haussesDetectees },
   })
 

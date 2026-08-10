@@ -6,6 +6,8 @@
 //  - Service terminé   → résumé heures travaillées (gris)
 
 import { useEffect, useState, useTransition } from 'react'
+import { toast } from '@/lib/toast'
+import { askConfirm } from '@/lib/confirm'
 import { Loader2, LogIn, LogOut, Clock, Pencil, Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
@@ -19,7 +21,7 @@ export type Pointage = {
   heures_travaillees: number | null
 }
 
-export default function PointageCard({ pointage }: { pointage: Pointage | null }) {
+export default function PointageCard({ pointage, readOnly = false }: { pointage: Pointage | null; readOnly?: boolean }) {
   const [pending, startTransition] = useTransition()
   const [now, setNow] = useState(() => Date.now())
   const [editing, setEditing] = useState(false)
@@ -44,25 +46,43 @@ export default function PointageCard({ pointage }: { pointage: Pointage | null }
     return `${dh}h ${String(dm).padStart(2, '0')}min`
   }
 
-  function action(fn: () => Promise<unknown>, confirmMsg?: string) {
-    if (confirmMsg && !confirm(confirmMsg)) return
+  async function action(fn: () => Promise<unknown>, confirmMsg?: string) {
+    if (confirmMsg && !(await askConfirm(confirmMsg))) return
     startTransition(async () => {
       try { await fn() }
-      catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
+      catch (e) { toast.error(e instanceof Error ? e.message : 'Erreur') }
     })
   }
 
   function saveEdit() {
     if (!/^\d{2}:\d{2}$/.test(editValue)) {
-      alert('Format attendu : HH:MM (ex 08:30)')
+      toast.error('Format attendu : HH:MM (ex 08:30)')
       return
     }
     startTransition(async () => {
       try {
         await corrigerArrivee({ heure: editValue })
         setEditing(false)
-      } catch (e) { alert(e instanceof Error ? e.message : 'Erreur') }
+      } catch (e) { toast.error(e instanceof Error ? e.message : 'Erreur') }
     })
+  }
+
+  // ─── Mode « voir en tant que » (gérant) : consultation seule, aucune action ───
+  if (readOnly) {
+    const statut = !pointage ? 'Pas encore pointé aujourd’hui'
+      : pointage.heure_depart ? `Service terminé · ${(pointage.heures_travaillees ?? 0).toFixed(1)}h`
+      : `En service depuis ${pointage.heure_arrivee?.slice(0, 5) ?? '—'}`
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Pointage du jour</p>
+            <p className="text-sm text-zinc-800 mt-1 font-medium">{statut}</p>
+          </div>
+          <span className="shrink-0 text-[11px] font-bold text-zinc-400">👁 lecture seule</span>
+        </div>
+      </Card>
+    )
   }
 
   // ─── État 1 : Pas pointé ─────────────────────────────────────

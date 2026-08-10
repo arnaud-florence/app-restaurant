@@ -15,9 +15,17 @@ export default async function SectionSuggestions() {
     .in('agent_id', ['strategique', 'meteo'])
     .order('urgence', { ascending: true })
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(40)
 
-  const initial = (data ?? []) as Finding[]
+  // Dédup à l'affichage : un même titre (même agent) peut exister en plusieurs
+  // exemplaires → on n'en garde qu'un.
+  const seen = new Set<string>()
+  const initial = ((data ?? []) as Finding[]).filter(f => {
+    const key = `${f.agent_id}::${f.titre}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 
   return (
     <section className="rounded-2xl ring-1 ring-zinc-200 bg-white p-4 sm:p-5 shadow-sm">

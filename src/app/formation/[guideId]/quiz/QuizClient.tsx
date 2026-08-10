@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { type Guide, type Question, type Progression, POSTE_INFO, peutRetenter } from '@/lib/formation'
 import { soumettreQuiz } from '../../actions'
-import OpsBottomNav, { type OpsBottomNavProfil } from '@/components/OpsBottomNav'
+import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 
 type Resultat = { score_pct: number; bonnes: number; total: number; statut: 'reussi' | 'echoue'; seuil: number }
 
@@ -90,7 +90,20 @@ export default function QuizClient({
             })}
           </div>
 
-          <Link href="/formation"><Button className="gap-1"><ArrowLeft className="h-4 w-4" /> Retour aux guides</Button></Link>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Link href="/formation" className="w-full sm:w-auto">
+              <Button className={cn('w-full min-h-[48px] text-base font-semibold gap-1 px-6', reussi ? 'bg-emerald-600 hover:bg-emerald-700' : '')}>
+                <ArrowLeft className="h-4 w-4" /> Retour à mes formations
+              </Button>
+            </Link>
+            {!reussi && (
+              <Link href={`/formation/${guide.id}?emp=${employe.id}`} className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full min-h-[48px] gap-1 px-6">
+                  <RefreshCcw className="h-4 w-4" /> Revoir le guide
+                </Button>
+              </Link>
+            )}
+          </div>
         </Card>
       </div>
     )
@@ -117,7 +130,6 @@ export default function QuizClient({
   // ─── Vue passage du quiz ────────────────────────────────────
   return (
     <div className="min-h-screen bg-stone-50 pb-mobile-nav">
-      <OpsBottomNav profil={navProfil} />
       <header className="bg-white border-b">
         <div className="max-w-3xl mx-auto p-3 flex items-center gap-3">
           <Link href={`/formation/${guide.id}?emp=${employe.id}`} className="text-zinc-600 hover:text-emerald-700"><ArrowLeft className="h-5 w-5" /></Link>
@@ -131,37 +143,43 @@ export default function QuizClient({
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 space-y-4">
-        {questions.map((q, i) => (
-          <Card key={q.id} className="p-4">
-            <p className="font-semibold mb-3">
-              <span className="text-amber-700">Q{q.ordre}.</span> {q.question}
+      <main className="max-w-3xl mx-auto p-4 space-y-5 pb-28">
+        {questions.map((q, i) => {
+          const repondu = reponses[i] !== null
+          return (
+          <Card key={q.id} className={cn('p-5 transition-colors', repondu && 'border-emerald-200')}>
+            <p className="font-bold text-base mb-4 leading-snug">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 text-xs font-black mr-2 align-middle">{i + 1}</span>
+              {q.question}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {q.choix.map((c, idx) => (
                 <label key={idx} className={cn(
-                  'flex items-center gap-2 rounded-md border p-3 cursor-pointer transition-colors',
-                  reponses[i] === idx ? 'bg-emerald-50 border-emerald-400' : 'hover:bg-zinc-50',
+                  'flex items-center gap-3 rounded-xl border-2 p-3.5 min-h-[52px] cursor-pointer transition-colors active:scale-[0.99]',
+                  reponses[i] === idx ? 'bg-emerald-50 border-emerald-400' : 'border-zinc-200 hover:bg-zinc-50',
                 )}>
                   <input
                     type="radio" name={`q-${q.id}`}
+                    className="h-5 w-5 accent-emerald-600 shrink-0"
                     checked={reponses[i] === idx}
                     onChange={() => setReponses(prev => prev.map((r, j) => j === i ? idx : r))}
                   />
-                  <span className="font-medium text-sm">{String.fromCharCode(65 + idx)}.</span>
-                  <span className="text-sm">{c}</span>
+                  <span className="font-bold text-sm text-zinc-500 shrink-0">{String.fromCharCode(65 + idx)}.</span>
+                  <span className="text-sm leading-snug">{c}</span>
                 </label>
               ))}
             </div>
           </Card>
-        ))}
+          )
+        })}
 
         {error && <Card className="p-3 bg-red-50 border-red-300 text-sm text-red-900">⚠️ {error}</Card>}
 
+        {/* Bouton valider : collant en bas sur mobile pour rester accessible */}
         <Button
           onClick={soumettre}
           disabled={!tousRepondu || pending}
-          className="w-full gap-1"
+          className="w-full gap-1 min-h-[52px] text-base font-bold sticky bottom-2 shadow-lg"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
           {tousRepondu ? 'Valider mes réponses' : `Répondre à toutes les questions (${reponses.filter(r => r !== null).length}/${questions.length})`}
