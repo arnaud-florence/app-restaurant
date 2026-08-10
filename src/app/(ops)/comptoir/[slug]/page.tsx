@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getComptoir, listComptoirSlugs } from '@/lib/comptoir/config'
 import ComptoirClient from '../ComptoirClient'
+import { getActivation, getConfigLivraisonFournil } from '@/lib/activation/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,5 +56,14 @@ export default async function ComptoirPage({ params }: { params: { slug: string 
     }
   })
 
-  return <ComptoirClient config={cfg} produits={produits} />
+  // La saisie « à livrer » n'a de sens qu'au fournil, et seulement si le
+  // module livraison est allumé. Ailleurs, le bloc n'est même pas rendu.
+  const etat = await getActivation()
+  const livraison = cfg.slug === 'fournil' && etat.fournil_livraison
+    ? await getConfigLivraisonFournil().then(c => ({
+        communes: c.communes, heureLimite: c.heureLimite, heureTournee: c.heureTournee,
+      }))
+    : null
+
+  return <ComptoirClient config={cfg} produits={produits} livraison={livraison} />
 }

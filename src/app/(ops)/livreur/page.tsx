@@ -11,24 +11,48 @@ import { getProfile } from '@/lib/auth'
 import BriefingPoste from '@/components/BriefingPoste'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import LivreurClient from './LivreurClient'
+import { instantParis } from '@/lib/activation/config'
 
 export const metadata = { title: 'Livreur — Service' }
 export const dynamic = 'force-dynamic'
 
 export default async function LivreurPage() {
   const supabase = await createClient()
-  const today = new Date().toISOString().slice(0, 10)
-  const dayStart = `${today}T00:00:00.000Z`
-  const dayEnd   = `${today}T23:59:59.999Z`
 
-  // Commandes ONLINE du jour avec livraison à effectuer
+  // ─── Journée de tournée, en heure de PARIS ──────────────────────────
+  // Deux corrections par rapport à la version initiale :
+  //
+  // 1. On filtre sur `creneau_retrait` (la date de LIVRAISON) et non sur
+  //    `created_at` (la date de COMMANDE). Le fournil prend des commandes le
+  //    soir pour la tournée du lendemain : filtrées sur created_at, elles
+  //    n'apparaissaient jamais dans la tournée qu'elles concernent.
+  //
+  // 2. Les bornes du jour sont calculées en heure de Paris. `toISOString()`
+  //    donne la date UTC : entre minuit et 2h du matin l'été, le livreur
+  //    voyait encore la tournée de la veille.
+  //
+  // Les commandes sans créneau (livraisons restaurant historiques) restent
+  // rattachées à leur jour de création — d'où la seconde branche du `or`.
+  const nowParis = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+
+  const demain = new Date(`${nowParis}T00:00:00Z`)
+  demain.setUTCDate(demain.getUTCDate() + 1)
+  const demainISO = demain.toISOString().slice(0, 10)
+
+  const dayStart = instantParis(nowParis, '00:00').toISOString()
+  const dayEnd   = instantParis(demainISO, '00:00').toISOString()
+
   const { data: cmds } = await supabase
     .from('commandes')
     .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation, mode_retrait, adresse_livraison, livraison_depart_at, email_retard_envoye_at, mode_paiement')
     .eq('source', 'ONLINE')
     .eq('mode_retrait', 'livraison')
-    .gte('created_at', dayStart)
-    .lte('created_at', dayEnd)
+    .or(
+      `and(creneau_retrait.gte.${dayStart},creneau_retrait.lt.${dayEnd}),` +
+      `and(creneau_retrait.is.null,created_at.gte.${dayStart},created_at.lt.${dayEnd})`,
+    )
     .not('statut', 'in', '(annule)')
     .order('creneau_retrait', { ascending: true, nullsFirst: false })
 

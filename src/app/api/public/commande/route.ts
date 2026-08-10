@@ -24,6 +24,8 @@ import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
 import { getClientIp } from '@/lib/public-api/rate-limit'
+import { getActivation, getConfigLivraisonFournil } from '@/lib/activation/server'
+import { tourneePour, communeLivrable } from '@/lib/activation/config'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -52,6 +54,9 @@ const commandeSchema = z.object({
   // 'livraison' = livreur amène à l'adresse → adresse_livraison requise
   mode_retrait:      z.enum(['a_emporter', 'livraison']).default('a_emporter'),
   adresse_livraison: z.string().max(500).nullable().optional(),
+  // Commune choisie dans la liste fermée des communes livrées. Vérifiée
+  // côté serveur : le client ne décide pas de la zone de livraison.
+  commune_livraison: z.string().max(120).nullable().optional(),
   honeypot:         z.string().nullable().optional(),
   captcha_token:    z.string().nullable().optional(),
 }).refine(
@@ -221,11 +226,54 @@ export async function POST(req: Request) {
     }
   }
 
+  // ─── Livraison Fournil : validation serveur de la zone et de la tournée ───
+  // Modèle « tournée » et non « créneaux » : une seule tournée par jour, qui
+  // porte AUTANT de commandes que nécessaire. Rien de ce que le client envoie
+  // n'est pris pour argent comptant — ni la commune, ni l'horaire.
+  let creneauFinal = p.creneau_retrait
+  let adresseFinale = p.mode_retrait === 'livraison' ? (p.adresse_livraison ?? null) : null
+
+  if (p.mode_retrait === 'livraison') {
+    const [etat, cfgLiv] = await Promise.all([getActivation(), getConfigLivraisonFournil()])
+
+    if (!etat.fournil_livraison) {
+      return Response.json(
+        { error: 'La livraison à domicile n’est pas disponible actuellement.' },
+        { status: 400, headers: cors },
+      )
+    }
+
+    const commune = (p.commune_livraison ?? '').trim()
+    if (!commune || !communeLivrable(commune, cfgLiv)) {
+      return Response.json({
+        error: `Nous livrons uniquement à ${cfgLiv.communes.join(', ')}.`,
+        communes: cfgLiv.communes,
+      }, { status: 400, headers: cors })
+    }
+
+    if (cfgLiv.minimumTtc > 0 && totalTTC < cfgLiv.minimumTtc) {
+      return Response.json({
+        error: `Commande minimum de ${cfgLiv.minimumTtc.toFixed(2).replace('.', ',')} € pour la livraison.`,
+      }, { status: 400, headers: cors })
+    }
+
+    // La tournée est RECALCULÉE ici (heure de Paris). Le créneau envoyé par le
+    // client n'est qu'un affichage : s'il a chargé la page à 8h25 et validé à
+    // 8h35, c'est la tournée du lendemain qui s'applique, pas celle qu'il a vue.
+    const tournee = tourneePour(new Date(), cfgLiv)
+    creneauFinal = tournee.creneau
+    adresseFinale = `${(p.adresse_livraison ?? '').trim()}, ${commune}`
+  }
+
   // ─── Anti-race : vérifie que le créneau choisi n'est pas déjà pris ───
   // Le cache CDN peut faire afficher un slot dispo pendant max 30s alors qu'il
   // vient d'être réservé. On revérifie au dernier moment, juste avant l'INSERT.
   // Règle : 1 commande max par créneau (cohérent avec listerCreneauxDisponibles).
-  if (p.creneau_retrait) {
+  //
+  // ⚠️ NE S'APPLIQUE PAS à la livraison : toutes les commandes d'une tournée
+  // partagent le même `creneau_retrait`. Sans cette exclusion, la 2ᵉ livraison
+  // de la journée serait refusée avec « ce créneau vient d'être réservé ».
+  if (p.creneau_retrait && p.mode_retrait !== 'livraison') {
     const slotStart = new Date(p.creneau_retrait)
     // Détermine la durée du créneau via la config (par défaut 15 min si introuvable)
     const jourSemaine = slotStart.getDay()
@@ -271,14 +319,14 @@ export async function POST(req: Request) {
     montant_total_ttc: totalTTC,
     tva_total: totalTVA,
     ventilation_tva: ventilationTva,
-    creneau_retrait: p.creneau_retrait,
+    creneau_retrait: creneauFinal,
     pourboire_total: p.pourboire,
     client_id: p.client_id || null,
     client_nom: p.client_nom || null,
     client_email: p.client_email || null,
     client_telephone: p.client_telephone || null,
     mode_retrait: p.mode_retrait,
-    adresse_livraison: p.mode_retrait === 'livraison' ? p.adresse_livraison : null,
+    adresse_livraison: adresseFinale,
     notes: notesAvecIdem,
   }).select('id, numero, montant_total_ttc, statut').single()
 
@@ -331,7 +379,9 @@ export async function POST(req: Request) {
       const tpl = emailConfirmationCommande({
         numero: cmd.numero,
         total: Number(cmd.montant_total_ttc),
-        creneau_iso: p.creneau_retrait,
+        // Créneau réellement retenu (recalculé côté serveur pour la livraison)
+        // et non celui affiché au client — l'email doit dire la vérité.
+        creneau_iso: creneauFinal,
         client_nom: p.client_nom ?? '',
         articles: articlesPourEmail,
       })

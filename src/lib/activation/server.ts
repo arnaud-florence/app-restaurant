@@ -108,6 +108,8 @@ export const getConfigLivraisonFournil = cache(async (): Promise<ConfigLivraison
         'fournil_livraison_heure_tournee',
         'fournil_livraison_minimum_ttc',
         'fournil_livraison_frais_ttc',
+        'fournil_ouverture',
+        'fournil_fermeture',
       ])
 
     const p = new Map((data ?? []).map(r => [r.cle as string, r.valeur as string]))
@@ -125,6 +127,8 @@ export const getConfigLivraisonFournil = cache(async (): Promise<ConfigLivraison
       heureTournee: p.get('fournil_livraison_heure_tournee') || LIVRAISON_FOURNIL_DEFAUT.heureTournee,
       minimumTtc:   nombre('fournil_livraison_minimum_ttc', LIVRAISON_FOURNIL_DEFAUT.minimumTtc),
       fraisTtc:     nombre('fournil_livraison_frais_ttc',   LIVRAISON_FOURNIL_DEFAUT.fraisTtc),
+      ouverture:    p.get('fournil_ouverture') || LIVRAISON_FOURNIL_DEFAUT.ouverture,
+      fermeture:    p.get('fournil_fermeture') || LIVRAISON_FOURNIL_DEFAUT.fermeture,
     }
   } catch {
     return { ...LIVRAISON_FOURNIL_DEFAUT }

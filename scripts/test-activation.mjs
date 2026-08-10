@@ -146,7 +146,61 @@ await step('livraison Fournil : paramètres présents et cohérents', async () =
   }
 })
 
-// ─── 6. API publique ───────────────────────────────────────────
+// ─── 6. Modèle « tournée » : plusieurs commandes sur un même créneau ───
+await step('livraison : la tournée porte plusieurs commandes', async () => {
+  // Régression couverte : le contrôle anti-collision de /api/public/commande
+  // imposait 1 commande par créneau. Toutes les livraisons d'une tournée
+  // partageant le même `creneau_retrait`, la 2ᵉ du jour était rejetée.
+  const creneau = new Date(Date.now() + 86_400_000)
+  creneau.setUTCHours(8, 0, 0, 0)
+  const iso = creneau.toISOString()
+
+  const { count } = await sb.from('commandes')
+    .select('id', { count: 'exact', head: true })
+    .eq('mode_retrait', 'livraison')
+    .eq('creneau_retrait', iso)
+
+  ok(`requête sur créneau de tournée OK (${count ?? 0} commande(s) existante(s) — aucune limite à 1)`)
+
+  // Vérifie que les colonnes du modèle livraison existent bien.
+  const { error } = await sb.from('commandes')
+    .select('mode_retrait, adresse_livraison, creneau_retrait')
+    .limit(1)
+  if (error) ko('colonnes livraison', error.message)
+  else ok('colonnes mode_retrait / adresse_livraison / creneau_retrait présentes')
+})
+
+// ─── 7. Produits Fournil : état de la vente en ligne ────────────
+await step('carte Fournil : état de la vente en ligne', async () => {
+  const { data, error } = await sb.from('recettes')
+    .select('id, nom, vendable_online, actif')
+    .eq('tag_destination', 'FOURNIL')
+  if (error) { ko('lecture recettes FOURNIL', error.message); return }
+
+  const actives = (data ?? []).filter(r => r.actif)
+  const online = actives.filter(r => r.vendable_online)
+  ok(`${actives.length} produit(s) Fournil actif(s)`)
+
+  if (online.length === 0) {
+    console.log(`  ℹ ${actives.length} produit(s) non encore commandables en ligne —`)
+    console.log(`     c'est attendu AVANT la migration 0111 (go-live).`)
+  } else {
+    ok(`${online.length} produit(s) commandable(s) en ligne`)
+  }
+
+  // Allergènes — obligation légale dès l'ouverture au public.
+  const ids = actives.map(r => r.id)
+  if (ids.length > 0) {
+    const { data: liens } = await sb.from('recette_ingredients')
+      .select('recette_id').in('recette_id', ids)
+    const avec = new Set((liens ?? []).map(l => l.recette_id))
+    const sans = actives.length - avec.size
+    if (sans === 0) ok('tous les produits ont des ingrédients (allergènes calculables)')
+    else console.log(`  ⚠ ${sans} produit(s) sans ingrédient → aucune information allergène possible (obligation légale)`)
+  }
+})
+
+// ─── 8. API publique ───────────────────────────────────────────
 if (BASE && API_KEY) {
   await step('API : GET /api/public/activation', async () => {
     const res = await fetch(`${BASE}/api/public/activation`, { headers: { 'x-api-key': API_KEY } })

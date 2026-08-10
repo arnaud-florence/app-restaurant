@@ -8,6 +8,8 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getComptoir } from '@/lib/comptoir/config'
+import { getConfigLivraisonFournil } from '@/lib/activation/server'
+import { tourneePour, communeLivrable } from '@/lib/activation/config'
 
 const schema = z.object({
   slug: z.string().min(1),
@@ -17,6 +19,16 @@ const schema = z.object({
     prix_unitaire_ht: z.number().min(0),
     tva: z.number().min(0),
   })).min(1),
+  // ─── Commande téléphonique à livrer ─────────────────────────────
+  // Le client appelle, l'employé saisit la commande au comptoir et coche
+  // « à livrer ». Elle rejoint la tournée du jour (ou du lendemain si
+  // l'heure limite est passée) et apparaît sur l'écran /livreur.
+  livraison: z.object({
+    nom: z.string().min(1).max(160),
+    telephone: z.string().min(1).max(40),
+    adresse: z.string().min(5).max(500),
+    commune: z.string().min(1).max(120),
+  }).nullable().optional(),
 })
 
 export async function creerCommandeComptoir(input: z.infer<typeof schema>) {
@@ -54,6 +66,33 @@ export async function creerCommandeComptoir(input: z.infer<typeof schema>) {
     const yymmdd = `${String(t.getFullYear()).slice(2)}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`
     const numero = `${cfg.prefix}-${yymmdd}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
 
+    // ─── Livraison éventuelle (commande passée par téléphone) ────────
+    // La zone et la tournée sont recalculées ici, jamais reprises telles
+    // quelles : c'est la même règle que pour les commandes du site.
+    let livraisonPatch: Record<string, unknown> = {}
+    if (d.livraison) {
+      const cfgLiv = await getConfigLivraisonFournil()
+      if (!communeLivrable(d.livraison.commune, cfgLiv)) {
+        return {
+          ok: false as const,
+          error: `Hors zone de livraison. Communes livrées : ${cfgLiv.communes.join(', ')}.`,
+        }
+      }
+      const tournee = tourneePour(new Date(), cfgLiv)
+      livraisonPatch = {
+        // `source: 'ONLINE'` — c'est ce que filtre l'écran /livreur. Une
+        // commande téléphonique est fonctionnellement une commande à
+        // distance : elle doit apparaître dans la tournée comme les autres.
+        source: 'ONLINE',
+        mode_retrait: 'livraison',
+        adresse_livraison: `${d.livraison.adresse.trim()}, ${d.livraison.commune.trim()}`,
+        creneau_retrait: tournee.creneau,
+        client_nom: d.livraison.nom.trim(),
+        client_telephone: d.livraison.telephone.trim(),
+        notes: `Commande par téléphone — tournée du ${tournee.date}`,
+      }
+    }
+
     const { data: cmd, error } = await sb.from('commandes').insert({
       numero,
       source: 'COMPTOIR',
@@ -64,6 +103,7 @@ export async function creerCommandeComptoir(input: z.infer<typeof schema>) {
       ventilation_tva: ventilation,
       consommation: 'emporter',
       etablissement_id: etab.id,
+      ...livraisonPatch,
     }).select('id, numero').single()
     if (error || !cmd) return { ok: false as const, error: error?.message ?? 'Erreur création commande' }
 
@@ -87,6 +127,7 @@ export async function creerCommandeComptoir(input: z.infer<typeof schema>) {
 
     revalidatePath(`/comptoir/${cfg.slug}`)
     revalidatePath('/service')
+    if (d.livraison) revalidatePath('/livreur')
     return { ok: true as const, numero: cmd.numero, total: total_ttc }
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : String(e) }

@@ -11,13 +11,32 @@ import { creerCommandeComptoir } from './actions'
 
 type LignePanier = { produit: ProduitComptoir; qte: number }
 
-export default function ComptoirClient({ config, produits }: { config: ComptoirDef; produits: ProduitComptoir[] }) {
+/** Coordonnées de livraison saisies pour une commande téléphonique. */
+type FormLivraison = { nom: string; telephone: string; adresse: string; commune: string }
+
+export default function ComptoirClient({
+  config, produits, livraison,
+}: {
+  config: ComptoirDef
+  produits: ProduitComptoir[]
+  /** Config de livraison — absente si le module livraison est éteint,
+   *  auquel cas le bloc « à livrer » n'apparaît pas du tout. */
+  livraison?: { communes: string[]; heureLimite: string; heureTournee: string } | null
+}) {
   const router = useRouter()
   const a = ACCENTS[config.accent]
   const [panier, setPanier] = useState<Map<string, LignePanier>>(new Map())
   const [cat, setCat] = useState<string>('Tous')
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<{ ok: boolean; texte: string } | null>(null)
+
+  const [aLivrer, setALivrer] = useState(false)
+  const [form, setForm] = useState<FormLivraison>({
+    nom: '', telephone: '', adresse: '', commune: livraison?.communes[0] ?? '',
+  })
+  const livraisonComplete =
+    form.nom.trim().length > 0 && form.telephone.trim().length > 0 &&
+    form.adresse.trim().length > 4 && form.commune.trim().length > 0
 
   const categories = useMemo(() => ['Tous', ...Array.from(new Set(produits.map(p => p.categorie)))], [produits])
   const affiches = cat === 'Tous' ? produits : produits.filter(p => p.categorie === cat)
@@ -47,6 +66,11 @@ export default function ComptoirClient({ config, produits }: { config: ComptoirD
 
   function valider() {
     if (lignes.length === 0) return
+    if (aLivrer && !livraisonComplete) {
+      setMsg({ ok: false, texte: 'Complète les coordonnées de livraison.' })
+      setTimeout(() => setMsg(null), 4000)
+      return
+    }
     start(async () => {
       const r = await creerCommandeComptoir({
         slug: config.slug,
@@ -56,10 +80,23 @@ export default function ComptoirClient({ config, produits }: { config: ComptoirD
           prix_unitaire_ht: l.produit.prix_unitaire_ht,
           tva: l.produit.tva,
         })),
+        livraison: aLivrer ? {
+          nom: form.nom.trim(),
+          telephone: form.telephone.trim(),
+          adresse: form.adresse.trim(),
+          commune: form.commune.trim(),
+        } : null,
       })
       if (r.ok) {
-        setMsg({ ok: true, texte: `✓ Commande ${r.numero} créée — ${fmtPrix(r.total)}` })
+        setMsg({
+          ok: true,
+          texte: aLivrer
+            ? `✓ ${r.numero} — ${fmtPrix(r.total)} · ajoutée à la tournée`
+            : `✓ Commande ${r.numero} créée — ${fmtPrix(r.total)}`,
+        })
         setPanier(new Map())
+        setALivrer(false)
+        setForm({ nom: '', telephone: '', adresse: '', commune: livraison?.communes[0] ?? '' })
         router.refresh()
       } else {
         setMsg({ ok: false, texte: `Erreur : ${r.error}` })
@@ -163,6 +200,61 @@ export default function ComptoirClient({ config, produits }: { config: ComptoirD
             </ul>
           )}
 
+          {/* Commande téléphonique à livrer — rejoint la tournée du jour */}
+          {livraison && (
+            <div className="border-t border-zinc-800 mt-3 pt-3">
+              <button
+                type="button"
+                onClick={() => setALivrer(v => !v)}
+                className={cn(
+                  'w-full min-h-[48px] rounded-xl font-black uppercase tracking-wider text-sm transition active:scale-[0.98]',
+                  aLivrer
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
+                )}
+              >
+                🛵 {aLivrer ? 'À livrer — activé' : 'Commande par téléphone à livrer'}
+              </button>
+
+              {aLivrer && (
+                <div className="mt-3 space-y-2">
+                  <input
+                    value={form.nom}
+                    onChange={e => setForm(f => ({ ...f, nom: e.target.value }))}
+                    placeholder="Nom du client"
+                    className="w-full h-12 px-3 rounded-lg bg-zinc-950 ring-1 ring-zinc-800 text-zinc-100 text-sm outline-none focus:ring-blue-500"
+                  />
+                  <input
+                    value={form.telephone}
+                    onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))}
+                    placeholder="Téléphone"
+                    type="tel"
+                    inputMode="tel"
+                    className="w-full h-12 px-3 rounded-lg bg-zinc-950 ring-1 ring-zinc-800 text-zinc-100 text-sm outline-none focus:ring-blue-500"
+                  />
+                  <input
+                    value={form.adresse}
+                    onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))}
+                    placeholder="Adresse (rue, n°, complément)"
+                    className="w-full h-12 px-3 rounded-lg bg-zinc-950 ring-1 ring-zinc-800 text-zinc-100 text-sm outline-none focus:ring-blue-500"
+                  />
+                  {/* Liste fermée : aucune commande hors zone possible. */}
+                  <select
+                    value={form.commune}
+                    onChange={e => setForm(f => ({ ...f, commune: e.target.value }))}
+                    className="w-full h-12 px-3 rounded-lg bg-zinc-950 ring-1 ring-zinc-800 text-zinc-100 text-sm outline-none focus:ring-blue-500"
+                  >
+                    {livraison.communes.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    Avant {livraison.heureLimite.replace(':', 'h')} → tournée du jour même,
+                    départ {livraison.heureTournee.replace(':', 'h')}. Après, tournée du lendemain.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="border-t border-zinc-800 mt-3 pt-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total TTC</span>
@@ -173,7 +265,7 @@ export default function ComptoirClient({ config, produits }: { config: ComptoirD
               disabled={pending || lignes.length === 0}
               className={cn('w-full min-h-[56px] rounded-xl text-white font-black uppercase tracking-wider transition active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500', a.validate)}
             >
-              {pending ? 'Création…' : 'Valider la commande'}
+              {pending ? 'Création…' : aLivrer ? 'Valider et mettre en tournée' : 'Valider la commande'}
             </button>
             <p className="text-[10px] text-zinc-500 mt-1.5 text-center">L&apos;encaissement se fait sur la caisse agréée.</p>
             {msg && (
