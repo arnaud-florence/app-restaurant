@@ -8,6 +8,10 @@ import { sendPushToPostes } from '@/lib/push'
 import { tauxTvaArticle, calculerLigneTva, agregerVentilation, type Consommation } from '@/lib/tva'
 import { logActivite } from '@/lib/operateur'
 import { getOrCreateSessionCaisseId } from '@/lib/caisse'
+import {
+  statutCommandeCible, estVenteComptoirDirecte,
+  type StatutArticleAgrege,
+} from '@/lib/commande-statut'
 
 // Marque 'servi' les articles d'une commande pas encore servis → déclenche la
 // déduction de stock (trigger tg_deduire_stock_article). Le .neq évite toute
@@ -91,40 +95,50 @@ export async function changerStatutArticle(input: unknown) {
       .select('statut')
       .eq('commande_id', article.commande_id)
 
-    const statuts = (tous ?? []).map(a => a.statut as StatutArticle)
-    let nouveauStatutCmd: StatutCommande = 'en_attente'
-    if (statuts.length > 0) {
-      if (statuts.every(s => s === 'servi'))                                nouveauStatutCmd = 'servi'
-      else if (statuts.every(s => s === 'pret' || s === 'servi'))           nouveauStatutCmd = 'pret'
-      else if (statuts.some(s => s === 'en_preparation'))                   nouveauStatutCmd = 'en_preparation'
-      else                                                                   nouveauStatutCmd = 'en_attente'
-    }
+    const statuts = (tous ?? []).map(a => a.statut as StatutArticleAgrege)
 
     // Ne jamais downgrader depuis 'encaisse' ou 'annule'
     const { data: cmd } = await supabase
       .from('commandes')
-      .select('statut')
+      .select('statut, source, numero_table, ardoise_nom, mode_paiement')
       .eq('id', article.commande_id)
       .single()
-    if (cmd && cmd.statut !== 'encaisse' && cmd.statut !== 'annule' && cmd.statut !== nouveauStatutCmd) {
+
+    // Règle de synchronisation + clôture des ventes au comptoir :
+    // fonction pure, testée par scripts/test-commande-statut.mjs.
+    //
+    // Une vente au comptoir entièrement servie passe directement à
+    // 'encaisse'. Sans cela elle resterait à 'servi' pour toujours et le
+    // chiffre d'affaires du Fournil n'apparaîtrait NULLE PART — tout le
+    // calcul du CA (dashboard, finances, agents) filtre sur 'encaisse'.
+    // Ce n'est pas un encaissement fiscal : aucune ligne dans
+    // `paiements_caisse`, la caisse agréée reste la source de vérité et le
+    // connecteur rapprochera ses tickets de ces commandes.
+    const ctx = {
+      source: (cmd?.source as string) ?? null,
+      numero_table: (cmd?.numero_table as string) ?? null,
+      ardoise_nom: (cmd?.ardoise_nom as string) ?? null,
+    }
+    const statutCible = statutCommandeCible(statuts, ctx) as StatutCommande
+    const venteComptoir = estVenteComptoirDirecte(ctx)
+
+    if (cmd && cmd.statut !== 'encaisse' && cmd.statut !== 'annule' && cmd.statut !== statutCible) {
       await supabase
         .from('commandes')
-        .update({ statut: nouveauStatutCmd })
+        .update({
+          statut: statutCible,
+          ...(statutCible === 'encaisse' && venteComptoir
+            ? { mode_paiement: cmd.mode_paiement ?? 'caisse_agreee' }
+            : {}),
+        })
         .eq('id', article.commande_id)
 
       // Si on bascule à 'servi' → la table passe à 'a_encaisser'
-      if (nouveauStatutCmd === 'servi') {
-        const { data: cmdFull } = await supabase
-          .from('commandes')
-          .select('numero_table')
-          .eq('id', article.commande_id)
-          .single()
-        if (cmdFull?.numero_table) {
-          await supabase
-            .from('tables_restaurant')
-            .update({ statut: 'a_encaisser' })
-            .eq('numero', cmdFull.numero_table)
-        }
+      if (statutCible === 'servi' && cmd.numero_table) {
+        await supabase
+          .from('tables_restaurant')
+          .update({ statut: 'a_encaisser' })
+          .eq('numero', cmd.numero_table)
       }
     }
   }

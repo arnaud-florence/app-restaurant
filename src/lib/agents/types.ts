@@ -18,6 +18,7 @@ export type AgentId =
   | 'bar_rt'        // 13. Bar temps réel : cmd boisson en attente >5min
   | 'snack_rt'      // 14. Snack temps réel : cmd online non prise en charge >5min
   | 'formateur'     // 15. Formateur (09h00) : suit progression équipe, encouragements, badges
+  | 'fournil_rt'    // 16. Fournil temps réel : commandes web, tournée de livraison, retraits
 
 export type Urgence = 'rouge' | 'jaune' | 'vert'
 
@@ -66,6 +67,10 @@ export const AGENTS: Record<AgentId, AgentDefinition> = {
   bar_rt:      { id: 'bar_rt',      nom: 'Bar — temps réel',      emoji: '🍷', description: 'Cmd boisson en attente >5min',                              schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'bar' },
   snack_rt:    { id: 'snack_rt',    nom: 'Snack — temps réel',    emoji: '🥪', description: 'Cmd online non prise en charge >5min',                      schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'snack_emporter' },
   formateur:   { id: 'formateur',   nom: 'Formateur',             emoji: '🎓', description: 'Suit progression équipe, encouragements, badges, alertes J-30', schedule: '0 9 * * *',     scheduleHuman: 'Chaque matin à 09h00' },
+  // Surveillance du Fournil — le seul point de vente ouvert pendant la
+  // période « Fournil d'abord ». Sans lui, l'activité ouverte serait la
+  // seule sans agent temps réel.
+  fournil_rt:  { id: 'fournil_rt',  nom: 'Fournil — temps réel',  emoji: '🥖', description: 'Cmd web en attente, tournée de livraison en retard, retraits oubliés', schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'fournil' },
 }
 
 export const AGENT_IDS = Object.keys(AGENTS) as AgentId[]

@@ -1,10 +1,16 @@
-// ─── Agents temps réel par poste — cuisine, serveur, bar, snack ─────
+// ─── Agents temps réel par poste ────────────────────────────────────
 //
-// Une SEULE route dynamique pour 4 agents. Le poste est passé en path.
+// Une SEULE route dynamique pour 5 agents. Le poste est passé en path.
 //   GET /api/cron/agents/realtime/cuisine
 //   GET /api/cron/agents/realtime/serveur
 //   GET /api/cron/agents/realtime/bar
 //   GET /api/cron/agents/realtime/snack
+//   GET /api/cron/agents/realtime/fournil
+//
+// Chaque agent est rattaché à un module d'activation (migration 0110) :
+// si son activité est fermée, la route répond 200 { skipped: true } sans
+// rien exécuter. Pendant la période « Fournil d'abord », seul `fournil`
+// travaille réellement.
 //
 // Chacun tourne toutes les 15 minutes (pendant le service). Détecte les
 // situations urgentes propres au poste, émet des findings + push notifs
@@ -20,13 +26,14 @@ import type { AgentId } from '@/lib/agents/types'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-type PosteRT = 'cuisine' | 'serveur' | 'bar' | 'snack'
+type PosteRT = 'cuisine' | 'serveur' | 'bar' | 'snack' | 'fournil'
 
 const POSTE_TO_AGENT: Record<PosteRT, AgentId> = {
   cuisine: 'cuisine_rt',
   serveur: 'serveur_rt',
   bar:     'bar_rt',
   snack:   'snack_rt',
+  fournil: 'fournil_rt',
 }
 
 const POSTE_TO_EMPLOYES: Record<PosteRT, string[]> = {
@@ -34,6 +41,9 @@ const POSTE_TO_EMPLOYES: Record<PosteRT, string[]> = {
   serveur: ['serveur', 'salle'],
   bar:     ['barman'],
   snack:   ['snacking', 'caisse_snacking', 'caisse'],
+  // Postes susceptibles de tenir le comptoir du fournil. 'polyvalent' est
+  // inclus : en petite équipe, c'est souvent lui qui ouvre à 6h.
+  fournil: ['fournil', 'boulanger', 'snack', 'polyvalent'],
 }
 
 export async function GET(req: Request, { params }: { params: { poste: string } }) {
@@ -41,7 +51,7 @@ export async function GET(req: Request, { params }: { params: { poste: string } 
 
   const poste = params.poste as PosteRT
   if (!POSTE_TO_AGENT[poste]) {
-    return NextResponse.json({ ok: false, error: 'poste invalide (cuisine|serveur|bar|snack)' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: 'poste invalide (cuisine|serveur|bar|snack|fournil)' }, { status: 400 })
   }
   const agentId = POSTE_TO_AGENT[poste]
 
@@ -71,6 +81,9 @@ export async function GET(req: Request, { params }: { params: { poste: string } 
         break
       case 'snack':
         nbAlertes = await detecterSnack(ctx, employesActifs)
+        break
+      case 'fournil':
+        nbAlertes = await detecterFournil(ctx, employesActifs)
         break
     }
 
@@ -340,5 +353,133 @@ async function detecterSnack(ctx: AgentContext, employesActifs: string[]): Promi
       url:   '/emporter',
     })
   }
+  return nb
+}
+
+// ─────────────────────────────────────────────────────────────
+// FOURNIL temps réel
+// ─────────────────────────────────────────────────────────────
+// Le fournil est le seul point de vente ouvert pendant la période
+// « Fournil d'abord ». Trois situations coûtent réellement de l'argent ou
+// des clients, et sont invisibles depuis le comptoir quand ça enchaîne :
+//
+//   1. une commande web arrivée et non prise en charge ;
+//   2. la tournée de livraison qui n'est pas partie à l'heure ;
+//   3. une commande prête que le client n'est jamais venu chercher.
+async function detecterFournil(ctx: AgentContext, employesActifs: string[]): Promise<number> {
+  let nb = 0
+  const maintenant = Date.now()
+
+  // ─── 1. Commandes web FOURNIL non prises en charge depuis > 10 min ───
+  // 10 min et non 5 comme au snack : à 6h du matin, une seule personne tient
+  // le comptoir et la fournée. Alerter trop tôt, c'est faire du bruit.
+  const seuilWeb = new Date(maintenant - 10 * 60_000).toISOString()
+  const { data: enAttente } = await ctx.supabase
+    .from('commandes')
+    .select('id, numero, created_at, client_nom, mode_retrait, commande_articles!inner(tag_destination)')
+    .eq('source', 'ONLINE')
+    .eq('statut', 'en_attente')
+    .lt('created_at', seuilWeb)
+    .limit(20)
+
+  type CmdWeb = {
+    id: string; numero: string; created_at: string; client_nom: string | null
+    mode_retrait: string | null
+    commande_articles: Array<{ tag_destination: string }>
+  }
+  for (const c of (enAttente ?? []) as CmdWeb[]) {
+    if (!c.commande_articles.some(a => a.tag_destination === 'FOURNIL')) continue
+    if (await findingDejaActif(ctx, 'fournil_web_attente', { commande_id: c.id })) continue
+    const ageMin = Math.floor((maintenant - new Date(c.created_at).getTime()) / 60_000)
+    await emitFinding(ctx, {
+      urgence: 'rouge',
+      type: 'fournil_web_attente',
+      titre: `Commande web #${c.numero} en attente depuis ${ageMin} min`,
+      message: `${c.client_nom ?? 'Un client'} attend une confirmation${c.mode_retrait === 'livraison' ? ' (à livrer)' : ''}.`,
+      action_label: 'Voir le comptoir',
+      action_url:   '/comptoir/fournil/kds',
+      data: { commande_id: c.id, numero: c.numero, age_min: ageMin },
+    })
+    nb++
+  }
+
+  // ─── 2. Tournée de livraison en retard ───────────────────────────────
+  // Une commande dont l'heure de tournée est dépassée de 30 min et qui n'est
+  // toujours pas partie : le client attend son pain devant sa porte.
+  const seuilTournee = new Date(maintenant - 30 * 60_000).toISOString()
+  const { data: tournee } = await ctx.supabase
+    .from('commandes')
+    .select('id, numero, creneau_retrait, adresse_livraison, client_nom, livraison_depart_at, statut')
+    .eq('mode_retrait', 'livraison')
+    .not('statut', 'in', '(encaisse,annule,retire_par_client)')
+    .is('livraison_depart_at', null)
+    .lt('creneau_retrait', seuilTournee)
+    .limit(20)
+
+  type CmdLiv = {
+    id: string; numero: string; creneau_retrait: string | null
+    adresse_livraison: string | null; client_nom: string | null
+  }
+  const enRetard = (tournee ?? []) as CmdLiv[]
+  for (const c of enRetard) {
+    if (await findingDejaActif(ctx, 'fournil_tournee_retard', { commande_id: c.id })) continue
+    const retardMin = c.creneau_retrait
+      ? Math.floor((maintenant - new Date(c.creneau_retrait).getTime()) / 60_000)
+      : 0
+    await emitFinding(ctx, {
+      urgence: 'rouge',
+      type: 'fournil_tournee_retard',
+      titre: `Livraison #${c.numero} en retard de ${retardMin} min`,
+      message: `${c.client_nom ?? 'Client'} — ${c.adresse_livraison ?? 'adresse non renseignée'}. La tournée n'est pas partie.`,
+      action_label: 'Voir la tournée',
+      action_url:   '/livreur',
+      data: { commande_id: c.id, numero: c.numero, retard_min: retardMin },
+    })
+    nb++
+  }
+
+  // ─── 3. Retraits oubliés ─────────────────────────────────────────────
+  // Commande prête dont l'heure de retrait est dépassée de plus d'une heure.
+  // En boulangerie ça se périme : mieux vaut rappeler le client que jeter.
+  const seuilRetrait = new Date(maintenant - 60 * 60_000).toISOString()
+  const { data: oublis } = await ctx.supabase
+    .from('commandes')
+    .select('id, numero, creneau_retrait, client_nom, client_telephone')
+    .eq('source', 'ONLINE')
+    .eq('mode_retrait', 'a_emporter')
+    .in('statut', ['pret', 'servi'])
+    .lt('creneau_retrait', seuilRetrait)
+    .limit(20)
+
+  type CmdOubli = {
+    id: string; numero: string; creneau_retrait: string | null
+    client_nom: string | null; client_telephone: string | null
+  }
+  for (const c of (oublis ?? []) as CmdOubli[]) {
+    if (await findingDejaActif(ctx, 'fournil_retrait_oublie', { commande_id: c.id })) continue
+    await emitFinding(ctx, {
+      urgence: 'jaune',
+      type: 'fournil_retrait_oublie',
+      titre: `Commande #${c.numero} pas récupérée`,
+      message: `${c.client_nom ?? 'Client'}${c.client_telephone ? ` · ${c.client_telephone}` : ''} — prête depuis plus d'une heure. Rappeler avant que ça ne se perde.`,
+      action_label: 'Voir le comptoir',
+      action_url:   '/comptoir/fournil/kds',
+      data: { commande_id: c.id, numero: c.numero },
+    })
+    nb++
+  }
+
+  // Un seul push groupé : le rate-limit plafonne déjà à 3/h par employé,
+  // autant ne pas le consommer en notifications séparées.
+  if (nb > 0) {
+    await pushAuxEmployes(employesActifs, {
+      title: `🥖 ${nb} alerte${nb > 1 ? 's' : ''} fournil`,
+      body:  enRetard.length > 0
+        ? `Dont ${enRetard.length} livraison${enRetard.length > 1 ? 's' : ''} en retard`
+        : 'Commandes web ou retraits à traiter',
+      url:   '/comptoir/fournil/kds',
+    })
+  }
+
   return nb
 }

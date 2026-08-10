@@ -141,7 +141,17 @@ Le Fournil ouvre seul (juillet-septembre 2026) ; restaurant, bar, pizzeria, cham
 
 Réouverture fin octobre : `/admin/etablissements` → groupe Restaurant → **« Ouvrir le restaurant »**. Le site suit en moins d'une minute. Ne pas rejouer 0111, qui est la migration de fermeture.
 
-Test : `node scripts/test-activation.mjs` (restaure toujours l'état initial).
+Tests : `node scripts/test-activation.mjs` (restaure toujours l'état initial), `node scripts/test-commande-statut.mjs`, `node scripts/test-fournil-circuit.mjs`.
+
+### Clôture des ventes au comptoir
+
+Une vente COMPTOIR sans table ni ardoise passe **directement à `encaisse`** quand tous ses articles sont `servi` (règle pure dans `src/lib/commande-statut.ts`).
+
+Sans cela, elle restait à `servi` indéfiniment et son chiffre d'affaires n'apparaissait **nulle part** : tout le calcul du CA (dashboard, `/service`, finances, agents) filtre sur `statut = 'encaisse'`. Le Fournil aurait affiché 0 € toute la journée.
+
+⚠️ Ce n'est **pas** un encaissement fiscal : aucune ligne n'est écrite dans `paiements_caisse`, donc le Z-report de l'app reste vide pour ces ventes. La caisse agréée demeure la source de vérité fiscale (NF525) et le connecteur `encaissements_externes` (migration 0108) rapproche ses tickets de ces commandes. `mode_paiement = 'caisse_agreee'` marque la distinction.
+
+Exclusions : commandes de table (addition demandée plus tard) et **ardoises** (compte ouvert soldé à la fin — les clôturer les rendrait introuvables et la tournée suivante créerait une 2ᵉ commande).
 
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
 
@@ -163,6 +173,9 @@ Test : `node scripts/test-activation.mjs` (restaure toujours l'état initial).
 | 10 | 🛡️ Sécurité | toutes les 30 min — connexions, écarts caisse, agents erreur |
 | 11-14 | 👨‍🍳 RT par poste (cuisine, serveur, bar, snack) | toutes les 15 min — alertes service en cours |
 | 15 | 🎓 Formateur | 08h UTC (= 09h Paris) — progression, badges, alertes J-30 certif |
+| 16 | 🥖 Fournil RT | toutes les 15 min — cmd web en attente, tournée en retard, retraits oubliés |
+
+Les agents 11-14 portent un `module` d'activation et sont **en veille** tant que le restaurant n'a pas ouvert (leur route répond `200 { skipped: true }`, jamais une erreur — le monitoring compte tout code ≠ 200 comme une panne). L'agent 16 couvre le Fournil, seul point de vente ouvert d'ici fin octobre 2026.
 
 **Déclenchement cron :** pg_cron + pg_net dans Supabase, fichier `sql/setup-pgcron-agents.sql` (gitignored car contient `CRON_SECRET` en clair). Alternative : `.github/workflows/agents-cron.yml` (ne couvre que les 9 agents originaux, à étendre si on bascule dessus).
 
@@ -457,6 +470,11 @@ PORT=3000 node scripts/test-pilotage.mjs         # Module 25
 PORT=3000 node scripts/test-affichage.mjs        # Module 26
 PORT=3000 node scripts/test-formation.mjs        # Module 27
 PORT=3000 node scripts/test-securite.mjs         # Module 28
+
+# Bascule « Fournil d'abord » (août 2026)
+node scripts/test-commande-statut.mjs            # règle de statut + clôture comptoir (pur, sans base)
+node scripts/test-activation.mjs                 # interrupteurs par activité (restaure l'état initial)
+node scripts/test-fournil-circuit.mjs            # circuit de vente Fournil bout en bout
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
