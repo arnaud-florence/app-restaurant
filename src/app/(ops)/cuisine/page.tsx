@@ -5,11 +5,17 @@ import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import type { PosteWidget } from '@/lib/taches-du-jour'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Cuisine — Service' }
 export const dynamic = 'force-dynamic'
 
 export default async function CuisinePage({ searchParams }: { searchParams: { role?: string } }) {
+  // Activité fermée → écran de veille plutôt qu'un poste vide.
+  // Couvre les tablettes qui ont ce poste en favori.
+  const veille = await gardeModule('restaurant_salle')
+  if (veille) return <ModuleEnVeille {...veille} />
   const commandes = await listCommandesActives()
   // ?role=pizzaiolo → on n'affiche que la colonne PIZZA (vue dédiée pour le pizzaiolo
   // qui n'a accès qu'à ses commandes pizza). Sans ce paramètre = vue cuisinier complète.

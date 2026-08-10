@@ -17,7 +17,27 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AgentId, Urgence } from './types'
+import { AGENTS, type AgentId, type Urgence } from './types'
+import { getActivation } from '@/lib/activation/server'
+
+// ─── Mise en veille par activité (migration 0110) ─────────────
+/** Un agent rattaché à une activité fermée ne doit pas tourner : il produirait
+ *  des alertes sur un service qui n'existe pas encore (« table sans commande
+ *  depuis 10 min » alors que la salle n'a pas ouvert).
+ *
+ *  ⚠️ La route appelante doit répondre **200** dans ce cas, pas une erreur :
+ *  le monitoring des agents compte tout code ≠ 200 comme une panne
+ *  (cf. CLAUDE.md §8, `net._http_response`). */
+export async function agentEnVeille(agentId: AgentId): Promise<boolean> {
+  const module = AGENTS[agentId]?.module
+  if (!module) return false          // agent transverse → tourne toujours
+  try {
+    const etat = await getActivation()
+    return etat[module] !== true
+  } catch {
+    return false                     // en cas de doute, on laisse tourner
+  }
+}
 
 // ─── Auth des routes cron ────────────────────────────────────
 // Vercel cron passe `Authorization: Bearer ${CRON_SECRET}` automatiquement

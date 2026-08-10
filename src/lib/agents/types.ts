@@ -30,7 +30,19 @@ export type AgentDefinition = {
   description: string         // 1 ligne
   schedule: string            // expression cron lisible "0 2 * * *"
   scheduleHuman: string       // "Chaque nuit à 02h00"
+  /** Module d'activation dont dépend l'agent (migration 0110).
+   *  Absent = agent transverse, tourne quelle que soit l'activité ouverte.
+   *  Un agent dont le module est éteint est mis en veille : sa route cron
+   *  répond 200 { skipped: true } — surtout pas une erreur, qui polluerait le
+   *  monitoring `net._http_response` (cf. CLAUDE.md §8). */
+  module?: ModuleActivationCle
 }
+
+/** Sous-ensemble des clés de `activites_modules` utilisées par les agents.
+ *  Typé en local pour éviter une dépendance circulaire avec lib/activation. */
+export type ModuleActivationCle =
+  | 'restaurant_salle' | 'pizzeria' | 'bar' | 'snack_emporter'
+  | 'chambres' | 'evenementiel' | 'fournil' | 'fournil_livraison'
 
 // Définitions statiques des 10 agents (utilisé par dashboard + index)
 export const AGENTS: Record<AgentId, AgentDefinition> = {
@@ -45,10 +57,14 @@ export const AGENTS: Record<AgentId, AgentDefinition> = {
   strategique: { id: 'strategique', nom: 'Conseiller stratégique', emoji: '🎯', description: 'Bilan hebdo, opportunités, benchmark, plan semaine',         schedule: '0 7 * * 1',     scheduleHuman: 'Chaque lundi à 07h00' },
   securite:    { id: 'securite',    nom: 'Vigile sécurité',       emoji: '🛡️', description: 'Connexions suspectes, intégrité data, perf app',             schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 minutes' },
   // ─── Temps réel par poste ───────────────────────────────────────
-  cuisine_rt:  { id: 'cuisine_rt',  nom: 'Cuisine — temps réel',  emoji: '👨‍🍳', description: 'Retards prép > 20min, alertes pendant le service',           schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
-  serveur_rt:  { id: 'serveur_rt',  nom: 'Serveur — temps réel',  emoji: '🍽',  description: 'Table sans cmd >10min, plat prêt non servi, addition >2h',  schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
-  bar_rt:      { id: 'bar_rt',      nom: 'Bar — temps réel',      emoji: '🍷', description: 'Cmd boisson en attente >5min',                              schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
-  snack_rt:    { id: 'snack_rt',    nom: 'Snack — temps réel',    emoji: '🥪', description: 'Cmd online non prise en charge >5min',                      schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service' },
+  // Ces quatre-là surveillent le service en salle : mis en veille tant que le
+  // restaurant n'a pas ouvert (cf. `module`). Le fournil, lui, garde sa propre
+  // surveillance via `fournil_rt` — le seul point de vente ouvert ne doit pas
+  // être le seul sans agent.
+  cuisine_rt:  { id: 'cuisine_rt',  nom: 'Cuisine — temps réel',  emoji: '👨‍🍳', description: 'Retards prép > 20min, alertes pendant le service',           schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'restaurant_salle' },
+  serveur_rt:  { id: 'serveur_rt',  nom: 'Serveur — temps réel',  emoji: '🍽',  description: 'Table sans cmd >10min, plat prêt non servi, addition >2h',  schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'restaurant_salle' },
+  bar_rt:      { id: 'bar_rt',      nom: 'Bar — temps réel',      emoji: '🍷', description: 'Cmd boisson en attente >5min',                              schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'bar' },
+  snack_rt:    { id: 'snack_rt',    nom: 'Snack — temps réel',    emoji: '🥪', description: 'Cmd online non prise en charge >5min',                      schedule: '*/15 * * * *',  scheduleHuman: 'Toutes les 15 min pendant le service', module: 'snack_emporter' },
   formateur:   { id: 'formateur',   nom: 'Formateur',             emoji: '🎓', description: 'Suit progression équipe, encouragements, badges, alertes J-30', schedule: '0 9 * * *',     scheduleHuman: 'Chaque matin à 09h00' },
 }
 

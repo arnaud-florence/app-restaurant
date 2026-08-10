@@ -9,7 +9,8 @@ import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar
 import BackToCategoryButton from '@/components/BackToCategoryButton'
 import StoriesNav from '@/components/StoriesNav'
 import { createClient } from '@/lib/supabase/server'
-import { CATEGORIES } from '@/lib/navigation'
+import { CATEGORIES, filtrerCategories } from '@/lib/navigation'
+import { getActivation } from '@/lib/activation/server'
 import { canAccess } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const isManager = !ap && profil.role === 'manager'
   const posteNav = ap ? ap.ciblePoste : (profil.poste ?? null)
   const permsNav = ap ? ap.ciblePerms : (profil.custom_permissions ?? null)
-  const categoriesNav = CATEGORIES
+  // Activités ouvertes d'abord (migration 0110), permissions ensuite.
+  const etatActivation = await getActivation()
+  const categoriesNav = filtrerCategories(etatActivation)
     // 'service' est déjà un onglet permanent de la barre du bas (MobileTabBar) →
     // on l'omet des stories pour éviter le doublon.
     .filter(c => c.slug !== 'service')

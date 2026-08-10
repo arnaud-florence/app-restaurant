@@ -60,6 +60,41 @@ export async function getTeasers(): Promise<ModuleActivation[]> {
   return modules.filter(m => !m.actif && m.teaser)
 }
 
+/** Garde de page pour les écrans de poste et d'admin.
+ *
+ *  Usage dans un Server Component :
+ *    const veille = await gardeModule('restaurant_salle')
+ *    if (veille) return <ModuleEnVeille {...veille} />
+ *
+ *  Renvoie null quand le module est allumé. */
+export async function gardeModule(
+  cle: ModuleCle,
+): Promise<{ emoji: string; titre: string; raison: string } | null> {
+  const modules = await getModules()
+  const m = modules.find(x => x.cle === cle)
+
+  // Module inconnu (migration 0110 pas encore passée) → on laisse passer :
+  // mieux vaut un écran fonctionnel qu'une app bloquée par une table absente.
+  if (!m) {
+    const etat = await getActivation()
+    if (etat[cle]) return null
+  } else if (m.actif) {
+    return null
+  }
+
+  const echeance = m?.date_ouverture_prevue
+    ? new Date(m.date_ouverture_prevue).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : null
+
+  return {
+    emoji: m?.emoji ?? '💤',
+    titre: m?.libelle ?? 'Poste indisponible',
+    raison: echeance
+      ? `Cette activité ouvre en ${echeance}.`
+      : 'Cette activité n’a pas encore ouvert.',
+  }
+}
+
 /** Configuration de la livraison Fournil, lue depuis `parametres`. */
 export const getConfigLivraisonFournil = cache(async (): Promise<ConfigLivraisonFournil> => {
   try {

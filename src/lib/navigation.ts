@@ -1,6 +1,8 @@
 // Catalogue de navigation centralisé — utilisé par TopActionBar (chips bottom)
 // et par les pages /admin/cat/[slug] qui affichent les sous-modules d'une catégorie.
 
+import type { EtatActivation, ModuleCle } from '@/lib/activation/config'
+
 export type CategoryTone = 'emerald' | 'amber' | 'violet' | 'blue' | 'red' | 'zinc' | 'rose'
 
 export type SubModule = {
@@ -11,6 +13,10 @@ export type SubModule = {
   description: string
   /** URL Unsplash thématique (fond photo de la tuile). Fallback emoji-gradient si absent. */
   imageUrl?: string
+  /** Module d'activation dont dépend la tuile (migration 0110). Absent = toujours
+   *  visible. Une tuile dont le module est éteint disparaît de la navigation —
+   *  et revient d'elle-même quand le gérant rallume l'activité. */
+  module?: ModuleCle
 }
 
 /** Helper pour générer une URL Unsplash optimisée (format 600x600 q75). */
@@ -62,14 +68,17 @@ export const CATEGORIES: Category[] = [
     imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=75',
     videoUrl: '/videos/brasserie.mp4.mp4',
     items: [
-      { href: '/serveur',         emoji: '🍽',   label: 'Salle / Serveur',  description: 'Plan de salle + prise de commande + encaissement.',  imageUrl: u('1414235077428-338989a2e8c0') },
+      // Le comptoir Fournil est le point de vente actif pendant la période
+      // « Fournil d'abord » → il ouvre la liste.
+      { href: '/comptoir/fournil', emoji: '🥖', label: 'Comptoir Fournil', description: 'Prise de commande boulangerie + KDS. Encaissement sur caisse agréée.', imageUrl: u('1509440159596-0249088772ff'), module: 'fournil' },
+      { href: '/serveur',         emoji: '🍽',   label: 'Salle / Serveur',  description: 'Plan de salle + prise de commande + encaissement.',  imageUrl: u('1414235077428-338989a2e8c0'), module: 'restaurant_salle' },
       { href: '/caisse',          emoji: '💰',   label: 'Caisse',           description: 'Dashboard live, ouverture/clôture session, rapport Z.', imageUrl: u('1556742502-ec7c0e9f34b1') },
-      { href: '/cuisine',         emoji: '👨‍🍳', label: 'Cuisine',          description: 'Bons de prep cuisine + pizza, minuteur, ding sonore.', imageUrl: u('1556909114-f6e7ad7d3136') },
-      { href: '/pizza',           emoji: '🍕',   label: 'Pizza',            description: 'KDS pizza dédié (filtre tag PIZZA).',                  imageUrl: u('1513104890138-7c749659a591') },
-      { href: '/bar',             emoji: '🍷',   label: 'Bar',              description: 'KDS bar pour boissons en attente.',                    imageUrl: u('1514933651103-005eec06c04b') },
-      { href: '/emporter',        emoji: '🛒',   label: 'Snack / Emporter', description: 'Service ONLINE différencié (créneaux multi-zones).',   imageUrl: u('1568901346375-23c9450c58cd') },
-      { href: '/livreur',         emoji: '🛵',   label: 'Livreur',          description: 'Tournée du jour, Maps multi-points, retards par mail.', imageUrl: u('1558981852-426c6c22a060') },
-      { href: '/reception',       emoji: '🛎',   label: 'Réception',        description: 'Arrivées/départs jour, demandes résa, acomptes.',      imageUrl: u('1551882547-ff40c63fe5fa') },
+      { href: '/cuisine',         emoji: '👨‍🍳', label: 'Cuisine',          description: 'Bons de prep cuisine + pizza, minuteur, ding sonore.', imageUrl: u('1556909114-f6e7ad7d3136'), module: 'restaurant_salle' },
+      { href: '/pizza',           emoji: '🍕',   label: 'Pizza',            description: 'KDS pizza dédié (filtre tag PIZZA).',                  imageUrl: u('1513104890138-7c749659a591'), module: 'pizzeria' },
+      { href: '/bar',             emoji: '🍷',   label: 'Bar',              description: 'KDS bar pour boissons en attente.',                    imageUrl: u('1514933651103-005eec06c04b'), module: 'bar' },
+      { href: '/emporter',        emoji: '🛒',   label: 'Snack / Emporter', description: 'Service ONLINE différencié (créneaux multi-zones).',   imageUrl: u('1568901346375-23c9450c58cd'), module: 'snack_emporter' },
+      { href: '/livreur',         emoji: '🛵',   label: 'Livreur',          description: 'Tournée du jour, Maps multi-points, retards par mail.', imageUrl: u('1558981852-426c6c22a060'), module: 'fournil_livraison' },
+      { href: '/reception',       emoji: '🛎',   label: 'Réception',        description: 'Arrivées/départs jour, demandes résa, acomptes.',      imageUrl: u('1551882547-ff40c63fe5fa'), module: 'chambres' },
       { href: '/admin/affichage', emoji: '📺',   label: 'Affichage TV',     description: 'Menu du jour + promos rotatives en salle (Module 26).', imageUrl: u('1593359677879-a4bb92f829d1') },
     ],
   },
@@ -101,11 +110,11 @@ export const CATEGORIES: Category[] = [
     imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=75',
     videoUrl: '/videos/chambre.mp4.mp4',
     items: [
-      { href: '/admin/reservations',     emoji: '📅', label: 'Réservations',      description: 'Tables, terrasse, chambres, événementiel.',              imageUrl: u('1517248135467-4c7edcad34c4') },
-      { href: '/admin/chambres',         emoji: '🛏',  label: 'Chambres',          description: 'Calendrier multi-chambres, check-in, facture PDF.',      imageUrl: u('1582719478250-c89cae4dc85b') },
-      { href: '/admin/groupes',          emoji: '👥', label: 'Groupes',           description: 'Tours-opérateurs, menus négociés, arrhes/solde.',        imageUrl: u('1559339352-11d035aa65de') },
+      { href: '/admin/reservations',     emoji: '📅', label: 'Réservations',      description: 'Tables, terrasse, chambres, événementiel.',              imageUrl: u('1517248135467-4c7edcad34c4'), module: 'reservation_table' },
+      { href: '/admin/chambres',         emoji: '🛏',  label: 'Chambres',          description: 'Calendrier multi-chambres, check-in, facture PDF.',      imageUrl: u('1582719478250-c89cae4dc85b'), module: 'chambres' },
+      { href: '/admin/groupes',          emoji: '👥', label: 'Groupes',           description: 'Tours-opérateurs, menus négociés, arrhes/solde.',        imageUrl: u('1559339352-11d035aa65de'), module: 'evenementiel' },
       { href: '/admin/clients',          emoji: '🧑', label: 'Clients / CRM',     description: 'Historique, allergies, segmentation, parrainage, campagnes, WiFi.', imageUrl: u('1521737711867-e3b97375f902') },
-      { href: '/admin/clients/fidelite', emoji: '⭐', label: 'Programme fidélité', description: 'Points, niveaux, paramètres, analytics, historique.',    imageUrl: u('1556742393-d5066b0a7894') },
+      { href: '/admin/clients/fidelite', emoji: '⭐', label: 'Programme fidélité', description: 'Points, niveaux, paramètres, analytics, historique.',    imageUrl: u('1556742393-d5066b0a7894'), module: 'fidelite' },
       { href: '/admin/promotions',       emoji: '🎁', label: 'Promotions',        description: 'Bannières site web & happy hours (côté site public).',   imageUrl: u('1607082348824-0a96f2a4b9da') },
       { href: '/admin/codes-promo',      emoji: '🏷',  label: 'Codes réduction',   description: 'Codes de réduction à l\'encaissement : création + suivi par code.', imageUrl: u('1607082349566-187342175e2f') },
       { href: '/admin/cartes-cadeaux',   emoji: '🎫', label: 'Cartes cadeaux',    description: 'Émission, suivi solde, conformité (Phase 1).',           imageUrl: u('1549465220-1a8b9238cd48') },
@@ -174,6 +183,16 @@ export const CATEGORIES: Category[] = [
     ],
   },
 ]
+
+/** Retire les tuiles dont le module d'activation est éteint, puis les catégories
+ *  devenues vides. Pendant la période « Fournil d'abord », cela fait disparaître
+ *  Salle, Pizza, Bar, Snack, Réception, Chambres, Groupes et Réservations de la
+ *  navigation des employés — sans rien supprimer côté code ni côté base. */
+export function filtrerCategories(etat: EtatActivation, categories: Category[] = CATEGORIES): Category[] {
+  return categories
+    .map(c => ({ ...c, items: c.items.filter(it => !it.module || etat[it.module]) }))
+    .filter(c => c.items.length > 0)
+}
 
 /** Retourne la catégorie qui contient un href donné, ou null.
  *  Quand plusieurs items matchent (cas d'items "préfixes" comme /admin qui match aussi

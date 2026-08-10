@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import GroupesClient from './GroupesClient'
 import { type Groupe, type Paiement, type MenuGroupe, type StatutGroupe, type TypeGroupe, type MethodePaiement, type TypePaiement } from '@/lib/groupes'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Groupes — Admin' }
 export const dynamic = 'force-dynamic'
@@ -14,6 +16,10 @@ export type DataGroupes = {
 }
 
 export default async function GroupesPage() {
+  // Activité fermée → module en veille. Rien n'est supprimé :
+  // réservations, chambres et groupes existants restent en base.
+  const veille = await gardeModule('evenementiel')
+  if (veille) return <ModuleEnVeille {...veille} theme="light" />
   const supabase = await createClient()
 
   const [grpRes, paiRes, menuRes, empRes, recRes] = await Promise.all([

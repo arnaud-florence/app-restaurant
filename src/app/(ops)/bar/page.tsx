@@ -4,11 +4,17 @@ import { listCommandesActives } from '../actions'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Bar — Service' }
 export const dynamic = 'force-dynamic'
 
 export default async function BarPage() {
+  // Activité fermée → écran de veille plutôt qu'un poste vide.
+  // Couvre les tablettes qui ont ce poste en favori.
+  const veille = await gardeModule('bar')
+  if (veille) return <ModuleEnVeille {...veille} />
   const supabase = await createClient()
 
   const [commandes, recettesRes, employesRes] = await Promise.all([

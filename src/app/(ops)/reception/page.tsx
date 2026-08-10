@@ -7,6 +7,8 @@ import { getProfile } from '@/lib/auth'
 import BriefingPoste from '@/components/BriefingPoste'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
 import ReceptionClient from './ReceptionClient'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Réception — Service' }
 export const dynamic = 'force-dynamic'
@@ -15,6 +17,10 @@ const ONGLETS_VALIDES = ['tables', 'demandes', 'arrivees', 'departs', 'chambres'
 type OngletReception = typeof ONGLETS_VALIDES[number]
 
 export default async function ReceptionPage({ searchParams }: { searchParams?: { tab?: string } }) {
+  // Activité fermée → écran de veille plutôt qu'un poste vide.
+  // Couvre les tablettes qui ont ce poste en favori.
+  const veille = await gardeModule('chambres')
+  if (veille) return <ModuleEnVeille {...veille} />
   const tabParam = searchParams?.tab
   const tabInitial: OngletReception = ONGLETS_VALIDES.includes(tabParam as OngletReception) ? (tabParam as OngletReception) : 'demandes'
   const supabase = await createClient()

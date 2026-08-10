@@ -4,11 +4,17 @@ import ServeurClient from './ServeurClient'
 import BriefingPoste from '@/components/BriefingPoste'
 import { getProfile } from '@/lib/auth'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Serveur — Service' }
 export const dynamic = 'force-dynamic'
 
 export default async function ServeurPage() {
+  // Activité fermée → écran de veille plutôt qu'un poste vide.
+  // Couvre les tablettes qui ont ce poste en favori.
+  const veille = await gardeModule('restaurant_salle')
+  if (veille) return <ModuleEnVeille {...veille} />
   const supabase = await createClient()
 
   const [commandes, tablesRes, recettesRes, employesRes] = await Promise.all([

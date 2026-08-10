@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CATEGORIES, type Category } from '@/lib/navigation'
+import { getActivation } from '@/lib/activation/server'
 import { getProfile } from '@/lib/auth'
 import { canAccess } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
@@ -211,8 +212,11 @@ export default async function CategoriePage({ params }: { params: { slug: string
   const peutVoir = (href: string) =>
     isManager || canAccess(profil?.poste, href, profil?.custom_permissions ?? null)
 
-  // On filtre les sous-modules selon les permissions du profil
-  const itemsVisibles = cat.items.filter(it => peutVoir(it.href))
+  // Activités ouvertes d'abord (migration 0110), permissions ensuite.
+  const etatActivation = await getActivation()
+  const itemsVisibles = cat.items
+    .filter(it => !it.module || etatActivation[it.module])
+    .filter(it => peutVoir(it.href))
   const tone = TONES[cat.tone]
 
   // Compteurs live par sous-module (selon la catégorie)

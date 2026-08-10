@@ -121,7 +121,27 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Endpoint admin exec-sql | `/api/admin/exec-sql` + fonction PG `exec_sql()` security definer pour migrations automatiques | 0086 |
 | Module 27 enrichi | niveaux 1/2/3, simulations interactives, certifications par poste, badges, Q/R IA contextualisée | 0087 |
 
-**Migrations actuelles : 0001 → 0087** (87 fichiers dans `supabase/migrations/`).
+**Migrations actuelles : 0001 → 0111.**
+
+### Activation par activité — « Fournil d'abord » (août 2026)
+
+Le Fournil ouvre seul (juillet-septembre 2026) ; restaurant, bar, pizzeria, chambres et événementiel n'ouvrent que **fin octobre 2026**. Tout est piloté par une seule table, `activites_modules` (migration 0110), et **aucun code n'est à modifier pour rouvrir**.
+
+| Où | Quoi |
+|---|---|
+| `activites_modules` | 14 modules répartis en `fournil` / `restaurant` / `commun`. Colonnes : `actif`, `teaser`, `date_ouverture_prevue`. |
+| `/admin/etablissements` | Le tableau des interrupteurs + bouton **« Ouvrir le restaurant »** (bascule groupée) + réglages de la livraison Fournil. |
+| `src/lib/activation/config.ts` | Types, clés, correspondances module → tags / PdV / routes, repli. Client-safe. |
+| `src/lib/activation/server.ts` | `getActivation()`, `estActif()`, `gardeModule()`. Server-only, mémoïsé par requête. |
+| `GET /api/public/activation` | Sert l'état au site public (TTL 60 s). |
+
+**Règle du repli** : quand la base ou l'API est injoignable, on retombe sur `REPLI_FOURNIL_SEUL` — **jamais** sur « tout ouvert ». Une panne ne doit pas dévoiler une activité qui n'a pas ouvert ; l'erreur inverse est irrattrapable.
+
+**Points de branchement** : `lib/navigation.ts` (`filtrerCategories`), les pages ops/admin (`gardeModule` + `<ModuleEnVeille />`), `/api/public/menu` (filtre par `tag_destination`), et `lib/agents/runner.ts` (`agentEnVeille`).
+
+Réouverture fin octobre : `/admin/etablissements` → groupe Restaurant → **« Ouvrir le restaurant »**. Le site suit en moins d'une minute. Ne pas rejouer 0111, qui est la migration de fermeture.
+
+Test : `node scripts/test-activation.mjs` (restaure toujours l'état initial).
 
 À chaque livraison de module : `scripts/test-<nom>.mjs` doit passer 100% (setup → assertions → cleanup, bilan ✓/✗).
 
@@ -264,7 +284,15 @@ Trigger Module 7 : à chaque article qui passe à `servi`, déduction automatiqu
 
 ### TVA
 
-Par défaut 10% (restauration sur place) appliquée à plat sur le total HT. Stocké par recette (`recettes.tva`, default 10) et par boisson (`boissons.tva`). Le ticket client utilise un taux unique 10% — affinage TVA mixte par tag à venir.
+Multi-taux depuis la migration 0066 — source de vérité `src/lib/tva.ts` :
+
+| Cas | Taux |
+|---|---|
+| Alcool (sur place ou emporter) | 20 % |
+| Plat / soft consommé sur place | 10 % |
+| Plat / soft à emporter | 5,5 % |
+
+Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0095) porte déjà les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries, 10 % snacking/boissons.
 
 ### Realtime obligatoire
 
@@ -360,7 +388,7 @@ fmtPct(n)   // 12,3 %
 
 - **Encodage PowerShell** : Out-File / Set-Content écrivent en UTF-16 LE par défaut sur Windows. Utiliser `-Encoding utf8` ou créer les fichiers via les outils Edit/Write de Claude Code.
 
-- **TVA mixte** : actuellement plat 10% partout. Le jour où on différencie alcool 20% / sur place 10% / vente à emporter 5,5%, recalculer à l'encaissement et dans le ticket client (constante `TVA_TAUX` dans `TicketClientPrintClient.tsx`).
+- **TVA mixte — FAIT** (migration 0066 + `src/lib/tva.ts`) : 20 % alcool, 10 % sur place, 5,5 % à emporter. `tauxTvaArticle()` est branché dans `(ops)/actions.ts`, l'encaissement serveur, la borne et `/api/public/menu`. Le comptoir (`(ops)/comptoir/actions.ts`) ventile par taux et force `consommation: 'emporter'`. **Limite connue** : une viennoiserie consommée sur place devrait être à 10 % et sort à 5,5 % — sous-collecte marginale, à traiter si le fournil développe de la conso sur place.
 
 - **Le projet voisin `C:\projets\monrestaurant`** est un ancien prototype, **pas** la version active. Ne pas s'y tromper.
 

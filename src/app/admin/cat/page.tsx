@@ -5,7 +5,8 @@
 // Filtré par rôle : le gérant voit tout, chaque employé voit sa carte réduite.
 
 import Link from 'next/link'
-import { CATEGORIES } from '@/lib/navigation'
+import { CATEGORIES, filtrerCategories } from '@/lib/navigation'
+import { getActivation } from '@/lib/activation/server'
 import { getProfile } from '@/lib/auth'
 import PullToRefresh from '@/components/PullToRefresh'
 import { canAccess } from '@/lib/permissions'
@@ -39,8 +40,11 @@ export default async function CatIndexPage() {
   const permsNav = ap ? ap.ciblePerms : (profil?.custom_permissions ?? null)
   const peutVoir = (href: string) => isManager || canAccess(posteNav, href, permsNav)
 
-  // Univers visibles (au moins 1 module accessible)
-  const categoriesVisibles = CATEGORIES
+  // Univers visibles : d'abord les activités ouvertes (migration 0110), puis
+  // les permissions du poste. Un module d'activité fermée n'apparaît pour
+  // personne, manager compris — c'est le sens de la mise en veille.
+  const etatActivation = await getActivation()
+  const categoriesVisibles = filtrerCategories(etatActivation)
     .map(c => ({ ...c, items: c.items.filter(it => peutVoir(it.href)) }))
     .filter(c => c.items.length > 0)
 

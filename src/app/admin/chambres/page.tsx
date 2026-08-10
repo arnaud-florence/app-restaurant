@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import ChambresAdminClient from './ChambresAdminClient'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Chambres — Admin' }
 export const dynamic = 'force-dynamic'
@@ -18,6 +20,10 @@ export type Chambre = {
 }
 
 export default async function ChambresAdminPage() {
+  // Activité fermée → module en veille. Rien n'est supprimé :
+  // réservations, chambres et groupes existants restent en base.
+  const veille = await gardeModule('chambres')
+  if (veille) return <ModuleEnVeille {...veille} theme="light" />
   const sb = await createClient()
   const { data } = await sb.from('chambres').select('*').order('numero')
   const chambres: Chambre[] = (data ?? []).map(c => ({

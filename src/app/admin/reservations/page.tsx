@@ -6,6 +6,8 @@ import {
 } from '@/lib/reservations'
 import { getProfile } from '@/lib/auth'
 import { isReadOnly } from '@/lib/permissions'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Réservations & événementiel — Admin' }
 export const dynamic = 'force-dynamic'
@@ -19,6 +21,10 @@ export type DataReservations = {
 }
 
 export default async function ReservationsPage() {
+  // Activité fermée → module en veille. Rien n'est supprimé :
+  // réservations, chambres et groupes existants restent en base.
+  const veille = await gardeModule('reservation_table')
+  if (veille) return <ModuleEnVeille {...veille} theme="light" />
   const supabase = await createClient()
 
   const [chRes, resaChRes, resaTRes, evtRes, tablesRes] = await Promise.all([

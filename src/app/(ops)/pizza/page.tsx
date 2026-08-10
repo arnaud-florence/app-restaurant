@@ -7,11 +7,17 @@ import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import BriefingPoste from '@/components/BriefingPoste'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
+import { gardeModule } from '@/lib/activation/server'
+import ModuleEnVeille from '@/components/ModuleEnVeille'
 
 export const metadata = { title: 'Pizza — Service' }
 export const dynamic = 'force-dynamic'
 
 export default async function PizzaPage() {
+  // Activité fermée → écran de veille plutôt qu'un poste vide.
+  // Couvre les tablettes qui ont ce poste en favori.
+  const veille = await gardeModule('pizzeria')
+  if (veille) return <ModuleEnVeille {...veille} />
   const commandes = await listCommandesActives()
   const profil = await getProfile()
 

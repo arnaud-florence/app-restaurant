@@ -13,7 +13,7 @@
 // Auth : Bearer CRON_SECRET. Manuel : appel direct au navigateur en dev.
 
 import { NextResponse } from 'next/server'
-import { runAgent, emitFinding, authCron, type AgentContext } from '@/lib/agents/runner'
+import { runAgent, emitFinding, authCron, agentEnVeille, type AgentContext } from '@/lib/agents/runner'
 import { sendPushToEmployeRateLimited } from '@/lib/push'
 import type { AgentId } from '@/lib/agents/types'
 
@@ -44,6 +44,15 @@ export async function GET(req: Request, { params }: { params: { poste: string } 
     return NextResponse.json({ ok: false, error: 'poste invalide (cuisine|serveur|bar|snack)' }, { status: 400 })
   }
   const agentId = POSTE_TO_AGENT[poste]
+
+  // Activité fermée → l'agent ne tourne pas. On répond 200 : un code d'erreur
+  // serait compté comme une panne par le monitoring des agents.
+  if (await agentEnVeille(agentId)) {
+    return NextResponse.json({
+      ok: true, skipped: true, agent: agentId,
+      raison: `activité fermée — agent en veille (à rallumer depuis /admin/etablissements)`,
+    })
+  }
 
   const result = await runAgent(agentId, async (ctx) => {
     // Récupère les employés pointés actuellement pour ce poste (pour push notif ciblée)
