@@ -7,8 +7,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import EtablissementsClient from './EtablissementsClient'
+import ActivationClient from './ActivationClient'
+import { getModules, getConfigLivraisonFournil } from '@/lib/activation/server'
 
-export const metadata = { title: 'Points de vente — Admin' }
+export const metadata = { title: 'Activités & points de vente — Admin' }
 export const dynamic = 'force-dynamic'
 
 export type Etablissement = {
@@ -31,11 +33,22 @@ export type Etablissement = {
 
 export default async function EtablissementsPage() {
   const supabase = await createClient()
-  const { data } = await supabase
-    .from('etablissements')
-    .select('id, nom, slug, type, categorie, inclus_ca_principal, mode_fiscal, adresse, telephone, email, siret, tva_intra, actif, is_principal, created_at')
-    .order('ordre', { ascending: true })
-    .order('is_principal', { ascending: false })
+  const [{ data }, modules, livraison] = await Promise.all([
+    supabase
+      .from('etablissements')
+      .select('id, nom, slug, type, categorie, inclus_ca_principal, mode_fiscal, adresse, telephone, email, siret, tva_intra, actif, is_principal, created_at')
+      .order('ordre', { ascending: true })
+      .order('is_principal', { ascending: false }),
+    getModules(),
+    getConfigLivraisonFournil(),
+  ])
 
-  return <EtablissementsClient initial={(data ?? []) as Etablissement[]} />
+  return (
+    <>
+      {/* Les interrupteurs d'abord : c'est le pilotage de l'ouverture. */}
+      <ActivationClient modules={modules} livraison={livraison} />
+      {/* Le registre des points de vente ensuite : configuration de fond. */}
+      <EtablissementsClient initial={(data ?? []) as Etablissement[]} />
+    </>
+  )
 }
