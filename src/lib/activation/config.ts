@@ -171,8 +171,23 @@ export const LIVRAISON_FOURNIL_DEFAUT: ConfigLivraisonFournil = {
   heureTournee: '10:00',
   minimumTtc: 0,
   fraisTtc: 0,
-  ouverture: '06:00',
-  fermeture: '20:00',
+  ouverture: '06:30',
+  fermeture: '19:30',
+}
+
+/** '06:30' → '6h30' ; '19:00' → '19h'. Formatage court à la française. */
+export function heureFr(hhmm: string): string {
+  const [h, m] = (hhmm ?? '').split(':')
+  if (!h) return ''
+  return m && m !== '00' ? `${Number(h)}h${m}` : `${Number(h)}h`
+}
+
+/** Nombre d'heures d'ouverture par jour, arrondi (pour les compteurs). */
+export function amplitudeHeures(ouverture: string, fermeture: string): number {
+  const [ho, mo] = ouverture.split(':').map(Number)
+  const [hf, mf] = fermeture.split(':').map(Number)
+  const min = (hf * 60 + mf) - (ho * 60 + mo)
+  return Math.max(0, Math.round(min / 60))
 }
 
 // ─── Calcul de la tournée de livraison ───────────────────────────────
@@ -247,16 +262,24 @@ export function heuresRetraitFournil(
   maintenant: Date,
   cfg: ConfigLivraisonFournil = LIVRAISON_FOURNIL_DEFAUT,
 ): Array<{ heure: string; iso: string }> {
-  const [hOuv] = cfg.ouverture.split(':').map(Number)
-  const [hFer] = cfg.fermeture.split(':').map(Number)
+  const [hOuv, mOuv] = cfg.ouverture.split(':').map(Number)
+  const [hFer, mFer] = cfg.fermeture.split(':').map(Number)
+
+  // Créneaux à l'heure ronde, bornés par l'amplitude réelle :
+  //   ouverture 6h30 → premier créneau à 7h (pas 6h, la boutique est fermée) ;
+  //   fermeture 19h30 → dernier créneau à 19h ;
+  //   fermeture pile 20h00 → dernier créneau à 19h (on ne fait pas venir
+  //   quelqu'un à l'heure exacte du rideau).
+  const premiere = (mOuv ?? 0) > 0 ? (hOuv ?? 6) + 1 : (hOuv ?? 6)
+  const derniere = (mFer ?? 0) > 0 ? (hFer ?? 19) : (hFer ?? 20) - 1
 
   const p = partiesParis(maintenant)
   const aujourdhui = `${p.annee}-${String(p.mois).padStart(2, '0')}-${String(p.jour).padStart(2, '0')}`
   // 30 min de préparation minimum sur la journée en cours.
-  const minHeure = dateISO === aujourdhui ? p.heures + (p.minutes > 30 ? 2 : 1) : hOuv
+  const minHeure = dateISO === aujourdhui ? p.heures + (p.minutes > 30 ? 2 : 1) : premiere
 
   const out: Array<{ heure: string; iso: string }> = []
-  for (let h = Math.max(hOuv ?? 6, minHeure); h < (hFer ?? 20); h++) {
+  for (let h = Math.max(premiere, minHeure); h <= derniere; h++) {
     const hh = `${String(h).padStart(2, '0')}:00`
     out.push({ heure: `${h}h`, iso: instantParis(dateISO, hh).toISOString() })
   }

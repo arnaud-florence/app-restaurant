@@ -49,6 +49,10 @@ export async function GET(req: Request) {
         etat: REPLI_FOURNIL_SEUL,
         teasers: [],
         tags: tagsActifs(REPLI_FOURNIL_SEUL),
+        horaires: {
+          ouverture: LIVRAISON_FOURNIL_DEFAUT.ouverture,
+          fermeture: LIVRAISON_FOURNIL_DEFAUT.fermeture,
+        },
         livraison: LIVRAISON_FOURNIL_DEFAUT,
         repli: true,
       }, { headers: { ...cors, ...cache } })
@@ -58,6 +62,10 @@ export async function GET(req: Request) {
 
     return Response.json({
       etat,
+      // Horaires d'ouverture du fournil — source unique pour tous les textes
+      // du site (accueil, carte, footer, Schema.org). Les changer dans l'admin
+      // suffit : plus aucun horaire n'est écrit en dur côté site.
+      horaires: { ouverture: livraison.ouverture, fermeture: livraison.fermeture },
       teasers: modules
         .filter(m => !m.actif && m.teaser)
         .map(m => ({
@@ -77,6 +85,10 @@ export async function GET(req: Request) {
       etat: REPLI_FOURNIL_SEUL,
       teasers: [],
       tags: tagsActifs(REPLI_FOURNIL_SEUL),
+      horaires: {
+        ouverture: LIVRAISON_FOURNIL_DEFAUT.ouverture,
+        fermeture: LIVRAISON_FOURNIL_DEFAUT.fermeture,
+      },
       livraison: LIVRAISON_FOURNIL_DEFAUT,
       repli: true,
     }, { headers: { ...cors, ...cache } })
