@@ -120,8 +120,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Push rate-limited | `sendPushToEmployeRateLimited()` plafonne 3 push/h/employé | 0084, 0085 |
 | Endpoint admin exec-sql | `/api/admin/exec-sql` + fonction PG `exec_sql()` security definer pour migrations automatiques | 0086 |
 | Module 27 enrichi | niveaux 1/2/3, simulations interactives, certifications par poste, badges, Q/R IA contextualisée | 0087 |
+| Carte réelle du Fournil | 60 produits des 13 affiches CasaTasia + photos découpées dans les affiches | 0113 |
 
-**Migrations actuelles : 0001 → 0111.**
+**Migrations actuelles : 0001 → 0113.**
 
 ### Activation par activité — « Fournil d'abord » (août 2026)
 
@@ -141,7 +142,7 @@ Le Fournil ouvre seul (juillet-septembre 2026) ; restaurant, bar, pizzeria, cham
 
 Réouverture fin octobre : `/admin/etablissements` → groupe Restaurant → **« Ouvrir le restaurant »**. Le site suit en moins d'une minute. Ne pas rejouer 0111, qui est la migration de fermeture.
 
-Tests : `node scripts/test-activation.mjs` (restaure toujours l'état initial), `node scripts/test-commande-statut.mjs`, `node scripts/test-fournil-circuit.mjs`.
+Tests : `node scripts/test-activation.mjs` (restaure toujours l'état initial), `node scripts/test-commande-statut.mjs`, `node scripts/test-fournil-circuit.mjs`, `node scripts/test-carte-fournil.mjs`.
 
 ### Clôture des ventes au comptoir
 
@@ -305,7 +306,17 @@ Multi-taux depuis la migration 0066 — source de vérité `src/lib/tva.ts` :
 | Plat / soft consommé sur place | 10 % |
 | Plat / soft à emporter | 5,5 % |
 
-Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0095) porte déjà les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries, 10 % snacking/boissons.
+Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0113) porte les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries/gourmandises, 10 % snacking, pizzas et boissons.
+
+⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
+
+### Carte du Fournil et photos produit
+
+Les 60 produits viennent des 13 affiches CasaTasia (migration 0113, prix TTC des affiches → HT en base). Les photos sont **découpées dans les affiches elles-mêmes** par `scripts/generer-photos-fournil.mjs` (sharp, rectangles en fractions de l'affiche) et déposées dans `public/produits/*.jpg`.
+
+`image_url` doit rester une **URL absolue** (`https://app-restaurant-livid.vercel.app/produits/<slug>.jpg`) : le site vitrine est un projet distinct qui consomme `/api/public/menu` en CORS, une URL relative y pointerait sur son propre domaine. Corollaire : **une photo n'est visible qu'après déploiement de l'app**.
+
+Vérification : `node scripts/test-carte-fournil.mjs` (compare la base aux prix des affiches, la TVA par famille, et l'existence réelle de chaque fichier photo).
 
 ### Realtime obligatoire
 
@@ -475,6 +486,7 @@ PORT=3000 node scripts/test-securite.mjs         # Module 28
 node scripts/test-commande-statut.mjs            # règle de statut + clôture comptoir (pur, sans base)
 node scripts/test-activation.mjs                 # interrupteurs par activité (restaure l'état initial)
 node scripts/test-fournil-circuit.mjs            # circuit de vente Fournil bout en bout
+node scripts/test-carte-fournil.mjs              # carte réelle (60 produits, prix affiches, photos)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
