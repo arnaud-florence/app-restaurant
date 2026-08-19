@@ -26,6 +26,7 @@ import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
 import { getClientIp } from '@/lib/public-api/rate-limit'
 import { getActivation, getConfigLivraisonFournil } from '@/lib/activation/server'
 import { tourneePour, communeLivrable } from '@/lib/activation/config'
+import { tauxTvaVente } from '@/lib/tva'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -130,8 +131,10 @@ export async function POST(req: Request) {
   const ventilationTva: Record<string, number> = {}
   const articlesEnrichis = p.articles.map(a => {
     const r = recetteMap.get(a.recette_id)!
-    // Emporter (ONLINE) → TVA 5,5% (sauf alcool 20%)
-    const tvaRate = r.contient_alcool ? 20 : 5.5
+    // Taux porté par le produit (cf. tauxTvaVente) — le même que /api/public/menu
+    // a servi au client et que le comptoir applique en boutique. Un taux figé
+    // ici ferait payer autre chose que le prix annoncé.
+    const tvaRate = tauxTvaVente(r, 'emporter')
     const prixHT = Number(r.prix_vente_ht)
     const prixTVA = prixHT * (tvaRate / 100)
     const prixTTC = prixHT + prixTVA
@@ -344,19 +347,38 @@ export async function POST(req: Request) {
   }
 
   // Hook notif interne (best-effort)
+  //
+  // Destinataires : TOUS les employés actifs. L'ancienne liste de postes
+  // (manager, cuisine, second, pizzaiolo, barman…) était celle du restaurant :
+  // au Fournil, les personnes au comptoir sont en poste « polyvalent » et ne
+  // recevaient donc rien. Une commande web qui n'alerte personne est pire
+  // qu'une absence de commande — le client attend un pain que personne ne
+  // prépare. Tant que l'équipe tient dans une salle, prévenir tout le monde est
+  // la bonne réponse ; à segmenter le jour où l'effectif le justifie.
+  //
+  // url_action : l'écran où la commande est réellement visible. `/emporter` est
+  // l'écran du restaurant, en veille jusqu'à sa réouverture — y envoyer l'équipe
+  // du Fournil la menait sur une page éteinte.
   try {
+    const tags = new Set(articlesEnrichis.map(a => a.tag_destination))
+    const urlAction = tags.size === 1 && tags.has('FOURNIL') ? '/comptoir/fournil' : '/emporter'
+
     const { data: destinataires } = await sb.from('employes')
       .select('id')
-      .in('poste', ['manager', 'cuisine', 'cuisinier', 'second', 'pizzaiolo', 'barman'])
       .eq('actif', true)
     if (destinataires && destinataires.length > 0) {
+      const lignes = articlesEnrichis
+        .map(a => `${a.quantite}× ${recetteMap.get(a.recette_id)?.nom ?? '?'}`)
+        .join(', ')
       await sb.from('notifications').insert(
         destinataires.map(e => ({
           destinataire_employe_id: e.id,
           type: 'commande_online_recue',
-          titre: '📦 Nouvelle commande ONLINE',
-          message: `Commande #${cmd.numero} reçue depuis le site web`,
-          url_action: '/emporter',
+          titre: `🌐 Commande web #${cmd.numero}`,
+          // Le contenu dans le message : l'équipe sait quoi préparer sans avoir
+          // à ouvrir un écran, ce qui compte quand la notif arrive au four.
+          message: `${lignes} — ${Number(cmd.montant_total_ttc ?? totalTTC).toFixed(2)} €`,
+          url_action: urlAction,
         }))
       )
     }

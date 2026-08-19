@@ -12,7 +12,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
-import { tauxTvaArticle } from '@/lib/tva'
+import { tauxTvaVente } from '@/lib/tva'
 import { getActivation } from '@/lib/activation/server'
 import { tagsActifs } from '@/lib/activation/config'
 
@@ -92,9 +92,10 @@ export async function GET(req: Request) {
       categorie: r.categorie,
       tag: r.tag_destination,
       description: r.description ?? '',
-      // TTC aligné sur la facturation réelle (commande en ligne = emporter :
-      // 5,5 % plat/soft, 20 % alcool). Évite l'écart prix affiché ≠ prix payé.
-      prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + tauxTvaArticle(r.contient_alcool, 'emporter') / 100) * 100) / 100,
+      // TTC au taux porté par le produit (cf. tauxTvaVente) : c'est le prix du
+      // panneau en boutique. La route de commande applique le même taux, donc
+      // prix affiché = prix payé, et le site est aligné sur le comptoir.
+      prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + tauxTvaVente(r, 'emporter') / 100) * 100) / 100,
       contient_alcool: r.contient_alcool,
       vendable_online: r.vendable_online,
       image_url: r.image_url,

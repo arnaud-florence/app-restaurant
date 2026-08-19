@@ -26,6 +26,31 @@ export function tauxTvaArticle(
   return 5.5
 }
 
+/**
+ * Taux applicable à la vente d'un produit du CATALOGUE (site, click & collect,
+ * comptoir) — par opposition à `tauxTvaArticle`, qui ne connaît que le mode de
+ * consommation.
+ *
+ * Le taux porté par le produit (`recettes.tva`) prime, parce qu'il vient de la
+ * carte réellement affichée en boutique : la carte du Fournil (migration 0113)
+ * mélange 5,5 % (pains, viennoiseries, pâtisseries, gourmandises) et 10 %
+ * (snacking, pizzas, boissons). `tauxTvaArticle(false, 'emporter')` renverrait
+ * 5,5 % pour tout, ce qui ferait payer au client autre chose que le prix du
+ * panneau — et sous-déclarerait la TVA sur la moitié de la carte.
+ *
+ * L'alcool reste à 20 % quoi qu'il arrive : c'est la loi, pas une donnée de
+ * carte. Sans taux en base, on retombe sur la règle sur place / à emporter.
+ */
+export function tauxTvaVente(
+  produit: { tva?: number | string | null; contient_alcool?: boolean | null },
+  consommation: Consommation,
+): TauxTva {
+  if (produit.contient_alcool) return 20
+  const porte = Number(produit.tva)
+  if (porte === 5.5 || porte === 10 || porte === 20) return porte
+  return tauxTvaArticle(false, consommation)
+}
+
 /** Calcule HT, TVA €, TTC pour une quantité × prix_unitaire_ht donné. */
 export function calculerLigneTva(
   quantite: number,
