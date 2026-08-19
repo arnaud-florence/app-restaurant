@@ -392,7 +392,9 @@ fmtPct(n)   // 12,3 %
 
 ## 8. Gotchas connus
 
-- **Déploiement prod** : `https://app-restaurant-livid.vercel.app` (Vercel, repo public `arnaud-florence/app-restaurant`, branche `main` auto-deploy). Toutes les env vars critiques (Supabase, Anthropic, CRON_SECRET, VAPID, Resend) sont configurées côté Vercel. Manque : `OPENWEATHER_API_KEY` (agent Météo + Module 22 ne tourneront pas sans).
+- **Déploiement prod** : `https://app-restaurant-livid.vercel.app` (Vercel, repo public `arnaud-florence/app-restaurant`, branche `main` auto-deploy).
+
+- **Domaine public : `casatasia.fr`** (OVH, titulaire CASATASIA, compte `xj9701-ovh`, renouvellement auto en août 2027). Il sert le **site vitrine**, projet Vercel `site-restaurant` — *pas* cette app. Zone DNS chez OVH : `A @ → 216.198.79.1` et `CNAME www → f0ab09f3a0e2f92c.vercel-dns-017.com.` ; `www` redirige en 308 vers l'apex, qui reste l'adresse canonique (c'est elle qu'on imprime). Les 3 MX `mx{1,2,3}.mail.ovh.net` sont ceux de la boîte incluse avec le domaine : **ne pas les supprimer**, sinon la messagerie tombe. Le back-office n'a pas encore de sous-domaine ; s'il en reçoit un (`app.casatasia.fr`), penser à mettre à jour `NEXT_PUBLIC_SITE_URL` et la base des `image_url` en base. Toutes les env vars critiques (Supabase, Anthropic, CRON_SECRET, VAPID, Resend) sont configurées côté Vercel. Manque : `OPENWEATHER_API_KEY` (agent Météo + Module 22 ne tourneront pas sans).
 
 - **Auth Supabase : `getUser()` doit OBLIGATOIREMENT être en try/catch côté serveur**. Quand le refresh token est expiré (cookies stales, ce qui arrive après un déploiement, un reset, ou plusieurs heures), `supabase.auth.getUser()` throw `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` (code `refresh_token_not_found`). Sans try/catch, l'erreur remonte dans le RSC qui crash → page d'erreur Next générique. **Fix appliqué dans `src/lib/auth.ts:getProfile()` et `src/lib/supabase/middleware.ts:updateSession()`** (commit 8f281ec). Si tu ajoutes un nouveau wrapper auth, applique le même pattern.
 
