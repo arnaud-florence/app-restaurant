@@ -31,6 +31,7 @@ export default function TicketCommande({
   subtitle,
   compact = false,
   cb = false,
+  permetRemise = false,
 }: {
   commande: CommandeService
   articles: CommandeService['articles']
@@ -40,6 +41,10 @@ export default function TicketCommande({
   subtitle?: ReactNode
   compact?: boolean
   cb?: boolean
+  /** Affiche « Remis au client » quand tout est prêt. Réservé aux postes qui
+   *  remettent eux-mêmes la commande (comptoir du Fournil) : en cuisine ou au
+   *  bar, c'est le serveur qui clôt, pas la brigade. */
+  permetRemise?: boolean
 }) {
   const min = statutMinuteur(commande.created_at, now)
   const minSty = STATUT_MINUTEUR_STYLE[min]
@@ -230,6 +235,24 @@ export default function TicketCommande({
               )
             })}
           </ul>
+        </div>
+      )}
+
+      {/* Remise au client : dernier geste d'une commande web au Fournil.
+          Sans lui, le ticket reste bloqué à « prêt » — la chaîne d'états
+          s'arrête à 'pret' et plus aucun bouton n'apparaît. Marquer tout
+          'servi' clôt la commande en 'encaisse' (cf. estRetraitFournil). */}
+      {tousPret && permetRemise && (
+        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-950/50">
+          <button
+            onClick={() => avancerTous('servi')}
+            className={cn(
+              'w-full rounded-md font-bold uppercase tracking-wider transition-colors active:scale-[0.98] bg-zinc-100 hover:bg-white text-zinc-900',
+              compact ? 'min-h-[44px] text-sm' : 'min-h-[56px] text-base',
+            )}
+          >
+            📦 Remis au client
+          </button>
         </div>
       )}
 

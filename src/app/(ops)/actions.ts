@@ -9,7 +9,7 @@ import { tauxTvaArticle, calculerLigneTva, agregerVentilation, type Consommation
 import { logActivite } from '@/lib/operateur'
 import { getOrCreateSessionCaisseId } from '@/lib/caisse'
 import {
-  statutCommandeCible, estVenteComptoirDirecte,
+  statutCommandeCible, estRemiseDirecte,
   type StatutArticleAgrege,
 } from '@/lib/commande-statut'
 
@@ -92,7 +92,7 @@ export async function changerStatutArticle(input: unknown) {
   if (article?.commande_id) {
     const { data: tous } = await supabase
       .from('commande_articles')
-      .select('statut')
+      .select('statut, tag_destination')
       .eq('commande_id', article.commande_id)
 
     const statuts = (tous ?? []).map(a => a.statut as StatutArticleAgrege)
@@ -100,7 +100,7 @@ export async function changerStatutArticle(input: unknown) {
     // Ne jamais downgrader depuis 'encaisse' ou 'annule'
     const { data: cmd } = await supabase
       .from('commandes')
-      .select('statut, source, numero_table, ardoise_nom, mode_paiement')
+      .select('statut, source, numero_table, ardoise_nom, mode_paiement, mode_retrait')
       .eq('id', article.commande_id)
       .single()
 
@@ -114,20 +114,26 @@ export async function changerStatutArticle(input: unknown) {
     // Ce n'est pas un encaissement fiscal : aucune ligne dans
     // `paiements_caisse`, la caisse agréée reste la source de vérité et le
     // connecteur rapprochera ses tickets de ces commandes.
+    // Le retrait d'une commande web au Fournil se clôture de la même façon :
+    // le client règle au comptoir en récupérant son sac. D'où mode_retrait
+    // (pour écarter les livraisons) et les tags des articles (pour distinguer
+    // une commande Fournil d'une commande du restaurant).
     const ctx = {
       source: (cmd?.source as string) ?? null,
       numero_table: (cmd?.numero_table as string) ?? null,
       ardoise_nom: (cmd?.ardoise_nom as string) ?? null,
+      mode_retrait: (cmd?.mode_retrait as string) ?? null,
+      tags: (tous ?? []).map(a => a.tag_destination as string),
     }
     const statutCible = statutCommandeCible(statuts, ctx) as StatutCommande
-    const venteComptoir = estVenteComptoirDirecte(ctx)
+    const remiseDirecte = estRemiseDirecte(ctx)
 
     if (cmd && cmd.statut !== 'encaisse' && cmd.statut !== 'annule' && cmd.statut !== statutCible) {
       await supabase
         .from('commandes')
         .update({
           statut: statutCible,
-          ...(statutCible === 'encaisse' && venteComptoir
+          ...(statutCible === 'encaisse' && remiseDirecte
             ? { mode_paiement: cmd.mode_paiement ?? 'caisse_agreee' }
             : {}),
         })

@@ -20,9 +20,23 @@ function estVenteComptoirDirecte(cmd) {
   return cmd.source === 'COMPTOIR' && !cmd.numero_table && !cmd.ardoise_nom?.trim()
 }
 
+// Click & collect du Fournil : réglé au comptoir au moment du retrait.
+// Exclut la livraison, qui a son propre circuit via le livreur.
+function estRetraitFournil(cmd) {
+  const tags = cmd.tags ?? []
+  return cmd.source === 'ONLINE'
+    && cmd.mode_retrait !== 'livraison'
+    && tags.length > 0
+    && tags.every(t => t === 'FOURNIL')
+}
+
+function estRemiseDirecte(cmd) {
+  return estVenteComptoirDirecte(cmd) || estRetraitFournil(cmd)
+}
+
 function statutCommandeCible(statutsArticles, cmd) {
   const agrege = agregerStatutsArticles(statutsArticles)
-  if (agrege === 'servi' && estVenteComptoirDirecte(cmd)) return 'encaisse'
+  if (agrege === 'servi' && estRemiseDirecte(cmd)) return 'encaisse'
   return agrege
 }
 
@@ -59,6 +73,25 @@ const CAS = [
   ['table servie → reste servi',           ['servi'],                           TABLE,    'servi'],
   ['comptoir AVEC table → reste servi',    ['servi'],
     { source: 'COMPTOIR', numero_table: '4', ardoise_nom: null },                         'servi'],
+
+  // ── Retrait d'une commande web au Fournil ──
+  // Le client règle au comptoir en récupérant son sac : une fois remis, la
+  // transaction est finie. Sans cette clôture, la commande resterait à 'servi'
+  // et son CA n'apparaîtrait dans aucun écran (tous filtrent sur 'encaisse').
+  ['retrait fournil servi → encaisse', ['servi'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: ['FOURNIL'] },                         'encaisse'],
+  ['retrait fournil 3 articles servis → encaisse', ['servi','servi','servi'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: ['FOURNIL','FOURNIL','FOURNIL'] },     'encaisse'],
+  ['retrait fournil partiel → pas de clôture', ['servi','pret'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: ['FOURNIL','FOURNIL'] },               'pret'],
+  ['LIVRAISON fournil → reste servi (circuit livreur)', ['servi'],
+    { ...ONLINE, mode_retrait: 'livraison', tags: ['FOURNIL'] },                          'servi'],
+  ['online tags mixtes → reste servi', ['servi'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: ['FOURNIL','PIZZA'] },                 'servi'],
+  ['online sans tag connu → reste servi', ['servi'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: [] },                                  'servi'],
+  ['online restaurant (SNACKING) → reste servi', ['servi'],
+    { ...ONLINE, mode_retrait: 'a_emporter', tags: ['SNACKING'] },                        'servi'],
 ]
 
 let ok = 0, ko = 0

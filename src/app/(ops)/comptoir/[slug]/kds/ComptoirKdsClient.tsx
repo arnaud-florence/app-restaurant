@@ -123,6 +123,7 @@ export default function ComptoirKdsClient({ config, initial }: { config: Comptoi
                 headerTone="plain"
                 subtitle={t.commande.numero}
                 cb={cb}
+                permetRemise
               />
             ))}
           </div>
