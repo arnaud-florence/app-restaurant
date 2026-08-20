@@ -48,7 +48,7 @@ const AFFICHES = {
   'Pizza ronde Reine': 3.90, 'Pizza ronde poulet-pesto': 3.90, 'Pizza ronde chèvre-miel': 3.90,
   'Eau plate 50 cl': 1.00, 'Eau gazeuse 50 cl': 1.50, 'Coca-Cola 33 cl': 1.80,
   'Coca-Cola Zéro 33 cl': 1.80, 'Ice Tea 33 cl': 1.80, 'Orangina 33 cl': 1.80,
-  "Jus d'orange 25 cl": 1.80, 'Jus de pomme 25 cl': 1.80,
+  "Jus d'orange 33 cl": 1.80, 'Jus de pomme 33 cl': 1.80,
   'Café expresso': 1.20, 'Café allongé': 1.20, 'Café noisette': 1.50,
   'Cappuccino': 2.50, 'Chocolat chaud': 2.50, 'Thé': 2.00,
   'Formule salade + boisson': 5.80, 'Formule sandwich ou panini + boisson': 6.20,
@@ -73,18 +73,40 @@ const { data: carte, error } = await sb.from('recettes')
 if (error) { console.error('Lecture des recettes impossible :', error.message); process.exit(1) }
 const actifs = carte.filter(r => r.actif)
 
+// Produits absents des affiches mais réellement vendus, découverts dans les
+// tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
+// n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
+const HORS_AFFICHE = new Set([
+  'Oasis 33 cl', 'Fanta 33 cl', 'Coca-Cola Cherry 33 cl', 'Ciao 33 cl',
+  'Red Bull 25 cl', 'Salade',
+  'Formule — sandwich ou panini', 'Formule — boisson', 'Formule — dessert',
+  'Formule — croissant ou pain au chocolat', 'Formule — expresso ou allongé',
+])
+
+// Retirés du click & collect par la 0115 : une tasse ne voyage pas, et une
+// formule « salade + boisson » ne dit pas laquelle.
+const HORS_LIGNE_VOULU = new Set([
+  'Café expresso', 'Café allongé', 'Café noisette', 'Cappuccino',
+  'Chocolat chaud', 'Thé',
+  'Formule salade + boisson', 'Formule sandwich ou panini + boisson',
+  'Formule salade + boisson + dessert', 'Formule sandwich ou panini + boisson + dessert',
+  'Formule Express', 'Formule Douceur chaude',
+  'Formule Petit-déjeuner complet', 'Formule Tartine',
+  ...HORS_AFFICHE,
+])
+
 await step('périmètre de la carte', async () => {
-  const attendu = Object.keys(AFFICHES).length
-  if (actifs.length === attendu) ok(`${attendu} produits actifs`)
-  else ko('nombre de produits', `${actifs.length} en base, ${attendu} sur les affiches`)
+  const attendu = Object.keys(AFFICHES).length + HORS_AFFICHE.size
+  if (actifs.length === attendu) ok(`${actifs.length} produits actifs (${Object.keys(AFFICHES).length} affichés + ${HORS_AFFICHE.size} connus de la caisse)`)
+  else ko('nombre de produits', `${actifs.length} en base, ${attendu} attendus`)
 
   const enBase = new Set(actifs.map(r => r.nom))
   const manquants = Object.keys(AFFICHES).filter(n => !enBase.has(n))
-  const enTrop = [...enBase].filter(n => !(n in AFFICHES))
+  const enTrop = [...enBase].filter(n => !(n in AFFICHES) && !HORS_AFFICHE.has(n))
   if (manquants.length === 0) ok('aucun produit d’affiche manquant')
   else ko('produits manquants', manquants.join(', '))
-  if (enTrop.length === 0) ok('aucun produit hors affiches')
-  else ko('produits hors affiches', enTrop.join(', '))
+  if (enTrop.length === 0) ok('aucun produit inconnu (ni affiche, ni caisse)')
+  else ko('produits inconnus', enTrop.join(', '))
 })
 
 await step('prix TTC conformes aux affiches', async () => {
@@ -101,6 +123,10 @@ await step('prix TTC conformes aux affiches', async () => {
 
 await step('TVA par famille (vente à emporter)', async () => {
   const mauvais = actifs.filter(r => {
+    // Un composant de formule suit le taux de ce qu'il contient, pas celui de
+    // sa catégorie : « croissant ou pain au chocolat » reste de la
+    // viennoiserie à 5,5 %, et c'est le taux que SumUp facture.
+    if (HORS_AFFICHE.has(r.nom)) return false
     const attendue = TVA_REDUITE.has(r.categorie) ? 5.5 : 10
     return Number(r.tva) !== attendue
   })
@@ -109,8 +135,9 @@ await step('TVA par famille (vente à emporter)', async () => {
 })
 
 await step('photos', async () => {
-  const sansPhoto = actifs.filter(r => !r.image_url)
-  if (sansPhoto.length === 0) ok('tous les produits ont une photo')
+  const surAffiche = actifs.filter(r => !HORS_AFFICHE.has(r.nom))
+  const sansPhoto = surAffiche.filter(r => !r.image_url)
+  if (sansPhoto.length === 0) ok(`les ${surAffiche.length} produits d’affiche ont leur photo`)
   else ko('produits sans photo', sansPhoto.map(r => r.nom).join(', '))
 
   const relatives = actifs.filter(r => r.image_url && !r.image_url.startsWith('http'))
@@ -124,8 +151,11 @@ await step('photos', async () => {
   if (absents.length === 0) ok('chaque photo existe dans public/produits/')
   else ko('fichiers photo manquants', absents.map(r => r.nom).join(', '))
 
+  // On ne compte que les vraies URL : 11 produits sans photo partagent `null`,
+  // ce qui n'est pas une photo réutilisée.
   const doublons = Object.entries(
-    actifs.reduce((a, r) => { a[r.image_url] = (a[r.image_url] ?? 0) + 1; return a }, {}),
+    actifs.filter(r => r.image_url)
+      .reduce((a, r) => { a[r.image_url] = (a[r.image_url] ?? 0) + 1; return a }, {}),
   ).filter(([, n]) => n > 1)
   if (doublons.length === 0) ok('aucune photo réutilisée sur deux produits')
   else ko('photos partagées', doublons.map(([u, n]) => `${u.split('/').pop()} ×${n}`).join(', '))
@@ -133,8 +163,10 @@ await step('photos', async () => {
 
 await step('mise en vente', async () => {
   const horsLigne = actifs.filter(r => !r.vendable_online)
-  if (horsLigne.length === 0) ok('les 60 produits sont commandables en ligne')
-  else ko('produits non vendables en ligne', horsLigne.map(r => r.nom).join(', '))
+  const inattendus = horsLigne.filter(r => !HORS_LIGNE_VOULU.has(r.nom))
+  const enLigne = actifs.length - horsLigne.length
+  if (inattendus.length === 0) ok(`${enLigne} produits commandables en ligne, ${horsLigne.length} au comptoir seulement (voulu)`)
+  else ko('produits retirés de la vente en ligne sans raison', inattendus.map(r => r.nom).join(', '))
 
   const { data: etab } = await sb.from('etablissements').select('id').eq('slug', 'fournil').maybeSingle()
   const orphelins = actifs.filter(r => r.etablissement_id !== etab?.id)
