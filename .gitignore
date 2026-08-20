@@ -54,5 +54,3 @@ sql/setup-pgcron-agents.sql
 # Résultats de campagne E2E (screenshots + rapports JSON, artefacts locaux)
 /e2e-results/
 
-# Contient CRON_SECRET en clair une fois complété
-sql/setup-pgcron-sumup.sql
