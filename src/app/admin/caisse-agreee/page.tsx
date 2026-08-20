@@ -5,6 +5,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fmtPrix } from '@/lib/foodCost'
+import SyncSumUpClient from './SyncSumUpClient'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Connecteur caisse agréée' }
@@ -87,6 +88,12 @@ export default async function CaisseAgreeePage() {
             <p className="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">Rapprochés</p>
             <p className="text-2xl font-black tabular-nums mt-1 text-zinc-900">{rapproches}<span className="text-sm text-zinc-400">/{rows.length}</span></p>
           </div>
+        </div>
+      )}
+
+      {!tableManquante && (
+        <div className="mb-6">
+          <SyncSumUpClient />
         </div>
       )}
 
