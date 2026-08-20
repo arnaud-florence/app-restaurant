@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     for (const e of etabs ?? []) slugToId.set(String(e.slug), String(e.id))
   } catch { /* table absente → ignore */ }
 
-  let recus = 0, rapproches = 0, sansCommande = 0
+  let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
   const erreurs: { ticket: string; error: string }[] = []
 
   for (const l of encaissements) {
@@ -97,7 +97,47 @@ export async function POST(req: Request) {
           }
         }
       }
-      const statutRappr = commandeId ? 'rapproche' : (l.commande_numero ? 'sans_commande' : 'non_rapproche')
+      // 1 bis. Ticket sans commande dans l'app (le cas normal au comptoir) :
+      // on le matérialise en commande 'encaisse' de source CAISSE. Sans ça, le
+      // ticket ne vivrait que dans le miroir `encaissements_externes`, que
+      // AUCUN calcul de CA ne lit — dashboard, pilotage, finances et agents
+      // filtrent tous sur `commandes.statut = 'encaisse'`.
+      //
+      // Idempotence : si ce ticket a déjà été ingéré, le miroir porte son
+      // commande_id ; on le réutilise au lieu d'en créer un second.
+      if (!commandeId) {
+        const { data: dejaVu } = await sb.from('encaissements_externes')
+          .select('commande_id')
+          .eq('source_caisse', source_caisse)
+          .eq('ticket_externe', l.ticket_externe)
+          .maybeSingle()
+
+        if (dejaVu?.commande_id) {
+          commandeId = String(dejaVu.commande_id)
+        } else {
+          const encaisseLe = l.encaisse_at ?? new Date().toISOString()
+          const { data: synth, error: eSynth } = await sb.from('commandes').insert({
+            numero: `CAI-${source_caisse.slice(0, 6).toUpperCase()}-${l.ticket_externe}`.slice(0, 60),
+            source: 'CAISSE',
+            statut: 'encaisse',
+            montant_total_ttc: l.montant_ttc,
+            montant_total_ht: l.montant_ht ?? null,
+            tva_total: l.tva_total ?? null,
+            ventilation_tva: l.ventilation_tva ?? {},
+            mode_paiement: l.mode_paiement ?? 'caisse_agreee',
+            etablissement_id: l.etablissement_slug ? (slugToId.get(l.etablissement_slug) ?? null) : null,
+            created_at: encaisseLe,
+            notes: `Ticket ${source_caisse} ${l.ticket_externe} — encaissé hors app`,
+          }).select('id').maybeSingle()
+
+          if (eSynth) { erreurs.push({ ticket: l.ticket_externe, error: eSynth.message }); continue }
+          if (synth) { commandeId = String(synth.id); creees++ }
+        }
+      }
+
+      const statutRappr = commandeId
+        ? (l.commande_numero ? 'rapproche' : 'non_rapproche')
+        : 'sans_commande'
 
       // 2. Miroir local (idempotent)
       const { error } = await sb.from('encaissements_externes').upsert({
@@ -129,6 +169,8 @@ export async function POST(req: Request) {
     source_caisse,
     recus,
     rapproches,
+    // Tickets matérialisés en commande 'CAISSE' pour entrer dans le CA.
+    commandes_creees: creees,
     sans_commande: sansCommande,
     erreurs,
   })
