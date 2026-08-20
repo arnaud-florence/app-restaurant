@@ -370,7 +370,11 @@ export async function POST(req: Request) {
       const lignes = articlesEnrichis
         .map(a => `${a.quantite}× ${recetteMap.get(a.recette_id)?.nom ?? '?'}`)
         .join(', ')
-      await sb.from('notifications').insert(
+      // On LIT l'erreur : supabase-js la retourne au lieu de la lever, donc le
+      // try/catch ci-dessus n'attrape rien. C'est ainsi qu'un type refusé par
+      // le check de la 0069 a fait échouer toutes les notifications de
+      // commande web pendant des mois, sans une ligne de log.
+      const { error: eNotif } = await sb.from('notifications').insert(
         destinataires.map(e => ({
           destinataire_employe_id: e.id,
           type: 'commande_online_recue',
@@ -381,6 +385,7 @@ export async function POST(req: Request) {
           url_action: urlAction,
         }))
       )
+      if (eNotif) console.error('[notif-online-public] insert refusé :', eNotif.message)
     }
   } catch (e) {
     console.error('[notif-online-public] erreur :', e)
