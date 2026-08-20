@@ -356,12 +356,14 @@ export async function POST(req: Request) {
   // prépare. Tant que l'équipe tient dans une salle, prévenir tout le monde est
   // la bonne réponse ; à segmenter le jour où l'effectif le justifie.
   //
-  // url_action : l'écran où la commande est réellement visible. `/emporter` est
-  // l'écran du restaurant, en veille jusqu'à sa réouverture — y envoyer l'équipe
-  // du Fournil la menait sur une page éteinte.
+  // url_action : l'écran où la commande est réellement visible, c'est-à-dire le
+  // KDS (« Prépa ») — /comptoir/fournil est l'écran de VENTE, il liste les
+  // produits à encaisser et ne montre aucune commande web. `/emporter`, lui,
+  // est l'écran du restaurant, en veille jusqu'à sa réouverture. Dans les deux
+  // cas l'équipe arrivait sur une page où sa commande n'était pas.
   try {
     const tags = new Set(articlesEnrichis.map(a => a.tag_destination))
-    const urlAction = tags.size === 1 && tags.has('FOURNIL') ? '/comptoir/fournil' : '/emporter'
+    const urlAction = tags.size === 1 && tags.has('FOURNIL') ? '/comptoir/fournil/kds' : '/emporter'
 
     const { data: destinataires } = await sb.from('employes')
       .select('id')
