@@ -15,6 +15,8 @@ import { ArrowRight, AlertTriangle, Printer, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AppMap, { type MapCategory, type Badge } from '@/components/control/AppMap'
 import PulseStrip, { type PulseTile } from '@/components/control/PulseStrip'
+import BusinessHeader from '@/components/control/BusinessHeader'
+import { getBusinessLive } from '@/lib/business-live'
 import { lireBriefDuJour } from '@/lib/co-gerant/brief'
 
 export const dynamic = 'force-dynamic'
@@ -69,6 +71,13 @@ export default async function CatIndexPage() {
   ])
 
   const caJour = (caJourRes.data ?? []).reduce((s, c) => s + Number(c.montant_total_ttc ?? 0), 0)
+
+  // Bandeau business : réservé au gérant, et jamais bloquant. Si la lecture
+  // échoue, l'accueil s'affiche sans lui plutôt que de tomber en erreur — on
+  // n'empêche pas d'ouvrir le service parce qu'un chiffre manque.
+  const business = isManager
+    ? await getBusinessLive().catch(() => null)
+    : null
   const nbEnCours = enCoursRes.count ?? 0
   const tablesData = tablesRes.data ?? []
   const nbTables = tablesData.length
@@ -201,6 +210,11 @@ export default async function CatIndexPage() {
             )}
           </Link>
         )}
+
+        {/* ─── ⓪ LE BUSINESS ─────────────────────────────────────── */}
+        {/* Avant l'opérationnel : en ouvrant l'app, la première question d'un
+            gérant est « où j'en suis », pas « qu'est-ce qui tourne ». */}
+        {isManager && business && <BusinessHeader b={business} />}
 
         {/* ─── ① LE POULS ────────────────────────────────────────── */}
         <PulseStrip tiles={tiles} />
