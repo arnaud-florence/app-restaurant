@@ -107,6 +107,7 @@ export async function POST(req: Request) {
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
   let lignesPosees = 0
   const inconnus = new Map<string, number>()
+  const crees: string[] = []
   const erreurs: { ticket: string; error: string }[] = []
 
   for (const l of encaissements) {
@@ -177,7 +178,40 @@ export async function POST(req: Request) {
             const aInserer = []
             for (const p of l.produits ?? []) {
               const cle = norm(p.nom_caisse)
-              const rec = parCaisse.get(cle) ?? parNom.get(cle)
+              let rec = parCaisse.get(cle) ?? parNom.get(cle)
+
+              // Libellé jamais vu : on crée sa fiche à la volée. SumUp n'expose
+              // aucune API catalogue (vérifié : Checkouts, Readers, Customers,
+              // Transactions, Payouts, Receipts, Members, Memberships, Roles,
+              // Merchants — rien sur les produits). Le ticket est donc la seule
+              // source, et c'est elle qui construit le miroir.
+              //
+              // Sans ça, un produit ajouté dans SumUp le matin vend toute la
+              // journée sans jamais apparaître dans le top des ventes ni dans
+              // les marges — son CA est compté, mais rattaché à rien.
+              if (!rec) {
+                const taux = p.tva_taux ?? 10
+                const { data: neuf } = await sb.from('recettes').insert({
+                  nom: p.nom_caisse,
+                  nom_caisse: p.nom_caisse,
+                  categorie: 'À classer',
+                  tag_destination: 'FOURNIL',
+                  prix_vente_ht: Math.round((p.prix_unitaire_ttc / (1 + taux / 100)) * 10000) / 10000,
+                  tva: taux,
+                  contient_alcool: false,
+                  vendable_online: false,   // pas de photo ni de description : hors vitrine
+                  actif: true,
+                  cree_par_caisse: true,
+                  etablissement_id: l.etablissement_slug ? (slugToId.get(l.etablissement_slug) ?? null) : null,
+                }).select('id, tag_destination').maybeSingle()
+
+                if (neuf) {
+                  rec = { id: String(neuf.id), tag: String(neuf.tag_destination ?? 'FOURNIL') }
+                  parCaisse.set(cle, rec)   // les lignes suivantes du même lot en profitent
+                  crees.push(p.nom_caisse)
+                }
+              }
+
               if (!rec) { inconnus.set(p.nom_caisse, (inconnus.get(p.nom_caisse) ?? 0) + 1); continue }
               const ttc = p.prix_unitaire_ttc
               const taux = p.tva_taux ?? 10
@@ -243,6 +277,9 @@ export async function POST(req: Request) {
     // mais ni le stock ni la marge ne les connaîtront tant qu'on ne les a pas
     // rattachés (colonne `recettes.nom_caisse`).
     produits_inconnus: Object.fromEntries(inconnus),
+    // Fiches créées à la volée depuis un libellé de caisse jamais vu.
+    // À relire dans /admin/recettes : catégorie « À classer », sans photo.
+    produits_crees: crees,
     sans_commande: sansCommande,
     erreurs,
   })

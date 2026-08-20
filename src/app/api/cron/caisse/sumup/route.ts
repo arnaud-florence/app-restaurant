@@ -22,6 +22,7 @@
 //     ci-dessous — une liste, puis un appel par ticket.
 
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -104,6 +105,31 @@ async function handler(req: Request) {
     .filter(t => typeof t.amount === 'number' && (t.amount as number) > 0)
     .filter(t => t.transaction_code ?? t.id)
 
+  // On écarte d'emblée les tickets DÉJÀ importés. Sans ce filtre, chaque
+  // passage refait le détail de toute la journée : à 70 tickets et une synchro
+  // toutes les 10 minutes, cela représentait ~10 000 appels quotidiens à SumUp
+  // pour ne rien apprendre. C'est ce gaspillage qui interdisait d'accélérer la
+  // cadence — une fois retiré, un passage ne coûte plus qu'un appel de liste
+  // plus les tickets réellement nouveaux.
+  const sb = await createClient()
+  const codes = abouties.map(t => String(t.transaction_code ?? t.id))
+  const dejaVus = new Set<string>()
+  if (codes.length > 0) {
+    const { data: connus } = await sb.from('encaissements_externes')
+      .select('ticket_externe')
+      .eq('source_caisse', 'sumup')
+      .in('ticket_externe', codes)
+    for (const c of connus ?? []) dejaVus.add(String(c.ticket_externe))
+  }
+  const nouveaux = abouties.filter(t => !dejaVus.has(String(t.transaction_code ?? t.id)))
+
+  if (nouveaux.length === 0) {
+    return NextResponse.json({
+      ok: true, source_caisse: 'sumup', depuis,
+      vus: abouties.length, nouveaux: 0, message: 'rien de neuf',
+    })
+  }
+
   // Détail ticket par ticket : c'est le seul endroit où SumUp donne les
   // produits et leur taux de TVA. On borne la concurrence pour ne pas se faire
   // limiter, et un détail manquant ne fait pas échouer le ticket — il rentrera
@@ -120,13 +146,13 @@ async function handler(req: Request) {
 
   const details = new Map<string, DetailSumUp | null>()
   const LOT = 6
-  for (let i = 0; i < abouties.length; i += LOT) {
-    const paquet = abouties.slice(i, i + LOT)
+  for (let i = 0; i < nouveaux.length; i += LOT) {
+    const paquet = nouveaux.slice(i, i + LOT)
     const res = await Promise.all(paquet.map(t => detail(String(t.transaction_code ?? t.id))))
     paquet.forEach((t, k) => details.set(String(t.transaction_code ?? t.id), res[k]))
   }
 
-  const encaissements = abouties.map(t => {
+  const encaissements = nouveaux.map(t => {
     const code = String(t.transaction_code ?? t.id)
     const d = details.get(code)
     const produits = (d?.products ?? [])
@@ -184,7 +210,12 @@ async function handler(req: Request) {
   })
 
   const resultat = await rep.json().catch(() => ({}))
-  return NextResponse.json({ ok: rep.ok, depuis, envoyes: encaissements.length, connecteur: resultat })
+  return NextResponse.json({
+    ok: rep.ok, depuis,
+    vus: abouties.length, deja_importes: dejaVus.size,
+    envoyes: encaissements.length,
+    connecteur: resultat,
+  })
 }
 
 export const GET = handler
