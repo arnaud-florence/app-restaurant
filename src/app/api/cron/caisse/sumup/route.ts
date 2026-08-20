@@ -98,6 +98,32 @@ async function handler(req: Request) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 502 })
   }
 
+  // ?champs=1 — inspection de la FORME de la réponse SumUp : uniquement les
+  // noms de champs, jamais les valeurs. Sert à vérifier ce que l'API expose
+  // réellement plutôt que de s'en remettre à la documentation, qui annonçait
+  // par exemple qu'il n'existait pas de produits alors qu'il y en a.
+  if (url.searchParams.get('champs') === '1') {
+    const premier = items.find(t => t.transaction_code ?? t.id)
+    if (!premier) return NextResponse.json({ ok: true, message: 'aucune transaction à inspecter' })
+    const code = String(premier.transaction_code ?? premier.id)
+    const r = await fetch(`https://api.sumup.com/v0.1/me/transactions?transaction_code=${encodeURIComponent(code)}`, {
+      headers: { Authorization: `Bearer ${cle}`, Accept: 'application/json' }, cache: 'no-store',
+    })
+    if (!r.ok) return NextResponse.json({ ok: false, error: `SumUp ${r.status}` }, { status: 502 })
+    const d = await r.json()
+    const noms = (o: unknown): unknown =>
+      Array.isArray(o) ? (o.length ? [noms(o[0])] : [])
+      : o && typeof o === 'object' ? Object.fromEntries(
+          Object.entries(o as Record<string, unknown>).map(([k, v]) => [k,
+            v && typeof v === 'object' ? noms(v) : typeof v]))
+      : typeof o
+    return NextResponse.json({
+      ok: true,
+      champs_liste: Object.keys(premier),
+      champs_detail: noms(d),
+    })
+  }
+
   // Seules les transactions abouties deviennent du CA. Un paiement remboursé ou
   // échoué ne doit pas gonfler la journée.
   const abouties = items
