@@ -121,8 +121,50 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Endpoint admin exec-sql | `/api/admin/exec-sql` + fonction PG `exec_sql()` security definer pour migrations automatiques | 0086 |
 | Module 27 enrichi | niveaux 1/2/3, simulations interactives, certifications par poste, badges, Q/R IA contextualisée | 0087 |
 | Carte réelle du Fournil | 60 produits des 13 affiches CasaTasia + photos découpées dans les affiches | 0113 |
+| Prix au taux du produit | `tauxTvaVente()` : le TTC servi et facturé suit `recettes.tva`, plus un taux figé | 0114 |
+| Vente en ligne restreinte | boissons chaudes et formules retirées du click & collect | 0115 |
+| Notification commande web | type `commande_online_recue` autorisé — l'insert échouait en silence | 0116 |
+| Adresse postale | Parking des Ferrages, 83136 Sainte Anastasie sur Issole | 0117 |
+| Produits hors Fournil endormis | `masque_hors_saison` — réveil par `sql/reveil-restaurant.sql` | 0118 |
 
-**Migrations actuelles : 0001 → 0113.**
+**Migrations actuelles : 0001 → 0118.**
+
+### Réouverture d'octobre — deux gestes, pas un
+
+Le bouton « Ouvrir le restaurant » de `/admin/etablissements` ne rallume que
+`activites_modules`. Les ~71 produits endormis par la 0118 portent
+`masque_hors_saison = true` et restent éteints : il faut aussi jouer
+**`sql/reveil-restaurant.sql`**, qui ne rallume que ces lignes-là (les recettes
+retirées à la main avant — doublons, seed de démo — doivent rester éteintes).
+Sans ce second geste, le restaurant rouvre avec une carte vide.
+
+### TVA : le taux du produit prime
+
+`tauxTvaArticle(alcool, consommation)` ne connaît que le mode de consommation
+et renvoie 5,5 % pour tout ce qui n'est pas alcoolisé à emporter. La carte du
+Fournil mélange 5,5 % (boulangerie) et 10 % (snacking, pizzas, boissons) :
+c'est **`tauxTvaVente(produit, consommation)`** qui fait foi côté catalogue,
+site et encaissement en ligne. Un taux figé y ferait payer autre chose que le
+prix du panneau — et sous-déclarerait la TVA sur la moitié de la carte.
+
+`prix_vente_ht` est en `decimal(10,4)` depuis la 0114 : à 2 décimales, un TTC
+de 2,40 € à 5,5 % est inatteignable (2,27 → 2,39 ; 2,28 → 2,41).
+
+### Clôture d'une commande web retirée au comptoir
+
+`estRetraitFournil()` (dans `src/lib/commande-statut.ts`) clôt en `encaisse`
+une commande ONLINE entièrement servie dont tous les articles sont FOURNIL et
+qui n'est pas une livraison — même raisonnement que la vente au comptoir : le
+client règle sur la caisse agréée en récupérant son sac. Sans elle, la commande
+restait bloquée à `pret` (la chaîne d'états du ticket s'arrête là) et son CA
+n'apparaissait nulle part.
+
+Le bouton **« 📦 Remis au client »** du KDS est derrière la prop
+`permetRemise`, fausse par défaut : en cuisine et au bar, c'est le serveur qui
+clôt, pas la brigade.
+
+⚠️ `scripts/test-commande-statut.mjs` **recopie** cette règle au lieu de
+l'importer (la source est en TS) : modifier les deux ensemble.
 
 ### Activation par activité — « Fournil d'abord » (août 2026)
 
