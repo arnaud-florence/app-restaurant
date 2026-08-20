@@ -37,13 +37,17 @@ export type VentesStats = {
   tva: Array<{ taux: string; montant: number }>
   /** Produits actifs qui n'ont RIEN vendu sur la période. */
   dormants: Array<{ nom: string; categorie: string }>
-  caParTicketMax: number
 }
 
 const PARIS = 'Europe/Paris'
 const fmtJour = new Intl.DateTimeFormat('fr-CA', { timeZone: PARIS, year: 'numeric', month: '2-digit', day: '2-digit' })
 const fmtLabel = new Intl.DateTimeFormat('fr-FR', { timeZone: PARIS, weekday: 'short', day: 'numeric' })
+// ⚠️ On passe par formatToParts : en français, `format()` renvoie « 09 h »,
+// que Number() transforme en NaN. Toutes les ventes tombaient alors dans une
+// seule barre « NaNh » et le graphe des heures de pointe ne montrait rien.
 const fmtHeure = new Intl.DateTimeFormat('fr-FR', { timeZone: PARIS, hour: '2-digit', hour12: false })
+const heureParis = (d: Date): number =>
+  Number(fmtHeure.formatToParts(d).find(p => p.type === 'hour')?.value ?? NaN)
 
 const delta = (v: number, p: number): Delta => ({
   valeur: Math.round(v * 100) / 100,
@@ -101,10 +105,14 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
     const b = parJourMap.get(fmtJour.format(d))
     if (b) { b.ca += montant; b.n++ }
 
-    const h = Number(fmtHeure.format(d))
-    const hb = parHeureMap.get(h) ?? { ca: 0, n: 0 }
-    hb.ca += montant; hb.n++
-    parHeureMap.set(h, hb)
+    // Le garde ne protège QUE le compartiment horaire : un `continue` ici
+    // priverait aussi la commande de son paiement et de sa TVA.
+    const h = heureParis(d)
+    if (Number.isFinite(h)) {
+      const hb = parHeureMap.get(h) ?? { ca: 0, n: 0 }
+      hb.ca += montant; hb.n++
+      parHeureMap.set(h, hb)
+    }
 
     const mp = String(c.mode_paiement ?? 'autre').toLowerCase()
     const nom = mp.includes('cash') || mp.includes('espece') ? 'Espèces'
@@ -190,6 +198,5 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
       .map(([taux, montant]) => ({ taux, montant: Math.round(montant * 100) / 100 }))
       .sort((a, b) => Number(a.taux) - Number(b.taux)),
     dormants,
-    caParTicketMax: Math.max(...parJour.map(j => j.ca), 1),
   }
 }
