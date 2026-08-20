@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   Menu, X, LogOut, BarChart3, ChefHat, Wine, ShieldCheck, Users, Wallet,
@@ -185,9 +186,18 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">
-          <Link href="/admin/cat" className="flex items-center gap-2 font-bold" onClick={() => setOpen(false)}>
-            <Building2 className="h-5 w-5 text-emerald-400" />
-            App Restaurant
+          {/* Le lettrage est découpé dans la photo d'enseigne : son fond est
+              crème, donc on l'assume en plaque claire plutôt que de le poser
+              à nu sur le stone-900 où il ferait un rectangle accidentel. */}
+          <Link href="/admin/cat" className="block" onClick={() => setOpen(false)}>
+            <Image
+              src="/logo-casatasia.png"
+              alt="CASATASIA — Maison méditerranéenne"
+              width={720}
+              height={186}
+              priority
+              className="h-11 w-auto rounded-lg"
+            />
           </Link>
           <button onClick={() => setOpen(false)} className="md:hidden p-1 -mr-1" aria-label="Fermer">
             <X className="h-5 w-5" />
