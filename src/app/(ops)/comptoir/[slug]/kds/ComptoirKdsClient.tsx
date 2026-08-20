@@ -32,14 +32,54 @@ export default function ComptoirKdsClient({ config, initial }: { config: Comptoi
     return () => clearInterval(t)
   }, [])
 
+  // ─── Impression automatique du bon ───────────────────────────────────
+  // Une commande web arrive pendant que l'équipe a les mains dans la farine :
+  // personne ne va lire un écran. Le bon sort tout seul sur l'imprimante du
+  // poste, comme en cuisine et au bar.
+  //
+  // Le réglage est par POSTE (localStorage) et non par employé : c'est
+  // l'imprimante branchée à cette tablette qui compte, pas qui la regarde.
+  const cleAutoPrint = `comptoir_${config.slug}_auto_print`
+  const [autoPrint, setAutoPrint] = useState(false)
+  const [printJobs, setPrintJobs] = useState<Array<{ key: string; src: string }>>([])
+
+  useEffect(() => {
+    try { setAutoPrint(localStorage.getItem(cleAutoPrint) === '1') } catch { /* ignore */ }
+  }, [cleAutoPrint])
+
+  function basculerAutoPrint() {
+    setAutoPrint(v => {
+      const nv = !v
+      try { localStorage.setItem(cleAutoPrint, nv ? '1' : '0') } catch { /* ignore */ }
+      return nv
+    })
+  }
+
+  // Les iframes sont retirées après 8 s : le temps que le navigateur ait lancé
+  // son impression, et sans laisser s'empiler des cadres invisibles.
+  useEffect(() => {
+    if (printJobs.length === 0) return
+    const t = setTimeout(() => setPrintJobs([]), 8000)
+    return () => clearTimeout(t)
+  }, [printJobs])
+
   // Sync depuis props + ding sur nouvelle commande de ce poste
   useEffect(() => {
     setCommandes(initial)
     const nouvelles = initial.filter(c => !previousIdsRef.current.has(c.id))
     const pourMoi = nouvelles.filter(c => c.articles.some(art => art.tag_destination === config.tag && art.statut !== 'servi'))
+    if (pourMoi.length > 0 && autoPrint) {
+      setPrintJobs(prev => [
+        ...prev,
+        ...pourMoi.map(c => ({
+          key: `${c.id}-${config.tag}-${Date.now()}`,
+          src: `/print/bons/${c.id}?dest=${config.tag}&auto=1`,
+        })),
+      ])
+    }
     if (pourMoi.length > 0 && audioReadyRef.current) playDing()
     previousIdsRef.current = new Set(initial.map(c => c.id))
-  }, [initial, config.tag])
+  }, [initial, config.tag, autoPrint])
 
   // Realtime → refresh
   useEffect(() => {
@@ -96,6 +136,16 @@ export default function ComptoirKdsClient({ config, initial }: { config: Comptoi
               🔔 {nbEnAttente}
             </span>
             <button onClick={activerSon} className="inline-flex items-center justify-center px-2.5 h-12 rounded-xl bg-zinc-800 text-zinc-200 text-xs font-bold active:scale-95" title="Activer le son">🔊</button>
+            <button
+              onClick={basculerAutoPrint}
+              className={cn(
+                'inline-flex items-center justify-center px-2.5 h-12 rounded-xl text-xs font-bold active:scale-95',
+                autoPrint ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400',
+              )}
+              title={autoPrint ? 'Impression auto activée' : 'Impression auto désactivée'}
+            >
+              🖨 {autoPrint ? 'ON' : 'OFF'}
+            </button>
             <Link href={`/comptoir/${config.slug}`} className="inline-flex items-center gap-1 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-sm active:scale-95" title="Prise de commande">🛒</Link>
             <Link href="/service" className="inline-flex items-center gap-1 px-3 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg active:scale-95">
               <span className="text-lg">⊞</span><span className="hidden sm:inline">Service</span>
@@ -129,6 +179,16 @@ export default function ComptoirKdsClient({ config, initial }: { config: Comptoi
           </div>
         )}
       </div>
+
+      {printJobs.map(j => (
+        <iframe
+          key={j.key}
+          src={j.src}
+          aria-hidden
+          tabIndex={-1}
+          style={{ position: 'fixed', width: 0, height: 0, border: 0, opacity: 0, pointerEvents: 'none' }}
+        />
+      ))}
     </div>
   )
 }
