@@ -38,8 +38,19 @@ function authCron(req: Request): boolean {
   return auth === `Bearer ${expected}`
 }
 
+// Détail d'un ticket, quand la caisse sait le fournir. Sans lignes, on ne
+// connaît qu'un montant : le CA est juste mais le stock, le food cost et le
+// menu engineering restent aveugles.
+const produitSchema = z.object({
+  nom_caisse: z.string().min(1),
+  quantite: z.number().positive(),
+  prix_unitaire_ttc: z.number(),
+  tva_taux: z.number().optional(),
+})
+
 const ligneSchema = z.object({
   ticket_externe: z.string().min(1),
+  produits: z.array(produitSchema).optional(),
   etablissement_slug: z.string().optional(),
   commande_numero: z.string().optional(),
   montant_ttc: z.number(),
@@ -76,7 +87,26 @@ export async function POST(req: Request) {
     for (const e of etabs ?? []) slugToId.set(String(e.slug), String(e.id))
   } catch { /* table absente → ignore */ }
 
+  // Carte du Fournil indexée par libellé de caisse ET par nom normalisé : le
+  // premier gagne quand il existe (c'est une correspondance déclarée à la
+  // main), le second rattrape les libellés identiques à l'accent près.
+  const norm = (x: string) =>
+    x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+  const parCaisse = new Map<string, { id: string; tag: string }>()
+  const parNom = new Map<string, { id: string; tag: string }>()
+  try {
+    const { data: recs } = await sb.from('recettes')
+      .select('id, nom, nom_caisse, tag_destination').eq('actif', true)
+    for (const r of recs ?? []) {
+      const v = { id: String(r.id), tag: String(r.tag_destination ?? 'FOURNIL') }
+      if (r.nom_caisse) parCaisse.set(norm(String(r.nom_caisse)), v)
+      parNom.set(norm(String(r.nom)), v)
+    }
+  } catch { /* carte injoignable → import sans lignes */ }
+
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
+  let lignesPosees = 0
+  const inconnus = new Map<string, number>()
   const erreurs: { ticket: string; error: string }[] = []
 
   for (const l of encaissements) {
@@ -131,7 +161,44 @@ export async function POST(req: Request) {
           }).select('id').maybeSingle()
 
           if (eSynth) { erreurs.push({ ticket: l.ticket_externe, error: eSynth.message }); continue }
-          if (synth) { commandeId = String(synth.id); creees++ }
+          if (synth) {
+            commandeId = String(synth.id)
+            creees++
+
+            // Lignes du ticket → commande_articles. C'est ce qui rend le stock,
+            // le food cost et le menu engineering exploitables : sans elles, la
+            // commande n'est qu'un montant. Statut 'servi' d'emblée — le produit
+            // est parti au comptoir — ce qui déclenche la déduction de stock
+            // (trigger de la 0009).
+            //
+            // Le prix et la TVA viennent du TICKET, jamais de la fiche produit :
+            // c'est la caisse qui fait foi, y compris quand elle applique un
+            // tarif que la fiche ignore.
+            const aInserer = []
+            for (const p of l.produits ?? []) {
+              const cle = norm(p.nom_caisse)
+              const rec = parCaisse.get(cle) ?? parNom.get(cle)
+              if (!rec) { inconnus.set(p.nom_caisse, (inconnus.get(p.nom_caisse) ?? 0) + 1); continue }
+              const ttc = p.prix_unitaire_ttc
+              const taux = p.tva_taux ?? 10
+              aInserer.push({
+                commande_id: commandeId,
+                recette_id: rec.id,
+                quantite: p.quantite,
+                prix_unitaire_ht: Math.round((ttc / (1 + taux / 100)) * 10000) / 10000,
+                prix_unitaire_ttc: ttc,
+                tva_taux: taux,
+                tva_eur: Math.round((ttc - ttc / (1 + taux / 100)) * p.quantite * 100) / 100,
+                tag_destination: rec.tag,
+                statut: 'servi',
+              })
+            }
+            if (aInserer.length > 0) {
+              const { error: eArt } = await sb.from('commande_articles').insert(aInserer)
+              if (eArt) erreurs.push({ ticket: l.ticket_externe, error: `lignes : ${eArt.message}` })
+              else lignesPosees += aInserer.length
+            }
+          }
         }
       }
 
@@ -171,6 +238,11 @@ export async function POST(req: Request) {
     rapproches,
     // Tickets matérialisés en commande 'CAISSE' pour entrer dans le CA.
     commandes_creees: creees,
+    lignes_posees: lignesPosees,
+    // Libellés de caisse sans équivalent dans la carte : leur CA est compté,
+    // mais ni le stock ni la marge ne les connaîtront tant qu'on ne les a pas
+    // rattachés (colonne `recettes.nom_caisse`).
+    produits_inconnus: Object.fromEntries(inconnus),
     sans_commande: sansCommande,
     erreurs,
   })

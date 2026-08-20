@@ -4,6 +4,8 @@ import CaisseClient from './CaisseClient'
 import BriefingPoste from '@/components/BriefingPoste'
 import { getProfile } from '@/lib/auth'
 import { getBriefingForPoste } from '@/lib/briefing/poste'
+import { getEtatEncaissement } from '@/lib/encaissement'
+import Link from 'next/link'
 
 export const metadata = { title: 'Caisse — Z-report' }
 export const dynamic = 'force-dynamic'

@@ -11,17 +11,15 @@
 //   SUMUP_API_KEY        clé secrète SumUp (sup_sk_…), profil marchand
 //   SUMUP_MERCHANT_CODE  code marchand SumUp (visible dans le back-office)
 //
-// ⚠️ DEUX LIMITES À CONNAÎTRE, elles ne viennent pas du code mais de SumUp :
+// Deux choses vérifiées sur les tickets réels du Fournil (17–19 août) :
 //
-//   1. Le lecteur de carte ne voit QUE les paiements par carte. Les ventes en
-//      espèces n'y sont pas. Le CA remonté ici est donc le CA carte, pas le CA
-//      total — sauf si l'équipe saisit aussi les espèces sur SumUp Caisse.
+//   • Les ventes en ESPÈCES remontent (`payment_type: CASH`). Le lecteur ne
+//     traite que la carte, mais SumUp Caisse enregistre aussi les espèces et
+//     l'API les renvoie. Le CA est donc complet.
 //
-//   2. L'historique des transactions ne porte pas de ventilation TVA : SumUp
-//      renvoie un montant, pas une répartition 5,5 / 10 / 20. On laisse donc
-//      `ventilation_tva` vide plutôt que d'inventer une clé de répartition —
-//      une TVA fausse serait pire qu'une TVA absente. La déclaration se fait
-//      sur les états SumUp, qui eux la portent.
+//   • Le détail par produit et la TVA existent, mais PAS dans l'historique :
+//     il faut appeler le détail de chaque transaction. D'où les deux étages
+//     ci-dessous — une liste, puis un appel par ticket.
 
 import { NextResponse } from 'next/server'
 
@@ -45,6 +43,22 @@ type TxSumUp = {
   timestamp?: string
 }
 
+type ProduitSumUp = {
+  name?: string
+  quantity?: number
+  price_with_vat?: number
+  total_with_vat?: number
+  vat_rate?: number
+}
+
+type DetailSumUp = {
+  products?: ProduitSumUp[]
+  vat_amount?: number
+  amount?: number
+  payment_type?: string
+  timestamp?: string
+}
+
 async function handler(req: Request) {
   if (!authCron(req)) return new NextResponse('Unauthorized', { status: 401 })
 
@@ -61,8 +75,9 @@ async function handler(req: Request) {
   const jours = Math.min(Math.max(Number(url.searchParams.get('jours') ?? 3), 1), 60)
   const depuis = new Date(Date.now() - jours * 86_400_000).toISOString().slice(0, 10)
 
-  // Historique des transactions du marchand.
-  const apiUrl = new URL(`https://api.sumup.com/v0.1/merchants/${marchand}/transactions/history`)
+  // Historique des transactions. NB : la forme /merchants/{code}/... répond 404
+  // sur ce compte ; c'est /me/... qui fonctionne.
+  const apiUrl = new URL('https://api.sumup.com/v0.1/me/transactions/history')
   apiUrl.searchParams.set('start_date', depuis)
   apiUrl.searchParams.set('limit', '500')
 
@@ -84,17 +99,72 @@ async function handler(req: Request) {
 
   // Seules les transactions abouties deviennent du CA. Un paiement remboursé ou
   // échoué ne doit pas gonfler la journée.
-  const encaissements = items
+  const abouties = items
     .filter(t => (t.status ?? '').toUpperCase() === 'SUCCESSFUL')
     .filter(t => typeof t.amount === 'number' && (t.amount as number) > 0)
-    .map(t => ({
-      ticket_externe: String(t.transaction_code ?? t.id),
+    .filter(t => t.transaction_code ?? t.id)
+
+  // Détail ticket par ticket : c'est le seul endroit où SumUp donne les
+  // produits et leur taux de TVA. On borne la concurrence pour ne pas se faire
+  // limiter, et un détail manquant ne fait pas échouer le ticket — il rentrera
+  // dans le CA sans ses lignes.
+  async function detail(code: string): Promise<DetailSumUp | null> {
+    try {
+      const r = await fetch(`https://api.sumup.com/v0.1/me/transactions?transaction_code=${encodeURIComponent(code)}`, {
+        headers: { Authorization: `Bearer ${cle}`, Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      return r.ok ? await r.json() : null
+    } catch { return null }
+  }
+
+  const details = new Map<string, DetailSumUp | null>()
+  const LOT = 6
+  for (let i = 0; i < abouties.length; i += LOT) {
+    const paquet = abouties.slice(i, i + LOT)
+    const res = await Promise.all(paquet.map(t => detail(String(t.transaction_code ?? t.id))))
+    paquet.forEach((t, k) => details.set(String(t.transaction_code ?? t.id), res[k]))
+  }
+
+  const encaissements = abouties.map(t => {
+    const code = String(t.transaction_code ?? t.id)
+    const d = details.get(code)
+    const produits = (d?.products ?? [])
+      .filter(p => p.name && typeof p.quantity === 'number' && p.quantity > 0)
+      .map(p => {
+        const qte = Number(p.quantity)
+        const unitaire = typeof p.price_with_vat === 'number'
+          ? Number(p.price_with_vat)
+          : Number(p.total_with_vat ?? 0) / qte
+        return {
+          nom_caisse: String(p.name).trim(),
+          quantite: qte,
+          prix_unitaire_ttc: Math.round(unitaire * 100) / 100,
+          // SumUp exprime le taux en fraction (0.055) — on le remet en points.
+          tva_taux: typeof p.vat_rate === 'number' ? Math.round(p.vat_rate * 1000) / 10 : undefined,
+        }
+      })
+
+    // Ventilation TVA reconstituée depuis les lignes, pas inventée.
+    const ventilation: Record<string, number> = {}
+    for (const p of produits) {
+      if (p.tva_taux == null) continue
+      const ht = (p.prix_unitaire_ttc * p.quantite) / (1 + p.tva_taux / 100)
+      const tva = p.prix_unitaire_ttc * p.quantite - ht
+      ventilation[String(p.tva_taux)] = Math.round(((ventilation[String(p.tva_taux)] ?? 0) + tva) * 100) / 100
+    }
+
+    return {
+      ticket_externe: code,
       etablissement_slug: 'fournil',
       montant_ttc: Number(t.amount),
+      tva_total: typeof d?.vat_amount === 'number' ? d.vat_amount : undefined,
+      ventilation_tva: Object.keys(ventilation).length ? ventilation : undefined,
       mode_paiement: (t.payment_type ?? 'carte').toLowerCase(),
       encaisse_at: t.timestamp,
-    }))
-    .filter(e => e.ticket_externe && e.ticket_externe !== 'undefined')
+      produits: produits.length ? produits : undefined,
+    }
+  })
 
   if (encaissements.length === 0) {
     return NextResponse.json({ ok: true, source_caisse: 'sumup', depuis, recus: 0, message: 'aucune transaction' })
