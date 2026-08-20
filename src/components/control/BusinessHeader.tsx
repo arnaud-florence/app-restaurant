@@ -30,10 +30,16 @@ export default function BusinessHeader({ b }: { b: BusinessLive }) {
 
   return (
     <section className="rounded-3xl bg-zinc-900 text-white p-4 sm:p-6 mb-5 shadow-lg">
-      <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1.5 mb-4">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
-        Le business — en direct
-      </h2>
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden />
+          Le business — en direct
+        </h2>
+        <Link href="/admin/ventes"
+              className="text-xs font-bold text-zinc-300 hover:text-white whitespace-nowrap">
+          Tout voir →
+        </Link>
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* ── Le chiffre du jour ─────────────────────────────────────── */}

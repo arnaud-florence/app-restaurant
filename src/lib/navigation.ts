@@ -148,6 +148,7 @@ export const CATEGORIES: Category[] = [
     items: [
       { href: '/admin/finances', emoji: '💰', label: 'Finances / TVA',    description: 'P&L live, trésorerie 30/60/90j, simulateurs.',  imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin/ventes-pdv', emoji: '📊', label: 'Ventes — 2 activités', description: 'Vision consolidée Restaurant + Fournil, CA ventilé par point de vente + commissions.', imageUrl: u('1460925895917-afdab827c52f') },
+      { href: '/admin/ventes', emoji: '📈', label: 'Statistiques de vente', description: 'CA, heures de pointe, meilleures ventes, comparaisons.', imageUrl: u('1543286386-713bdd548da4') },
       { href: '/admin/economie', emoji: '🧮', label: 'Centre économique', description: 'Point mort, marges, surplus, redistribution.', imageUrl: u('1611532736597-de2d4265fba3') },
       { href: '/admin/energie',  emoji: '⚡', label: 'Énergie',           description: 'Élec/gaz/eau, comparaison N-1, alertes +20%.', imageUrl: u('1473341304170-971dccb5ac1e') },
       { href: '/admin/commissions', emoji: '🤝', label: 'Commissions tiers', description: 'FDJ, tabac, relais colis — commissions hors CA principal.', imageUrl: u('1518186285589-2f7649de83e0') },
