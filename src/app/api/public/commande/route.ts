@@ -27,6 +27,7 @@ import { getClientIp } from '@/lib/public-api/rate-limit'
 import { getActivation, getConfigLivraisonFournil } from '@/lib/activation/server'
 import { tourneePour, communeLivrable } from '@/lib/activation/config'
 import { tauxTvaVente } from '@/lib/tva'
+import { sendPushToEmployeRateLimited } from '@/lib/push'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -388,6 +389,25 @@ export async function POST(req: Request) {
         }))
       )
       if (eNotif) console.error('[notif-online-public] insert refusé :', eNotif.message)
+
+      // Push sur le téléphone. La ligne en base ne suffit pas : personne ne
+      // regarde la cloche de l'app en continu, et une commande web qui
+      // n'alerte personne se traduit par un client qui attend un pain que
+      // personne ne prépare.
+      //
+      // force: true — la limite de 3 push/heure existe pour empêcher les
+      // agents de spammer. Une commande client n'est pas du bruit d'agent, et
+      // avaler la 4e commande de l'heure serait exactement la panne qu'on
+      // cherche à éviter.
+      await Promise.allSettled(destinataires.map(e =>
+        sendPushToEmployeRateLimited(e.id as string, {
+          title: `🌐 Commande web #${cmd.numero}`,
+          body: `${lignes} — ${Number(cmd.montant_total_ttc ?? totalTTC).toFixed(2)} €`,
+          tag: `cmd-${cmd.numero}`,      // une seule notif par commande, même multi-appareils
+          url: urlAction,
+          vibrate: [200, 100, 200],
+        }, { force: true }),
+      ))
     }
   } catch (e) {
     console.error('[notif-online-public] erreur :', e)
