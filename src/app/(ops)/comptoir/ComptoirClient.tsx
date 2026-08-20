@@ -31,6 +31,11 @@ export default function ComptoirClient({
   const [msg, setMsg] = useState<{ ok: boolean; texte: string } | null>(null)
 
   const [aLivrer, setALivrer] = useState(false)
+  // Sous 1024 px, le panier n'était pas une colonne mais un bloc placé APRÈS
+  // les 84 produits : la personne au comptoir ne voyait jamais ce qu'elle
+  // encaissait. Il devient une feuille ancrée en bas, repliée par défaut —
+  // le total et le bouton Valider restent visibles en permanence.
+  const [panierDeplie, setPanierDeplie] = useState(false)
   const [form, setForm] = useState<FormLivraison>({
     nom: '', telephone: '', adresse: '', commune: livraison?.communes[0] ?? '',
   })
@@ -129,7 +134,7 @@ export default function ComptoirClient({
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-3 sm:gap-4 p-3 sm:p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-3 sm:gap-4 p-3 sm:p-5 max-lg:pb-44">
         {/* Catalogue */}
         <div>
           {/* Filtres catégories */}
@@ -178,12 +183,35 @@ export default function ComptoirClient({
         </div>
 
         {/* Panier */}
-        <aside className="rounded-2xl bg-zinc-900 ring-1 ring-zinc-800 p-3 sm:p-4 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-110px)] flex flex-col">
-          <p className="text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-2">🛒 Panier {nbArticles > 0 && `· ${nbArticles}`}</p>
+        <aside className={cn(
+          'bg-zinc-900 ring-1 ring-zinc-800 p-3 sm:p-4 flex flex-col rounded-2xl',
+          'lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-110px)]',
+          // Sous lg : ancrée en bas de l'écran, au-dessus du catalogue.
+          'max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40',
+          'max-lg:rounded-b-none max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.6)]',
+          panierDeplie && 'max-lg:max-h-[80vh]',
+        )}>
+          {/* Poignée tactile : n'existe que sous lg, où la feuille se replie. */}
+          <button
+            type="button"
+            onClick={() => setPanierDeplie(v => !v)}
+            className="lg:hidden -mt-1 mb-2 flex items-center justify-between gap-2 min-h-[44px] w-full"
+          >
+            <span className="text-sm font-black text-zinc-100">
+              🛒 {nbArticles > 0 ? `${nbArticles} article${nbArticles > 1 ? 's' : ''}` : 'Panier vide'}
+            </span>
+            <span className="text-xs font-bold text-zinc-400">
+              {panierDeplie ? 'Replier ▼' : 'Voir le détail ▲'}
+            </span>
+          </button>
+
+          <p className="max-lg:hidden text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-2">🛒 Panier {nbArticles > 0 && `· ${nbArticles}`}</p>
           {lignes.length === 0 ? (
-            <p className="text-sm text-zinc-500 italic py-6 text-center">Touche un produit pour l&apos;ajouter.</p>
+            <p className={cn('text-sm text-zinc-500 italic py-6 text-center', !panierDeplie && 'max-lg:hidden')}>
+              Touche un produit pour l&apos;ajouter.
+            </p>
           ) : (
-            <ul className="space-y-2 overflow-y-auto flex-1 -mr-1 pr-1">
+            <ul className={cn('space-y-2 overflow-y-auto flex-1 -mr-1 pr-1', !panierDeplie && 'max-lg:hidden')}>
               {lignes.map(l => (
                 <li key={l.produit.id} className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -202,7 +230,7 @@ export default function ComptoirClient({
 
           {/* Commande téléphonique à livrer — rejoint la tournée du jour */}
           {livraison && (
-            <div className="border-t border-zinc-800 mt-3 pt-3">
+            <div className={cn('border-t border-zinc-800 mt-3 pt-3', !panierDeplie && 'max-lg:hidden')}>
               <button
                 type="button"
                 onClick={() => setALivrer(v => !v)}
@@ -255,6 +283,7 @@ export default function ComptoirClient({
             </div>
           )}
 
+          {/* Toujours visible, replié ou non : c'est ce qu'on encaisse. */}
           <div className="border-t border-zinc-800 mt-3 pt-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total TTC</span>
