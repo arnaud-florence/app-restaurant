@@ -59,6 +59,9 @@ const ligneSchema = z.object({
   ventilation_tva: z.record(z.string(), z.number()).optional(),
   mode_paiement: z.string().optional(),
   encaisse_at: z.string().optional(),
+  /** Pourboire encaissé avec la vente. Il appartient à l'équipe, pas au CA —
+   *  il est donc stocké à part et n'entre pas dans montant_total_ttc. */
+  pourboire: z.number().optional(),
 })
 const payloadSchema = z.object({
   source_caisse: z.string().min(1),
@@ -156,6 +159,7 @@ export async function POST(req: Request) {
             tva_total: l.tva_total ?? null,
             ventilation_tva: l.ventilation_tva ?? {},
             mode_paiement: l.mode_paiement ?? 'caisse_agreee',
+            pourboire_total: l.pourboire ?? 0,
             etablissement_id: l.etablissement_slug ? (slugToId.get(l.etablissement_slug) ?? null) : null,
             created_at: encaisseLe,
             notes: `Ticket ${source_caisse} ${l.ticket_externe} — encaissé hors app`,

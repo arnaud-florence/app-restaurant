@@ -42,6 +42,7 @@ type TxSumUp = {
   status?: string
   payment_type?: string
   timestamp?: string
+  refunded_amount?: number
 }
 
 type ProduitSumUp = {
@@ -58,6 +59,12 @@ type DetailSumUp = {
   amount?: number
   payment_type?: string
   timestamp?: string
+  /** Pourboire encaissé avec la vente — c'est de l'argent de l'équipe. */
+  tip_amount?: number
+  /** Remboursement partiel ou total déjà accordé sur cette vente. */
+  refunded_amount?: number
+  /** Ventilation TVA donnée par la caisse, plus fiable que reconstruite. */
+  vat_rates?: Array<{ rate?: number; vat?: number; gross?: number; net?: number }>
 }
 
 async function handler(req: Request) {
@@ -197,19 +204,35 @@ async function handler(req: Request) {
         }
       })
 
-    // Ventilation TVA reconstituée depuis les lignes, pas inventée.
+    // Ventilation TVA : celle de la caisse d'abord (`vat_rates`), qui fait foi
+    // fiscalement. On ne reconstitue depuis les lignes que si elle manque.
     const ventilation: Record<string, number> = {}
-    for (const p of produits) {
-      if (p.tva_taux == null) continue
-      const ht = (p.prix_unitaire_ttc * p.quantite) / (1 + p.tva_taux / 100)
-      const tva = p.prix_unitaire_ttc * p.quantite - ht
-      ventilation[String(p.tva_taux)] = Math.round(((ventilation[String(p.tva_taux)] ?? 0) + tva) * 100) / 100
+    if (Array.isArray(d?.vat_rates) && d.vat_rates.length > 0) {
+      for (const v of d.vat_rates) {
+        if (typeof v.rate !== 'number' || typeof v.vat !== 'number') continue
+        const taux = String(Math.round(v.rate * 1000) / 10)
+        ventilation[taux] = Math.round(((ventilation[taux] ?? 0) + v.vat) * 100) / 100
+      }
+    } else {
+      for (const p of produits) {
+        if (p.tva_taux == null) continue
+        const ht = (p.prix_unitaire_ttc * p.quantite) / (1 + p.tva_taux / 100)
+        const tva = p.prix_unitaire_ttc * p.quantite - ht
+        ventilation[String(p.tva_taux)] = Math.round(((ventilation[String(p.tva_taux)] ?? 0) + tva) * 100) / 100
+      }
     }
+
+    // Un remboursement partiel laisse la transaction en SUCCESSFUL : sans
+    // cette soustraction, une vente remboursée à moitié compterait pour son
+    // montant entier et gonflerait le chiffre d'affaires.
+    const rembourse = Number(d?.refunded_amount ?? t.refunded_amount ?? 0)
+    const encaisse = Math.max(0, Number(t.amount) - rembourse)
 
     return {
       ticket_externe: code,
       etablissement_slug: 'fournil',
-      montant_ttc: Number(t.amount),
+      montant_ttc: Math.round(encaisse * 100) / 100,
+      pourboire: typeof d?.tip_amount === 'number' ? d.tip_amount : undefined,
       tva_total: typeof d?.vat_amount === 'number' ? d.vat_amount : undefined,
       ventilation_tva: Object.keys(ventilation).length ? ventilation : undefined,
       mode_paiement: (t.payment_type ?? 'carte').toLowerCase(),
@@ -217,6 +240,10 @@ async function handler(req: Request) {
       produits: produits.length ? produits : undefined,
     }
   })
+  // Une vente intégralement remboursée n'est plus du chiffre d'affaires : on
+  // ne la matérialise pas en commande. Elle reste visible côté SumUp, qui
+  // demeure le registre fiscal.
+  .filter(e => e.montant_ttc > 0)
 
   if (encaissements.length === 0) {
     return NextResponse.json({ ok: true, source_caisse: 'sumup', depuis, recus: 0, message: 'aucune transaction' })
