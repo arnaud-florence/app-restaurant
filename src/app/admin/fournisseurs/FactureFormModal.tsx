@@ -11,10 +11,12 @@ import { type Fournisseur, type BonCommande, type Facture } from '@/lib/fourniss
 import { createFacture } from './actions'
 
 export default function FactureFormModal({
-  fournisseurs, bons, onClose, onSaved, initial,
+  fournisseurs, bons, factures = [], onClose, onSaved, initial,
 }: {
   fournisseurs: Fournisseur[]
   bons: BonCommande[]
+  /** Factures existantes — pour lier un avoir à sa facture d'origine */
+  factures?: Facture[]
   onClose: () => void
   onSaved: () => void
   /** Données pré-remplies (ex: depuis le Scanner OCR) */
@@ -34,6 +36,7 @@ export default function FactureFormModal({
       total_ht: number | null
     }>
     nb_pages?: number
+    type_document?: 'facture' | 'avoir'
   }
 }) {
   const [isPending, startTransition] = useTransition()
@@ -64,6 +67,11 @@ export default function FactureFormModal({
   const [montantTTC, setMontantTTC] = useState(initial?.montant_ttc != null ? String(initial.montant_ttc) : '0')
   const [statut, setStatut] = useState<Facture['statut']>('a_payer')
   const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [typeDocument, setTypeDocument] = useState<'facture' | 'avoir'>(initial?.type_document ?? 'facture')
+  const [factureLieeId, setFactureLieeId] = useState('')
+  const estAvoir = typeDocument === 'avoir'
+  const facturesDuFournisseur = factures.filter(f =>
+    f.fournisseur_id === fournisseurId && f.type_document !== 'avoir')
 
   const bonsDuFournisseur = bons.filter(b => b.fournisseur_id === fournisseurId)
 
@@ -97,6 +105,8 @@ export default function FactureFormModal({
           notes: notes || null,
           lignes: initial?.lignes ?? [],
           nb_pages: initial?.nb_pages ?? 1,
+          type_document: typeDocument,
+          facture_liee_id: factureLieeId || null,
         })
         onSaved()
       } catch (e) { setErreur(e instanceof Error ? e.message : 'Erreur') }
@@ -106,7 +116,7 @@ export default function FactureFormModal({
   return (
     <Dialog open onClose={onClose} panelClassName="sm:max-w-lg">
       <DialogHeader onClose={onClose}>
-        <DialogTitle>➕ Nouvelle facture fournisseur</DialogTitle>
+        <DialogTitle>{estAvoir ? '↩️ Nouvel avoir fournisseur' : '➕ Nouvelle facture fournisseur'}</DialogTitle>
         <DialogDescription>
           Date d&apos;échéance et statut servent aux alertes de paiement automatiques.
         </DialogDescription>
@@ -114,13 +124,46 @@ export default function FactureFormModal({
 
       <DialogBody className="space-y-3">
         <div className="space-y-1.5">
+          <Label>Type de document</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setTypeDocument('facture')}
+              className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${!estAvoir ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 hover:border-zinc-500'}`}>
+              📄 Facture
+            </button>
+            <button type="button" onClick={() => setTypeDocument('avoir')}
+              className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${estAvoir ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-zinc-300 hover:border-emerald-500'}`}>
+              ↩️ Avoir (le fournisseur nous doit)
+            </button>
+          </div>
+          {estAvoir && (
+            <p className="text-xs text-emerald-700">
+              Saisis les montants en positif — l&apos;avoir viendra automatiquement en déduction des dettes fournisseur.
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
           <Label>Fournisseur *</Label>
           <Select value={fournisseurId} onChange={e => { setFournisseurId(e.target.value); setBonId('') }}>
             {fournisseurs.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
           </Select>
         </div>
 
-        {bonsDuFournisseur.length > 0 && (
+        {estAvoir && facturesDuFournisseur.length > 0 && (
+          <div className="space-y-1.5">
+            <Label>Facture d&apos;origine (optionnel)</Label>
+            <Select value={factureLieeId} onChange={e => setFactureLieeId(e.target.value)}>
+              <option value="">— Aucune (geste commercial…) —</option>
+              {facturesDuFournisseur.map(f => (
+                <option key={f.id} value={f.id}>
+                  {f.numero} · {f.date_emission} · {f.montant_ttc.toFixed(2)} €
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        {!estAvoir && bonsDuFournisseur.length > 0 && (
           <div className="space-y-1.5">
             <Label>Lié à un bon de commande (optionnel)</Label>
             <Select value={bonId} onChange={e => selectBon(e.target.value)}>

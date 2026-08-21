@@ -65,6 +65,9 @@ export type Facture = {
   montant_ht: number
   montant_ttc: number
   statut: 'a_payer' | 'paye' | 'en_retard' | 'litige' | 'annule'
+  /** 'avoir' = note de crédit du fournisseur, montants stockés en négatif */
+  type_document: 'facture' | 'avoir'
+  facture_liee_id: string | null
   paye_le: string | null
   notes: string | null
   created_at: string

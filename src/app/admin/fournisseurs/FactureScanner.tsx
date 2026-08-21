@@ -29,7 +29,7 @@ export type LigneExtraite = {
 }
 
 export type FactureExtraite = {
-  type: 'facture' | 'bon_livraison' | 'ticket' | 'inconnu'
+  type: 'facture' | 'avoir' | 'bon_livraison' | 'ticket' | 'inconnu'
   fournisseur_nom: string | null
   numero: string | null
   date_emission: string | null

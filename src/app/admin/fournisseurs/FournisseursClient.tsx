@@ -54,6 +54,7 @@ type ScannedFacture = {
     total_ht: number | null
   }>
   nb_pages?: number
+  type_document?: 'facture' | 'avoir'
 }
 
 type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
@@ -345,6 +346,7 @@ export default function FournisseursClient({
         <FactureFormModal
           fournisseurs={fournisseurs.filter(f => f.actif)}
           bons={bons}
+          factures={factures}
           initial={scannedData ?? undefined}
           onClose={() => { setCreatingFacture(false); setScannedData(null) }}
           onSaved={() => { setCreatingFacture(false); setScannedData(null); router.refresh() }}
@@ -363,6 +365,7 @@ export default function FournisseursClient({
               montant_ttc: data.montant_ttc,
               lignes: data.lignes,
               nb_pages: data.nb_pages,
+              type_document: data.type === 'avoir' ? 'avoir' : 'facture',
               notes: data.notes
                 ? `Scanné par Agent IA. Notes : ${data.notes}`
                 : 'Scanné par Agent IA',
@@ -690,6 +693,7 @@ function FacturesTab({
                   <li key={f.id} className="p-3 space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold truncate">{f.numero}</span>
+                      {f.type_document === 'avoir' && <Badge variant="success">↩️ Avoir</Badge>}
                       <Badge className={cn('border shrink-0', cfg.cls)}>{cfg.emoji} {cfg.label}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{f.fournisseur_nom ?? '—'}</p>
@@ -730,7 +734,10 @@ function FacturesTab({
                     const cfg = STATUT_FACTURE_LABEL[f.statut]
                     return (
                       <tr key={f.id} className="border-t hover:bg-muted/30">
-                        <td className="py-2 px-3 font-semibold">{f.numero}</td>
+                        <td className="py-2 px-3 font-semibold">
+                          {f.numero}
+                          {f.type_document === 'avoir' && <Badge variant="success" className="ml-2">↩️ Avoir</Badge>}
+                        </td>
                         <td className="py-2 px-2 truncate max-w-40">{f.fournisseur_nom ?? '—'}</td>
                         <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap">
                           {format(parseISO(f.date_emission), 'd MMM', { locale: fr })}

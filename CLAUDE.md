@@ -129,8 +129,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Visuels produits sans photo | plaques typographiques + vraies photos boissons de marque | 0124 |
 | Factures multi-pages + lignes | scanner N pages en 1 appel, `facture_lignes`, prix d'achat auto | 0125 |
 | Achat-revente + traçabilité libre | `recettes.cout_achat_ht`, `lots_produits.produit_nom` | 0126 |
+| Avoirs fournisseurs | `type_document`, montants négatifs, scanner les reconnaît | 0127 |
 
-**Migrations actuelles : 0001 → 0126.**
+**Migrations actuelles : 0001 → 0127.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -179,6 +180,14 @@ par nom **et** `nom_caisse`, même prudence que pour les ingrédients).
 Ne PAS relancer le chantier « saisir les 90 compositions » : il est hors
 modèle. Tests : `node scripts/test-facture-lignes.mjs`,
 `node scripts/test-achat-revente.mjs`.
+
+**Avoirs fournisseurs** (0127) : même table et même scanner que les factures,
+distingués par `type_document`. **Montants stockés en négatif** — l'UI saisit
+du positif, l'action applique le signe — pour que toutes les sommes
+existantes (dettes du pilotage, P&L, snapshot assistant) restent justes sans
+modification. Les lignes d'un avoir ne propagent JAMAIS de prix d'achat :
+c'est de la marchandise rendue, pas un tarif. `facture_liee_id` (on delete
+set null) référence la facture d'origine. Test : `node scripts/test-avoirs.mjs`.
 
 **Traçabilité en saisie libre** (0126) : `lots_produits.produit_nom` — on
 trace n'importe quelle réception au clavier, le lien ingrédient est

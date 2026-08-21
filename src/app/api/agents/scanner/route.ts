@@ -29,7 +29,7 @@ export const maxDuration = 60
 const MODEL = 'claude-haiku-4-5'
 
 type FactureExtraite = {
-  type: 'facture' | 'bon_livraison' | 'ticket' | 'inconnu'
+  type: 'facture' | 'avoir' | 'bon_livraison' | 'ticket' | 'inconnu'
   fournisseur_nom: string | null
   numero: string | null
   date_emission: string | null         // YYYY-MM-DD
@@ -155,11 +155,13 @@ Tu analyses l'image et tu extrais les données STRICTEMENT au format JSON ci-des
 
 Si une valeur n'est pas lisible ou absente, mets null. Pour les dates, utilise YYYY-MM-DD.
 Pour les nombres, utilise des décimaux (12.50 pas "12,50").
-Le champ "confiance" est ton estimation 0..1 de la qualité OCR (1 = parfait, 0.5 = lisible mais des doutes, < 0.3 = très flou).`
+Le champ "confiance" est ton estimation 0..1 de la qualité OCR (1 = parfait, 0.5 = lisible mais des doutes, < 0.3 = très flou).
+
+Un AVOIR (note de crédit) porte généralement la mention « AVOIR », « Note de crédit » ou « Credit note » : type="avoir". Renvoie ses montants en VALEUR ABSOLUE (positifs), même si le document les affiche en négatif.`
 
   const userPrompt = `Analyse cette image et renvoie le JSON suivant :
 {
-  "type": "facture" | "bon_livraison" | "ticket" | "inconnu",
+  "type": "facture" | "avoir" | "bon_livraison" | "ticket" | "inconnu",
   "fournisseur_nom": string | null,
   "numero": string | null,
   "date_emission": "YYYY-MM-DD" | null,
@@ -248,7 +250,7 @@ async function analyserExtraction(ctx: AgentContext, extracted: FactureExtraite)
     urgence,
     type: 'scan_document',
     titre: extracted.fournisseur_nom
-      ? `📄 ${extracted.type === 'facture' ? 'Facture' : extracted.type === 'bon_livraison' ? 'BL' : 'Ticket'} ${extracted.fournisseur_nom} scanné`
+      ? `📄 ${extracted.type === 'facture' ? 'Facture' : extracted.type === 'avoir' ? 'Avoir' : extracted.type === 'bon_livraison' ? 'BL' : 'Ticket'} ${extracted.fournisseur_nom} scanné`
       : '📄 Document scanné',
     message: [
       extracted.montant_ttc ? `Montant : ${extracted.montant_ttc.toFixed(2)}€ TTC` : null,
