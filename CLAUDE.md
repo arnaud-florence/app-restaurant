@@ -130,8 +130,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Factures multi-pages + lignes | scanner N pages en 1 appel, `facture_lignes`, prix d'achat auto | 0125 |
 | Achat-revente + traçabilité libre | `recettes.cout_achat_ht`, `lots_produits.produit_nom` | 0126 |
 | Avoirs fournisseurs | `type_document`, montants négatifs, scanner les reconnaît | 0127 |
+| Hygiène & conformité | `date_releve`, suppression de lots, coffre `documents_conformite` | 0128 |
 
-**Migrations actuelles : 0001 → 0127.**
+**Migrations actuelles : 0001 → 0128.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -188,6 +189,25 @@ existantes (dettes du pilotage, P&L, snapshot assistant) restent justes sans
 modification. Les lignes d'un avoir ne propagent JAMAIS de prix d'achat :
 c'est de la marchandise rendue, pas un tarif. `facture_liee_id` (on delete
 set null) référence la facture d'origine. Test : `node scripts/test-avoirs.mjs`.
+
+**Relevés température : `date_releve` est la date métier** (0128).
+`created_at` n'est que l'horodatage d'insertion — un relevé saisi après coup
+porte sa vraie date. TOUS les lecteurs (agent HACCP, registre imprimable,
+snapshot assistant, mon-espace, page hygiène) filtrent sur `date_releve` ;
+un nouveau lecteur doit faire pareil. La NC auto d'un relevé hors plage porte
+aussi cette date.
+
+**Documents de conformité** (0128) : bucket Storage public `conformite`
+(créé par `scripts/creer-bucket-conformite.mjs`) + table
+`documents_conformite`. Upload via `POST /api/conformite/documents`
+(multipart, manager only — les server actions plafonnent à ~1 Mo, d'où la
+route API) ; suppression via DELETE qui efface fiche ET fichier. UI :
+`/admin/legal` → onglet 📁 Documents, catégorie en texte libre, alerte
+expiration à J-30. Test : `node scripts/test-conformite.mjs`.
+
+**Suppression de lots** (`supprimerLot`) : réservée aux erreurs de saisie —
+le cycle de vie normal (consommé, jeté, expiré, rappelé) passe par les
+STATUTS, qui gardent la trace au registre.
 
 **Traçabilité en saisie libre** (0126) : `lots_produits.produit_nom` — on
 trace n'importe quelle réception au clavier, le lien ingrédient est

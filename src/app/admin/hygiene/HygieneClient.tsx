@@ -23,7 +23,7 @@ import {
 import {
   creerReleveTemperature, validerCheckHygiene, creerProcedure,
   creerPlanHaccp, supprimerPlanHaccp,
-  creerLot, changerStatutLot,
+  creerLot, changerStatutLot, supprimerLot,
   creerNonConformite, resoudreNonConformite,
   creerIntervention3D,
   creerPlanNettoyage, marquerExecuteNettoyage, supprimerPlanNettoyage,
@@ -192,7 +192,7 @@ function QuotidienTab({
   const checkedIds = new Set(checklistsToday.map(c => c.procedure_id))
 
   // Releves récents groupés par moment du jour
-  const relevesToday = releves.filter(r => r.created_at.slice(0, 10) === today)
+  const relevesToday = releves.filter(r => r.date_releve === today)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -220,7 +220,9 @@ function QuotidienTab({
                     {moInfo && <span className="text-[10px] text-zinc-500">{moInfo.emoji} {moInfo.label}</span>}
                   </div>
                   <p className="text-[11px] text-zinc-500">
-                    {format(parseISO(r.created_at), 'HH:mm', { locale: fr })}
+                    {r.date_releve === today
+                      ? format(parseISO(r.created_at), 'HH:mm', { locale: fr })
+                      : format(parseISO(r.date_releve), 'dd/MM', { locale: fr })}
                     {r.employe_nom && ` · ${r.employe_nom}`}
                     {r.notes && ` · ${r.notes}`}
                   </p>
@@ -320,6 +322,7 @@ function RelevModal({
   onSuccess: (msg: string) => void
 }) {
   const [equipement, setEquipement] = useState('')
+  const [dateReleve, setDateReleve] = useState(new Date().toISOString().slice(0, 10))
   const [type, setType] = useState<TypeEquipement | ''>('')
   const [temperature, setTemperature] = useState<number | ''>('')
   const [moment, setMoment] = useState<Moment>('matin')
@@ -335,6 +338,7 @@ function RelevModal({
       try {
         const r = await creerReleveTemperature({
           equipement: equipement.trim(),
+          date_releve: dateReleve,
           type_equipement: type || null,
           temperature: Number(temperature),
           moment, employe_id: employeId || null,
@@ -354,6 +358,14 @@ function RelevModal({
       <Field label="Équipement">
         <input value={equipement} onChange={e => setEquipement(e.target.value)}
           placeholder="Ex: Frigo cuisine 1, Congélateur principal…"
+          className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+      </Field>
+      <Field label="Date du relevé">
+        {/* Saisissable : on doit pouvoir entrer après coup le relevé d'hier
+            soir — le registre HACCP et l'agent comptent par date de relevé,
+            pas par date de saisie. */}
+        <input type="date" value={dateReleve} max={new Date().toISOString().slice(0, 10)}
+          onChange={e => setDateReleve(e.target.value)}
           className="w-full h-12 px-3 rounded-md border border-zinc-300" />
       </Field>
       <Field label="Type (active le calcul auto-conforme)">
@@ -808,6 +820,19 @@ function LotsTab({
                     >
                       {(Object.keys(STATUT_LOT_LABEL) as StatutLot[]).map(s => <option key={s} value={s}>{STATUT_LOT_LABEL[s].label}</option>)}
                     </select>
+                    <button
+                      onClick={async () => {
+                        if (!(await askConfirm({
+                          title: 'Supprimer ce lot',
+                          message: `Supprimer définitivement « ${l.produit_nom ?? l.ingredient_nom ?? l.lot_numero} » (lot ${l.lot_numero}) ? Pour un lot réellement consommé, jeté ou rappelé, change plutôt son statut : le registre en garde la trace.`,
+                          confirmLabel: 'Supprimer', danger: true,
+                        }))) return
+                        try { await supprimerLot(l.id); onOk('Lot supprimé'); router.refresh() }
+                        catch (err) { onError(err) }
+                      }}
+                      aria-label="Supprimer le lot"
+                      className="min-h-[36px] w-9 rounded border border-zinc-200 text-zinc-400 hover:text-red-600 hover:border-red-300 shrink-0"
+                    >🗑</button>
                   </div>
                   <p className="font-medium">{l.produit_nom ?? l.ingredient_nom ?? '—'}</p>
                   <div className="flex items-center justify-between gap-2 text-xs">
@@ -838,6 +863,7 @@ function LotsTab({
                 <th className="text-left px-3 py-2 font-medium">Fournisseur</th>
                 <th className="text-left px-3 py-2 font-medium">Reçu le</th>
                 <th className="text-left px-3 py-2 font-medium">Statut</th>
+                <th className="px-2 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -875,6 +901,21 @@ function LotsTab({
                       >
                         {(Object.keys(STATUT_LOT_LABEL) as StatutLot[]).map(s => <option key={s} value={s}>{STATUT_LOT_LABEL[s].label}</option>)}
                       </select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <button
+                        onClick={async () => {
+                          if (!(await askConfirm({
+                            title: 'Supprimer ce lot',
+                            message: `Supprimer définitivement « ${l.produit_nom ?? l.ingredient_nom ?? l.lot_numero} » (lot ${l.lot_numero}) ? Pour un lot réellement consommé, jeté ou rappelé, change plutôt son statut : le registre en garde la trace.`,
+                            confirmLabel: 'Supprimer', danger: true,
+                          }))) return
+                          try { await supprimerLot(l.id); onOk('Lot supprimé'); router.refresh() }
+                          catch (err) { onError(err) }
+                        }}
+                        aria-label="Supprimer le lot"
+                        className="h-8 w-8 rounded border border-zinc-200 text-zinc-400 hover:text-red-600 hover:border-red-300"
+                      >🗑</button>
                     </td>
                   </tr>
                 )

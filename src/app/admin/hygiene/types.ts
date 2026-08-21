@@ -187,6 +187,8 @@ export type ReleveTemperature = {
   employe_id: string | null
   employe_nom: string | null
   notes: string | null
+  /** Date métier du relevé (≠ created_at, horodatage d'insertion) */
+  date_releve: string
   created_at: string
 }
 

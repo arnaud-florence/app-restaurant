@@ -11,6 +11,9 @@ import { TYPE_EQUIPEMENT_LABEL, type TypeEquipement } from './types'
 
 const releveSchema = z.object({
   equipement:      z.string().trim().min(1).max(100),
+  // Date MÉTIER du relevé (saisie après coup possible) — created_at reste
+  // l'horodatage technique d'insertion.
+  date_releve:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   type_equipement: z.enum(['frigo','congelateur','chambre_froide','bain_marie']).nullable(),
   temperature:     z.number(),
   moment:          z.enum(['matin','midi','soir','autre']).nullable(),
@@ -37,6 +40,7 @@ export async function creerReleveTemperature(input: unknown): Promise<{ id: stri
     .from('releves_temperatures')
     .insert({
       equipement: p.equipement,
+      date_releve: p.date_releve ?? new Date().toISOString().slice(0, 10),
       type_equipement: p.type_equipement,
       temperature: p.temperature,
       temperature_min_ok, temperature_max_ok, conforme,
@@ -54,7 +58,7 @@ export async function creerReleveTemperature(input: unknown): Promise<{ id: stri
     const { data: nc } = await supabase
       .from('non_conformites')
       .insert({
-        date_constat: new Date().toISOString().slice(0, 10),
+        date_constat: p.date_releve ?? new Date().toISOString().slice(0, 10),
         type: 'temperature',
         gravite: 'majeure',
         description: `Relevé hors plage sur "${p.equipement}" : ${p.temperature}°C (attendu ${temperature_min_ok}–${temperature_max_ok}°C)`,
@@ -194,6 +198,19 @@ export async function creerLot(input: unknown): Promise<{ id: string }> {
   if (error || !data) throw new Error(error?.message ?? 'Erreur')
   revalidatePath('/admin/hygiene')
   return { id: data.id as string }
+}
+
+// Suppression DÉFINITIVE, réservée aux erreurs de saisie (mauvais produit,
+// doublon, lot incomplet à recommencer). Le cycle de vie normal d'un lot ne
+// passe jamais par ici : consommé, jeté, expiré ou rappelé sont des STATUTS,
+// qui gardent la trace au registre — c'est toute la valeur de la traçabilité.
+export async function supprimerLot(id: string) {
+  if (!id) throw new Error('id manquant')
+  const supabase = await createClient()
+  const { error } = await supabase.from('lots_produits').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/hygiene')
+  return { ok: true as const }
 }
 
 const majStatutLotSchema = z.object({

@@ -33,8 +33,9 @@ export default async function HygienePage() {
       .eq('date_realisation', today)
       .order('heure_realisation', { ascending: false }),
     supabase.from('releves_temperatures')
-      .select(`id, equipement, type_equipement, temperature, temperature_min_ok, temperature_max_ok, conforme, moment, employe_id, notes, created_at,
+      .select(`id, equipement, type_equipement, temperature, temperature_min_ok, temperature_max_ok, conforme, moment, employe_id, notes, date_releve, created_at,
                employe:employes!employe_id(prenom, nom)`)
+      .order('date_releve', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(60),
     supabase.from('plans_haccp').select('*').eq('actif', true).order('ccp_numero', { nullsFirst: false }).order('created_at'),
@@ -97,7 +98,8 @@ export default async function HygienePage() {
   type ReleveRow = { id: string; equipement: string; type_equipement: string | null;
     temperature: number | string; temperature_min_ok: number | string | null;
     temperature_max_ok: number | string | null; conforme: boolean | null;
-    moment: string | null; employe_id: string | null; notes: string | null; created_at: string;
+    moment: string | null; employe_id: string | null; notes: string | null;
+    date_releve: string; created_at: string;
     employe?: { prenom?: string; nom?: string } | null }
   const releves: ReleveTemperature[] = ((relevesRes.data ?? []) as ReleveRow[]).map(r => {
     const e = r.employe
@@ -112,6 +114,7 @@ export default async function HygienePage() {
       employe_id: r.employe_id,
       employe_nom: e ? `${e.prenom ?? ''} ${e.nom ?? ''}`.trim() : null,
       notes: r.notes,
+      date_releve: r.date_releve,
       created_at: r.created_at,
     }
   })

@@ -26,8 +26,9 @@ export default async function RegistreHygienePrintPage() {
   const [paramsRes, tempRes, checkRes, ncRes] = await Promise.all([
     supabase.from('parametres').select('cle, valeur').in('cle', ['etablissement_nom', 'etablissement_adresse', 'etablissement_siret']),
     supabase.from('releves_temperatures')
-      .select('equipement, type_equipement, temperature, conforme, created_at, employe:employes!employe_id(prenom, nom)')
-      .gte('created_at', debutIso)
+      .select('equipement, type_equipement, temperature, conforme, date_releve, created_at, employe:employes!employe_id(prenom, nom)')
+      .gte('date_releve', debutDate)
+      .order('date_releve', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(300),
     supabase.from('checklists_hygiene')
@@ -53,7 +54,7 @@ export default async function RegistreHygienePrintPage() {
       type: (t.type_equipement as string) ?? null,
       temperature: Number(t.temperature ?? 0),
       conforme: (t.conforme as boolean) ?? null,
-      date: t.created_at as string,
+      date: (t.date_releve ?? t.created_at) as string,
       employe: nom(t.employe as never),
     })),
     checklists: (checkRes.data ?? []).map(c => ({

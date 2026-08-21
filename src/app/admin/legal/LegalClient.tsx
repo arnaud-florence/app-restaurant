@@ -22,7 +22,7 @@ import {
 } from './actions'
 import type { DataLegal } from './page'
 
-type Tab = 'obligations' | 'affichages' | 'accidents' | 'registre'
+type Tab = 'obligations' | 'affichages' | 'accidents' | 'documents' | 'registre'
 
 export default function LegalClient({ data }: { data: DataLegal }) {
   const [tab, setTab] = useState<Tab>('obligations')
@@ -73,6 +73,9 @@ export default function LegalClient({ data }: { data: DataLegal }) {
             <PillTab active={tab === 'accidents'} onClick={() => setTab('accidents')}>
               🩹 Accidents <PillCount n={data.accidents.length} active={tab === 'accidents'} />
             </PillTab>
+            <PillTab active={tab === 'documents'} onClick={() => setTab('documents')}>
+              📁 Documents <PillCount n={data.documents.length} active={tab === 'documents'} />
+            </PillTab>
             <PillTab active={tab === 'registre'} onClick={() => setTab('registre')}>📜 Registre sécurité</PillTab>
           </div>
         </AdminPageHeader>
@@ -80,6 +83,7 @@ export default function LegalClient({ data }: { data: DataLegal }) {
         {tab === 'obligations' && <ObligationsTab obligations={data.obligations} onError={flashKo} onOk={flashOk} />}
         {tab === 'affichages'  && <AffichagesTab affichages={data.affichages} onError={flashKo} onOk={flashOk} />}
         {tab === 'accidents'   && <AccidentsTab accidents={data.accidents} employes={data.employes} onError={flashKo} onOk={flashOk} />}
+        {tab === 'documents'   && <DocumentsTab documents={data.documents} onError={flashKo} onOk={flashOk} />}
         {tab === 'registre'    && <RegistreTab data={data} />}
       </main>
 
@@ -617,5 +621,166 @@ function ModalActions({ onClose, onValider, pending, validLabel }: { onClose: ()
       <button onClick={onClose} disabled={pending} className="flex-1 min-h-[48px] rounded-md bg-zinc-100 hover:bg-zinc-200 font-bold">Annuler</button>
       <button onClick={onValider} disabled={pending} className="flex-[2] min-h-[48px] rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 text-white font-bold">{pending ? '…' : validLabel}</button>
     </div>
+  )
+}
+
+
+// ─── TAB Documents — coffre des justificatifs de conformité ─────────
+// Permis d'exploitation, attestations HACCP, rapports de contrôle,
+// assurances… Catégorie en texte LIBRE (même philosophie que la
+// traçabilité) ; upload en photo ou PDF via /api/conformite/documents.
+
+function DocumentsTab({
+  documents, onError, onOk,
+}: {
+  documents: import('./page').DocumentConformite[]
+  onError: (e: unknown) => void
+  onOk: (m: string) => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [titre, setTitre] = useState('')
+  const [categorie, setCategorie] = useState('')
+  const [dateDocument, setDateDocument] = useState('')
+  const [dateExpiration, setDateExpiration] = useState('')
+  const [notes, setNotes] = useState('')
+  const [fichier, setFichier] = useState<File | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const router = useRouter()
+
+  const fmtTaille = (o: number | null) =>
+    o == null ? '' : o > 1024 * 1024 ? `${(o / 1024 / 1024).toFixed(1)} Mo` : `${Math.round(o / 1024)} Ko`
+
+  const etatExpiration = (d: string | null): 'expire' | 'proche' | null => {
+    if (!d) return null
+    const jours = Math.floor((new Date(d).getTime() - Date.now()) / 86400000)
+    return jours < 0 ? 'expire' : jours <= 30 ? 'proche' : null
+  }
+
+  async function envoyer() {
+    if (!titre.trim()) { onError(new Error('Titre obligatoire')); return }
+    if (!fichier) { onError(new Error('Choisis un fichier (PDF ou photo)')); return }
+    setEnvoi(true)
+    try {
+      const fd = new FormData()
+      fd.set('fichier', fichier)
+      fd.set('titre', titre.trim())
+      fd.set('categorie', categorie.trim())
+      fd.set('date_document', dateDocument)
+      fd.set('date_expiration', dateExpiration)
+      fd.set('notes', notes.trim())
+      const r = await fetch('/api/conformite/documents', { method: 'POST', body: fd })
+      const json = await r.json()
+      if (!r.ok || !json.ok) throw new Error(json.error ?? `HTTP ${r.status}`)
+      setShowForm(false)
+      setTitre(''); setCategorie(''); setDateDocument(''); setDateExpiration(''); setNotes(''); setFichier(null)
+      onOk('Document enregistré')
+      router.refresh()
+    } catch (e) { onError(e) } finally { setEnvoi(false) }
+  }
+
+  async function supprimer(d: import('./page').DocumentConformite) {
+    if (!(await askConfirm({
+      title: 'Supprimer ce document',
+      message: `Supprimer définitivement « ${d.titre} » ? Le fichier sera effacé du stockage.`,
+      confirmLabel: 'Supprimer', danger: true,
+    }))) return
+    try {
+      const r = await fetch(`/api/conformite/documents?id=${d.id}`, { method: 'DELETE' })
+      const json = await r.json()
+      if (!r.ok || !json.ok) throw new Error(json.error ?? `HTTP ${r.status}`)
+      onOk('Document supprimé')
+      router.refresh()
+    } catch (e) { onError(e) }
+  }
+
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white">
+      <header className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold">Documents de conformité</h2>
+          <p className="text-xs text-zinc-500">Permis d&apos;exploitation, attestations HACCP, contrôles, assurances…</p>
+        </div>
+        <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm shrink-0">
+          + Ajouter
+        </button>
+      </header>
+
+      <div className="divide-y divide-zinc-100">
+        {documents.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-zinc-400">
+            Aucun document. Ajoute ici tes justificatifs officiels — ils seront toujours sous la main lors d&apos;un contrôle.
+          </p>
+        ) : documents.map(d => {
+          const exp = etatExpiration(d.date_expiration)
+          return (
+            <article key={d.id} className={cn('px-4 py-3 flex items-start gap-3',
+              exp === 'expire' && 'bg-red-50', exp === 'proche' && 'bg-amber-50')}>
+              <span className="text-2xl shrink-0">{(d.fichier_nom ?? '').toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <a href={d.fichier_url} target="_blank" rel="noreferrer" className="font-semibold hover:underline">
+                    {d.titre}
+                  </a>
+                  {d.categorie && <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-100 rounded px-1.5 py-0.5 text-zinc-600">{d.categorie}</span>}
+                  {exp === 'expire' && <span className="text-[10px] font-bold text-red-700">⚠ EXPIRÉ</span>}
+                  {exp === 'proche' && <span className="text-[10px] font-bold text-amber-700">⏳ expire bientôt</span>}
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {[
+                    d.date_document && `document du ${new Date(d.date_document).toLocaleDateString('fr-FR')}`,
+                    d.date_expiration && `valide jusqu'au ${new Date(d.date_expiration).toLocaleDateString('fr-FR')}`,
+                    fmtTaille(d.taille_octets),
+                  ].filter(Boolean).join(' · ') || '—'}
+                </p>
+                {d.notes && <p className="text-xs text-zinc-600 mt-1">{d.notes}</p>}
+              </div>
+              <button onClick={() => supprimer(d)} aria-label={`Supprimer ${d.titre}`}
+                className="min-h-[36px] w-9 rounded border border-zinc-200 text-zinc-400 hover:text-red-600 hover:border-red-300 shrink-0">🗑</button>
+            </article>
+          )
+        })}
+      </div>
+
+      {showForm && (
+        <Modal title="Ajouter un document" onClose={() => setShowForm(false)} disabled={envoi}>
+          <Field label="Titre *">
+            <input value={titre} onChange={e => setTitre(e.target.value)}
+              placeholder="Ex : Permis d'exploitation 2026"
+              className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+          </Field>
+          <Field label="Catégorie (libre)">
+            <input value={categorie} onChange={e => setCategorie(e.target.value)}
+              placeholder="Ex : permis, HACCP, contrôle, assurance…" list="categories-conformite"
+              className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+            <datalist id="categories-conformite">
+              <option value="Permis d'exploitation" /><option value="Formation HACCP" />
+              <option value="Contrôle officiel" /><option value="Assurance" />
+              <option value="Licence" /><option value="Bail" />
+            </datalist>
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Date du document">
+              <input type="date" value={dateDocument} onChange={e => setDateDocument(e.target.value)}
+                className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+            </Field>
+            <Field label="Expire le (optionnel)">
+              <input type="date" value={dateExpiration} onChange={e => setDateExpiration(e.target.value)}
+                className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+            </Field>
+          </div>
+          <Field label="Fichier * (PDF ou photo, 15 Mo max)">
+            <input type="file" accept="application/pdf,image/*"
+              onChange={e => setFichier(e.target.files?.[0] ?? null)}
+              className="w-full text-sm file:mr-3 file:min-h-[40px] file:px-3 file:rounded-md file:border-0 file:bg-zinc-900 file:text-white file:font-bold" />
+            {fichier && <p className="text-xs text-zinc-500 mt-1">{fichier.name} · {fmtTaille(fichier.size)}</p>}
+          </Field>
+          <Field label="Notes (optionnel)">
+            <input value={notes} onChange={e => setNotes(e.target.value)}
+              className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+          </Field>
+          <ModalActions onClose={() => setShowForm(false)} onValider={envoyer} pending={envoi} validLabel="⬆️ Enregistrer" />
+        </Modal>
+      )}
+    </section>
   )
 }

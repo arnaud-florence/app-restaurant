@@ -8,17 +8,31 @@ import {
 export const metadata = { title: 'Obligations légales — Admin' }
 export const dynamic = 'force-dynamic'
 
+export type DocumentConformite = {
+  id: string
+  titre: string
+  categorie: string | null
+  fichier_url: string
+  fichier_nom: string | null
+  taille_octets: number | null
+  date_document: string | null
+  date_expiration: string | null
+  notes: string | null
+  created_at: string
+}
+
 export type DataLegal = {
   obligations: Obligation[]
   accidents: Accident[]
   affichages: Affichage[]
   employes: { id: string; prenom: string; nom: string; poste: string }[]
+  documents: DocumentConformite[]
 }
 
 export default async function LegalPage() {
   const supabase = await createClient()
 
-  const [oblRes, accRes, affRes, empRes] = await Promise.all([
+  const [oblRes, accRes, affRes, empRes, docRes] = await Promise.all([
     supabase.from('obligations_legales')
       .select('id, titre, categorie, description, date_echeance, frequence, statut, prestataire, document_url, notes')
       .order('date_echeance', { nullsFirst: false }),
@@ -30,6 +44,7 @@ export default async function LegalPage() {
       .select('*')
       .order('ordre'),
     supabase.from('employes').select('id, prenom, nom, poste').eq('actif', true).order('prenom'),
+    supabase.from('documents_conformite').select('*').order('created_at', { ascending: false }),
   ])
 
   const obligations: Obligation[] = (oblRes.data ?? []).map(o => ({
@@ -82,5 +97,7 @@ export default async function LegalPage() {
     id: e.id as string, prenom: e.prenom as string, nom: e.nom as string, poste: e.poste as string,
   }))
 
-  return <LegalClient data={{ obligations, accidents, affichages, employes }} />
+  const documents = (docRes.data ?? []) as DocumentConformite[]
+
+  return <LegalClient data={{ obligations, accidents, affichages, employes, documents }} />
 }

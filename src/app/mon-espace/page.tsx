@@ -286,7 +286,7 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
         : Promise.resolve({ count: 0 } as { count: number }),
       supabase.from('releves_temperatures')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', weekISO + 'T00:00:00'),
+        .gte('date_releve', weekISO),
       supabase.from('non_conformites')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', weekISO + 'T00:00:00')
@@ -362,7 +362,7 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
         : Promise.resolve({ count: 0 } as { count: number }),
       supabase.from('releves_temperatures')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', weekISO + 'T00:00:00'),
+        .gte('date_releve', weekISO),
     ])
     statsPoste = [
       { emoji: '🍳', label: 'Plats équipe',  value: String(cmdArtRes.count ?? 0), sublabel: 'cette semaine' },

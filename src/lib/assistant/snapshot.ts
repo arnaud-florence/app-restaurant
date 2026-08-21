@@ -75,7 +75,7 @@ export async function genererSnapshot(supabase: SupabaseClient): Promise<Snapsho
     foodCostMoyenEtAlertes(supabase),  // food cost calculé runtime (recettes.food_cost_pct n'existe pas)
     supabase.from('non_conformites').select('id, gravite, date_constat, statut').eq('statut', 'ouverte'),
     supabase.from('releves_temperatures').select('id', { count: 'exact', head: true })
-      .gte('created_at', aujourdhui + 'T00:00:00').lte('created_at', aujourdhui + 'T23:59:59'),
+      .eq('date_releve', aujourdhui),
     supabase.from('lots_produits').select('id, dlc, statut').eq('statut', 'en_stock').not('dlc', 'is', null),
     supabase.from('obligations_legales').select('id, date_echeance, statut').neq('statut', 'fait'),
     supabase.from('factures_fournisseurs').select('id, montant_ttc, statut').eq('statut', 'a_payer'),

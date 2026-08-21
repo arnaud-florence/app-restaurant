@@ -70,7 +70,7 @@ async function analyseTemperatures(ctx: AgentContext) {
   const { data: relevesJour } = await ctx.supabase
     .from('releves_temperatures')
     .select('id, equipement, type_equipement, temperature, conforme, moment, created_at')
-    .gte('created_at', `${todayStr}T00:00:00`)
+    .eq('date_releve', todayStr)
 
   // Liste des équipements connus = ceux qui ont eu au moins un relevé sur 30j
   const il30j = new Date(); il30j.setDate(il30j.getDate() - 30)
