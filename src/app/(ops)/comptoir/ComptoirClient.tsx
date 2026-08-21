@@ -15,13 +15,16 @@ type LignePanier = { produit: ProduitComptoir; qte: number }
 type FormLivraison = { nom: string; telephone: string; adresse: string; commune: string }
 
 export default function ComptoirClient({
-  config, produits, livraison,
+  config, produits, livraison, build,
 }: {
   config: ComptoirDef
   produits: ProduitComptoir[]
   /** Config de livraison — absente si le module livraison est éteint,
    *  auquel cas le bloc « à livrer » n'apparaît pas du tout. */
   livraison?: { communes: string[]; heureLimite: string; heureTournee: string } | null
+  /** Version déployée, affichée dans l'en-tête pour repérer une tablette
+   *  restée sur une version mise en cache par le service worker. */
+  build?: string
 }) {
   const router = useRouter()
   const a = ACCENTS[config.accent]
@@ -120,7 +123,10 @@ export default function ComptoirClient({
             <div>
               <p className={cn('text-[10px] font-black uppercase tracking-[0.2em] leading-none', a.kicker)}>Point de vente</p>
               <h1 className="font-display italic text-xl sm:text-2xl font-medium text-white leading-none mt-0.5">{config.label}</h1>
-              <p className="text-[10px] text-zinc-500 mt-0.5">{config.sousTitre}</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">
+                {config.sousTitre}
+                {build && <span className="ml-2 opacity-60 tabular-nums">v{build}</span>}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">

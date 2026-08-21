@@ -11,6 +11,35 @@ import { getComptoir } from '@/lib/comptoir/config'
 import { getConfigLivraisonFournil } from '@/lib/activation/server'
 import { tourneePour, communeLivrable } from '@/lib/activation/config'
 
+// Un message qu'une personne au comptoir peut lire.
+//
+// `schema.parse()` lève une ZodError dont `.message` est le tableau JSON des
+// problèmes. Renvoyé tel quel, il s'affichait sur une ligne étroite où seuls
+// les deux premiers mots — « Invalid input » — étaient lisibles : impossible
+// de savoir quel champ manquait, ni pour l'équipe, ni pour nous.
+const LIBELLES: Record<string, string> = {
+  'livraison.nom':        'le nom du client',
+  'livraison.telephone':  'le téléphone',
+  'livraison.adresse':    "l'adresse (au moins 5 caractères)",
+  'livraison.commune':    'la commune',
+  'articles':             'le panier',
+  'slug':                 'le point de vente',
+}
+
+function messageLisible(e: unknown): string {
+  if (e instanceof z.ZodError) {
+    const champs = e.issues.map(i => {
+      const chemin = i.path.filter(p => typeof p !== 'number').join('.')
+      return LIBELLES[chemin] ?? chemin ?? 'un champ'
+    })
+    const uniques = [...new Set(champs)]
+    return uniques.length === 1
+      ? `Il manque ${uniques[0]}.`
+      : `Champs à compléter : ${uniques.join(', ')}.`
+  }
+  return e instanceof Error ? e.message : String(e)
+}
+
 const schema = z.object({
   slug: z.string().min(1),
   articles: z.array(z.object({
@@ -130,6 +159,6 @@ export async function creerCommandeComptoir(input: z.infer<typeof schema>) {
     if (d.livraison) revalidatePath('/livreur')
     return { ok: true as const, numero: cmd.numero, total: total_ttc }
   } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : String(e) }
+    return { ok: false as const, error: messageLisible(e) }
   }
 }

@@ -65,5 +65,10 @@ export default async function ComptoirPage({ params }: { params: { slug: string 
       }))
     : null
 
-  return <ComptoirClient config={cfg} produits={produits} livraison={livraison} />
+  // Version du déploiement affichée dans l'en-tête. Sans elle, impossible de
+  // savoir si une tablette exécute le code du jour ou une version gardée en
+  // cache par le service worker — on débogue alors à l'aveugle.
+  const build = (process.env.VERCEL_GIT_COMMIT_SHA ?? 'local').slice(0, 7)
+
+  return <ComptoirClient config={cfg} produits={produits} livraison={livraison} build={build} />
 }
