@@ -140,7 +140,7 @@ export default function ComptoirClient({
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-3 sm:gap-4 p-3 sm:p-5 max-lg:pb-44">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-3 sm:gap-4 p-3 sm:p-5 pb-56 lg:pb-5">
         {/* Catalogue */}
         <div>
           {/* Filtres catégories */}
@@ -191,11 +191,23 @@ export default function ComptoirClient({
         {/* Panier */}
         <aside className={cn(
           'bg-zinc-900 ring-1 ring-zinc-800 p-3 sm:p-4 flex flex-col rounded-2xl',
-          'lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-110px)]',
-          // Sous lg : ancrée en bas de l'écran, au-dessus du catalogue.
-          'max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40',
-          'max-lg:rounded-b-none max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.6)]',
-          panierDeplie && 'max-lg:max-h-[80vh]',
+          // ─── Mobile d'abord ────────────────────────────────────────
+          // Écrit en mobile-first et non avec `max-lg:` : les variantes
+          // descendantes ne s'appliquaient pas sur l'appareil de l'équipe et
+          // le panier restait invisible. Ici la feuille est ancrée par défaut
+          // et c'est le DESKTOP qui repasse en colonne — si une variante
+          // devait encore échouer, le pire cas serait un panier flottant sur
+          // grand écran, pas un panier introuvable au comptoir.
+          'fixed inset-x-2 z-40 shadow-[0_-8px_30px_rgba(0,0,0,0.6)]',
+          // La barre d'action mobile occupe `bottom-3` sur ~73 px, jusqu'à
+          // ~106 px avec le home indicator. On se pose AU-DESSUS d'elle
+          // plutôt que par-dessus : recouvrir la navigation réglerait un
+          // problème en en créant un autre.
+          'bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]',
+          panierDeplie ? 'max-h-[70vh]' : 'max-h-none',
+          // ─── Desktop : colonne de la grille, comme avant ────────────
+          'lg:sticky lg:inset-x-auto lg:bottom-auto lg:z-auto',
+          'lg:shadow-none lg:top-[88px] lg:max-h-[calc(100vh-110px)]',
         )}>
           {/* Poignée tactile : n'existe que sous lg, où la feuille se replie. */}
           <button
@@ -211,13 +223,26 @@ export default function ComptoirClient({
             </span>
           </button>
 
-          <p className="max-lg:hidden text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-2">🛒 Panier {nbArticles > 0 && `· ${nbArticles}`}</p>
+          {/* Repartir de zéro d'un geste. Sans ça, corriger un panier erroné
+              obligeait à décrémenter chaque ligne une par une — inacceptable
+              avec du monde devant le comptoir. */}
+          {nbArticles > 0 && (
+            <button
+              type="button"
+              onClick={() => setPanier(new Map())}
+              className="mb-2 self-start text-xs font-bold text-red-300 hover:text-red-200 underline underline-offset-2 min-h-[36px]"
+            >
+              Vider le panier
+            </button>
+          )}
+
+          <p className="hidden lg:block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-2">🛒 Panier {nbArticles > 0 && `· ${nbArticles}`}</p>
           {lignes.length === 0 ? (
-            <p className={cn('text-sm text-zinc-500 italic py-6 text-center', !panierDeplie && 'max-lg:hidden')}>
+            <p className={cn('text-sm text-zinc-500 italic py-6 text-center', !panierDeplie && 'hidden lg:block')}>
               Touche un produit pour l&apos;ajouter.
             </p>
           ) : (
-            <ul className={cn('space-y-2 overflow-y-auto flex-1 -mr-1 pr-1', !panierDeplie && 'max-lg:hidden')}>
+            <ul className={cn('space-y-2 overflow-y-auto flex-1 -mr-1 pr-1', !panierDeplie && 'hidden lg:block')}>
               {lignes.map(l => (
                 <li key={l.produit.id} className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
@@ -236,7 +261,7 @@ export default function ComptoirClient({
 
           {/* Commande téléphonique à livrer — rejoint la tournée du jour */}
           {livraison && (
-            <div className={cn('border-t border-zinc-800 mt-3 pt-3', !panierDeplie && 'max-lg:hidden')}>
+            <div className={cn('border-t border-zinc-800 mt-3 pt-3', !panierDeplie && 'hidden lg:block')}>
               <button
                 type="button"
                 onClick={() => setALivrer(v => !v)}
