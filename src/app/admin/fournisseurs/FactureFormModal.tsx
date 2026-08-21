@@ -26,6 +26,14 @@ export default function FactureFormModal({
     montant_ht?: number | null
     montant_ttc?: number | null
     notes?: string | null
+    lignes?: Array<{
+      description: string
+      quantite: number | null
+      unite: string | null
+      prix_unitaire_ht: number | null
+      total_ht: number | null
+    }>
+    nb_pages?: number
   }
 }) {
   const [isPending, startTransition] = useTransition()
@@ -87,6 +95,8 @@ export default function FactureFormModal({
           montant_ttc: parseFloat(montantTTC) || 0,
           statut,
           notes: notes || null,
+          lignes: initial?.lignes ?? [],
+          nb_pages: initial?.nb_pages ?? 1,
         })
         onSaved()
       } catch (e) { setErreur(e instanceof Error ? e.message : 'Erreur') }
@@ -161,6 +171,15 @@ export default function FactureFormModal({
             <Input type="number" step="0.01" min={0} value={montantTTC} onChange={e => setMontantTTC(e.target.value)} />
           </div>
         </div>
+
+        {initial?.lignes && initial.lignes.length > 0 && (
+          <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-900">
+            📋 <b>{initial.lignes.length} ligne(s)</b> extraite(s)
+            {(initial.nb_pages ?? 1) > 1 ? ` sur ${initial.nb_pages} pages` : ''} seront enregistrées
+            avec la facture. Les prix reconnus mettront à jour le prix d&apos;achat des ingrédients
+            correspondants — c&apos;est ce qui alimente le calcul des marges.
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label>Notes</Label>

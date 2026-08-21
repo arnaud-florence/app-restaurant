@@ -126,8 +126,10 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Notification commande web | type `commande_online_recue` autorisé — l'insert échouait en silence | 0116 |
 | Adresse postale | Parking des Ferrages, 83136 Sainte Anastasie sur Issole | 0117 |
 | Produits hors Fournil endormis | `masque_hors_saison` — réveil par `sql/reveil-restaurant.sql` | 0118 |
+| Visuels produits sans photo | plaques typographiques + vraies photos boissons de marque | 0124 |
+| Factures multi-pages + lignes | scanner N pages en 1 appel, `facture_lignes`, prix d'achat auto | 0125 |
 
-**Migrations actuelles : 0001 → 0118.**
+**Migrations actuelles : 0001 → 0125.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -149,6 +151,27 @@ prix du panneau — et sous-déclarerait la TVA sur la moitié de la carte.
 
 `prix_vente_ht` est en `decimal(10,4)` depuis la 0114 : à 2 décimales, un TTC
 de 2,40 € à 5,5 % est inatteignable (2,27 → 2,39 ; 2,28 → 2,41).
+
+### Factures fournisseurs : les lignes font les marges
+
+`facture_lignes` (0125) conserve le détail extrait par le scanner Claude
+Vision — il était jeté avant, seuls les totaux survivaient. À la création
+d'une facture, chaque ligne est rapprochée d'un ingrédient (normalisation
+casse/accents, noms ≥ 4 caractères — un faux rapprochement écrirait un faux
+prix, pire qu'aucun) ; les lignes rapprochées mettent à jour
+`ingredients.prix_achat_ht` et tracent `historique_prix_ingredients`
+(source `livraison`).
+
+Le scanner accepte jusqu'à 8 pages **dans un seul appel** Claude Vision
+(un JSON unique : totaux non dupliqués, pas de fusion de « reports »). Le
+front réduit chaque photo à 1600 px avant envoi — 3 photos d'iPhone brutes
+dépasseraient la limite de corps de requête Vercel (~4,5 Mo).
+
+⚠️ Maillon suivant pour des marges réelles : les 90 produits Fournil n'ont
+**aucune composition** (`recette_ingredients` vide pour eux — les 353 liaisons
+en base sont celles des recettes de démo). Tant qu'elles ne sont pas saisies,
+le food cost des produits reste incalculable, même avec des prix d'achat à
+jour. Test : `node scripts/test-facture-lignes.mjs`.
 
 ### Clôture d'une commande web retirée au comptoir
 

@@ -57,24 +57,44 @@ export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 500 })
 
-  // Lit l'image depuis le body (JSON base64 ou multipart)
+  // Lit les pages depuis le body. Une facture fournisseur fait souvent
+  // plusieurs pages (Metro, Transgourmet…) : on accepte un tableau `images`
+  // et on envoie TOUTES les pages dans le même appel Claude Vision — c'est ce
+  // qui permet un total unique et des lignes non dupliquées, là où un appel
+  // par page obligerait à fusionner des JSON partiels (totaux répétés,
+  // report « suite page 2 » compté deux fois…).
+  // `image_base64` seul reste accepté pour compatibilité.
   const contentType = req.headers.get('content-type') ?? ''
-  let imageBase64: string
-  let mediaType: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg'
+  type Page = { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' }
+  const pages: Page[] = []
+  const normaliser = (b64: string, mt?: string): Page => ({
+    data: b64.replace(/^data:image\/[a-z]+;base64,/, ''),
+    mediaType: mt === 'image/png' || mt === 'image/webp' ? mt : 'image/jpeg',
+  })
 
   try {
     if (contentType.includes('application/json')) {
-      const body = await req.json() as { image_base64?: string; media_type?: string }
-      if (!body.image_base64) return NextResponse.json({ error: 'image_base64 requis' }, { status: 400 })
-      imageBase64 = body.image_base64.replace(/^data:image\/[a-z]+;base64,/, '')
-      if (body.media_type === 'image/png' || body.media_type === 'image/webp') mediaType = body.media_type
+      const body = await req.json() as {
+        image_base64?: string; media_type?: string
+        images?: Array<{ image_base64: string; media_type?: string }>
+      }
+      if (Array.isArray(body.images) && body.images.length > 0) {
+        for (const im of body.images) {
+          if (im?.image_base64) pages.push(normaliser(im.image_base64, im.media_type))
+        }
+      } else if (body.image_base64) {
+        pages.push(normaliser(body.image_base64, body.media_type))
+      }
+      if (pages.length === 0) return NextResponse.json({ error: 'image_base64 ou images[] requis' }, { status: 400 })
     } else if (contentType.includes('multipart/form-data')) {
       const form = await req.formData()
-      const file = form.get('image') as File | null
-      if (!file) return NextResponse.json({ error: 'image manquante' }, { status: 400 })
-      const buf = Buffer.from(await file.arrayBuffer())
-      imageBase64 = buf.toString('base64')
-      if (file.type === 'image/png' || file.type === 'image/webp') mediaType = file.type
+      // getAll accepte plusieurs champs `image` — une page par fichier
+      for (const f of form.getAll('image')) {
+        if (!(f instanceof File)) continue
+        const buf = Buffer.from(await f.arrayBuffer())
+        pages.push(normaliser(buf.toString('base64'), f.type))
+      }
+      if (pages.length === 0) return NextResponse.json({ error: 'image manquante' }, { status: 400 })
     } else {
       return NextResponse.json({ error: 'Content-Type non supporté (application/json ou multipart/form-data)' }, { status: 415 })
     }
@@ -82,10 +102,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Lecture image échouée : ${e instanceof Error ? e.message : 'erreur'}` }, { status: 400 })
   }
 
-  // Vérifie taille raisonnable (Claude Vision : max 5MB recommandé)
-  const tailleKo = Math.ceil(imageBase64.length / 1024 * 0.75)
+  if (pages.length > 8) {
+    return NextResponse.json({ error: `${pages.length} pages : maximum 8 par facture.` }, { status: 413 })
+  }
+  // Taille TOTALE : le front réduit chaque page (~1600 px) avant envoi, la
+  // limite serveur n'est qu'un garde-fou.
+  const tailleKo = Math.ceil(pages.reduce((s, pg) => s + pg.data.length, 0) / 1024 * 0.75)
   if (tailleKo > 6000) {
-    return NextResponse.json({ error: `Image trop volumineuse (${tailleKo}KB > 6MB). Réduis la résolution.` }, { status: 413 })
+    return NextResponse.json({ error: `Pages trop volumineuses (${tailleKo}KB > 6MB au total). Réduis la résolution.` }, { status: 413 })
   }
 
   // Lance l'agent (loggue dans agents_runs + agent_findings)
@@ -94,7 +118,7 @@ export async function POST(req: Request) {
   const captured: { extracted: FactureExtraite | null; analyse: AnalyseOut | null } = { extracted: null, analyse: null }
 
   const result = await runAgent('scanner', async (ctx) => {
-    const extracted = await extraireDocument(apiKey, imageBase64, mediaType)
+    const extracted = await extraireDocument(apiKey, pages)
     const analyse = await analyserExtraction(ctx, extracted)
     captured.extracted = extracted
     captured.analyse = analyse
@@ -112,6 +136,7 @@ export async function POST(req: Request) {
     ok: true,
     runId: result.runId,
     extracted: captured.extracted,
+    nb_pages: pages.length,
     haussesDetectees: captured.analyse?.haussesDetectees ?? [],
   })
 }
@@ -119,7 +144,10 @@ export async function POST(req: Request) {
 // ─────────────────────────────────────────────────────────────
 // Extraction via Claude Vision
 // ─────────────────────────────────────────────────────────────
-async function extraireDocument(apiKey: string, imageBase64: string, mediaType: 'image/jpeg' | 'image/png' | 'image/webp'): Promise<FactureExtraite> {
+async function extraireDocument(
+  apiKey: string,
+  pages: Array<{ data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' }>,
+): Promise<FactureExtraite> {
   const client = new Anthropic({ apiKey })
 
   const systemPrompt = `Tu es un expert en lecture de documents commerciaux français : factures, bons de livraison, tickets de caisse, notes de frais.
@@ -146,17 +174,22 @@ Le champ "confiance" est ton estimation 0..1 de la qualité OCR (1 = parfait, 0.
   "notes": string | null
 }
 
-Pour les lignes : sois exhaustif (toutes les lignes du document). Pour les tickets de caisse simples, type="ticket" et lignes peut être vide.`
+Pour les lignes : sois exhaustif (toutes les lignes du document). Pour les tickets de caisse simples, type="ticket" et lignes peut être vide.${pages.length > 1 ? `
+
+IMPORTANT : les ${pages.length} images sont les pages successives d'UN SEUL ET MÊME document. Renvoie UN SEUL JSON couvrant l'ensemble : toutes les lignes de toutes les pages, et les montants totaux UNE seule fois (ceux de la dernière page font foi ; ignore les sous-totaux « report » ou « suite »).` : ''}`
 
   const resp = await client.messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: 6000,
     system: systemPrompt,
     messages: [{
       role: 'user',
       content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-        { type: 'text', text: userPrompt },
+        ...pages.map(pg => ({
+          type: 'image' as const,
+          source: { type: 'base64' as const, media_type: pg.mediaType, data: pg.data },
+        })),
+        { type: 'text' as const, text: userPrompt },
       ],
     }],
   })

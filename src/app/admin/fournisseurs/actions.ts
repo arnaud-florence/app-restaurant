@@ -36,6 +36,14 @@ const bonCommandeSchema = z.object({
   })),
 })
 
+const factureLigneSchema = z.object({
+  description: z.string().min(1).max(300),
+  quantite: z.number().nullable().optional(),
+  unite: z.string().max(30).nullable().optional(),
+  prix_unitaire_ht: z.number().nullable().optional(),
+  total_ht: z.number().nullable().optional(),
+})
+
 const factureSchema = z.object({
   fournisseur_id: z.string().uuid(),
   bon_commande_id: z.string().uuid().optional().nullable(),
@@ -46,6 +54,8 @@ const factureSchema = z.object({
   montant_ttc: z.number().min(0),
   statut: z.enum(['a_payer','paye','en_retard','litige','annule']),
   notes: z.string().max(1000).optional().nullable(),
+  lignes: z.array(factureLigneSchema).max(200).optional().default([]),
+  nb_pages: z.number().int().min(1).max(8).optional().default(1),
 })
 
 const receptionLigneSchema = z.object({
@@ -487,10 +497,18 @@ export async function validerReception(bon_id: string) {
 }
 
 // ─── Factures ────────────────────────────────────────────────────────
+// Rapprochement ligne de facture → ingrédient : comparaison insensible à la
+// casse et aux accents, sur l'inclusion du nom le plus court dans le plus
+// long. Volontairement prudent (noms de 4 caractères minimum) : un mauvais
+// rapprochement écrirait un faux prix d'achat, ce qui est pire qu'aucun.
+function normaliserNom(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+}
+
 export async function createFacture(input: unknown) {
   const p = factureSchema.parse(input)
   const supabase = await createClient()
-  const { error } = await supabase.from('factures_fournisseurs').insert({
+  const { data: facture, error } = await supabase.from('factures_fournisseurs').insert({
     fournisseur_id: p.fournisseur_id,
     bon_commande_id: p.bon_commande_id || null,
     numero: p.numero,
@@ -500,10 +518,65 @@ export async function createFacture(input: unknown) {
     montant_ttc: p.montant_ttc,
     statut: p.statut,
     notes: p.notes || null,
-  })
+    nb_pages: p.nb_pages,
+  }).select('id').single()
   if (error) throw new Error(error.message)
+
+  let lignesInserees = 0
+  let prixMisAJour = 0
+
+  if (p.lignes.length > 0 && facture) {
+    // Rapprochement en mémoire : ~100 ingrédients, inutile de requêter par ligne
+    const { data: ings } = await supabase.from('ingredients')
+      .select('id, nom').eq('actif', true)
+    const ingredients = (ings ?? []).map(i => ({ id: i.id as string, nom: normaliserNom(i.nom as string) }))
+
+    const rows = p.lignes.map(l => {
+      const desc = normaliserNom(l.description)
+      const match = ingredients.find(i =>
+        i.nom.length >= 4 && (desc.includes(i.nom) || (desc.length >= 4 && i.nom.includes(desc))),
+      )
+      return {
+        facture_id: facture.id as string,
+        description: l.description,
+        quantite: l.quantite ?? null,
+        unite: l.unite ?? null,
+        prix_unitaire_ht: l.prix_unitaire_ht ?? null,
+        total_ht: l.total_ht ?? null,
+        ingredient_id: match?.id ?? null,
+      }
+    })
+
+    // L'échec des lignes ne doit PAS annuler la facture : les totaux sont
+    // déjà enregistrés, on signale seulement dans la réponse.
+    const { error: eLignes } = await supabase.from('facture_lignes').insert(rows)
+    if (!eLignes) {
+      lignesInserees = rows.length
+
+      // Met à jour le prix d'achat des ingrédients rapprochés + trace
+      // l'historique (source 'livraison' — c'est ce que lisent les courbes
+      // de prix et l'alerte hausse de l'agent Scanner).
+      for (const r of rows) {
+        if (!r.ingredient_id || !r.prix_unitaire_ht || r.prix_unitaire_ht <= 0) continue
+        const { error: eIng } = await supabase.from('ingredients')
+          .update({ prix_achat_ht: r.prix_unitaire_ht, updated_at: new Date().toISOString() })
+          .eq('id', r.ingredient_id)
+        if (!eIng) {
+          prixMisAJour++
+          await supabase.from('historique_prix_ingredients').insert({
+            ingredient_id: r.ingredient_id,
+            prix_achat_ht: r.prix_unitaire_ht,
+            source: 'livraison',
+            note: `Facture ${p.numero} — ${r.description.slice(0, 120)}`,
+          })
+        }
+      }
+    }
+  }
+
   revalidatePath('/admin/fournisseurs')
-  return { ok: true as const }
+  revalidatePath('/admin/ingredients')
+  return { ok: true as const, lignes: lignesInserees, prix_mis_a_jour: prixMisAJour }
 }
 
 export async function changerStatutFacture(id: string, statut: 'a_payer'|'paye'|'en_retard'|'litige'|'annule') {

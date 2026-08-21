@@ -45,6 +45,15 @@ type ScannedFacture = {
   montant_ht: number | null
   montant_ttc: number | null
   notes: string | null
+  /** Détail ligne à ligne extrait par le scanner — alimente les marges */
+  lignes?: Array<{
+    description: string
+    quantite: number | null
+    unite: string | null
+    prix_unitaire_ht: number | null
+    total_ht: number | null
+  }>
+  nb_pages?: number
 }
 
 type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
@@ -352,6 +361,8 @@ export default function FournisseursClient({
               date_echeance: data.date_echeance,
               montant_ht: data.montant_ht,
               montant_ttc: data.montant_ttc,
+              lignes: data.lignes,
+              nb_pages: data.nb_pages,
               notes: data.notes
                 ? `Scanné par Agent IA. Notes : ${data.notes}`
                 : 'Scanné par Agent IA',
