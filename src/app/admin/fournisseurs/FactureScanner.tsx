@@ -84,7 +84,12 @@ export default function FactureScanner({
   onExtractionComplete: (data: FactureExtraite) => void
   onClose: () => void
 }) {
-  const fileRef = useRef<HTMLInputElement>(null)
+  // Deux inputs distincts : `capture="environment"` ouvre directement
+  // l'appareil photo sur mobile — mais sur la plupart des Android il EMPÊCHE
+  // de choisir dans la bibliothèque. Un seul input ne peut pas faire les
+  // deux ; chaque bouton déclenche le sien.
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galerieRef = useRef<HTMLInputElement>(null)
   const [pages, setPages] = useState<string[]>([])
   const [extracted, setExtracted] = useState<FactureExtraite | null>(null)
   const [hausses, setHausses] = useState<HausseDetectee[]>([])
@@ -94,7 +99,8 @@ export default function FactureScanner({
 
   function reset() {
     setPages([]); setExtracted(null); setHausses([]); setErreur('')
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galerieRef.current) galerieRef.current.value = ''
   }
 
   async function ajouterFichiers(files: FileList | File[]) {
@@ -110,7 +116,8 @@ export default function FactureScanner({
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Lecture des images échouée')
     }
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galerieRef.current) galerieRef.current.value = ''
   }
 
   async function analyser() {
@@ -160,10 +167,17 @@ export default function FactureScanner({
           </header>
 
           <input
-            ref={fileRef}
+            ref={cameraRef}
             type="file"
             accept="image/*"
             capture="environment"
+            className="hidden"
+            onChange={e => { if (e.target.files?.length) ajouterFichiers(e.target.files) }}
+          />
+          <input
+            ref={galerieRef}
+            type="file"
+            accept="image/*"
             multiple
             className="hidden"
             onChange={e => { if (e.target.files?.length) ajouterFichiers(e.target.files) }}
@@ -179,18 +193,23 @@ export default function FactureScanner({
                 if (e.dataTransfer.files.length) ajouterFichiers(e.dataTransfer.files)
               }}
               className={cn(
-                'border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer',
-                dragging ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-300 hover:border-emerald-400',
+                'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
+                dragging ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-300',
               )}
-              onClick={() => fileRef.current?.click()}
             >
               <p className="text-4xl mb-2">📄</p>
               <p className="font-semibold mb-1">Glisse la ou les pages ici</p>
               <p className="text-xs text-zinc-500 mb-3">
-                … ou clique pour ouvrir l&apos;appareil photo / les fichiers.
                 Une facture de plusieurs pages ? Ajoute-les toutes avant d&apos;analyser.
               </p>
-              <Button type="button" variant="outline" size="sm">Choisir une ou plusieurs images</Button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button type="button" variant="outline" className="min-h-[48px]" onClick={() => cameraRef.current?.click()}>
+                  📷 Prendre une photo
+                </Button>
+                <Button type="button" variant="outline" className="min-h-[48px]" onClick={() => galerieRef.current?.click()}>
+                  🖼️ Choisir dans la bibliothèque
+                </Button>
+              </div>
             </div>
           )}
 
@@ -218,10 +237,13 @@ export default function FactureScanner({
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => fileRef.current?.click()} variant="outline" size="sm" className="flex-1" disabled={loading}>
-                    ＋ Ajouter une page
+                  <Button onClick={() => cameraRef.current?.click()} variant="outline" size="sm" className="flex-1" disabled={loading}>
+                    📷 Photo
                   </Button>
-                  <Button onClick={reset} variant="outline" size="sm" disabled={loading}>↺ Recommencer</Button>
+                  <Button onClick={() => galerieRef.current?.click()} variant="outline" size="sm" className="flex-1" disabled={loading}>
+                    🖼️ Bibliothèque
+                  </Button>
+                  <Button onClick={reset} variant="outline" size="sm" disabled={loading}>↺</Button>
                 </div>
                 {!extracted && (
                   <Button onClick={analyser} disabled={loading} className="w-full">
