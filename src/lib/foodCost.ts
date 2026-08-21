@@ -93,10 +93,15 @@ export type SyntheseRecette = {
 export function synthese(
   lignes: LigneCout[],
   nb_portions: number,
-  prix_vente_ht: number
+  prix_vente_ht: number,
+  // Achat-revente (Fournil) : prix d'achat unitaire du produit fini.
+  // S'AJOUTE au coût de la composition — achat-revente pur : composition
+  // vide, coût = cout_achat_ht ; produit transformé : les deux s'additionnent
+  // (le surgelé acheté + la matière première associée).
+  cout_achat_ht: number = 0,
 ): SyntheseRecette {
   const total = coutTotal(lignes)
-  const portion = coutPortion(total, nb_portions)
+  const portion = coutPortion(total, nb_portions) + (cout_achat_ht > 0 ? round4(cout_achat_ht) : 0)
   const fc = foodCostPct(portion, prix_vente_ht)
   return {
     cout_total: total,

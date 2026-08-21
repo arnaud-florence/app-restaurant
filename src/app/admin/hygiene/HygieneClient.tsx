@@ -757,6 +757,7 @@ function LotsTab({
       const q = search.trim().toLowerCase()
       arr = arr.filter(l =>
         l.lot_numero.toLowerCase().includes(q)
+        || (l.produit_nom ?? '').toLowerCase().includes(q)
         || (l.ingredient_nom ?? '').toLowerCase().includes(q)
         || (l.fournisseur_nom ?? '').toLowerCase().includes(q)
       )
@@ -808,7 +809,7 @@ function LotsTab({
                       {(Object.keys(STATUT_LOT_LABEL) as StatutLot[]).map(s => <option key={s} value={s}>{STATUT_LOT_LABEL[s].label}</option>)}
                     </select>
                   </div>
-                  <p className="font-medium">{l.ingredient_nom ?? '—'}</p>
+                  <p className="font-medium">{l.produit_nom ?? l.ingredient_nom ?? '—'}</p>
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-zinc-600 tabular-nums">{l.quantite}{l.unite ? ` ${l.unite}` : ''}</span>
                     {l.dlc && (
@@ -849,7 +850,7 @@ function LotsTab({
                     a === 'proche' && l.statut === 'en_stock' && 'bg-amber-50',
                   )}>
                     <td className="px-3 py-2 font-mono text-xs">{l.lot_numero}</td>
-                    <td className="px-3 py-2">{l.ingredient_nom ?? '—'}</td>
+                    <td className="px-3 py-2">{l.produit_nom ?? l.ingredient_nom ?? '—'}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{l.quantite}{l.unite ? ` ${l.unite}` : ''}</td>
                     <td className="px-3 py-2">
                       {l.dlc ? (
@@ -904,6 +905,7 @@ function LotModal({
   onSuccess: () => void
 }) {
   const [ingredientId, setIngredientId] = useState('')
+  const [produitNom, setProduitNom] = useState('')
   const [lotNumero, setLotNumero] = useState('')
   const [dlc, setDlc] = useState('')
   const [fournisseurId, setFournisseurId] = useState('')
@@ -916,11 +918,16 @@ function LotModal({
 
   function valider() {
     if (!lotNumero.trim()) { onError(new Error('N° de lot obligatoire')); return }
+    if (!produitNom.trim() && !ingredientId) {
+      onError(new Error('Nomme le produit tracé (saisie libre) ou choisis un ingrédient'))
+      return
+    }
     const f = fournisseurs.find(x => x.id === fournisseurId)
     startTransition(async () => {
       try {
         await creerLot({
           ingredient_id: ingredientId || null,
+          produit_nom: produitNom.trim() || null,
           lot_numero: lotNumero.trim(),
           dlc: dlc || null,
           fournisseur_id: fournisseurId || null,
@@ -939,9 +946,20 @@ function LotModal({
 
   return (
     <Modal title="Nouveau lot (saisie manuelle)" onClose={onClose} disabled={isPending}>
-      <Field label="Ingrédient">
+      {/* Saisie LIBRE en premier : on trace ce qu'on veut, sans devoir
+          d'abord le créer comme ingrédient. Le lien ingrédient (en dessous)
+          reste possible mais facultatif. */}
+      <Field label="Produit tracé *">
+        <input
+          value={produitNom}
+          onChange={e => setProduitNom(e.target.value)}
+          placeholder="ex : Croissants surgelés carton 25kg, saumon fumé…"
+          className="w-full h-12 px-3 rounded-md border border-zinc-300"
+        />
+      </Field>
+      <Field label="Lier à un ingrédient (optionnel)">
         <select value={ingredientId} onChange={e => setIngredientId(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
-          <option value="">— Aucun (libre) —</option>
+          <option value="">— Aucun —</option>
           {ingredients.map(i => <option key={i.id} value={i.id}>{i.nom} ({i.unite})</option>)}
         </select>
       </Field>

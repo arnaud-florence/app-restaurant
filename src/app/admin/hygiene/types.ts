@@ -41,6 +41,8 @@ export type Lot = {
   id: string
   ingredient_id: string | null
   ingredient_nom: string | null
+  /** Produit tracé en saisie libre (sans passer par la liste des ingrédients) */
+  produit_nom: string | null
   lot_numero: string
   dlc: string | null
   fournisseur_id: string | null

@@ -169,6 +169,10 @@ export async function supprimerPlanHaccp(id: string) {
 
 const lotSchema = z.object({
   ingredient_id:  z.string().uuid().nullable(),
+  // Saisie LIBRE du produit tracé : on doit pouvoir tracer n'importe quelle
+  // réception (carton de surgelés, article ponctuel) sans devoir d'abord la
+  // créer comme ingrédient. Le lien ingrédient est un plus, pas un préalable.
+  produit_nom:    z.string().trim().max(200).nullable(),
   lot_numero:     z.string().trim().min(1).max(100),
   dlc:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   fournisseur_id: z.string().uuid().nullable(),

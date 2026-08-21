@@ -51,7 +51,8 @@ export default function RecettesClient({
     s: synthese(
       r.ingredients.map(li => ({ quantite: li.quantite, prix_achat_ht: li.ingredient_prix_achat_ht })),
       r.nb_portions,
-      r.prix_vente_ht
+      r.prix_vente_ht,
+      r.cout_achat_ht ?? 0,
     ),
   })), [initialRecettes])
 

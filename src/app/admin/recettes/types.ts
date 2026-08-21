@@ -28,6 +28,8 @@ export type Recette = {
   temps_preparation: number
   nb_portions: number
   prix_vente_ht: number
+  /** Achat-revente : prix d'achat HT du produit fini (surgelé), par unité vendue */
+  cout_achat_ht: number | null
   tva: number
   contient_alcool: boolean
   actif: boolean
@@ -68,6 +70,7 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     temps_preparation: 15,
     nb_portions: 1,
     prix_vente_ht: 0,
+    cout_achat_ht: null,
     tva: 10,
     contient_alcool: false,
     actif: true,

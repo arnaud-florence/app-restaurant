@@ -39,7 +39,7 @@ export default async function HygienePage() {
       .limit(60),
     supabase.from('plans_haccp').select('*').eq('actif', true).order('ccp_numero', { nullsFirst: false }).order('created_at'),
     supabase.from('lots_produits')
-      .select(`id, ingredient_id, lot_numero, dlc, fournisseur_id, fournisseur_nom, quantite, unite, bon_commande_id, date_reception, statut, notes, created_at,
+      .select(`id, ingredient_id, produit_nom, lot_numero, dlc, fournisseur_id, fournisseur_nom, quantite, unite, bon_commande_id, date_reception, statut, notes, created_at,
                ingredient:ingredients(nom)`)
       .order('date_reception', { ascending: false })
       .limit(200),
@@ -135,10 +135,12 @@ export default async function HygienePage() {
     dlc: string | null; fournisseur_id: string | null; fournisseur_nom: string | null;
     quantite: number | string; unite: string | null; bon_commande_id: string | null;
     date_reception: string; statut: string; notes: string | null; created_at: string;
+    produit_nom: string | null;
     ingredient?: { nom?: string } | null }
   const lots: Lot[] = ((lotsRes.data ?? []) as LotRow[]).map(l => ({
     id: l.id, ingredient_id: l.ingredient_id,
     ingredient_nom: l.ingredient?.nom ?? null,
+    produit_nom: l.produit_nom ?? null,
     lot_numero: l.lot_numero,
     dlc: l.dlc, fournisseur_id: l.fournisseur_id,
     fournisseur_nom: l.fournisseur_nom,

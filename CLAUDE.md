@@ -128,8 +128,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Produits hors Fournil endormis | `masque_hors_saison` — réveil par `sql/reveil-restaurant.sql` | 0118 |
 | Visuels produits sans photo | plaques typographiques + vraies photos boissons de marque | 0124 |
 | Factures multi-pages + lignes | scanner N pages en 1 appel, `facture_lignes`, prix d'achat auto | 0125 |
+| Achat-revente + traçabilité libre | `recettes.cout_achat_ht`, `lots_produits.produit_nom` | 0126 |
 
-**Migrations actuelles : 0001 → 0125.**
+**Migrations actuelles : 0001 → 0126.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -167,11 +168,21 @@ Le scanner accepte jusqu'à 8 pages **dans un seul appel** Claude Vision
 front réduit chaque photo à 1600 px avant envoi — 3 photos d'iPhone brutes
 dépasseraient la limite de corps de requête Vercel (~4,5 Mo).
 
-⚠️ Maillon suivant pour des marges réelles : les 90 produits Fournil n'ont
-**aucune composition** (`recette_ingredients` vide pour eux — les 353 liaisons
-en base sont celles des recettes de démo). Tant qu'elles ne sont pas saisies,
-le food cost des produits reste incalculable, même avec des prix d'achat à
-jour. Test : `node scripts/test-facture-lignes.mjs`.
+**Modèle Fournil : achat-revente, pas composition** (0126). Le Fournil achète
+quasi tout surgelé et revend sans transformation : le coût d'un produit est
+`recettes.cout_achat_ht` (prix d'achat par unité vendue), pas une recette
+chiffrée. `synthese()` (src/lib/foodCost.ts) ADDITIONNE composition et coût
+d'achat : achat-revente pur → composition vide ; les ~5 % transformés → les
+deux. Alimentation : champ « Coût d'achat HT » de la fiche produit, et
+propagation automatique depuis les lignes de facture scannées (rapprochement
+par nom **et** `nom_caisse`, même prudence que pour les ingrédients).
+Ne PAS relancer le chantier « saisir les 90 compositions » : il est hors
+modèle. Tests : `node scripts/test-facture-lignes.mjs`,
+`node scripts/test-achat-revente.mjs`.
+
+**Traçabilité en saisie libre** (0126) : `lots_produits.produit_nom` — on
+trace n'importe quelle réception au clavier, le lien ingrédient est
+facultatif. L'affichage montre `produit_nom ?? ingredient_nom`.
 
 ### Clôture d'une commande web retirée au comptoir
 

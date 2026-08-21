@@ -530,6 +530,18 @@ export async function createFacture(input: unknown) {
     const { data: ings } = await supabase.from('ingredients')
       .select('id, nom').eq('actif', true)
     const ingredients = (ings ?? []).map(i => ({ id: i.id as string, nom: normaliserNom(i.nom as string) }))
+    // Achat-revente (Fournil) : le produit acheté EST souvent le produit vendu
+    // (« Croissant » sur la facture Metro = le produit « Croissant » de la
+    // carte). Quand une ligne se rapproche d'un produit par son nom, son prix
+    // unitaire devient recettes.cout_achat_ht — la marge se met à jour toute
+    // seule à chaque facture scannée. Même prudence que pour les ingrédients.
+    const { data: recs } = await supabase.from('recettes')
+      .select('id, nom, nom_caisse').eq('actif', true)
+    const produits = (recs ?? []).flatMap(r => {
+      const out = [{ id: r.id as string, nom: normaliserNom(r.nom as string) }]
+      if (r.nom_caisse) out.push({ id: r.id as string, nom: normaliserNom(r.nom_caisse as string) })
+      return out
+    })
 
     const rows = p.lignes.map(l => {
       const desc = normaliserNom(l.description)
@@ -556,8 +568,19 @@ export async function createFacture(input: unknown) {
       // Met à jour le prix d'achat des ingrédients rapprochés + trace
       // l'historique (source 'livraison' — c'est ce que lisent les courbes
       // de prix et l'alerte hausse de l'agent Scanner).
-      for (const r of rows) {
-        if (!r.ingredient_id || !r.prix_unitaire_ht || r.prix_unitaire_ht <= 0) continue
+      for (const [idx, r] of rows.entries()) {
+        const prixLigne = r.prix_unitaire_ht
+        if (prixLigne && prixLigne > 0) {
+          const desc = normaliserNom(p.lignes[idx].description)
+          const prod = produits.find(x =>
+            x.nom.length >= 4 && (desc.includes(x.nom) || (desc.length >= 4 && x.nom.includes(desc))),
+          )
+          if (prod) {
+            await supabase.from('recettes')
+              .update({ cout_achat_ht: prixLigne }).eq('id', prod.id)
+          }
+        }
+        if (!r.ingredient_id || !prixLigne || prixLigne <= 0) continue
         const { error: eIng } = await supabase.from('ingredients')
           .update({ prix_achat_ht: r.prix_unitaire_ht, updated_at: new Date().toISOString() })
           .eq('id', r.ingredient_id)

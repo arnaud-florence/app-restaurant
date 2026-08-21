@@ -37,6 +37,7 @@ const formSchema = z.object({
   temps_preparation: z.number().int().min(0).max(720),
   nb_portions: z.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.number().min(0).max(99999),
+  cout_achat_ht: z.number().min(0).max(99999).nullable(),
   tva: z.number().min(0).max(100),
   contient_alcool: z.boolean(),
   photo_url: z.string().max(2000),
@@ -73,6 +74,7 @@ export default function RecetteFormModal({
         temps_preparation: recette.temps_preparation,
         nb_portions: recette.nb_portions,
         prix_vente_ht: recette.prix_vente_ht,
+        cout_achat_ht: recette.cout_achat_ht,
         tva: recette.tva,
         contient_alcool: recette.contient_alcool ?? false,
         photo_url: recette.photo_url ?? '',
@@ -92,6 +94,7 @@ export default function RecetteFormModal({
 
   const nb_portions   = watch('nb_portions')
   const prix_vente_ht = watch('prix_vente_ht')
+  const cout_achat_ht = watch('cout_achat_ht')
   const tag           = watch('tag_destination')
   const photo_url     = watch('photo_url')
 
@@ -101,8 +104,9 @@ export default function RecetteFormModal({
       lignes.map(li => ({ quantite: li.quantite, prix_achat_ht: li.ingredient_prix_achat_ht })),
       Number(nb_portions) || 1,
       Number(prix_vente_ht) || 0,
+      Number(cout_achat_ht) || 0,
     ),
-    [lignes, nb_portions, prix_vente_ht]
+    [lignes, nb_portions, prix_vente_ht, cout_achat_ht]
   )
   const fcSty = STATUT_FOOD_COST_STYLE[synth.statut]
 
@@ -361,6 +365,22 @@ export default function RecetteFormModal({
                       min={0}
                       {...register('prix_vente_ht', { valueAsNumber: true })}
                       className="font-bold text-lg tabular-nums"
+                    />
+                  </Field>
+                  {/* Achat-revente (Fournil) : quasi toute la carte est achetée
+                      surgelée et revendue telle quelle. Le coût, c'est ce prix
+                      d'achat — pas une composition. Il s'ajoute au coût des
+                      ingrédients pour les rares produits transformés. */}
+                  <Field label="Coût d'achat HT (€/unité) — achat-revente" error={errors.cout_achat_ht?.message}>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      min={0}
+                      placeholder="ex : 0.32 (croissant surgelé)"
+                      {...register('cout_achat_ht', {
+                        setValueAs: v => (v === '' || v == null ? null : Number(v)),
+                      })}
+                      className="tabular-nums"
                     />
                   </Field>
                   <Field label="TVA (%)" error={errors.tva?.message}>
