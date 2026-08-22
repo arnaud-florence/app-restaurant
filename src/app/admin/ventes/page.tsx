@@ -117,7 +117,9 @@ export default async function VentesPage({
             {s.parJour.map((j, i) => {
               const meilleur = j.ca === maxJour && j.ca > 0
               return (
-                <div key={j.date} className="flex-1 flex flex-col items-center justify-end gap-1 min-w-0">
+                <Link href={`/admin/ventes/${j.date}`} key={j.date}
+                  className="flex-1 flex flex-col items-center justify-end gap-1 min-w-0 group"
+                  title={`Voir le détail du ${j.label}`}>
                   {/* Le montant n'est écrit que sur le meilleur jour et le dernier :
                       une étiquette sur chaque barre ferait un tableau, pas un graphe. */}
                   {(meilleur || i === s.parJour.length - 1) && (
@@ -128,10 +130,49 @@ export default async function VentesPage({
                     style={{ height: Math.max(3, (j.ca / maxJour) * 108) }}
                     title={`${j.label} : ${eur(j.ca, 2)} — ${j.tickets} ticket${j.tickets > 1 ? 's' : ''}`}
                   />
-                  <span className="text-[10px] text-zinc-500 capitalize truncate w-full text-center">{j.label}</span>
-                </div>
+                  <span className="text-[10px] text-zinc-500 capitalize truncate w-full text-center group-hover:text-zinc-800 group-hover:font-bold">{j.label}</span>
+                </Link>
               )
             })}
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-400">Touchez un jour pour son journal complet : tickets un à un, TVA, paiements, marges.</p>
+        </Bloc>
+      )}
+
+      {/* ── Journal des journées : chaque jour retraçable ─────────────── */}
+      {s.parJour.length > 1 && (
+        <Bloc titre="Journal des journées" aide="Chaque ligne ouvre le détail complet du jour — tickets, TVA, paiements, marge.">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[420px]">
+              <thead className="text-[11px] uppercase tracking-wider text-zinc-500">
+                <tr>
+                  <th className="text-left py-1.5 font-bold">Jour</th>
+                  <th className="text-right py-1.5 font-bold">Tickets</th>
+                  <th className="text-right py-1.5 font-bold">CA TTC</th>
+                  <th className="text-right py-1.5 font-bold">Panier</th>
+                  <th className="py-1.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {[...s.parJour].reverse().map(j => (
+                  <tr key={j.date} className="hover:bg-zinc-50">
+                    <td className="py-1.5 capitalize">
+                      <Link href={`/admin/ventes/${j.date}`} className="font-medium text-zinc-800 hover:underline">
+                        {j.label}
+                      </Link>
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{j.tickets}</td>
+                    <td className="py-1.5 text-right tabular-nums font-bold">{eur(j.ca, 2)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-zinc-600">
+                      {j.tickets > 0 ? eur(j.ca / j.tickets, 2) : '—'}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <Link href={`/admin/ventes/${j.date}`} className="text-xs font-bold text-emerald-700 hover:text-emerald-800">détail →</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Bloc>
       )}
