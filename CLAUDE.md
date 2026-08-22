@@ -526,7 +526,14 @@ fmtPct(n)   // 12,3 %
    - Bilan ✓/✗ + `process.exit(1)` si échec
    - Optionnel : fetch HTTP si `PORT=3000` est passé en env
 
-4. Annoncer dans le récap final : ce qui est livré, où, et **explicitement** "pas de migration" si c'est le cas.
+4. **Bumper `CACHE_VERSION`** (`public/sw.js`, ligne 8) à CHAQUE livraison qui
+   touche l'UI — pas seulement les « critiques ». Le service worker sert les
+   chunks en cache-first : sans bump, les tablettes du comptoir continuent de
+   faire tourner l'ancienne version et le gérant signale des fonctionnalités
+   « absentes » qui sont en prod depuis des jours (vécu deux fois : panier
+   comptoir le 20/08, date des relevés le 22/08).
+
+5. Annoncer dans le récap final : ce qui est livré, où, et **explicitement** "pas de migration" si c'est le cas.
 
 ## 8. Gotchas connus
 
