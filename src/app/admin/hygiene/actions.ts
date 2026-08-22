@@ -200,6 +200,32 @@ export async function creerLot(input: unknown): Promise<{ id: string }> {
   return { id: data.id as string }
 }
 
+// Correction d'un lot mal saisi : mêmes champs qu'à la création.
+// Le STATUT ne se change pas ici (il a son propre parcours changerStatutLot,
+// qui trace le cycle de vie) — on corrige les faits, pas l'histoire.
+const modifierLotSchema = z.object({
+  lot_id:         z.string().uuid(),
+  ingredient_id:  z.string().uuid().nullable(),
+  produit_nom:    z.string().trim().max(200).nullable(),
+  lot_numero:     z.string().trim().min(1).max(100),
+  dlc:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  fournisseur_id: z.string().uuid().nullable(),
+  fournisseur_nom: z.string().max(200).nullable(),
+  quantite:       z.number().min(0).default(0),
+  unite:          z.string().max(20).nullable(),
+  date_reception: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes:          z.string().max(500).nullable(),
+})
+
+export async function modifierLot(input: unknown) {
+  const { lot_id, ...champs } = modifierLotSchema.parse(input)
+  const supabase = await createClient()
+  const { error } = await supabase.from('lots_produits').update(champs).eq('id', lot_id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/hygiene')
+  return { ok: true as const }
+}
+
 // Suppression DÉFINITIVE, réservée aux erreurs de saisie (mauvais produit,
 // doublon, lot incomplet à recommencer). Le cycle de vie normal d'un lot ne
 // passe jamais par ici : consommé, jeté, expiré ou rappelé sont des STATUTS,

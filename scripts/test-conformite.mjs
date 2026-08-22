@@ -35,6 +35,18 @@ const { data: lot } = await sb.from('lots_produits').insert({
   produit_nom: 'TEST-0128 erreur de saisie', lot_numero: 'TEST-0128-' + Date.now(),
   quantite: 1, statut: 'en_stock',
 }).select('id').single()
+
+// Correction d'un lot (parcours modifierLot) : les champs se corrigent,
+// le statut ne bouge pas par ce chemin.
+const { error: eM } = await sb.from('lots_produits')
+  .update({ produit_nom: 'TEST-0128 corrigé', quantite: 25, dlc: '2027-01-15' })
+  .eq('id', lot.id)
+const { data: corr } = await sb.from('lots_produits')
+  .select('produit_nom, quantite, statut').eq('id', lot.id).single()
+check('lot corrigé (nom, quantité, DLC) sans toucher au statut',
+  !eM && corr?.produit_nom === 'TEST-0128 corrigé'
+  && Number(corr?.quantite) === 25 && corr?.statut === 'en_stock')
+
 const { error: e2 } = await sb.from('lots_produits').delete().eq('id', lot.id)
 const { count: cLot } = await sb.from('lots_produits')
   .select('id', { count: 'exact', head: true }).eq('id', lot.id)

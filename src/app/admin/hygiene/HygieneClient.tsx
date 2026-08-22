@@ -23,7 +23,7 @@ import {
 import {
   creerReleveTemperature, validerCheckHygiene, creerProcedure,
   creerPlanHaccp, supprimerPlanHaccp,
-  creerLot, changerStatutLot, supprimerLot,
+  creerLot, changerStatutLot, supprimerLot, modifierLot,
   creerNonConformite, resoudreNonConformite,
   creerIntervention3D,
   creerPlanNettoyage, marquerExecuteNettoyage, supprimerPlanNettoyage,
@@ -758,6 +758,7 @@ function LotsTab({
   const [filtre, setFiltre] = useState<'tous' | 'en_stock' | 'critique' | 'proche'>('en_stock')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editLot, setEditLot] = useState<Lot | null>(null)
   const router = useRouter()
 
   const filtered = useMemo(() => {
@@ -833,6 +834,9 @@ function LotsTab({
                       aria-label="Supprimer le lot"
                       className="min-h-[36px] w-9 rounded border border-zinc-200 text-zinc-400 hover:text-red-600 hover:border-red-300 shrink-0"
                     >🗑</button>
+                    <button onClick={() => setEditLot(l)} aria-label="Corriger le lot"
+                      className="min-h-[36px] w-9 rounded border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-400 shrink-0"
+                    >✎</button>
                   </div>
                   <p className="font-medium">{l.produit_nom ?? l.ingredient_nom ?? '—'}</p>
                   <div className="flex items-center justify-between gap-2 text-xs">
@@ -916,6 +920,9 @@ function LotsTab({
                         aria-label="Supprimer le lot"
                         className="h-8 w-8 rounded border border-zinc-200 text-zinc-400 hover:text-red-600 hover:border-red-300"
                       >🗑</button>
+                      <button onClick={() => setEditLot(l)} aria-label="Corriger le lot"
+                        className="h-8 w-8 rounded border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-400 ml-1"
+                      >✎</button>
                     </td>
                   </tr>
                 )
@@ -932,26 +939,33 @@ function LotsTab({
           onClose={() => setShowForm(false)} onError={onError}
           onSuccess={() => { setShowForm(false); onOk('Lot créé') }} />
       )}
+      {editLot && (
+        <LotModal ingredients={ingredients} fournisseurs={fournisseurs} initial={editLot}
+          onClose={() => setEditLot(null)} onError={onError}
+          onSuccess={() => { setEditLot(null); onOk('Lot corrigé') }} />
+      )}
     </div>
   )
 }
 
 function LotModal({
-  ingredients, fournisseurs, onClose, onError, onSuccess,
+  ingredients, fournisseurs, onClose, onError, onSuccess, initial,
 }: {
   ingredients: IngredientShort[]
   fournisseurs: FournisseurShort[]
   onClose: () => void
   onError: (e: unknown) => void
   onSuccess: () => void
+  /** Lot à corriger — absent en création */
+  initial?: Lot
 }) {
-  const [ingredientId, setIngredientId] = useState('')
-  const [produitNom, setProduitNom] = useState('')
-  const [lotNumero, setLotNumero] = useState('')
-  const [dlc, setDlc] = useState('')
-  const [fournisseurId, setFournisseurId] = useState('')
-  const [quantite, setQuantite] = useState<number | ''>('')
-  const [notes, setNotes] = useState('')
+  const [ingredientId, setIngredientId] = useState(initial?.ingredient_id ?? '')
+  const [produitNom, setProduitNom] = useState(initial?.produit_nom ?? '')
+  const [lotNumero, setLotNumero] = useState(initial?.lot_numero ?? '')
+  const [dlc, setDlc] = useState(initial?.dlc ?? '')
+  const [fournisseurId, setFournisseurId] = useState(initial?.fournisseur_id ?? '')
+  const [quantite, setQuantite] = useState<number | ''>(initial ? initial.quantite : '')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -966,19 +980,22 @@ function LotModal({
     const f = fournisseurs.find(x => x.id === fournisseurId)
     startTransition(async () => {
       try {
-        await creerLot({
+        const champs = {
           ingredient_id: ingredientId || null,
           produit_nom: produitNom.trim() || null,
           lot_numero: lotNumero.trim(),
           dlc: dlc || null,
           fournisseur_id: fournisseurId || null,
-          fournisseur_nom: f?.nom ?? null,
+          fournisseur_nom: f?.nom ?? (fournisseurId ? null : initial?.fournisseur_nom ?? null),
           quantite: quantite === '' ? 0 : Number(quantite),
-          unite: ing?.unite ?? null,
-          bon_commande_id: null,
-          date_reception: new Date().toISOString().slice(0, 10),
+          unite: ing?.unite ?? initial?.unite ?? null,
           notes: notes.trim() || null,
-        })
+        }
+        if (initial) {
+          await modifierLot({ ...champs, lot_id: initial.id, date_reception: initial.date_reception })
+        } else {
+          await creerLot({ ...champs, bon_commande_id: null, date_reception: new Date().toISOString().slice(0, 10) })
+        }
         onSuccess()
         router.refresh()
       } catch (e) { onError(e) }
@@ -986,7 +1003,7 @@ function LotModal({
   }
 
   return (
-    <Modal title="Nouveau lot (saisie manuelle)" onClose={onClose} disabled={isPending}>
+    <Modal title={initial ? `Corriger le lot ${initial.lot_numero}` : 'Nouveau lot (saisie manuelle)'} onClose={onClose} disabled={isPending}>
       {/* Saisie LIBRE en premier : on trace ce qu'on veut, sans devoir
           d'abord le créer comme ingrédient. Le lien ingrédient (en dessous)
           reste possible mais facultatif. */}
@@ -1018,7 +1035,7 @@ function LotModal({
         <Field label={`Quantité${ing?.unite ? ` (${ing.unite})` : ''}`}><input type="number" step="0.001" value={quantite} onChange={e => setQuantite(e.target.value === '' ? '' : Number(e.target.value))} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
       </div>
       <Field label="Notes (optionnel)"><input value={notes} onChange={e => setNotes(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
-      <ModalActions onClose={onClose} onValider={valider} pending={isPending} validLabel="+ Créer le lot" />
+      <ModalActions onClose={onClose} onValider={valider} pending={isPending} validLabel={initial ? '✓ Enregistrer la correction' : '+ Créer le lot'} />
     </Modal>
   )
 }
