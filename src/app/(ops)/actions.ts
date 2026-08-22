@@ -100,7 +100,7 @@ export async function changerStatutArticle(input: unknown) {
     // Ne jamais downgrader depuis 'encaisse' ou 'annule'
     const { data: cmd } = await supabase
       .from('commandes')
-      .select('statut, source, numero_table, ardoise_nom, mode_paiement, mode_retrait')
+      .select('statut, source, numero_table, ardoise_nom, mode_paiement, mode_retrait, numero, client_email, client_nom, creneau_retrait')
       .eq('id', article.commande_id)
       .single()
 
@@ -129,7 +129,10 @@ export async function changerStatutArticle(input: unknown) {
     const remiseDirecte = estRemiseDirecte(ctx)
 
     if (cmd && cmd.statut !== 'encaisse' && cmd.statut !== 'annule' && cmd.statut !== statutCible) {
-      await supabase
+      // `.neq('statut', statutCible)` + select : quand « tout avancer » fait
+      // partir plusieurs transitions en parallèle, une seule écrit vraiment le
+      // nouveau statut — c'est elle, et elle seule, qui envoie l'e-mail client.
+      const { data: bascule } = await supabase
         .from('commandes')
         .update({
           statut: statutCible,
@@ -138,6 +141,44 @@ export async function changerStatutArticle(input: unknown) {
             : {}),
         })
         .eq('id', article.commande_id)
+        .neq('statut', statutCible)
+        .select('id')
+
+      // ─── E-mail « commande prête » — le circuit du FOURNIL ───────────
+      // Le site promet « vous recevrez un e-mail dès que votre commande sera
+      // prête ». Le hook historique vit dans marquerStatutCommandeOnline
+      // (écran /emporter du restaurant, en veille) : sur le KDS Fournil, la
+      // commande passe à 'pret' par CET agrégat-ci, et rien ne partait.
+      // Best-effort : un échec d'e-mail ne bloque jamais le service.
+      if ((bascule?.length ?? 0) > 0 && statutCible === 'pret'
+          && cmd.source === 'ONLINE' && cmd.client_email) {
+        try {
+          const { sendEmail, emailLayout } = await import('@/lib/email')
+          const livraison = cmd.mode_retrait === 'livraison'
+          const prenom = ((cmd.client_nom as string) ?? '').split(' ')[0]
+          const heure = cmd.creneau_retrait
+            ? new Date(cmd.creneau_retrait as string).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })
+            : null
+          const body = livraison
+            ? `<p>Bonjour${prenom ? ' ' + prenom : ''},</p>
+               <p><strong>Votre commande #${cmd.numero} est prête ! 🥖</strong></p>
+               <p>Elle vous sera livrée${heure ? ` au créneau prévu (${heure})` : ' sous peu'} — paiement à la remise.</p>
+               <p>À très vite,<br><strong>CasaTasia — Le Fournil</strong></p>`
+            : `<p>Bonjour${prenom ? ' ' + prenom : ''},</p>
+               <p><strong>Votre commande #${cmd.numero} est prête à retirer ! 🥖</strong></p>
+               <p>Vous pouvez venir la chercher dès maintenant${heure ? ` (créneau prévu : ${heure})` : ''} — paiement au comptoir.</p>
+               <p>À très vite,<br><strong>CasaTasia — Le Fournil</strong></p>`
+          sendEmail({
+            to: cmd.client_email as string,
+            subject: livraison
+              ? `🥖 Commande #${cmd.numero} prête — livraison en route`
+              : `🥖 Commande #${cmd.numero} prête à retirer`,
+            html: emailLayout({ titre: 'Commande prête !', bodyHtml: body }),
+          }).catch(e => console.error('[email-pret-fournil] échec :', e))
+        } catch (e) {
+          console.error('[email-pret-fournil] erreur :', e)
+        }
+      }
 
       // Si on bascule à 'servi' → la table passe à 'a_encaisser'
       if (statutCible === 'servi' && cmd.numero_table) {
