@@ -17,6 +17,10 @@ export type CommandeService = {
   statut: StatutCommande
   notes: string | null
   client_nom?: string | null
+  /** ONLINE — coordonnées et mode : le KDS doit dire POUR QUI, QUAND, OÙ */
+  client_telephone?: string | null
+  adresse_livraison?: string | null
+  mode_retrait?: string | null
   serveur_nom?: string | null
   created_at: string
   articles: ArticleService[]

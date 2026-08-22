@@ -1526,6 +1526,7 @@ export async function listCommandesActives() {
     .select(`
       id, numero, source, numero_table, ardoise_nom, statut, notes, created_at, creneau_retrait, creneaux_par_tag,
       montant_total_ttc, tva_total, consommation, mode_paiement,
+      client_nom, client_telephone, adresse_livraison, mode_retrait,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, commande_id, recette_id, quantite, prix_unitaire_ht, prix_unitaire_ttc, tva_taux, tag_destination, commentaire, allergenes_a_eviter, statut, recette:recettes(nom))
     `)
@@ -1544,6 +1545,10 @@ export async function listCommandesActives() {
       statut: r.statut as StatutCommande,
       notes: (r.notes as string) ?? null,
       created_at: r.created_at as string,
+      client_nom:        (r.client_nom as string) ?? null,
+      client_telephone:  (r.client_telephone as string) ?? null,
+      adresse_livraison: (r.adresse_livraison as string) ?? null,
+      mode_retrait:      (r.mode_retrait as string) ?? null,
       serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
       montant_total_ttc: Number(r.montant_total_ttc ?? 0),
       tva_total:         Number(r.tva_total ?? 0),

@@ -111,10 +111,10 @@ export default function TicketCommande({
       {creneauTime && (
         <div className={cn('px-3 py-2 text-white flex items-center justify-between gap-2', urgenceCls)}>
           <div className="flex items-center gap-2">
-            <span className="text-lg">{isOnline ? '📦' : '🛒'}</span>
+            <span className="text-lg">{commande.mode_retrait === 'livraison' ? '🚚' : isOnline ? '📦' : '🛒'}</span>
             <div>
               <p className="text-[11px] uppercase tracking-wider opacity-90 leading-none">
-                Retrait {isOnline ? 'web' : 'comptoir'} à
+                {commande.mode_retrait === 'livraison' ? 'Livraison à' : `Retrait ${isOnline ? 'web' : 'comptoir'} à`}
               </p>
               <p className="text-base font-bold tabular-nums leading-tight">
                 {new Date(creneauTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -124,6 +124,28 @@ export default function TicketCommande({
           {minutesRestantes !== null && (
             <p className="text-xl font-bold tabular-nums">
               {minutesRestantes < 0 ? `+${Math.abs(minutesRestantes)} min` : `${minutesRestantes} min`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Qui / où joindre / où livrer — le ticket doit suffire à traiter la
+          commande sans ouvrir un autre écran. Le téléphone est un lien tel: :
+          sur tablette, un doigt suffit pour appeler le client. */}
+      {isOnline && (commande.client_nom || commande.client_telephone || commande.adresse_livraison) && (
+        <div className="px-3 py-2 bg-zinc-950/60 border-b border-zinc-800 space-y-0.5">
+          <p className="text-sm font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
+            <span>👤 {commande.client_nom ?? 'Client web'}</span>
+            {commande.client_telephone && (
+              <a href={`tel:${commande.client_telephone}`}
+                 className="text-emerald-300 underline decoration-emerald-300/40 tabular-nums">
+                📞 {commande.client_telephone}
+              </a>
+            )}
+          </p>
+          {commande.mode_retrait === 'livraison' && (
+            <p className="text-sm text-amber-200">
+              🚚 {commande.adresse_livraison ?? 'Adresse non renseignée — appeler le client'}
             </p>
           )}
         </div>

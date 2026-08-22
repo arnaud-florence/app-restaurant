@@ -19,6 +19,11 @@ export type BonsPrintData = {
     created_at: string
     creneau_retrait: string | null   // ISO datetime — créneau de retrait choisi (snack/pizza/online)
     serveur_nom: string | null
+    /** ONLINE — le bon voyage agrafé au sac : il doit dire pour qui et où */
+    client_nom: string | null
+    client_telephone: string | null
+    adresse_livraison: string | null
+    mode_retrait: string | null
   }
   articles: BonArticle[]
 }

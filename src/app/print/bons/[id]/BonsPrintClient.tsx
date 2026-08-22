@@ -119,12 +119,26 @@ export default function BonsPrintClient({ data, auto }: { data: BonsPrintData; a
                   : format(cr, 'EEE dd/MM', { locale: fr }).toUpperCase()
                 return (
                   <div className="my-2 px-2 py-1.5 border-2 border-zinc-900 bg-zinc-900 text-white text-center">
-                    <div className="text-[10px] font-bold tracking-wider opacity-80">RETRAIT</div>
+                    <div className="text-[10px] font-bold tracking-wider opacity-80">
+                      {commande.mode_retrait === 'livraison' ? '🚚 LIVRAISON' : 'RETRAIT'}
+                    </div>
                     <div className="text-xl font-black leading-tight">🕒 {heureRetrait}</div>
                     <div className="text-[10px] font-bold">{dateRetrait}</div>
                   </div>
                 )
               })()}
+
+              {/* Coordonnées client : le bon est agrafé au sac, il doit
+                  suffire au retrait comme à la tournée sans autre écran. */}
+              {(commande.client_nom || commande.client_telephone || commande.adresse_livraison) && (
+                <div className="my-2 px-2 py-1.5 border-2 border-zinc-900 text-[12px] leading-snug">
+                  {commande.client_nom && <div className="font-black">{commande.client_nom}</div>}
+                  {commande.client_telephone && <div className="font-mono">📞 {commande.client_telephone}</div>}
+                  {commande.mode_retrait === 'livraison' && (
+                    <div className="font-bold">🚚 {commande.adresse_livraison ?? 'Adresse manquante — appeler'}</div>
+                  )}
+                </div>
+              )}
 
               {/* Articles : grosse quantité × nom */}
               <ul className="space-y-1.5 border-y-2 border-dashed border-zinc-900 py-2">

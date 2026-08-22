@@ -26,6 +26,7 @@ export default async function BonsPrintPage({
     .from('commandes')
     .select(`
       id, numero, source, numero_table, notes, created_at, creneau_retrait,
+      client_nom, client_telephone, adresse_livraison, mode_retrait,
       serveur:employes!serveur_id(prenom, nom),
       commande_articles(id, quantite, tag_destination, commentaire, allergenes_a_eviter, recette:recettes(nom))
     `)
@@ -71,6 +72,10 @@ export default async function BonsPrintPage({
       created_at: cmd.created_at as string,
       creneau_retrait: (cmd.creneau_retrait as string) ?? null,
       serveur_nom: serv ? `${serv.prenom ?? ''} ${serv.nom ?? ''}`.trim() : null,
+      client_nom: (cmd.client_nom as string) ?? null,
+      client_telephone: (cmd.client_telephone as string) ?? null,
+      adresse_livraison: (cmd.adresse_livraison as string) ?? null,
+      mode_retrait: (cmd.mode_retrait as string) ?? null,
     },
     articles,
   }
