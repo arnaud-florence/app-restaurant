@@ -965,6 +965,8 @@ function LotModal({
   const [dlc, setDlc] = useState(initial?.dlc ?? '')
   const [fournisseurId, setFournisseurId] = useState(initial?.fournisseur_id ?? '')
   const [quantite, setQuantite] = useState<number | ''>(initial ? initial.quantite : '')
+  const [dateReception, setDateReception] = useState(
+    initial?.date_reception ?? new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -992,9 +994,9 @@ function LotModal({
           notes: notes.trim() || null,
         }
         if (initial) {
-          await modifierLot({ ...champs, lot_id: initial.id, date_reception: initial.date_reception })
+          await modifierLot({ ...champs, lot_id: initial.id, date_reception: dateReception })
         } else {
-          await creerLot({ ...champs, bon_commande_id: null, date_reception: new Date().toISOString().slice(0, 10) })
+          await creerLot({ ...champs, bon_commande_id: null, date_reception: dateReception })
         }
         onSuccess()
         router.refresh()
@@ -1025,6 +1027,14 @@ function LotModal({
         <Field label="N° de lot"><input value={lotNumero} onChange={e => setLotNumero(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 font-mono" /></Field>
         <Field label="DLC"><input type="date" value={dlc} onChange={e => setDlc(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
       </div>
+      {/* Saisissable : la marchandise reçue lundi se saisit parfois mardi —
+          le registre doit porter la date de RÉCEPTION, pas celle de la saisie
+          (même logique que date_releve des relevés de température, 0128). */}
+      <Field label="Reçu le">
+        <input type="date" value={dateReception} max={new Date().toISOString().slice(0, 10)}
+          onChange={e => setDateReception(e.target.value)}
+          className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Fournisseur">
           <select value={fournisseurId} onChange={e => setFournisseurId(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
