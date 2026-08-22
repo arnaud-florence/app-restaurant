@@ -57,6 +57,52 @@ export default async function VentesPage({
         <Chiffre titre="Panier moyen" d={s.panierMoyen} format={v => eur(v, 2)} />
       </div>
 
+      {/* ── Marge & casse ─────────────────────────────────────────────── */}
+      {/* Les marges de l'audit, mais VIVANTES : recalculées à chaque visite
+          depuis les ventes et les coûts d'achat (0126). La casse (invendus
+          du soir, 0129) vient en déduction — un croissant jeté coûte autant
+          qu'un croissant vendu. */}
+      {s.marge.caHTCouvert > 0 && (
+        <Bloc titre="Marge brute"
+              aide={`Calculée sur ${s.marge.couverturePct} % du CA HT (produits au coût d'achat connu). Scanne les factures manquantes pour élargir.`}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">CA HT couvert</p>
+              <p className="text-xl font-black tabular-nums text-zinc-800">{eur(s.marge.caHTCouvert, 2)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">Coût d'achat</p>
+              <p className="text-xl font-black tabular-nums text-zinc-800">{eur(s.marge.cout, 2)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">Marge brute</p>
+              <p className="text-xl font-black tabular-nums text-emerald-700">{eur(s.marge.brute, 2)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">Food cost</p>
+              <p className={cn('text-xl font-black tabular-nums',
+                (s.marge.foodCostPct ?? 0) > 33 ? 'text-red-600'
+                : (s.marge.foodCostPct ?? 0) >= 28 ? 'text-amber-600' : 'text-emerald-700')}>
+                {s.marge.foodCostPct != null ? `${s.marge.foodCostPct.toLocaleString('fr-FR')} %` : '—'}
+              </p>
+              <p className="text-[10px] text-zinc-400">cible 28–33 %</p>
+            </div>
+          </div>
+          {s.casse.total > 0 && (
+            <div className="mt-3 pt-3 border-t border-zinc-100 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <p className="text-sm text-zinc-700">
+                🗑 Casse : <b className="text-red-600 tabular-nums">{eur(s.casse.total, 2)}</b>
+                {' '}({s.casse.pieces} pièce{s.casse.pieces > 1 ? 's' : ''})
+                {' '}→ marge nette <b className="tabular-nums">{eur(s.marge.brute - s.casse.total, 2)}</b>
+              </p>
+              <p className="text-xs text-zinc-500 truncate">
+                {s.casse.top.map(t => `${t.nom} ${eur(t.eur, 2)}`).join(' · ')}
+              </p>
+            </div>
+          )}
+        </Bloc>
+      )}
+
       {/* ── CA par jour ───────────────────────────────────────────────── */}
       {s.parJour.length > 1 && (
         <Bloc titre="Chiffre d'affaires par jour">
@@ -120,6 +166,13 @@ export default async function VentesPage({
                         style={{ width: `${Math.max(2, p.part * 100)}%` }} />
                 </span>
                 <span className="text-sm tabular-nums text-zinc-700 font-bold shrink-0 w-20 text-right">{eur(p.ca, 2)}</span>
+                {/* Food cost par produit : le prix ne dit rien sans le coût */}
+                <span className={cn('text-xs tabular-nums font-bold shrink-0 w-14 text-right',
+                  p.fc == null ? 'text-zinc-300'
+                  : p.fc > 33 ? 'text-red-600'
+                  : p.fc >= 28 ? 'text-amber-600' : 'text-emerald-700')}>
+                  {p.fc != null ? `${p.fc.toLocaleString('fr-FR')} %` : '—'}
+                </span>
               </li>
             ))}
           </ol>

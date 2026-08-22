@@ -31,12 +31,35 @@ export type VentesStats = {
   parJour: Array<{ date: string; label: string; ca: number; tickets: number }>
   /** CA par heure d'ouverture — dit quand produire et quand staffer. */
   parHeure: Array<{ heure: number; ca: number; tickets: number }>
-  topProduits: Array<{ nom: string; quantite: number; ca: number; part: number }>
+  topProduits: Array<{
+    nom: string; quantite: number; ca: number; part: number
+    /** Marge brute HT (null si le coût d'achat du produit est inconnu) */
+    marge: number | null
+    /** Food cost % (coût / CA HT), null si coût inconnu */
+    fc: number | null
+  }>
   parCategorie: Array<{ nom: string; quantite: number; ca: number; part: number }>
   parPaiement: Array<{ nom: string; ca: number; part: number }>
   tva: Array<{ taux: string; montant: number }>
   /** Produits actifs qui n'ont RIEN vendu sur la période. */
   dormants: Array<{ nom: string; categorie: string }>
+  /** Marges de la période — calculées sur les produits au coût d'achat connu. */
+  marge: {
+    caHT: number
+    /** CA HT du périmètre couvert par un coût (les autres produits n'entrent
+        pas dans le food cost pondéré, ils sont dits « non couverts »). */
+    caHTCouvert: number
+    cout: number
+    brute: number
+    foodCostPct: number | null
+    couverturePct: number
+  }
+  /** Casse (invendus du soir) sur la même période — vient en déduction. */
+  casse: {
+    total: number
+    pieces: number
+    top: Array<{ nom: string; quantite: number; eur: number }>
+  }
 }
 
 const PARIS = 'Europe/Paris'
@@ -127,35 +150,53 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
 
   // ── Lignes : produits et catégories ───────────────────────────────
   const ids = actuelles.map(c => String(c.id))
-  const prodMap = new Map<string, { q: number; ca: number }>()
+  const prodMap = new Map<string, { q: number; ca: number; caHT: number; cout: number; couvert: boolean }>()
   const catMap = new Map<string, { q: number; ca: number }>()
   const vendus = new Set<string>()
+  let mCaHT = 0, mCaHTCouvert = 0, mCout = 0
 
   if (ids.length > 0) {
     // Supabase borne la taille d'un `in` : on découpe.
     for (let i = 0; i < ids.length; i += 200) {
       const { data: arts } = await sb
         .from('commande_articles')
-        .select('quantite, prix_unitaire_ttc, recette:recettes(nom, categorie)')
+        .select('quantite, prix_unitaire_ttc, tva_taux, recette:recettes(nom, categorie, cout_achat_ht, tva)')
         .in('commande_id', ids.slice(i, i + 200))
       for (const a of arts ?? []) {
-        const r = a.recette as { nom?: string; categorie?: string } | null
+        const r = a.recette as { nom?: string; categorie?: string; cout_achat_ht?: number | string | null; tva?: number | string | null } | null
         const nom = r?.nom ?? '—'
         const cat = r?.categorie ?? 'Sans catégorie'
         const q = Number(a.quantite ?? 0)
         const ca = q * Number(a.prix_unitaire_ttc ?? 0)
+        // Marge : CA HT au taux réellement facturé (repli : taux du produit),
+        // coût = quantité × coût d'achat (achat-revente, cf. 0126).
+        const taux = Number(a.tva_taux ?? r?.tva ?? 5.5)
+        const caHT = ca / (1 + taux / 100)
+        const coutU = r?.cout_achat_ht == null ? null : Number(r.cout_achat_ht)
+        const couvert = coutU != null && coutU > 0
+        mCaHT += caHT
+        if (couvert) { mCaHTCouvert += caHT; mCout += q * coutU }
         vendus.add(nom)
-        const p = prodMap.get(nom) ?? { q: 0, ca: 0 }; p.q += q; p.ca += ca; prodMap.set(nom, p)
+        const p = prodMap.get(nom) ?? { q: 0, ca: 0, caHT: 0, cout: 0, couvert: false }
+        p.q += q; p.ca += ca; p.caHT += caHT
+        if (couvert) { p.cout += q * coutU; p.couvert = true }
+        prodMap.set(nom, p)
         const c2 = catMap.get(cat) ?? { q: 0, ca: 0 }; c2.q += q; c2.ca += ca; catMap.set(cat, c2)
       }
     }
   }
 
   const caLignes = [...prodMap.values()].reduce((s, v) => s + v.ca, 0) || 1
-  const rang = (m: Map<string, { q: number; ca: number }>) =>
-    [...m.entries()]
-      .map(([nom, v]) => ({ nom, quantite: v.q, ca: Math.round(v.ca * 100) / 100, part: v.ca / caLignes }))
-      .sort((a, b) => b.ca - a.ca)
+  const rangProduits = [...prodMap.entries()]
+    .map(([nom, v]) => ({
+      nom, quantite: v.q, ca: Math.round(v.ca * 100) / 100, part: v.ca / caLignes,
+      marge: v.couvert ? Math.round((v.caHT - v.cout) * 100) / 100 : null,
+      fc: v.couvert && v.caHT > 0 ? Math.round(v.cout / v.caHT * 1000) / 10 : null,
+    }))
+    .sort((a, b) => b.ca - a.ca)
+  const rangCategories = [...catMap.entries()]
+    .map(([nom, v]) => ({ nom, quantite: v.q, ca: Math.round(v.ca * 100) / 100, part: v.ca / caLignes }))
+    .sort((a, b) => b.ca - a.ca)
 
   // ── Dormants : actifs, jamais vendus sur la période ────────────────
   // C'est l'information que la caisse ne donne pas — elle ne connaît que ce
@@ -180,6 +221,22 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
 
   const caPaiements = [...paiements.values()].reduce((s, v) => s + v, 0) || 1
 
+  // ── Casse : invendus du soir sur la même période (0129) ────────────
+  const { data: inv } = await sb
+    .from('invendus')
+    .select('quantite, cout_unitaire_ht, recette:recettes(nom)')
+    .gte('date_invendu', fmtJour.format(debut))
+  let casseTotal = 0, cassePieces = 0
+  const casseMap = new Map<string, { q: number; eur: number }>()
+  for (const l of inv ?? []) {
+    const q = Number(l.quantite ?? 0)
+    const eur = q * Number(l.cout_unitaire_ht ?? 0)
+    casseTotal += eur; cassePieces += q
+    const nom = (l.recette as { nom?: string } | null)?.nom ?? '—'
+    const cur = casseMap.get(nom) ?? { q: 0, eur: 0 }
+    cur.q += q; cur.eur += eur; casseMap.set(nom, cur)
+  }
+
   return {
     periode, debut: debut.toISOString(), fin: fin.toISOString(),
     ca: delta(caAct, caPrec),
@@ -189,8 +246,8 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
     parHeure: [...parHeureMap.entries()]
       .map(([heure, v]) => ({ heure, ca: Math.round(v.ca * 100) / 100, tickets: v.n }))
       .sort((a, b) => a.heure - b.heure),
-    topProduits: rang(prodMap).slice(0, 15),
-    parCategorie: rang(catMap),
+    topProduits: rangProduits.slice(0, 15),
+    parCategorie: rangCategories,
     parPaiement: [...paiements.entries()]
       .map(([nom, ca]) => ({ nom, ca: Math.round(ca * 100) / 100, part: ca / caPaiements }))
       .sort((a, b) => b.ca - a.ca),
@@ -198,5 +255,20 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
       .map(([taux, montant]) => ({ taux, montant: Math.round(montant * 100) / 100 }))
       .sort((a, b) => Number(a.taux) - Number(b.taux)),
     dormants,
+    marge: {
+      caHT: Math.round(mCaHT * 100) / 100,
+      caHTCouvert: Math.round(mCaHTCouvert * 100) / 100,
+      cout: Math.round(mCout * 100) / 100,
+      brute: Math.round((mCaHTCouvert - mCout) * 100) / 100,
+      foodCostPct: mCaHTCouvert > 0 ? Math.round(mCout / mCaHTCouvert * 1000) / 10 : null,
+      couverturePct: mCaHT > 0 ? Math.round(mCaHTCouvert / mCaHT * 100) : 0,
+    },
+    casse: {
+      total: Math.round(casseTotal * 100) / 100,
+      pieces: Math.round(cassePieces),
+      top: [...casseMap.entries()]
+        .map(([nom, v]) => ({ nom, quantite: v.q, eur: Math.round(v.eur * 100) / 100 }))
+        .sort((a, b) => b.eur - a.eur).slice(0, 5),
+    },
   }
 }
