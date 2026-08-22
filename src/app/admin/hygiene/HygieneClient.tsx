@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
@@ -758,6 +758,7 @@ function LotsTab({
   const [filtre, setFiltre] = useState<'tous' | 'en_stock' | 'critique' | 'proche'>('en_stock')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [showScan, setShowScan] = useState(false)
   const [editLot, setEditLot] = useState<Lot | null>(null)
   const router = useRouter()
 
@@ -790,7 +791,10 @@ function LotsTab({
         <div className="flex gap-2">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="N° lot, ingrédient, fournisseur…"
             className="h-10 px-3 rounded-md border border-zinc-300 text-sm w-64" />
-          <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau lot</button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowScan(true)} className="min-h-[40px] px-3 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm">📷 Scanner étiquettes</button>
+            <button onClick={() => setShowForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau lot</button>
+          </div>
         </div>
       </div>
 
@@ -943,6 +947,11 @@ function LotsTab({
         <LotModal ingredients={ingredients} fournisseurs={fournisseurs} initial={editLot}
           onClose={() => setEditLot(null)} onError={onError}
           onSuccess={() => { setEditLot(null); onOk('Lot corrigé') }} />
+      )}
+      {showScan && (
+        <LotScanModal fournisseurs={fournisseurs}
+          onClose={() => setShowScan(false)} onError={onError}
+          onSuccess={(n) => { setShowScan(false); onOk(`${n} lot(s) créé(s) depuis le scan`) }} />
       )}
     </div>
   )
@@ -1379,4 +1388,217 @@ function FiltreBtn({ active, onClick, children }: { active: boolean; onClick: ()
 
 function fmtDate(iso: string): string {
   return format(parseISO(iso), 'd MMM yyyy', { locale: fr })
+}
+
+
+// ─── Scanner de traçabilité ──────────────────────────────────────────
+// Photos des étiquettes produit ou d'une page du cahier manuscrit →
+// /api/agents/scanner-lots (Claude Vision) → liste relue et corrigée à la
+// main → création des lots. Une page de cahier peut porter 9 lots d'un
+// coup : la relecture avant validation n'est pas optionnelle, l'OCR d'une
+// écriture manuscrite se trompe parfois d'un chiffre sur un n° de lot.
+
+type LotScanne = {
+  produit: string; dlc: string | null; lot_numero: string | null
+  marque: string | null; format: string | null; confiance: number
+  garder: boolean
+}
+
+function reduirePhotoLot(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onerror = () => rej(new Error('Lecture du fichier échouée'))
+    r.onloadend = () => {
+      const img = new Image()
+      img.onerror = () => rej(new Error('Image illisible'))
+      img.onload = () => {
+        const MAX = 1600
+        const ratio = Math.min(1, MAX / Math.max(img.width, img.height))
+        if (ratio === 1 && file.size < 1024 * 1024) return res(r.result as string)
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.width * ratio); c.height = Math.round(img.height * ratio)
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+        res(c.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = r.result as string
+    }
+    r.readAsDataURL(file)
+  })
+}
+
+function LotScanModal({
+  fournisseurs, onClose, onError, onSuccess,
+}: {
+  fournisseurs: FournisseurShort[]
+  onClose: () => void
+  onError: (e: unknown) => void
+  onSuccess: (n: number) => void
+}) {
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galerieRef = useRef<HTMLInputElement>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [lots, setLots] = useState<LotScanne[] | null>(null)
+  const [fournisseurId, setFournisseurId] = useState('')
+  const [dateReception, setDateReception] = useState(new Date().toISOString().slice(0, 10))
+  const [chargement, setChargement] = useState(false)
+  const [envoi, setEnvoi] = useState(false)
+  const router = useRouter()
+
+  async function ajouter(files: FileList) {
+    try {
+      const nouvelles = await Promise.all(Array.from(files)
+        .filter(f => f.type.startsWith('image/')).map(reduirePhotoLot))
+      setPhotos(p => [...p, ...nouvelles].slice(0, 8))
+      setLots(null)
+    } catch (e) { onError(e) }
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galerieRef.current) galerieRef.current.value = ''
+  }
+
+  async function analyser() {
+    setChargement(true)
+    try {
+      const images = photos.map(p => {
+        const m = p.match(/^data:(image\/[a-z]+);base64,(.+)$/)
+        if (!m) throw new Error('Format image non reconnu')
+        return { image_base64: m[2], media_type: m[1] }
+      })
+      const r = await fetch('/api/agents/scanner-lots', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images }),
+      })
+      const json = await r.json()
+      if (!r.ok || !json.ok) throw new Error(json.error ?? `HTTP ${r.status}`)
+      setLots((json.lots as Omit<LotScanne, 'garder'>[]).map(l => ({ ...l, garder: true })))
+    } catch (e) { onError(e) } finally { setChargement(false) }
+  }
+
+  function maj(i: number, champ: keyof LotScanne, valeur: string | boolean) {
+    setLots(ls => ls!.map((l, j) => j === i ? { ...l, [champ]: valeur } : l))
+  }
+
+  async function creerTous() {
+    const retenus = (lots ?? []).filter(l => l.garder && l.produit.trim())
+    if (retenus.length === 0) { onError(new Error('Aucun lot coché')); return }
+    setEnvoi(true)
+    const f = fournisseurs.find(x => x.id === fournisseurId)
+    let crees = 0
+    try {
+      for (const l of retenus) {
+        await creerLot({
+          ingredient_id: null,
+          produit_nom: [l.produit.trim(), l.format].filter(Boolean).join(' '),
+          lot_numero: (l.lot_numero ?? 'N/C').trim() || 'N/C',
+          dlc: l.dlc || null,
+          fournisseur_id: fournisseurId || null,
+          fournisseur_nom: f?.nom ?? l.marque ?? null,
+          quantite: 0,
+          unite: null,
+          bon_commande_id: null,
+          date_reception: dateReception,
+          notes: l.marque ? `Marque : ${l.marque} · saisi par scan` : 'Saisi par scan',
+        })
+        crees++
+      }
+      onSuccess(crees)
+      router.refresh()
+    } catch (e) {
+      onError(e instanceof Error ? new Error(`${crees} lot(s) créé(s), puis : ${e.message}`) : e)
+    } finally { setEnvoi(false) }
+  }
+
+  return (
+    <Modal title="📷 Scanner la traçabilité" onClose={onClose} disabled={envoi}>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+        onChange={e => { if (e.target.files?.length) ajouter(e.target.files) }} />
+      <input ref={galerieRef} type="file" accept="image/*" multiple className="hidden"
+        onChange={e => { if (e.target.files?.length) ajouter(e.target.files) }} />
+
+      {!lots && (
+        <>
+          <p className="text-sm text-zinc-600">
+            Photographie les étiquettes des produits ou la page du cahier — les deux marchent,
+            écriture manuscrite comprise. Plusieurs photos possibles, puis une seule analyse.
+          </p>
+          {photos.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {photos.map((ph, i) => (
+                <div key={i} className="relative rounded border bg-zinc-50 overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ph} alt={`Photo ${i + 1}`} className="w-full h-20 object-cover" />
+                  <button onClick={() => setPhotos(ps => ps.filter((_, j) => j !== i))}
+                    aria-label={`Retirer la photo ${i + 1}`}
+                    className="absolute top-0.5 right-0.5 w-6 h-6 rounded-full bg-black/60 text-white text-sm leading-none">×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => cameraRef.current?.click()} disabled={chargement}
+              className="flex-1 min-h-[48px] rounded-md border border-zinc-300 font-bold text-sm hover:border-zinc-500">📷 Photo</button>
+            <button onClick={() => galerieRef.current?.click()} disabled={chargement}
+              className="flex-1 min-h-[48px] rounded-md border border-zinc-300 font-bold text-sm hover:border-zinc-500">🖼️ Bibliothèque</button>
+          </div>
+          {photos.length > 0 && (
+            <button onClick={analyser} disabled={chargement}
+              className="w-full min-h-[48px] rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">
+              {chargement ? '⏳ Lecture en cours…' : `🔍 Lire ${photos.length > 1 ? `les ${photos.length} photos` : 'la photo'}`}
+            </button>
+          )}
+        </>
+      )}
+
+      {lots && (
+        <>
+          <p className="text-sm text-zinc-600">
+            <b>{lots.length} lot(s) reconnu(s).</b> Relis chaque ligne — surtout les n° de lot
+            manuscrits — corrige au besoin, décoche ce qui est faux, puis valide.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Fournisseur (pour tous)">
+              <select value={fournisseurId} onChange={e => setFournisseurId(e.target.value)}
+                className="w-full h-12 px-3 rounded-md border border-zinc-300">
+                <option value="">— Aucun —</option>
+                {fournisseurs.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
+              </select>
+            </Field>
+            <Field label="Reçus le">
+              <input type="date" value={dateReception} max={new Date().toISOString().slice(0, 10)}
+                onChange={e => setDateReception(e.target.value)}
+                className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+            </Field>
+          </div>
+          <div className="space-y-2 max-h-[42vh] overflow-y-auto pr-1">
+            {lots.map((l, i) => (
+              <div key={i} className={cn('rounded-md border p-2 space-y-1.5',
+                l.garder ? 'border-zinc-300' : 'border-zinc-200 opacity-50',
+                l.confiance < 0.6 && l.garder && 'border-amber-400 bg-amber-50')}>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={l.garder} onChange={e => maj(i, 'garder', e.target.checked)}
+                    className="w-5 h-5 shrink-0" aria-label={`Garder ${l.produit}`} />
+                  <input value={l.produit} onChange={e => maj(i, 'produit', e.target.value)}
+                    className="flex-1 h-10 px-2 rounded border border-zinc-300 font-medium min-w-0" placeholder="Produit" />
+                  {l.confiance < 0.6 && <span className="text-[10px] font-bold text-amber-700 shrink-0">à relire</span>}
+                </div>
+                <div className="flex gap-2">
+                  <input type="date" value={l.dlc ?? ''} onChange={e => maj(i, 'dlc', e.target.value)}
+                    className="h-10 px-2 rounded border border-zinc-300 text-sm" aria-label="DLC" />
+                  <input value={l.lot_numero ?? ''} onChange={e => maj(i, 'lot_numero', e.target.value)}
+                    className="flex-1 h-10 px-2 rounded border border-zinc-300 font-mono text-sm min-w-0" placeholder="N° de lot" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setLots(null)} disabled={envoi}
+              className="min-h-[48px] px-4 rounded-md border border-zinc-300 font-bold text-sm">↺ Reprendre</button>
+            <button onClick={creerTous} disabled={envoi}
+              className="flex-1 min-h-[48px] rounded-md bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-sm">
+              {envoi ? '⏳ Création…' : `✓ Créer ${lots.filter(l => l.garder).length} lot(s)`}
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
+  )
 }

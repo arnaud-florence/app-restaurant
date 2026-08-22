@@ -205,6 +205,13 @@ route API) ; suppression via DELETE qui efface fiche ET fichier. UI :
 `/admin/legal` → onglet 📁 Documents, catégorie en texte libre, alerte
 expiration à J-30. Test : `node scripts/test-conformite.mjs`.
 
+**Scanner de traçabilité** (`POST /api/agents/scanner-lots`) : photos des
+étiquettes produit OU d'une page de cahier manuscrite → Claude Vision extrait
+la liste des lots (produit, DLC, n° de lot, marque) → relecture ligne à ligne
+obligatoire dans l'UI (l'OCR du manuscrit se trompe parfois d'un chiffre) →
+création groupée. Bouton « 📷 Scanner étiquettes » dans /admin/hygiene,
+onglet lots. Une photo peut porter plusieurs lots — la réponse est un tableau.
+
 **Suppression de lots** (`supprimerLot`) : réservée aux erreurs de saisie —
 le cycle de vie normal (consommé, jeté, expiré, rappelé) passe par les
 STATUTS, qui gardent la trace au registre.
