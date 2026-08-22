@@ -220,6 +220,18 @@ STATUTS, qui gardent la trace au registre.
 trace n'importe quelle réception au clavier, le lien ingrédient est
 facultatif. L'affichage montre `produit_nom ?? ingredient_nom`.
 
+### ⛔ Plus jamais de commande de test sur le circuit réel
+
+Depuis le 22 août 2026, **le Fournil attend de vraies commandes web** : toute
+commande ONLINE est réelle et doit être traitée. Interdiction de créer des
+commandes de test via le site ou `/api/public/commande` — l'équipe ne peut
+pas distinguer un test d'une vraie livraison à préparer, et une vraie
+commande noyée dans les tests serait manquée. Pour valider un changement du
+tunnel : s'arrêter à l'étape de paiement SANS confirmer, ou tester la logique
+en pur (scripts de test qui n'écrivent pas de commande ONLINE `en_attente`).
+Si le gérant demande explicitement un test de bout en bout : nom de client
+« TEST », prévenir l'équipe avant, supprimer immédiatement après.
+
 ### Clôture d'une commande web retirée au comptoir
 
 `estRetraitFournil()` (dans `src/lib/commande-statut.ts`) clôt en `encaisse`
