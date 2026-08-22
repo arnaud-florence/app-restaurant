@@ -165,8 +165,16 @@ export default function RecetteFormModal({
 
   // ─── Submit ────────────────────────────────────────────────────────
   function onSubmit(data: FormData) {
-    if (lignes.length === 0) {
-      setError('root', { message: 'Une recette doit avoir au moins un ingrédient.' })
+    // Achat-revente (le modèle du Fournil, ~95 % de la carte) : le produit
+    // est acheté fini, son coût est `cout_achat_ht`, il n'a PAS de
+    // composition. Exiger un ingrédient bloquait toute modification — y
+    // compris un simple changement de prix. On exige désormais l'un OU
+    // l'autre : une composition, ou un coût d'achat (0 accepté si le champ a
+    // été volontairement renseigné, mais vide = rien du tout → on guide).
+    if (lignes.length === 0 && (data.cout_achat_ht == null || Number.isNaN(data.cout_achat_ht))) {
+      setError('root', {
+        message: 'Indique soit un coût d\'achat (produit revendu tel quel), soit au moins un ingrédient (produit fabriqué).',
+      })
       return
     }
     startTransition(async () => {
@@ -314,7 +322,8 @@ export default function RecetteFormModal({
                 {/* Liste des ingrédients */}
                 {lignes.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic text-center py-4">
-                    Aucun ingrédient — ajoutes-en au moins un avant de sauvegarder.
+                    Aucun ingrédient — normal pour un produit acheté-revendu :
+                    renseigne son coût d&apos;achat dans « Tarification » et c&apos;est tout.
                   </p>
                 ) : (
                   <ul className="divide-y border rounded-md overflow-hidden">
