@@ -193,6 +193,16 @@ function QuotidienTab({
 
   // Releves récents groupés par moment du jour
   const relevesToday = releves.filter(r => r.date_releve === today)
+  // Historique : groupé par date de relevé, du plus récent au plus ancien.
+  const [vueHisto, setVueHisto] = useState(false)
+  const parDate = useMemo(() => {
+    const m = new Map<string, typeof releves>()
+    for (const r of releves) {
+      if (!m.has(r.date_releve)) m.set(r.date_releve, [])
+      m.get(r.date_releve)!.push(r)
+    }
+    return Array.from(m.entries())
+  }, [releves])
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -200,13 +210,62 @@ function QuotidienTab({
       <section className="rounded-lg border border-zinc-200 bg-white">
         <header className="px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Aujourd&apos;hui</p>
-            <h2 className="text-lg font-bold">🌡️ Relevés température · {relevesToday.length}</h2>
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
+              <button onClick={() => setVueHisto(false)}
+                className={cn('px-2 py-0.5 rounded', !vueHisto ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-800')}>
+                Aujourd&apos;hui
+              </button>
+              <button onClick={() => setVueHisto(true)}
+                className={cn('px-2 py-0.5 rounded', vueHisto ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-800')}>
+                Historique
+              </button>
+            </div>
+            <h2 className="text-lg font-bold">🌡️ Relevés température · {vueHisto ? releves.length : relevesToday.length}</h2>
           </div>
           <button onClick={() => setShowRelevForm(true)} className="min-h-[40px] px-3 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">+ Nouveau relevé</button>
         </header>
         <div className="divide-y divide-zinc-100 max-h-[60vh] overflow-y-auto">
-          {relevesToday.length === 0 ? (
+          {/* Historique : un bandeau par jour, puis les mêmes lignes qu'en vue
+              du jour. Le bandeau porte le bilan (n relevés, n hors plage) —
+              c'est la lecture que fait un contrôleur : « montrez-moi la
+              semaine dernière ». */}
+          {vueHisto && parDate.map(([date, lignes]) => {
+            const nok = lignes.filter(r => r.conforme === false).length
+            return (
+              <div key={date}>
+                <div className="px-4 py-1.5 bg-zinc-50 border-y border-zinc-100 flex items-center justify-between">
+                  <p className="text-xs font-bold text-zinc-600 capitalize">
+                    {format(parseISO(date + 'T12:00:00'), 'EEEE d MMMM', { locale: fr })}
+                    {date === today && ' · aujourd\u2019hui'}
+                  </p>
+                  <p className={cn('text-[11px] font-bold tabular-nums', nok > 0 ? 'text-red-600' : 'text-emerald-700')}>
+                    {lignes.length} relevé{lignes.length > 1 ? 's' : ''}{nok > 0 ? ` · ${nok} hors plage` : ' · ✓'}
+                  </p>
+                </div>
+                {lignes.map(r => (
+                  <div key={r.id} className={cn('px-4 py-2 flex items-center justify-between gap-3',
+                    r.conforme === false ? 'bg-red-50' : '')}>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-bold">
+                        {(r.type_equipement ? TYPE_EQUIPEMENT_LABEL[r.type_equipement]?.emoji : '')} {r.equipement}
+                      </span>
+                      <p className="text-[11px] text-zinc-500">
+                        {r.moment ? MOMENT_LABEL[r.moment]?.label : ''}{r.employe_nom && ` · ${r.employe_nom}`}
+                      </p>
+                    </div>
+                    <p className={cn('text-lg font-bold tabular-nums shrink-0',
+                      r.conforme === false ? 'text-red-700' : r.conforme === true ? 'text-emerald-700' : 'text-zinc-700')}>
+                      {r.temperature.toFixed(1)}°
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+          {vueHisto && parDate.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun relevé enregistré.</p>
+          )}
+          {!vueHisto && (relevesToday.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-zinc-400">Aucun relevé aujourd&apos;hui.</p>
           ) : relevesToday.map(r => {
             const sty = r.conforme === false ? 'bg-red-50' : r.conforme === true ? '' : 'bg-zinc-50'
@@ -240,7 +299,7 @@ function QuotidienTab({
                 </div>
               </div>
             )
-          })}
+          }))}
         </div>
       </section>
 

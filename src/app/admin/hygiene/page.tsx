@@ -37,7 +37,7 @@ export default async function HygienePage() {
                employe:employes!employe_id(prenom, nom)`)
       .order('date_releve', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(60),
+      .limit(240),
     supabase.from('plans_haccp').select('*').eq('actif', true).order('ccp_numero', { nullsFirst: false }).order('created_at'),
     supabase.from('lots_produits')
       .select(`id, ingredient_id, produit_nom, lot_numero, dlc, fournisseur_id, fournisseur_nom, quantite, unite, bon_commande_id, date_reception, statut, notes, created_at,
