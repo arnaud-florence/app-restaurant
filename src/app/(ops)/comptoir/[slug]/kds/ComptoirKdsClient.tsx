@@ -147,6 +147,7 @@ export default function ComptoirKdsClient({ config, initial }: { config: Comptoi
               🖨 {autoPrint ? 'ON' : 'OFF'}
             </button>
             <Link href={`/comptoir/${config.slug}`} className="inline-flex items-center gap-1 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-sm active:scale-95" title="Prise de commande">🛒</Link>
+            <Link href="/invendus" className="inline-flex items-center gap-1 px-3 h-12 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold text-sm active:scale-95" title="Invendus du soir">🗑</Link>
             <Link href="/service" className="inline-flex items-center gap-1 px-3 h-12 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-sm shadow-lg active:scale-95">
               <span className="text-lg">⊞</span><span className="hidden sm:inline">Service</span>
             </Link>

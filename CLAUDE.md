@@ -131,8 +131,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Achat-revente + traçabilité libre | `recettes.cout_achat_ht`, `lots_produits.produit_nom` | 0126 |
 | Avoirs fournisseurs | `type_document`, montants négatifs, scanner les reconnaît | 0127 |
 | Hygiène & conformité | `date_releve`, suppression de lots, coffre `documents_conformite` | 0128 |
+| Invendus du soir | `(ops)/invendus` — comptage à la fermeture, coût figé, synthèse 7 j | 0129 |
 
-**Migrations actuelles : 0001 → 0128.**
+**Migrations actuelles : 0001 → 0129.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -154,6 +155,17 @@ prix du panneau — et sous-déclarerait la TVA sur la moitié de la carte.
 
 `prix_vente_ht` est en `decimal(10,4)` depuis la 0114 : à 2 décimales, un TTC
 de 2,40 € à 5,5 % est inatteignable (2,27 → 2,39 ; 2,28 → 2,41).
+
+### Invendus du soir — la casse qui manquait au food cost
+
+`(ops)/invendus` (0129) : comptage par produit à la fermeture, gros steppers
+tactiles, upsert par (date, produit) — repasser corrige. `cout_unitaire_ht`
+est FIGÉ à la saisie (la casse d'un jour reste valorisée au tarif de ce
+jour). Quantité 0 = suppression de la ligne, pas un zéro stocké. Les
+catégories boissons/formules sont exclues de la liste (rien ne s'y jette à
+J+1). Synthèse 7 jours en tête de page : total € + top produits jetés —
+c'est l'outil de réglage des commandes Gineys. Lien 🗑 dans l'en-tête du
+KDS Fournil. Test : `node scripts/test-invendus.mjs`.
 
 ### Factures fournisseurs : les lignes font les marges
 
