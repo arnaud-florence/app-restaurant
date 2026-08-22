@@ -469,6 +469,63 @@ async function detecterFournil(ctx: AgentContext, employesActifs: string[]): Pro
     nb++
   }
 
+  // ─── 4. Écarts de prix caisse ↔ outil ────────────────────────────────
+  // SumUp n'expose pas son catalogue par API : un prix changé en caisse ne
+  // peut se détecter qu'en le voyant passer dans les ventes. Quand le miroir
+  // encaisse un produit à un prix qui ne correspond plus à la fiche, le site
+  // affiche — et facture — un prix différent du comptoir. On compare le prix
+  // DOMINANT des 2 dernières heures au TTC attendu de la fiche, et on exige
+  // au moins 2 ventes au prix divergent : une vente isolée est plus souvent
+  // un geste commercial qu'un changement de tarif.
+  const seuilPrix = new Date(maintenant - 2 * 60 * 60_000).toISOString()
+  const { data: ventesCaisse } = await ctx.supabase
+    .from('commande_articles')
+    .select('recette_id, prix_unitaire_ttc, commande:commandes!inner(source, created_at)')
+    .eq('commande.source', 'CAISSE')
+    .gte('commande.created_at', seuilPrix)
+    .not('recette_id', 'is', null)
+    .neq('statut', 'annule')
+    .limit(500)
+
+  type VenteLigne = { recette_id: string; prix_unitaire_ttc: number | string }
+  const parProduit = new Map<string, Map<number, number>>() // recette → prix → occurrences
+  for (const v of (ventesCaisse ?? []) as VenteLigne[]) {
+    const prix = Math.round(Number(v.prix_unitaire_ttc) * 100) / 100
+    if (!(prix > 0)) continue // ligne offerte : pas un tarif
+    const m = parProduit.get(v.recette_id) ?? new Map<number, number>()
+    m.set(prix, (m.get(prix) ?? 0) + 1)
+    parProduit.set(v.recette_id, m)
+  }
+
+  if (parProduit.size > 0) {
+    const { data: fiches } = await ctx.supabase
+      .from('recettes')
+      .select('id, nom, prix_vente_ht, tva')
+      .in('id', Array.from(parProduit.keys()))
+    for (const f of fiches ?? []) {
+      const attendu = Math.round(Number(f.prix_vente_ht) * (1 + Number(f.tva ?? 0) / 100) * 100) / 100
+      if (!(attendu > 0)) continue
+      // Prix dominant observé en caisse sur la fenêtre
+      let domine = 0, occurrences = 0
+      for (const [prix, n] of parProduit.get(f.id as string)!) {
+        if (n > occurrences) { domine = prix; occurrences = n }
+      }
+      if (occurrences < 2) continue
+      if (Math.abs(domine - attendu) <= 0.011) continue // au centime près : arrondi, pas écart
+      if (await findingDejaActif(ctx, 'fournil_ecart_prix', { recette_id: String(f.id), prix_caisse: domine.toFixed(2) })) continue
+      await emitFinding(ctx, {
+        urgence: 'jaune',
+        type: 'fournil_ecart_prix',
+        titre: `Écart de prix : ${f.nom} à ${domine.toFixed(2).replace('.', ',')} € en caisse`,
+        message: `La fiche produit (et donc le site) est à ${attendu.toFixed(2).replace('.', ',')} € TTC, la caisse encaisse ${domine.toFixed(2).replace('.', ',')} € (${occurrences} vente(s) sur 2 h). Aligner l'un ou l'autre : un client web ne doit pas payer un autre prix que le comptoir.`,
+        action_label: 'Ouvrir la fiche produit',
+        action_url:   '/admin/recettes',
+        data: { recette_id: String(f.id), prix_caisse: domine.toFixed(2), prix_fiche: attendu.toFixed(2), occurrences: String(occurrences) },
+      })
+      nb++
+    }
+  }
+
   // Un seul push groupé : le rate-limit plafonne déjà à 3/h par employé,
   // autant ne pas le consommer en notifications séparées.
   if (nb > 0) {
