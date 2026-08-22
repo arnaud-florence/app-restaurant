@@ -94,6 +94,7 @@ export default function RecetteFormModal({
 
   const nb_portions   = watch('nb_portions')
   const prix_vente_ht = watch('prix_vente_ht')
+  const tvaCourante   = watch('tva')
   const cout_achat_ht = watch('cout_achat_ht')
   const tag           = watch('tag_destination')
   const photo_url     = watch('photo_url')
@@ -357,14 +358,37 @@ export default function RecetteFormModal({
               {/* Tarification */}
               <section className="space-y-3">
                 <SectionTitle>💶 Tarification</SectionTitle>
+                {/* Le gérant raisonne en TTC — c'est le prix du panneau et
+                    celui de la caisse. On saisit donc le TTC, le HT en découle
+                    (4 décimales : à 2, un TTC de 2,40 € à 5,5 % est
+                    inatteignable — cf. migration 0114). Le champ HT reste
+                    éditable pour les cas particuliers. */}
+                <Field label="Prix de vente TTC (€) — le prix du panneau">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={prix_vente_ht > 0 ? (Math.round(prix_vente_ht * (1 + (Number(tvaCourante) || 0) / 100) * 100) / 100).toString() : ''}
+                    onChange={e => {
+                      const ttc = parseFloat(e.target.value)
+                      if (Number.isFinite(ttc)) {
+                        setValue('prix_vente_ht',
+                          Math.round(ttc / (1 + (Number(tvaCourante) || 0) / 100) * 10000) / 10000,
+                          { shouldValidate: true })
+                      }
+                    }}
+                    className="font-bold text-lg tabular-nums"
+                    placeholder="ex : 1.40"
+                  />
+                </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Prix de vente HT (€) *" error={errors.prix_vente_ht?.message}>
+                  <Field label="Prix de vente HT (€) — calculé" error={errors.prix_vente_ht?.message}>
                     <Input
                       type="number"
-                      step="0.01"
+                      step="0.0001"
                       min={0}
                       {...register('prix_vente_ht', { valueAsNumber: true })}
-                      className="font-bold text-lg tabular-nums"
+                      className="tabular-nums"
                     />
                   </Field>
                   {/* Achat-revente (Fournil) : quasi toute la carte est achetée
