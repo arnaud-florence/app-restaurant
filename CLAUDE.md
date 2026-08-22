@@ -133,6 +133,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Hygiène & conformité | `date_releve`, suppression de lots, coffre `documents_conformite` | 0128 |
 | Invendus du soir | `(ops)/invendus` — comptage à la fermeture, coût figé, synthèse 7 j | 0129 |
 | Marges vivantes | `/admin/ventes` — marge brute, food cost pondéré, casse déduite | — |
+| Commande conseillée | `/admin/commande-fournil` — ventes 14 j × couverture, colisage lu sur factures | — |
 
 **Migrations actuelles : 0001 → 0129.**
 

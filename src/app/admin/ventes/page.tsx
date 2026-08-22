@@ -57,6 +57,13 @@ export default async function VentesPage({
         <Chiffre titre="Panier moyen" d={s.panierMoyen} format={v => eur(v, 2)} />
       </div>
 
+      <div className="flex justify-end -mb-2">
+        <Link href="/admin/commande-fournil"
+          className="text-sm font-bold text-emerald-700 hover:text-emerald-800">
+          🧮 Commande fournisseur conseillée →
+        </Link>
+      </div>
+
       {/* ── Marge & casse ─────────────────────────────────────────────── */}
       {/* Les marges de l'audit, mais VIVANTES : recalculées à chaque visite
           depuis les ventes et les coûts d'achat (0126). La casse (invendus
