@@ -221,6 +221,22 @@ export default async function HygienePage() {
     default:                             widgetPoste = null  // manager ou autre
   }
 
+  // ── Équipements de froid connus : appris des relevés passés + registre
+  // maintenance (categorie 'froid'). Pas de table dédiée : taper « Frigo
+  // vitrine » une fois suffit, la pastille existe pour toujours.
+  const connusMap = new Map<string, string | null>()
+  for (const r of releves) {
+    if (!connusMap.has(r.equipement)) connusMap.set(r.equipement, r.type_equipement)
+  }
+  const { data: eqFroid } = await supabase.from('equipements')
+    .select('nom').eq('categorie', 'froid').eq('actif', true)
+  for (const e of eqFroid ?? []) {
+    if (!connusMap.has(e.nom as string)) connusMap.set(e.nom as string, null)
+  }
+  const equipementsConnus = Array.from(connusMap.entries())
+    .map(([nom, type]) => ({ nom, type }))
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+
   return (
     <HygieneClient
       employes={employes}
@@ -235,6 +251,7 @@ export default async function HygienePage() {
       interventions={interventions}
       plansNettoyage={plansNettoyage}
       widgetPoste={widgetPoste}
+      equipementsConnus={equipementsConnus}
     />
   )
 }

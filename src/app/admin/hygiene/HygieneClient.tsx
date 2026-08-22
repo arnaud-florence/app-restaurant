@@ -47,6 +47,8 @@ export default function HygieneClient(props: {
   interventions: Intervention3D[]
   plansNettoyage: PlanNettoyage[]
   widgetPoste?: PosteWidget | null
+  /** Frigos/congélateurs déjà connus (relevés passés + registre maintenance) */
+  equipementsConnus?: Array<{ nom: string; type: string | null }>
 }) {
   const [tab, setTab] = useState<Tab>('quotidien')
   const [erreur, setErreur] = useState('')
@@ -116,6 +118,7 @@ export default function HygieneClient(props: {
             procedures={props.procedures}
             checklistsToday={props.checklistsToday}
             releves={props.releves}
+            equipementsConnus={props.equipementsConnus ?? []}
             today={today}
             onError={flashKo} onOk={flashOk}
           />
@@ -175,12 +178,13 @@ function KpiBadge({ label, value, accent }: { label: string; value: number | str
 
 // ─── TAB 1 — Quotidien ──────────────────────────────────────────────
 function QuotidienTab({
-  employes, procedures, checklistsToday, releves, today, onError, onOk,
+  employes, procedures, checklistsToday, releves, equipementsConnus, today, onError, onOk,
 }: {
   employes: Employe[]
   procedures: ProcedureHygiene[]
   checklistsToday: ChecklistHygiene[]
   releves: ReleveTemperature[]
+  equipementsConnus: Array<{ nom: string; type: string | null }>
   today: string
   onError: (e: unknown) => void
   onOk: (m: string) => void
@@ -356,7 +360,8 @@ function QuotidienTab({
       </section>
 
       {showRelevForm && (
-        <RelevModal employes={employes} onClose={() => setShowRelevForm(false)} onError={onError}
+        <RelevModal employes={employes} equipementsConnus={equipementsConnus}
+          onClose={() => setShowRelevForm(false)} onError={onError}
           onSuccess={(msg) => { setShowRelevForm(false); onOk(msg) }} />
       )}
       {showChecklistForm && (
@@ -373,9 +378,10 @@ function QuotidienTab({
 }
 
 function RelevModal({
-  employes, onClose, onError, onSuccess,
+  employes, equipementsConnus, onClose, onError, onSuccess,
 }: {
   employes: Employe[]
+  equipementsConnus: Array<{ nom: string; type: string | null }>
   onClose: () => void
   onError: (e: unknown) => void
   onSuccess: (msg: string) => void
@@ -414,7 +420,40 @@ function RelevModal({
 
   return (
     <Modal title="Nouveau relevé température" onClose={onClose} disabled={isPending}>
-      <Field label="Équipement">
+      {/* Pastilles : un geste au lieu de retaper le nom à chaque relevé.
+          Auto-apprenant — chaque équipement relevé une fois devient une
+          pastille (+ registre maintenance categorie 'froid'). Au tout
+          premier jour, des suggestions types pré-remplissent le champ,
+          modifiables avant d'enregistrer. */}
+      <div className="flex flex-wrap gap-1.5">
+        {(equipementsConnus.length > 0
+          ? equipementsConnus
+          : [
+              { nom: 'Frigo vitrine', type: 'frigo' },
+              { nom: 'Frigo réserve', type: 'frigo' },
+              { nom: 'Congélateur 1', type: 'congelateur' },
+              { nom: 'Congélateur 2', type: 'congelateur' },
+            ]
+        ).map(eq => (
+          <button key={eq.nom} type="button"
+            onClick={() => {
+              setEquipement(eq.nom)
+              if (eq.type === 'frigo' || eq.type === 'congelateur'
+                  || eq.type === 'chambre_froide' || eq.type === 'bain_marie') {
+                setType(eq.type as TypeEquipement)
+              } else if (/cong[eé]l/i.test(eq.nom)) setType('congelateur')
+              else if (/frigo|vitrine|r[eé]frig/i.test(eq.nom)) setType('frigo')
+              document.getElementById('releve-temperature-input')?.focus()
+            }}
+            className={cn('min-h-[40px] px-3 rounded-full border text-sm font-bold',
+              equipement === eq.nom
+                ? 'bg-zinc-900 text-white border-zinc-900'
+                : 'bg-white border-zinc-300 hover:border-zinc-500')}>
+            {/cong[eé]l/i.test(eq.nom) ? '🧊' : '❄️'} {eq.nom}
+          </button>
+        ))}
+      </div>
+      <Field label={equipementsConnus.length > 0 ? 'Équipement' : 'Équipement (modifiable)'}>
         <input value={equipement} onChange={e => setEquipement(e.target.value)}
           placeholder="Ex: Frigo cuisine 1, Congélateur principal…"
           className="w-full h-12 px-3 rounded-md border border-zinc-300" />
@@ -439,7 +478,7 @@ function RelevModal({
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Température °C">
-          <input type="number" step="0.1" value={temperature}
+          <input id="releve-temperature-input" type="number" step="0.1" value={temperature}
             onChange={e => setTemperature(e.target.value === '' ? '' : Number(e.target.value))}
             className="w-full h-14 px-3 rounded-md border border-zinc-300 text-2xl font-bold tabular-nums text-right" />
         </Field>
