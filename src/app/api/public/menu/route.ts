@@ -59,6 +59,17 @@ export async function GET(req: Request) {
     `)
     .eq('actif', true)
     .in('tag_destination', tags)
+    // ─── Barrière de présentabilité ────────────────────────────────
+    // Le miroir caisse (0122) crée des produits bruts (« Mario »,
+    // « Pago 20cl », « Formule — boisson »…) en catégorie « À classer »,
+    // sans visuel. Ils servaient le rapprochement des tickets — et
+    // fuyaient sur la carte publique : 22 produits sans image sous un
+    // intitulé « À classer » visible des clients.
+    // Règle simple et définitive : RIEN ne paraît au public sans
+    // catégorie réelle ET sans visuel. Classer un produit dans l'admin et
+    // lui donner une image suffit à le publier — rien d'autre à faire.
+    .not('image_url', 'is', null)
+    .neq('categorie', 'À classer')
 
   if (etabIds.length > 0) {
     query = query.or(`etablissement_id.in.(${etabIds.join(',')}),etablissement_id.is.null`)
