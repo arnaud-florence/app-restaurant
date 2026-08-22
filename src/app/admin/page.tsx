@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import { AGENTS, type AgentId } from '@/lib/agents/types'
+import BusinessHeader from '@/components/control/BusinessHeader'
+import { getBusinessLive } from '@/lib/business-live'
 import SectionKPIs from './pilotage/sections/SectionKPIs'
 import SectionSuggestions from './pilotage/sections/SectionSuggestions'
 import { Target, Sparkles, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -16,6 +18,12 @@ export const dynamic = 'force-dynamic'
 export default async function AdminHome() {
   const supabase = await createClient()
   const profil = await getProfile()
+
+  // Le business EN DIRECT, pas celui d'hier : les KPIs des agents plus bas
+  // datent de leur dernier passage (Veilleur à 2 h du matin…). La page qui
+  // s'appelle « Tableau de bord » doit ouvrir sur le CA du jour, en direct
+  // depuis le miroir caisse — même bloc que /admin/cat.
+  const business = await getBusinessLive().catch(() => null)
 
   const { data: alertesData } = await supabase
     .from('agent_findings')
@@ -103,6 +111,9 @@ export default async function AdminHome() {
             </Link>
           </div>
         </header>
+
+        {/* ─── BUSINESS EN DIRECT — la première chose qu'on voit ────── */}
+        {business && <BusinessHeader b={business} />}
 
         {/* ─── ALERTES URGENTES (premium card list) ────────────────── */}
         <section className="space-y-3">
