@@ -135,8 +135,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Marges vivantes | `/admin/ventes` — marge brute, food cost pondéré, casse déduite | — |
 | Commande conseillée | `/admin/commande-fournil` — ventes 14 j × couverture, colisage lu sur factures | — |
 | Inventaire hebdo | `(ops)/inventaire` — stock compté et valorisé, repère « dernière fois » | 0130 |
+| Correspondance d'achat | `recettes.libelle_achat` + `unites_par_achat` — panuozzi ← pâton | 0131 |
 
-**Migrations actuelles : 0001 → 0130.**
+**Migrations actuelles : 0001 → 0131.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -186,6 +187,24 @@ orange/pomme) doit être RETROUVÉ, pas recréé en double au premier ticket.
 La vente s'y rattache, le produit reste désactivé — donc hors site, hors
 inventaire, hors commande conseillée. `.order('actif')` fait gagner un
 homonyme actif sur un inactif.
+
+**Correspondance produit vendu ↔ matière achetée** (0131) : le produit vendu
+porte rarement le nom de la matière (« Panuozzi » ← « PATON A PIZZA », les
+quatre cafés ← la même capsule Lavazza, une part de flan ← 1/10 d'un flan de
+2 kg). `recettes.libelle_achat` (libellé fournisseur à reconnaître) +
+`unites_par_achat` (unités vendues par unité achetée) portent ce lien ;
+saisissables dans la fiche produit. La propagation utilise `filter` et non
+`find` : une ligne de facture peut alimenter plusieurs produits. Amorçage :
+`node scripts/correspondances-achat.mjs`.
+
+⚠️ **L'UNITÉ DE LA LIGNE de facture décide, AVANT le C=N.** Gineys facture
+tantôt au colis (`q=2 Col, pu=20,31`), tantôt à la pièce (`q=27 Pce,
+pu=1,26`) — pour un libellé portant C=27 dans les deux cas. Diviser par C=N
+une ligne déjà au détail donnait un moelleux à 4,7 centimes (food cost 3 %).
+`extraireConditionnement()` lit aussi le format Brake sans « C= » (« 100
+capsules », « Carton de 50 dosettes ») mais REFUSE les contenances
+(« 90G », « 33 cl ») — les prendre pour un colisage diviserait un prix par
+un poids.
 
 ⚠️ **Propagation des prix facture → produits : TOUJOURS à la pièce.** Le
 prix de ligne Gineys est celui du COLIS (« CROISSANT … C=96 » = 28,84 € le

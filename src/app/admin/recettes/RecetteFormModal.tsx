@@ -38,6 +38,8 @@ const formSchema = z.object({
   nb_portions: z.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.number().min(0).max(99999),
   cout_achat_ht: z.number().min(0).max(99999).nullable(),
+  libelle_achat: z.string().max(200),
+  unites_par_achat: z.number().positive().max(1000),
   tva: z.number().min(0).max(100),
   contient_alcool: z.boolean(),
   photo_url: z.string().max(2000),
@@ -75,6 +77,8 @@ export default function RecetteFormModal({
         nb_portions: recette.nb_portions,
         prix_vente_ht: recette.prix_vente_ht,
         cout_achat_ht: recette.cout_achat_ht,
+        libelle_achat: recette.libelle_achat ?? '',
+        unites_par_achat: recette.unites_par_achat ?? 1,
         tva: recette.tva,
         contient_alcool: recette.contient_alcool ?? false,
         photo_url: recette.photo_url ?? '',
@@ -413,6 +417,25 @@ export default function RecetteFormModal({
                       {...register('cout_achat_ht', {
                         setValueAs: v => (v === '' || v == null ? null : Number(v)),
                       })}
+                      className="tabular-nums"
+                    />
+                  </Field>
+                  {/* Le produit vendu porte rarement le nom de la matière
+                      achetée : « Panuozzi » ← « PATON A PIZZA », les deux
+                      cafés ← la même capsule. Ce libellé permet au scanner de
+                      factures de reconnaître la ligne et de mettre le coût à
+                      jour tout seul à chaque livraison. */}
+                  <Field label="Libellé sur la facture fournisseur (optionnel)" error={errors.libelle_achat?.message}>
+                    <Input
+                      placeholder="ex : PATON A PIZZA — si différent du nom du produit"
+                      {...register('libelle_achat')}
+                    />
+                  </Field>
+                  <Field label="Unités vendues par unité achetée" error={errors.unites_par_achat?.message}>
+                    <Input
+                      type="number" step="0.001" min={0.001}
+                      placeholder="1"
+                      {...register('unites_par_achat', { valueAsNumber: true })}
                       className="tabular-nums"
                     />
                   </Field>

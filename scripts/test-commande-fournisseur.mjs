@@ -16,6 +16,13 @@ check('C=6 X 500 rejeté (multiplicateur espacé)', extraireConditionnement('SER
 check('sans C= → null', extraireConditionnement('BEURRE DOUX ROULEAU 1KG') === null)
 check('C=1 rejeté (pas un colis)', extraireConditionnement('TRUC C=1') === null)
 
+// Formats Brake, sans « C= » : nombre + mot dénombrable
+check('« 100 capsules » → 100', extraireConditionnement('Kit complet café Lavazza blue (100 capsules gobelets)') === 100)
+check('« Carton de 50 dosettes » → 50', extraireConditionnement('Carton de 50 dosettes chocolat Blue') === 50)
+check('« 150 » seul, sans mot d\'unité → null', extraireConditionnement('Dosette Thé menthé 150') === null)
+check('« 90G » n\'est pas un conditionnement', extraireConditionnement('COULANT GOURMAND AU CHOCOLAT 90G CARIGEL') === null)
+check('« 33 cl » n\'est pas un conditionnement', extraireConditionnement('COCA COLA 33 cl') === null)
+
 // ─── Suggestion ──────────────────────────────────────────────────────
 // 14 croissants/j vendus, pas de casse, colis de 96, couvrir 7 j :
 // 14×7×1,1 = 107,8 → 108 pièces → 2 colis (192 livrées)

@@ -30,6 +30,10 @@ export type Recette = {
   prix_vente_ht: number
   /** Achat-revente : prix d'achat HT du produit fini (surgelé), par unité vendue */
   cout_achat_ht: number | null
+  /** Libellé fournisseur à reconnaître sur les factures (0131) */
+  libelle_achat: string | null
+  /** Unités vendues tirées d'une unité achetée (flan entier → 10 parts) */
+  unites_par_achat: number
   tva: number
   contient_alcool: boolean
   actif: boolean
@@ -71,6 +75,8 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     nb_portions: 1,
     prix_vente_ht: 0,
     cout_achat_ht: null,
+    libelle_achat: '',
+    unites_par_achat: 1,
     tva: 10,
     contient_alcool: false,
     actif: true,

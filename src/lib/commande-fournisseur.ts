@@ -13,11 +13,23 @@
  * suivi d'un multiplicateur est rejeté plutôt que mal compris. */
 export function extraireConditionnement(description: string): number | null {
   const m = description.match(/C=(\d+)(?!\d)/)
-  if (!m) return null
-  const apres = description.slice((m.index ?? 0) + m[0].length)
-  if (/^\s*[X×x]/.test(apres)) return null
-  const n = Number(m[1])
-  return n >= 2 && n <= 2000 ? n : null
+  if (m) {
+    const apres = description.slice((m.index ?? 0) + m[0].length)
+    if (/^\s*[X×x]/.test(apres)) return null
+    const n = Number(m[1])
+    return n >= 2 && n <= 2000 ? n : null
+  }
+  // Format Brake France, sans « C= » : le nombre est collé à un mot d'unité
+  // dénombrable (« 100 capsules », « Carton de 50 dosettes », « 150 pièces »).
+  // On n'accepte QUE ces mots-là : « 90G » ou « 33 cl » sont des contenances,
+  // pas des conditionnements — les prendre pour tels diviserait un prix par
+  // un poids et produirait un coût absurde.
+  const b = description.match(/(\d+)\s*(capsules?|dosettes?|pi[eè]ces?|unit[eé]s?|sachets?)\b/i)
+  if (b) {
+    const n = Number(b[1])
+    return n >= 2 && n <= 2000 ? n : null
+  }
+  return null
 }
 
 export type Suggestion = {
