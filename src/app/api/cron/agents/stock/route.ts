@@ -132,6 +132,30 @@ export async function GET(req: Request) {
     // (E) Génère bons de commande EN BROUILLON, 1 par fournisseur
     const six_h = new Date(Date.now() - 6 * 3600_000).toISOString()
     let bonsCreated = 0
+    // ── Purge des propositions périmées ─────────────────────────────
+    // L'agent propose un brouillon par fournisseur toutes les 6 h. Sans
+    // ménage, ils s'empilent : 1 816 avaient été accumulés en trois mois,
+    // au point de bloquer la suppression d'un fournisseur (contrainte de
+    // clé étrangère). Un brouillon d'agent que personne n'a ouvert en une
+    // semaine est une proposition morte — les besoins ont changé depuis.
+    // On ne touche QUE ce que l'agent a écrit et que personne n'a validé :
+    // statut brouillon, notes signées « Agent Stock », rien de réceptionné.
+    try {
+      const il7j = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      const { data: perimes } = await ctx.supabase
+        .from('bons_commande')
+        .select('id')
+        .eq('statut', 'brouillon')
+        .ilike('notes', '%Agent Stock%')
+        .lt('created_at', il7j)
+        .limit(500)
+      const idsPerimes = (perimes ?? []).map(b => b.id as string)
+      if (idsPerimes.length > 0) {
+        await ctx.supabase.from('bon_commande_lignes').delete().in('bon_commande_id', idsPerimes)
+        await ctx.supabase.from('bons_commande').delete().in('id', idsPerimes)
+      }
+    } catch { /* le ménage ne doit jamais faire échouer l'agent */ }
+
     const bonsDetails: Array<{ fournisseur: string; nb_lignes: number; montant: number; bc_id: string }> = []
     for (const [fournId, lignes] of besoinsParFournisseur) {
       const fournInfo = [...fournisseurParNom.values()].find(f => f.id === fournId)
