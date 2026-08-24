@@ -188,6 +188,16 @@ La vente s'y rattache, le produit reste désactivé — donc hors site, hors
 inventaire, hors commande conseillée. `.order('actif')` fait gagner un
 homonyme actif sur un inactif.
 
+**On compte et on commande des MATIÈRES, pas des produits vendus.**
+`(ops)/inventaire` et `/admin/commande-fournil` replient les produits qui
+partagent un `libelle_achat` en UNE ligne : le congélateur contient des
+pâtons, pas « Pizza ronde Reine » + « Panuozzi » ; la réserve contient une
+boîte de capsules, pas quatre cafés. Les ventes et la casse s'ADDITIONNENT
+sur la matière (÷ `unites_par_achat` : 10 parts de flan vendues = 1 flan à
+racheter), et le coût affiché est celui de l'unité ACHETÉE
+(`cout_achat_ht × unites_par_achat`). La ligne d'inventaire est portée par
+un représentant stable (premier produit du groupe trié par id).
+
 **Correspondance produit vendu ↔ matière achetée** (0131) : le produit vendu
 porte rarement le nom de la matière (« Panuozzi » ← « PATON A PIZZA », les
 quatre cafés ← la même capsule Lavazza, une part de flan ← 1/10 d'un flan de

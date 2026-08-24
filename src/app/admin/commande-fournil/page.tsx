@@ -27,7 +27,7 @@ export default async function CommandeFournilPage({
     // et cafés en dosettes se commandent ailleurs (Brake / grossiste
     // boissons) et n'ont rien à faire dans cette liste.
     sb.from('recettes')
-      .select('id, nom, nom_caisse, categorie, cout_achat_ht')
+      .select('id, nom, nom_caisse, categorie, cout_achat_ht, libelle_achat, unites_par_achat')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
       .not('categorie', 'in', '("Boisson fraîche","Boisson chaude","Formule","À classer")')
       .order('categorie').order('nom'),
@@ -73,18 +73,42 @@ export default async function CommandeFournilPage({
     return null
   }
 
-  const lignes: LigneSuggestion[] = produits.map(p => {
-    const v = ventes.get(p.id as string) ?? 0
-    const j = casse.get(p.id as string) ?? 0
-    const cond = conditionnementDe(p.nom as string, (p.nom_caisse as string) ?? null)
+  // ── On commande des MATIÈRES, pas des produits vendus ───────────────
+  // Gineys livre des pâtons, pas « Pizza ronde Reine » et « Panuozzi »
+  // séparément. Les produits partageant un `libelle_achat` (0131) fusionnent
+  // en une ligne, et leurs ventes S'ADDITIONNENT : trois pizzas et un panuozzi
+  // vendus, ce sont quatre pâtons à racheter.
+  type Groupe = {
+    id: string; nom: string; categorie: string; nomCaisse: string | null
+    ventes: number; casse: number; parAchat: number
+  }
+  const groupes = new Map<string, Groupe>()
+  for (const p of produits) {
+    const cle = ((p.libelle_achat as string) ?? '').trim() || (p.nom as string)
+    const parAchat = Number(p.unites_par_achat ?? 1) || 1
+    const g = groupes.get(cle) ?? {
+      id: p.id as string, nom: cle, categorie: (p.categorie as string) ?? 'Autre',
+      nomCaisse: (p.nom_caisse as string) ?? null, ventes: 0, casse: 0, parAchat,
+    }
+    // Ventes en unités VENDUES → converties en unités ACHETÉES (10 parts de
+    // flan vendues = 1 flan à racheter).
+    g.ventes += (ventes.get(p.id as string) ?? 0) / parAchat
+    g.casse += (casse.get(p.id as string) ?? 0) / parAchat
+    groupes.set(cle, g)
+  }
+
+  const lignes: LigneSuggestion[] = Array.from(groupes.values()).map(p => {
+    const v = p.ventes
+    const j = p.casse
+    const cond = conditionnementDe(p.nom, p.nomCaisse)
     const sug = suggererCommande({
       ventesPeriode: v, cassePeriode: j,
       joursObserves: JOURS_OBSERVES, joursACouvrir,
       conditionnement: cond,
     })
     return {
-      nom: p.nom as string,
-      categorie: (p.categorie as string) ?? 'Autre',
+      nom: p.nom,
+      categorie: p.categorie,
       ventesJour: Math.round(v / JOURS_OBSERVES * 10) / 10,
       casseJour: Math.round(j / JOURS_OBSERVES * 10) / 10,
       conditionnement: cond,

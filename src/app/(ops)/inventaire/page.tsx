@@ -19,7 +19,7 @@ export default async function InventairePage() {
   // compte aussi) — seules les formules, qui ne sont pas un stock, sortent.
   const [prodRes, jourRes, dernierRes] = await Promise.all([
     supabase.from('recettes')
-      .select('id, nom, categorie, cout_achat_ht')
+      .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
       .neq('categorie', 'Formule')
       .order('categorie').order('nom'),
@@ -34,12 +34,31 @@ export default async function InventairePage() {
       .limit(400),
   ])
 
-  const produits = (prodRes.data ?? []).map(r => ({
-    id: r.id as string,
-    nom: r.nom as string,
-    categorie: (r.categorie as string) ?? 'Autre',
-    cout: r.cout_achat_ht == null ? null : Number(r.cout_achat_ht),
-  }))
+  // ── On compte des MATIÈRES, pas des produits vendus ─────────────────
+  // Dans le congélateur il y a des pâtons, pas « Pizza ronde Reine », « Pizza
+  // ronde chèvre-miel », « Pizza ronde poulet-pesto » ET « Panuozzi ». Dans la
+  // réserve il y a une boîte de capsules, pas quatre cafés. Les produits qui
+  // partagent un `libelle_achat` (0131) se replient donc en UNE ligne à
+  // compter, portée par un représentant stable (le premier par id).
+  //
+  // Coût de la matière = cout_achat_ht × unites_par_achat : le coût stocké est
+  // celui de l'unité VENDUE (1/10 de flan) ; on compte des flans entiers.
+  type Ligne = { id: string; nom: string; categorie: string; cout: number | null }
+  const groupes = new Map<string, Ligne>()
+  for (const r of (prodRes.data ?? []).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+    const cle = ((r.libelle_achat as string) ?? '').trim() || (r.nom as string)
+    if (groupes.has(cle)) continue
+    const coutVendu = r.cout_achat_ht == null ? null : Number(r.cout_achat_ht)
+    const parAchat = Number(r.unites_par_achat ?? 1) || 1
+    groupes.set(cle, {
+      id: r.id as string,
+      nom: cle,
+      categorie: (r.categorie as string) ?? 'Autre',
+      cout: coutVendu == null ? null : Math.round(coutVendu * parAchat * 10000) / 10000,
+    })
+  }
+  const produits = Array.from(groupes.values())
+    .sort((a, b) => a.categorie.localeCompare(b.categorie, 'fr') || a.nom.localeCompare(b.nom, 'fr'))
 
   const dejaSaisi: Record<string, number> = {}
   for (const l of jourRes.data ?? []) dejaSaisi[l.recette_id as string] = Number(l.quantite)
