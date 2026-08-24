@@ -138,8 +138,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Correspondance d'achat | `recettes.libelle_achat` + `unites_par_achat` — panuozzi ← pâton | 0131 |
 | Nom de la matière | `recettes.nom_matiere` — « Pâton à pizza » à l'inventaire | 0132 |
 | Stock des matières | `ingredients.stocke`, `inventaires.ingredient_id` + `cible_id` | 0133, 0134 |
+| Stock théorique & démarque | calcul à la lecture : comptage + factures − ventes | 0135 |
 
-**Migrations actuelles : 0001 → 0134.**
+**Migrations actuelles : 0001 → 0135.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -189,6 +190,31 @@ orange/pomme) doit être RETROUVÉ, pas recréé en double au premier ticket.
 La vente s'y rattache, le produit reste désactivé — donc hors site, hors
 inventaire, hors commande conseillée. `.order('actif')` fait gagner un
 homonyme actif sur un inactif.
+
+**Le stock théorique se CALCULE, il ne se stocke pas.** Aucun compteur
+entretenu à chaque vente : il dériverait au premier oubli (café offert, saisie
+manquée, ticket non remonté) et un stock auquel personne ne croit ne sert à
+rien. `(ops)/inventaire` recalcule à l'ouverture depuis les sources :
+
+    attendu = dernier comptage + entrées (factures scannées) − sorties (ventes caisse)
+
+Une facture scannée en retard corrige donc le chiffre toute seule. L'écart
+entre l'attendu et le compté est la DÉMARQUE, affichée ligne à ligne pendant
+la saisie (en pièces et en euros). Les avoirs comptent en négatif — c'est de
+la marchandise rendue. Les entrées d'une ligne au colis sont multipliées par
+le conditionnement ; celles d'une ligne à la pièce prises telles quelles.
+
+⚠️ Les SORTIES ne sont connues que pour les produits revendus tels quels — la
+caisse sait combien de croissants sont partis, pas combien de tranches de
+jambon sont entrées dans les sandwichs (il faudrait une recette chiffrée,
+hors modèle). Pour une matière première, on affiche les entrées seules et
+AUCUN théorique : mieux vaut pas de chiffre qu'un chiffre faux.
+
+⚠️ L'unité d'une matière (`ingredients.unite`) doit être celle de la LIGNE DE
+FACTURE, pas une unité « logique » : Gineys facture la mozzarella au kg même
+si elle arrive en sacs de 2 kg. Compter en sacs rendrait les entrées
+incumulables. C'est aussi l'unité du prix relevé, donc la valorisation tombe
+juste sans conversion.
 
 **L'inventaire compte des produits ET des matières premières** (0133).
 Un sandwich ou un panini ne se stocke pas — il s'assemble. Les catégories

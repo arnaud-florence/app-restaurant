@@ -18,6 +18,7 @@ const fmtEur = (n: number) =>
 
 export default function InventaireClient({
   produits, dejaSaisi, precedent, datePrecedente, valeurPrecedente, dateJour,
+  entrees, sorties, theorique,
 }: {
   produits: Produit[]
   dejaSaisi: Record<string, number>
@@ -25,6 +26,12 @@ export default function InventaireClient({
   datePrecedente: string | null
   valeurPrecedente: number
   dateJour: string
+  /** Entrées depuis le dernier comptage (factures scannées) */
+  entrees: Record<string, number>
+  /** Sorties depuis le dernier comptage (ventes caisse) */
+  sorties: Record<string, number>
+  /** Stock attendu = comptage + entrées − sorties. Null si non calculable. */
+  theorique: Record<string, number | null>
 }) {
   const [quantites, setQuantites] = useState<Record<string, number>>(dejaSaisi)
   const [date, setDate] = useState(dateJour)
@@ -93,7 +100,9 @@ export default function InventaireClient({
           {datePrecedente && (
             <p className="text-xs text-zinc-500">
               Dernier inventaire : {new Date(datePrecedente + 'T12:00:00').toLocaleDateString('fr-FR')}
-              {' · '}stock valorisé {fmtEur(valeurPrecedente)} HT — les repères « dernière fois » viennent de lui.
+              {' · '}stock valorisé {fmtEur(valeurPrecedente)} HT.
+              {' '}« Attendu » = ce comptage + les factures scannées − les ventes de la caisse.
+              L&apos;écart avec ce que tu comptes, c&apos;est la démarque.
             </p>
           )}
         </div>
@@ -107,6 +116,9 @@ export default function InventaireClient({
               {prods.map(p => {
                 const q = quantites[p.id] ?? 0
                 const avant = precedent[p.id]
+                const th = theorique[p.id]
+                const ent = entrees[p.id] ?? 0
+                const sor = sorties[p.id] ?? 0
                 return (
                   <li key={p.id} className={cn(
                     'flex items-center gap-2 rounded-lg px-3 py-2 ring-1',
@@ -115,10 +127,30 @@ export default function InventaireClient({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.nom}</p>
                       <p className="text-xs text-zinc-500 tabular-nums">
-                        {avant != null && `dernière fois : ${avant}`}
-                        {avant != null && p.cout != null && ' · '}
-                        {p.cout != null && q > 0 && <span className="text-emerald-300">{fmtEur(q * p.cout)}</span>}
+                        {th != null ? (
+                          <>
+                            attendu <b className="text-zinc-300">{th}</b>
+                            <span className="text-zinc-600">
+                              {' '}({avant ?? 0}{ent ? ` +${ent}` : ''}{sor ? ` −${sor}` : ''})
+                            </span>
+                          </>
+                        ) : avant != null ? `dernière fois : ${avant}` : null}
+                        {p.cout != null && q > 0 && (
+                          <span className="text-emerald-300"> · {fmtEur(q * p.cout)}</span>
+                        )}
                       </p>
+                      {/* L'écart, c'est la démarque : ce qui est parti sans
+                          être vendu ni compté comme jeté. Affiché à la saisie,
+                          au moment où on a encore le produit sous les yeux. */}
+                      {th != null && q > 0 && Math.abs(q - th) >= 1 && (
+                        <p className={cn('text-xs font-bold tabular-nums',
+                          q < th ? 'text-red-400' : 'text-amber-300')}>
+                          {q < th
+                            ? `⚠ ${Math.round((th - q) * 100) / 100} manquant${th - q > 1 ? 's' : ''}`
+                            : `+${Math.round((q - th) * 100) / 100} de plus qu'attendu`}
+                          {p.cout != null && q < th && ` · ${fmtEur((th - q) * p.cout)}`}
+                        </p>
+                      )}
                     </div>
                     <button onClick={() => fixer(p.id, q - 1)} disabled={q === 0}
                       aria-label={`Retirer un ${p.nom}`}
