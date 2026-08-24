@@ -304,6 +304,16 @@ Ne PAS relancer le chantier « saisir les 90 compositions » : il est hors
 modèle. Tests : `node scripts/test-facture-lignes.mjs`,
 `node scripts/test-achat-revente.mjs`.
 
+**Garde-fou anti-doublon de facture.** `createFacture` REFUSE un numéro déjà
+enregistré chez le même fournisseur et pour le même `type_document` — deux
+scans de la même facture Promocash avaient gonflé les achats de ~447 € en
+silence. Le double critère est nécessaire : deux fournisseurs numérotent
+chacun leur série, et une facture peut légitimement partager son numéro avec
+son avoir. `forcer_doublon: true` passe outre ; la case correspondante
+n'apparaît dans le formulaire QU'APRÈS le refus (toujours visible, elle
+finirait cochée par habitude). Test : `node scripts/test-doublon-facture.mjs`
+— ⚠️ il RECOPIE la règle, modifier les deux ensemble.
+
 **Avoirs fournisseurs** (0127) : même table et même scanner que les factures,
 distingués par `type_document`. **Montants stockés en négatif** — l'UI saisit
 du positif, l'action applique le signe — pour que toutes les sommes

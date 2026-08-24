@@ -58,6 +58,8 @@ const factureSchema = z.object({
   lignes: z.array(factureLigneSchema).max(200).optional().default([]),
   nb_pages: z.number().int().min(1).max(8).optional().default(1),
   type_document: z.enum(['facture','avoir']).optional().default('facture'),
+  /** Passe outre l'alerte de doublon (numéro déjà saisi chez ce fournisseur). */
+  forcer_doublon: z.boolean().optional().default(false),
   facture_liee_id: z.string().uuid().optional().nullable(),
 })
 
@@ -513,6 +515,36 @@ function normaliserNom(s: string): string {
 export async function createFacture(input: unknown) {
   const p = factureSchema.parse(input)
   const supabase = await createClient()
+
+  // ─── Garde-fou anti-doublon ──────────────────────────────────────
+  // Rescanner une facture déjà saisie la comptait une seconde fois, sans
+  // rien signaler : deux factures Promocash rescannées le 24/08 avaient
+  // gonflé les achats de ~447 € et les dettes fournisseur d'autant. Un
+  // numéro de facture est unique CHEZ UN FOURNISSEUR — deux fournisseurs
+  // peuvent numéroter pareil, d'où le double critère.
+  // On BLOQUE plutôt qu'on avertit : l'écriture est silencieuse et ses
+  // effets (coûts, marges, dettes) se propagent partout. `forcer_doublon`
+  // laisse la main au gérant quand le doublon est légitime — un fournisseur
+  // qui réémet le même numéro, cela arrive.
+  if (!p.forcer_doublon) {
+    const { data: deja } = await supabase.from('factures_fournisseurs')
+      .select('id, date_emission, montant_ttc, type_document')
+      .eq('fournisseur_id', p.fournisseur_id)
+      .eq('numero', p.numero)
+      .eq('type_document', p.type_document)
+      .maybeSingle()
+    if (deja) {
+      const quoi = p.type_document === 'avoir' ? 'Cet avoir' : 'Cette facture'
+      const montant = Math.abs(Number(deja.montant_ttc ?? 0)).toFixed(2).replace('.', ',')
+      throw new Error(
+        `${quoi} n° ${p.numero} est déjà enregistrée pour ce fournisseur `
+        + `(${deja.date_emission}, ${montant} € TTC). `
+        + `Vérifie la liste avant d'enregistrer — ou coche « enregistrer quand même » `
+        + `s'il s'agit bien d'un second document portant le même numéro.`,
+      )
+    }
+  }
+
   // Avoir : montants stockés en NÉGATIF (l'UI saisit du positif). Toutes les
   // sommes existantes — dettes à payer du pilotage, P&L, snapshot assistant —
   // restent ainsi justes sans modification : l'avoir vient en déduction.

@@ -69,6 +69,11 @@ export default function FactureFormModal({
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [typeDocument, setTypeDocument] = useState<'facture' | 'avoir'>(initial?.type_document ?? 'facture')
   const [factureLieeId, setFactureLieeId] = useState('')
+  // Apparaît UNIQUEMENT quand le serveur a détecté un doublon : une case
+  // toujours visible finirait cochée par habitude, et le garde-fou ne
+  // servirait plus à rien.
+  const [doublonDetecte, setDoublonDetecte] = useState(false)
+  const [forcerDoublon, setForcerDoublon] = useState(false)
   const estAvoir = typeDocument === 'avoir'
   const facturesDuFournisseur = factures.filter(f =>
     f.fournisseur_id === fournisseurId && f.type_document !== 'avoir')
@@ -107,9 +112,14 @@ export default function FactureFormModal({
           nb_pages: initial?.nb_pages ?? 1,
           type_document: typeDocument,
           facture_liee_id: factureLieeId || null,
+          forcer_doublon: forcerDoublon,
         })
         onSaved()
-      } catch (e) { setErreur(e instanceof Error ? e.message : 'Erreur') }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Erreur'
+        setErreur(msg)
+        if (/d[ée]j[àa] enregistr/i.test(msg)) setDoublonDetecte(true)
+      }
     })
   }
 
@@ -230,6 +240,18 @@ export default function FactureFormModal({
         </div>
 
         {erreur && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">⚠️ {erreur}</p>}
+        {doublonDetecte && (
+          <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm cursor-pointer">
+            <input type="checkbox" checked={forcerDoublon}
+              onChange={e => setForcerDoublon(e.target.checked)}
+              className="mt-0.5 w-5 h-5 shrink-0" />
+            <span className="text-amber-900">
+              <b>Enregistrer quand même.</b> À ne cocher que si le fournisseur a
+              réellement émis deux documents portant ce numéro — sinon tu comptes
+              deux fois le même achat.
+            </span>
+          </label>
+        )}
       </DialogBody>
 
       <DialogFooter>
