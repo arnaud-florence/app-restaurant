@@ -16,36 +16,38 @@ const env = Object.fromEntries(
     .map(l => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')] }))
 const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 
-// [produit vendu, libellé sur la facture, unités vendues par unité achetée]
+// [produit vendu, libellé sur la facture, unités par unité achetée, nom en stock]
+// Le 4ᵉ champ est le nom AFFICHÉ à l'inventaire et sur la commande : on compte
+// des « pâtons », pas des « PATON A PIZZA 250G C=40 ».
 const CORRESPONDANCES = [
   // Le nom du produit ne ressemble pas à celui de la matière
-  ['Panuozzi',                'PATON A PIZZA',                 1],
-  ['Pizza ronde Reine',       'PATON A PIZZA',                 1],
-  ['Pizza ronde chèvre-miel', 'PATON A PIZZA',                 1],
-  ['Pizza ronde poulet-pesto','PATON A PIZZA',                 1],
-  ['Lin tournesol',           'BUCHE LIN TOURNSOL',            1],
-  ['Moelleux choco',          'COULANT GOURMAND AU CHOCOLAT',  1],
+  ['Panuozzi',                'PATON A PIZZA',                 1, 'Pâton à pizza'],
+  ['Pizza ronde Reine',       'PATON A PIZZA',                 1, 'Pâton à pizza'],
+  ['Pizza ronde chèvre-miel', 'PATON A PIZZA',                 1, 'Pâton à pizza'],
+  ['Pizza ronde poulet-pesto','PATON A PIZZA',                 1, 'Pâton à pizza'],
+  ['Lin tournesol',           'BUCHE LIN TOURNSOL',            1, 'Bûche lin-tournesol'],
+  ['Moelleux choco',          'COULANT GOURMAND AU CHOCOLAT',  1, 'Coulant chocolat'],
   // Une même capsule sert deux boissons — d'où le `filter` dans la propagation
-  ['Café expresso',           'Kit complet café Lavazza',      1],
-  ['Café allongé',            'Kit complet café Lavazza',      1],
-  ['Café noisette',           'Kit complet café Lavazza',      1],
-  ['Cappuccino',              'Kit complet café Lavazza',      1],
-  ['Chocolat chaud',          'dosettes chocolat Blue',        1],
-  ['Thé',                     'Dosette Thé menthé',            1],
+  ['Café expresso',           'Kit complet café Lavazza',      1, 'Dosette de café'],
+  ['Café allongé',            'Kit complet café Lavazza',      1, 'Dosette de café'],
+  ['Café noisette',           'Kit complet café Lavazza',      1, 'Dosette de café'],
+  ['Cappuccino',              'Kit complet café Lavazza',      1, 'Dosette de café'],
+  ['Chocolat chaud',          'dosettes chocolat Blue',        1, 'Dosette chocolat'],
+  ['Thé',                     'Dosette Thé menthé',            1, 'Dosette de thé'],
   // Un flan entier de 2 kg donne 10 parts
-  ['Part de flan pâtissier',  'HAOU FLAN CRU',                10],
+  ['Part de flan pâtissier',  'HAOU FLAN CRU',                10, 'Flan entier'],
 ]
 
 let ok = 0
 const absents = []
-for (const [nom, libelle, unites] of CORRESPONDANCES) {
+for (const [nom, libelle, unites, matiere] of CORRESPONDANCES) {
   const { data, error } = await sb.from('recettes')
-    .update({ libelle_achat: libelle, unites_par_achat: unites })
+    .update({ libelle_achat: libelle, unites_par_achat: unites, nom_matiere: matiere })
     .eq('nom', nom).eq('tag_destination', 'FOURNIL')
     .select('nom')
   if (error) { console.log(`  ✗ ${nom} : ${error.message}`); continue }
   if (!data?.length) { absents.push(nom); continue }
-  console.log(`  ✓ ${nom.padEnd(26)} ← ${libelle}${unites !== 1 ? `  (÷ ${unites})` : ''}`)
+  console.log(`  ✓ ${nom.padEnd(26)} → stock « ${matiere} »${unites !== 1 ? `  (÷ ${unites})` : ''}`)
   ok++
 }
 if (absents.length) console.log(`  · introuvables : ${absents.join(', ')}`)

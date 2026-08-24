@@ -39,6 +39,7 @@ const formSchema = z.object({
   prix_vente_ht: z.number().min(0).max(99999),
   cout_achat_ht: z.number().min(0).max(99999).nullable(),
   libelle_achat: z.string().max(200),
+  nom_matiere: z.string().max(120),
   unites_par_achat: z.number().positive().max(1000),
   tva: z.number().min(0).max(100),
   contient_alcool: z.boolean(),
@@ -78,6 +79,7 @@ export default function RecetteFormModal({
         prix_vente_ht: recette.prix_vente_ht,
         cout_achat_ht: recette.cout_achat_ht,
         libelle_achat: recette.libelle_achat ?? '',
+        nom_matiere: recette.nom_matiere ?? '',
         unites_par_achat: recette.unites_par_achat ?? 1,
         tva: recette.tva,
         contient_alcool: recette.contient_alcool ?? false,
@@ -430,6 +432,12 @@ export default function RecetteFormModal({
                       placeholder="ex : PATON A PIZZA — si différent du nom du produit"
                       {...register('libelle_achat')}
                     />
+                  </Field>
+                  {/* Ce qu'on compte dans le congélateur : « Pâton à pizza »,
+                      pas « PATON A PIZZA 250G C=40 ». Les produits qui
+                      partagent ce nom forment UNE ligne d'inventaire. */}
+                  <Field label="Nom en stock (ce qu'on compte)" error={errors.nom_matiere?.message}>
+                    <Input placeholder="ex : Pâton à pizza, Dosette de café" {...register('nom_matiere')} />
                   </Field>
                   <Field label="Unités vendues par unité achetée" error={errors.unites_par_achat?.message}>
                     <Input

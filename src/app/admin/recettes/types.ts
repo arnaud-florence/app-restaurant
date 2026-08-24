@@ -32,6 +32,8 @@ export type Recette = {
   cout_achat_ht: number | null
   /** Libellé fournisseur à reconnaître sur les factures (0131) */
   libelle_achat: string | null
+  /** Nom de la matière telle qu'on la compte en stock (0132) */
+  nom_matiere: string | null
   /** Unités vendues tirées d'une unité achetée (flan entier → 10 parts) */
   unites_par_achat: number
   tva: number
@@ -76,6 +78,7 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     prix_vente_ht: 0,
     cout_achat_ht: null,
     libelle_achat: '',
+    nom_matiere: '',
     unites_par_achat: 1,
     tva: 10,
     contient_alcool: false,

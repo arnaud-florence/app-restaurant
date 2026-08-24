@@ -27,7 +27,7 @@ export default async function CommandeFournilPage({
     // et cafés en dosettes se commandent ailleurs (Brake / grossiste
     // boissons) et n'ont rien à faire dans cette liste.
     sb.from('recettes')
-      .select('id, nom, nom_caisse, categorie, cout_achat_ht, libelle_achat, unites_par_achat')
+      .select('id, nom, nom_caisse, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
       .not('categorie', 'in', '("Boisson fraîche","Boisson chaude","Formule","À classer")')
       .order('categorie').order('nom'),
@@ -84,11 +84,14 @@ export default async function CommandeFournilPage({
   }
   const groupes = new Map<string, Groupe>()
   for (const p of produits) {
-    const cle = ((p.libelle_achat as string) ?? '').trim() || (p.nom as string)
+    const cle = ((p.nom_matiere as string) ?? '').trim()
+      || ((p.libelle_achat as string) ?? '').trim()
+      || (p.nom as string)
     const parAchat = Number(p.unites_par_achat ?? 1) || 1
     const g = groupes.get(cle) ?? {
       id: p.id as string, nom: cle, categorie: (p.categorie as string) ?? 'Autre',
-      nomCaisse: (p.nom_caisse as string) ?? null, ventes: 0, casse: 0, parAchat,
+      nomCaisse: ((p.libelle_achat as string) ?? '').trim() || (p.nom_caisse as string) || null,
+      ventes: 0, casse: 0, parAchat,
     }
     // Ventes en unités VENDUES → converties en unités ACHETÉES (10 parts de
     // flan vendues = 1 flan à racheter).

@@ -136,8 +136,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Commande conseillée | `/admin/commande-fournil` — ventes 14 j × couverture, colisage lu sur factures | — |
 | Inventaire hebdo | `(ops)/inventaire` — stock compté et valorisé, repère « dernière fois » | 0130 |
 | Correspondance d'achat | `recettes.libelle_achat` + `unites_par_achat` — panuozzi ← pâton | 0131 |
+| Nom de la matière | `recettes.nom_matiere` — « Pâton à pizza » à l'inventaire | 0132 |
 
-**Migrations actuelles : 0001 → 0131.**
+**Migrations actuelles : 0001 → 0132.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -187,6 +188,13 @@ orange/pomme) doit être RETROUVÉ, pas recréé en double au premier ticket.
 La vente s'y rattache, le produit reste désactivé — donc hors site, hors
 inventaire, hors commande conseillée. `.order('actif')` fait gagner un
 homonyme actif sur un inactif.
+
+**Trois champs, trois rôles distincts** — ne pas les confondre :
+`libelle_achat` (0131) sert à RECONNAÎTRE la ligne de facture, c'est le texte
+brut du fournisseur ; `nom_matiere` (0132) est ce qu'on AFFICHE en comptant
+(« Pâton à pizza ») ; `nom_caisse` est le libellé du ticket SumUp. La clé de
+regroupement stock/commande est `nom_matiere ?? libelle_achat ?? nom`, mais
+la recherche du conditionnement se fait toujours sur `libelle_achat`.
 
 **On compte et on commande des MATIÈRES, pas des produits vendus.**
 `(ops)/inventaire` et `/admin/commande-fournil` replient les produits qui

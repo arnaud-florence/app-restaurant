@@ -19,7 +19,7 @@ export default async function InventairePage() {
   // compte aussi) — seules les formules, qui ne sont pas un stock, sortent.
   const [prodRes, jourRes, dernierRes] = await Promise.all([
     supabase.from('recettes')
-      .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat')
+      .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
       .neq('categorie', 'Formule')
       .order('categorie').order('nom'),
@@ -46,7 +46,11 @@ export default async function InventairePage() {
   type Ligne = { id: string; nom: string; categorie: string; cout: number | null }
   const groupes = new Map<string, Ligne>()
   for (const r of (prodRes.data ?? []).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
-    const cle = ((r.libelle_achat as string) ?? '').trim() || (r.nom as string)
+    // Nom AFFICHÉ = ce qu'on compte (« Pâton à pizza »), pas le texte de la
+    // facture (« PATON A PIZZA 250G C=40 »). Repli en cascade.
+    const cle = ((r.nom_matiere as string) ?? '').trim()
+      || ((r.libelle_achat as string) ?? '').trim()
+      || (r.nom as string)
     if (groupes.has(cle)) continue
     const coutVendu = r.cout_achat_ht == null ? null : Number(r.cout_achat_ht)
     const parAchat = Number(r.unites_par_achat ?? 1) || 1
