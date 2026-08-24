@@ -179,6 +179,14 @@ repère « dernière fois : N » sous chaque produit, recherche, valeur totale
 en continu. Boissons incluses, formules exclues. Lien 📦 dans l'en-tête du
 KDS. Test : `node scripts/test-inventaire.mjs`.
 
+⚠️ **Le miroir caisse cherche parmi TOUS les produits, actifs ou non.**
+`/api/integrations/caisse/encaissements` rapproche sans filtre `actif` : un
+produit désactivé exprès (focaccias arrêtées, « Jus de fruit » remplacé par
+orange/pomme) doit être RETROUVÉ, pas recréé en double au premier ticket.
+La vente s'y rattache, le produit reste désactivé — donc hors site, hors
+inventaire, hors commande conseillée. `.order('actif')` fait gagner un
+homonyme actif sur un inactif.
+
 ⚠️ **Propagation des prix facture → produits : TOUJOURS à la pièce.** Le
 prix de ligne Gineys est celui du COLIS (« CROISSANT … C=96 » = 28,84 € le
 carton) : écrit tel quel dans `cout_achat_ht`, il a produit un croissant à

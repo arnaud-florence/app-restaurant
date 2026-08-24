@@ -98,8 +98,15 @@ export async function POST(req: Request) {
   const parCaisse = new Map<string, { id: string; tag: string }>()
   const parNom = new Map<string, { id: string; tag: string }>()
   try {
+    // Volontairement SANS filtre `actif` : un produit désactivé exprès
+    // (focaccias arrêtées, « Jus de fruit » remplacé par orange/pomme) doit
+    // être RETROUVÉ, pas recréé en double. La vente s'y rattache — elle a
+    // bien eu lieu — et le produit reste désactivé, donc absent du site, de
+    // l'inventaire et des suggestions de commande.
+    // `.order('actif')` : false avant true, donc un homonyme ACTIF écrase
+    // l'inactif dans la map et garde la priorité.
     const { data: recs } = await sb.from('recettes')
-      .select('id, nom, nom_caisse, tag_destination').eq('actif', true)
+      .select('id, nom, nom_caisse, tag_destination, actif').order('actif')
     for (const r of recs ?? []) {
       const v = { id: String(r.id), tag: String(r.tag_destination ?? 'FOURNIL') }
       if (r.nom_caisse) parCaisse.set(norm(String(r.nom_caisse)), v)
