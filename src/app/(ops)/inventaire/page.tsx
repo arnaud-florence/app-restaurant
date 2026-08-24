@@ -17,21 +17,31 @@ export default async function InventairePage() {
 
   // Tous les produits actifs, boissons comprises (le frigo à canettes se
   // compte aussi) — seules les formules, qui ne sont pas un stock, sortent.
-  const [prodRes, jourRes, dernierRes] = await Promise.all([
+  const [prodRes, jourRes, dernierRes, matRes] = await Promise.all([
     supabase.from('recettes')
       .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
-      .neq('categorie', 'Formule')
+      // Un sandwich, un panini, une salade ou une formule ne se STOCKE pas :
+      // ça s'assemble à la commande. Ce qui se compte, ce sont leurs
+      // matières — chargées juste après depuis `ingredients`.
+      .not('categorie', 'in', '("Formule","Formule petit-déjeuner","Sandwich","Panini","Salade")')
       .order('categorie').order('nom'),
     supabase.from('inventaires')
-      .select('recette_id, quantite')
+      .select('recette_id, ingredient_id, quantite')
       .eq('date_inventaire', aujourdhui),
     // Dernier inventaire AVANT aujourd'hui : repère par produit + valeur totale
     supabase.from('inventaires')
-      .select('date_inventaire, recette_id, quantite, cout_unitaire_ht')
+      .select('date_inventaire, recette_id, ingredient_id, quantite, cout_unitaire_ht')
       .lt('date_inventaire', aujourdhui)
       .order('date_inventaire', { ascending: false })
       .limit(400),
+    // Matières premières réellement stockées (0133) : jambon, rosette,
+    // mozzarella, emballages… `stocke` sépare le réel des 100 lignes de démo
+    // héritées du modèle restaurant.
+    supabase.from('ingredients')
+      .select('id, nom, categorie, unite, prix_achat_ht')
+      .eq('stocke', true).eq('actif', true)
+      .order('categorie').order('nom'),
   ])
 
   // ── On compte des MATIÈRES, pas des produits vendus ─────────────────
@@ -61,11 +71,26 @@ export default async function InventairePage() {
       cout: coutVendu == null ? null : Math.round(coutVendu * parAchat * 10000) / 10000,
     })
   }
+  // Les matières premières rejoignent la liste, préfixées `ing:` pour que le
+  // client sache sur quelle colonne écrire (recette_id ou ingredient_id).
+  for (const m of matRes.data ?? []) {
+    const unite = (m.unite as string) ?? ''
+    groupes.set(`ing:${m.id}`, {
+      id: `ing:${m.id}`,
+      nom: unite ? `${m.nom} — ${unite}` : (m.nom as string),
+      categorie: (m.categorie as string) ?? 'Matières',
+      cout: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
+    })
+  }
+
   const produits = Array.from(groupes.values())
     .sort((a, b) => a.categorie.localeCompare(b.categorie, 'fr') || a.nom.localeCompare(b.nom, 'fr'))
 
   const dejaSaisi: Record<string, number> = {}
-  for (const l of jourRes.data ?? []) dejaSaisi[l.recette_id as string] = Number(l.quantite)
+  for (const l of jourRes.data ?? []) {
+    const cle = l.ingredient_id ? `ing:${l.ingredient_id}` : (l.recette_id as string)
+    dejaSaisi[cle] = Number(l.quantite)
+  }
 
   // Ne garder que le dernier inventaire (une seule date)
   const datePrecedente = (dernierRes.data ?? [])[0]?.date_inventaire as string | undefined
@@ -73,7 +98,7 @@ export default async function InventairePage() {
   let valeurPrecedente = 0
   for (const l of dernierRes.data ?? []) {
     if (l.date_inventaire !== datePrecedente) continue
-    precedent[l.recette_id as string] = Number(l.quantite)
+    precedent[l.ingredient_id ? `ing:${l.ingredient_id}` : (l.recette_id as string)] = Number(l.quantite)
     valeurPrecedente += Number(l.quantite) * Number(l.cout_unitaire_ht ?? 0)
   }
 

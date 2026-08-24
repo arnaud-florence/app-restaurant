@@ -62,7 +62,7 @@ export default function InventaireClient({
       try {
         const r = await enregistrerInventaire({
           date_inventaire: date,
-          lignes: produits.map(p => ({ recette_id: p.id, quantite: quantites[p.id] ?? 0 })),
+          lignes: produits.map(p => ({ cible: p.id, quantite: quantites[p.id] ?? 0 })),
         })
         setMessage(`✓ Inventaire enregistré — ${r.lignes} produit(s), stock ${fmtEur(r.valeur_ht)} HT`)
         router.refresh()

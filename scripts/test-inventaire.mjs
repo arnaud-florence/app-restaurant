@@ -24,13 +24,13 @@ const cout = Number(prod.cout_achat_ht)
 // ─── 1. Inventaire semaine 1 : 96 croissants (un carton plein) ───────
 const { error: e1 } = await sb.from('inventaires').upsert([{
   date_inventaire: D1, recette_id: prod.id, quantite: 96, cout_unitaire_ht: cout,
-}], { onConflict: 'date_inventaire,recette_id' })
+}], { onConflict: 'date_inventaire,cible_id' })
 check('semaine 1 : 96 en stock', !e1)
 
 // ─── 2. Repassage = correction ───────────────────────────────────────
 await sb.from('inventaires').upsert([{
   date_inventaire: D1, recette_id: prod.id, quantite: 90, cout_unitaire_ht: cout,
-}], { onConflict: 'date_inventaire,recette_id' })
+}], { onConflict: 'date_inventaire,cible_id' })
 const { data: relu, count } = await sb.from('inventaires')
   .select('quantite, cout_unitaire_ht', { count: 'exact' })
   .eq('date_inventaire', D1).eq('recette_id', prod.id)
@@ -41,7 +41,7 @@ check(`stock valorisé : 90 × ${cout} = ${(90 * cout).toFixed(2)} €`,
 // ─── 3. Semaine 2 + lecture « dernier inventaire précédent » ─────────
 await sb.from('inventaires').upsert([{
   date_inventaire: D2, recette_id: prod.id, quantite: 40, cout_unitaire_ht: cout,
-}], { onConflict: 'date_inventaire,recette_id' })
+}], { onConflict: 'date_inventaire,cible_id' })
 const { data: dern } = await sb.from('inventaires')
   .select('date_inventaire, quantite')
   .eq('recette_id', prod.id).lt('date_inventaire', D2)
@@ -59,6 +59,40 @@ const { count: c2 } = await sb.from('inventaires')
   .select('*', { count: 'exact', head: true })
   .eq('date_inventaire', D2).eq('recette_id', prod.id)
 check('remise à zéro : ligne disparue', c2 === 0)
+
+// ─── 5. Une matière première se compte aussi (0133) ──────────────────
+const { data: mat } = await sb.from('ingredients')
+  .select('id, nom, prix_achat_ht').eq('stocke', true).eq('nom', 'Jambon blanc tranché').single()
+const { error: eI } = await sb.from('inventaires').insert({
+  date_inventaire: D1, ingredient_id: mat.id, recette_id: null,
+  quantite: 3, cout_unitaire_ht: Number(mat.prix_achat_ht),
+})
+check('matière première comptée (3 barquettes de jambon)', !eI)
+
+// Les deux types cohabitent le même jour
+const { count: cJour } = await sb.from('inventaires')
+  .select('*', { count: 'exact', head: true }).eq('date_inventaire', D1)
+check('produit ET matière le même jour', cJour === 2)
+
+// Le CHECK refuse une ligne sans cible, ou avec les deux
+const { error: eVide } = await sb.from('inventaires').insert({
+  date_inventaire: D1, recette_id: null, ingredient_id: null, quantite: 1,
+})
+check('ligne sans cible refusée', !!eVide)
+const { error: eDeux } = await sb.from('inventaires').insert({
+  date_inventaire: D1, recette_id: prod.id, ingredient_id: mat.id, quantite: 1,
+})
+check('ligne avec DEUX cibles refusée', !!eDeux)
+
+// L'upsert par matière corrige au lieu de dupliquer
+await sb.from('inventaires').upsert([{
+  date_inventaire: D1, ingredient_id: mat.id, recette_id: null,
+  quantite: 5, cout_unitaire_ht: Number(mat.prix_achat_ht),
+}], { onConflict: 'date_inventaire,cible_id' })
+const { data: reluM, count: cM } = await sb.from('inventaires')
+  .select('quantite', { count: 'exact' })
+  .eq('date_inventaire', D1).eq('ingredient_id', mat.id)
+check('repassage matière : 1 ligne, corrigée à 5', cM === 1 && Number(reluM[0].quantite) === 5)
 
 // ─── Cleanup ─────────────────────────────────────────────────────────
 await sb.from('inventaires').delete().in('date_inventaire', [D1, D2])

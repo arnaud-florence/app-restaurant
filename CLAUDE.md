@@ -137,8 +137,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Inventaire hebdo | `(ops)/inventaire` — stock compté et valorisé, repère « dernière fois » | 0130 |
 | Correspondance d'achat | `recettes.libelle_achat` + `unites_par_achat` — panuozzi ← pâton | 0131 |
 | Nom de la matière | `recettes.nom_matiere` — « Pâton à pizza » à l'inventaire | 0132 |
+| Stock des matières | `ingredients.stocke`, `inventaires.ingredient_id` + `cible_id` | 0133, 0134 |
 
-**Migrations actuelles : 0001 → 0132.**
+**Migrations actuelles : 0001 → 0134.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -188,6 +189,24 @@ orange/pomme) doit être RETROUVÉ, pas recréé en double au premier ticket.
 La vente s'y rattache, le produit reste désactivé — donc hors site, hors
 inventaire, hors commande conseillée. `.order('actif')` fait gagner un
 homonyme actif sur un inactif.
+
+**L'inventaire compte des produits ET des matières premières** (0133).
+Un sandwich ou un panini ne se stocke pas — il s'assemble. Les catégories
+Sandwich / Panini / Salade / Formule sont donc exclues de l'inventaire, et
+`ingredients.stocke = true` marque les matières réellement comptées (jambon,
+rosette, mozzarella, emballages…) — la table contient 100 lignes de démo du
+modèle restaurant qu'il ne faut surtout pas afficher. Amorçage :
+`node scripts/matieres-fournil.mjs` (36 matières issues des factures réelles).
+
+Une ligne d'inventaire porte SOIT `recette_id`, SOIT `ingredient_id` (CHECK
+`num_nonnulls = 1`). Le client envoie une `cible` : l'uuid brut pour un
+produit, préfixé `ing:` pour une matière.
+
+⚠️ **`onConflict` ne sait pas viser un index PARTIEL** — PostgREST répond
+« no unique or exclusion constraint matching the ON CONFLICT specification »
+et tout upsert échoue. D'où `inventaires.cible_id`, colonne générée
+`coalesce(recette_id, ingredient_id)` avec un index unique TOTAL (0134) :
+un seul `onConflict: 'date_inventaire,cible_id'` pour les deux types.
 
 **Trois champs, trois rôles distincts** — ne pas les confondre :
 `libelle_achat` (0131) sert à RECONNAÎTRE la ligne de facture, c'est le texte
