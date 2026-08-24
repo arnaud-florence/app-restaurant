@@ -134,8 +134,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Invendus du soir | `(ops)/invendus` — comptage à la fermeture, coût figé, synthèse 7 j | 0129 |
 | Marges vivantes | `/admin/ventes` — marge brute, food cost pondéré, casse déduite | — |
 | Commande conseillée | `/admin/commande-fournil` — ventes 14 j × couverture, colisage lu sur factures | — |
+| Inventaire hebdo | `(ops)/inventaire` — stock compté et valorisé, repère « dernière fois » | 0130 |
 
-**Migrations actuelles : 0001 → 0129.**
+**Migrations actuelles : 0001 → 0130.**
 
 ### Réouverture d'octobre — deux gestes, pas un
 
@@ -168,6 +169,23 @@ catégories boissons/formules sont exclues de la liste (rien ne s'y jette à
 J+1). Synthèse 7 jours en tête de page : total € + top produits jetés —
 c'est l'outil de réglage des commandes Gineys. Lien 🗑 dans l'en-tête du
 KDS Fournil. Test : `node scripts/test-invendus.mjs`.
+
+### Inventaire hebdomadaire — le stock compté et valorisé
+
+`(ops)/inventaire` (0130) : même contrat que les invendus — upsert par
+(date, produit), coût FIGÉ à la saisie (stock valorisé au tarif du jour du
+comptage), quantité 0 = suppression. Saisie directe du nombre + steppers,
+repère « dernière fois : N » sous chaque produit, recherche, valeur totale
+en continu. Boissons incluses, formules exclues. Lien 📦 dans l'en-tête du
+KDS. Test : `node scripts/test-inventaire.mjs`.
+
+⚠️ **Propagation des prix facture → produits : TOUJOURS à la pièce.** Le
+prix de ligne Gineys est celui du COLIS (« CROISSANT … C=96 » = 28,84 € le
+carton) : écrit tel quel dans `cout_achat_ht`, il a produit un croissant à
+40 € de coût (vécu le 22/08, 4 produits corrompus par un scan). La
+propagation divise par `extraireConditionnement()` (C=N), ne propage sans
+C=N que si l'unité de ligne dit « pièce », et refuse tout coût ≥ 95 % du
+prix de vente HT. Restauration : `node scripts/alimenter-couts-achat.mjs`.
 
 ### Factures fournisseurs : les lignes font les marges
 

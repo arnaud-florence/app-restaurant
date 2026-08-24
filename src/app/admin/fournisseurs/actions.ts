@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { extraireConditionnement } from '@/lib/commande-fournisseur'
 import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import { logActivite } from '@/lib/operateur'
@@ -551,10 +552,11 @@ export async function createFacture(input: unknown) {
     // unitaire devient recettes.cout_achat_ht — la marge se met à jour toute
     // seule à chaque facture scannée. Même prudence que pour les ingrédients.
     const { data: recs } = await supabase.from('recettes')
-      .select('id, nom, nom_caisse').eq('actif', true)
+      .select('id, nom, nom_caisse, prix_vente_ht').eq('actif', true)
     const produits = (recs ?? []).flatMap(r => {
-      const out = [{ id: r.id as string, nom: normaliserNom(r.nom as string) }]
-      if (r.nom_caisse) out.push({ id: r.id as string, nom: normaliserNom(r.nom_caisse as string) })
+      const pv = Number(r.prix_vente_ht ?? 0)
+      const out = [{ id: r.id as string, nom: normaliserNom(r.nom as string), pv }]
+      if (r.nom_caisse) out.push({ id: r.id as string, nom: normaliserNom(r.nom_caisse as string), pv })
       return out
     })
 
@@ -592,8 +594,23 @@ export async function createFacture(input: unknown) {
             x.nom.length >= 4 && (desc.includes(x.nom) || (desc.length >= 4 && x.nom.includes(desc))),
           )
           if (prod) {
-            await supabase.from('recettes')
-              .update({ cout_achat_ht: prixLigne }).eq('id', prod.id)
+            // Le prix de ligne Gineys est presque toujours celui du COLIS
+            // (« CROISSANT … C=96 » à 28,84 € le carton). Écrit tel quel, il a
+            // fait un croissant à 40 € de coût — marges détruites en silence.
+            // Prix à la pièce = prix du colis ÷ C=N. Sans C=N lisible, on ne
+            // propage que si l'unité de la ligne dit explicitement « pièce ».
+            const cond = extraireConditionnement(p.lignes[idx].description)
+            const uniteLigne = String(p.lignes[idx].unite ?? '').toLowerCase()
+            const estPiece = /^(pce|pi[eè]ce|piece|p|u|unite|unité)s?$/.test(uniteLigne)
+            const prixPiece = cond != null ? prixLigne / cond : (estPiece ? prixLigne : null)
+            // Garde-fou final : en achat-revente, un coût ≥ 95 % du prix de
+            // vente HT est forcément une erreur de rapprochement — on n'écrit
+            // pas un chiffre qui rendrait la marge négative en silence.
+            if (prixPiece != null && (prod.pv <= 0 || prixPiece < prod.pv * 0.95)) {
+              await supabase.from('recettes')
+                .update({ cout_achat_ht: Math.round(prixPiece * 10000) / 10000 })
+                .eq('id', prod.id)
+            }
           }
         }
         if (!r.ingredient_id || !prixLigne || prixLigne <= 0) continue
