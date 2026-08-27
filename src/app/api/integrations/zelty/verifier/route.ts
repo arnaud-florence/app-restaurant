@@ -16,6 +16,7 @@ import { mapperCommandes } from '@/lib/integrations/zelty/mapper'
 import { normaliserPlat, rapprocher, type PlatNormalise } from '@/lib/integrations/zelty/catalogue'
 import { construireCommandeZelty } from '@/lib/integrations/zelty/emission'
 import { construireDisponibilites, type PlatCourant, type Voulu } from '@/lib/integrations/zelty/disponibilite'
+import { construireImport, type ProduitLocalComplet } from '@/lib/integrations/zelty/import-catalogue'
 import { extraireListe } from '@/lib/integrations/zelty/client'
 
 export const runtime = 'nodejs'
@@ -32,6 +33,13 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 }) }
 
   const b = (body ?? {}) as Record<string, unknown>
+
+  // ── Import initial : quelle carte partirait vers la caisse ? ─────
+  if (Array.isArray(b.aImporter)) {
+    const deja = new Set<string>(Array.isArray(b.dejaLies) ? b.dejaLies as string[] : [])
+    const res = construireImport(b.aImporter as ProduitLocalComplet[], deja)
+    return NextResponse.json({ ok: res.ecartes.length === 0, ...res })
+  }
 
   // ── Disponibilités : que serait-il écrit dans la caisse ? ────────
   // Le sens le plus dangereux : on veut absolument voir la charge utile

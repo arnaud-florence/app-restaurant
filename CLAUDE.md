@@ -804,6 +804,36 @@ d'un mode de paiement configuré dans Zelty : un nom inconnu renvoie 400
 Test : `PORT=3000 node scripts/test-zelty-emission.mjs` — 19 assertions, sans
 compte ni clé.
 
+#### Import initial de la carte — outil → Zelty
+
+`/api/cron/caisse/zelty/import[?dry=1][&tag=FOURNIL]`. Zelty arrive **vide** :
+plutôt que de saisir 85 produits à la main — avec les fautes de frappe et les
+prix mal recopiés que ça implique — on pousse la carte qu'on a déjà, prix,
+TVA et **photos** compris (Zelty accepte une URL d'image, et les nôtres sont
+absolues).
+
+⚠️ **Notre identifiant part dans leur `remote_id`.** C'est ce qui rend la
+correspondance exacte dès le premier jour : plus jamais de rapprochement par
+le nom, et un produit renommé de part et d'autre reste le même produit.
+
+⚠️ **Aucun `id` n'est envoyé** : un `id` inconnu ferait échouer l'appel, un
+`id` réutilisé écraserait un plat existant. L'import CRÉE ; la mise à jour
+passe par le miroir. Le garde-fou anti-doublon est la table des
+correspondances : seuls les produits sans lien sont envoyés, et les
+identifiants rendus par Zelty sont enregistrés **immédiatement** — sans ça un
+second lancement recréerait toute la carte en double, sans rien signaler.
+
+⚠️ **La TVA SUR PLACE suit la loi, pas le panneau.** Notre `tva` est le taux
+de l'emporter ; le recopier tel quel sous-déclarerait un croissant mangé à
+table (10 %, pas 5,5 %). L'alcool reste à 20 % et la presse à 2,1 % dans les
+deux modes. Le prix affiché ne change pas — c'est le taux qui change, donc la
+marge sur place est légèrement moindre. C'est la règle française.
+
+Le mode `?dry=1` **ne demande aucune clé** : il ne contacte personne, ce qui
+permet de relire toute la carte avant même d'avoir un compte.
+
+Test : `PORT=3000 node scripts/test-zelty-import.mjs` — 17 assertions.
+
 #### Disponibilités — `POST /catalog/dishes` (0141)
 
 `/api/cron/caisse/zelty/disponibilites[?dry=1]`. L'inventaire du matin sait
@@ -1214,6 +1244,7 @@ PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty — commandes 
 PORT=3000 node scripts/test-zelty-catalogue.mjs # traduction Zelty — catalogue (sans compte)
 PORT=3000 node scripts/test-zelty-emission.mjs  # émission vers la caisse (sans compte)
 PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (sans compte)
+PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (sans compte)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
