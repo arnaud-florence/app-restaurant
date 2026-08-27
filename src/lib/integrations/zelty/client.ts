@@ -15,6 +15,7 @@
 //   ZELTY_API_KEY              la clé, générée depuis le back-office
 //   ZELTY_AUTH                 'bearer' (défaut) | 'x-api-key'
 //   ZELTY_ORDERS_PATH          défaut '/orders'
+//   ZELTY_CATALOGUE_PATH       défaut '/catalog/dishes'
 //   ZELTY_MONTANTS_EN_CENTIMES 'true' | 'false' — À DÉCLARER, cf. mapper.ts
 //   ZELTY_ETABLISSEMENT_SLUG   point de vente à rattacher, défaut 'fournil'
 //
@@ -25,6 +26,7 @@ export type ConfigZelty = {
   cle: string
   auth: 'bearer' | 'x-api-key'
   cheminCommandes: string
+  cheminCatalogue: string
   montantsEnCentimes: boolean
   etablissementSlug: string
 }
@@ -58,6 +60,7 @@ export function lireConfig(): ConfigPrete | ConfigManquante {
       cle,
       auth: process.env.ZELTY_AUTH === 'x-api-key' ? 'x-api-key' : 'bearer',
       cheminCommandes: process.env.ZELTY_ORDERS_PATH ?? '/orders',
+      cheminCatalogue: process.env.ZELTY_CATALOGUE_PATH ?? '/catalog/dishes',
       montantsEnCentimes: centimes === 'true',
       etablissementSlug: process.env.ZELTY_ETABLISSEMENT_SLUG ?? 'fournil',
     },
@@ -152,4 +155,58 @@ export async function recupererCommandes(
     offset += PAR_PAGE
   }
   return { commandes: toutes, url: premiere, pages }
+}
+
+/**
+ * Récupère TOUT le catalogue.
+ *
+ * `limit=0` désactive la clause SQL LIMIT et renvoie tous les plats — c'est
+ * documenté, et contre-intuitif : zéro veut dire « tout », pas « aucun ».
+ * On garde quand même une pagination de repli, au cas où le comportement
+ * changerait : un catalogue tronqué en silence casserait le rapprochement
+ * sans le dire.
+ *
+ * `show_all=true` inclut les plats marqués « caisse seulement » (`zc_only`) :
+ * on veut les connaître pour ne PAS les publier sur le site, pas les ignorer.
+ */
+export async function recupererPlats(
+  c: ConfigZelty,
+): Promise<{ plats: unknown[]; url: string; pages: number }> {
+  const base = () => {
+    const u = new URL(c.baseUrl.replace(/\/+$/, '') + c.cheminCatalogue)
+    u.searchParams.set('show_all', 'true')
+    u.searchParams.set('lang', 'fr')
+    return u
+  }
+  const premiere = base()
+  premiere.searchParams.set('limit', '0')
+
+  const rep = await appeler(c, premiere)
+  const tout = extraireListeCle(rep, 'dishes')
+  if (tout.length > 0) return { plats: tout, url: premiere.toString(), pages: 1 }
+
+  // Repli paginé si `limit=0` ne se comporte pas comme documenté.
+  const tous: unknown[] = []
+  let offset = 0, pages = 0
+  while (pages < 20) {
+    const u = base()
+    u.searchParams.set('limit', '500')
+    u.searchParams.set('offset', String(offset))
+    const lot = extraireListeCle(await appeler(c, u), 'dishes')
+    pages++
+    tous.push(...lot)
+    if (lot.length < 500) break
+    offset += 500
+  }
+  return { plats: tous, url: premiere.toString(), pages: pages + 1 }
+}
+
+/** Extrait un tableau sous une clé nommée, ou sous les enveloppes usuelles. */
+export function extraireListeCle(reponse: unknown, cle: string): unknown[] {
+  if (Array.isArray(reponse)) return reponse
+  if (reponse && typeof reponse === 'object') {
+    const v = (reponse as Record<string, unknown>)[cle]
+    if (Array.isArray(v)) return v
+  }
+  return extraireListe(reponse)
 }

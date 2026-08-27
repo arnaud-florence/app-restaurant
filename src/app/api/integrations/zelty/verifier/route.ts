@@ -13,6 +13,7 @@
 
 import { NextResponse } from 'next/server'
 import { mapperCommandes } from '@/lib/integrations/zelty/mapper'
+import { normaliserPlat, rapprocher, type PlatNormalise } from '@/lib/integrations/zelty/catalogue'
 import { extraireListe } from '@/lib/integrations/zelty/client'
 
 export const runtime = 'nodejs'
@@ -29,6 +30,37 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 }) }
 
   const b = (body ?? {}) as Record<string, unknown>
+
+  // ── Catalogue ────────────────────────────────────────────────────
+  // Même usage que pour les commandes : on colle des plats Zelty et on voit
+  // ce que la traduction en fait, sans clé et sans rien écrire.
+  if (Array.isArray(b.plats)) {
+    const plats: PlatNormalise[] = []
+    const illisibles: string[] = []
+    for (const brut of b.plats) {
+      const n = normaliserPlat(brut)
+      if ('erreur' in n) illisibles.push(n.erreur)
+      else plats.push(n)
+    }
+    const locaux = Array.isArray(b.locaux)
+      ? (b.locaux as Array<{ id: string; nom: string; nom_caisse?: string | null }>)
+          .map(l => ({ id: l.id, nom: l.nom, nom_caisse: l.nom_caisse ?? null }))
+      : []
+    const corr = new Map<string, string>(
+      Object.entries((b.correspondances ?? {}) as Record<string, string>),
+    )
+    const { apparies, sansCorrespondance } = rapprocher(plats, locaux, corr)
+    return NextResponse.json({
+      ok: illisibles.length === 0,
+      lus: b.plats.length,
+      lisibles: plats.length,
+      illisibles,
+      apparies: apparies.map(a => ({ nom: a.plat.nom, recetteId: a.recetteId, par: a.par })),
+      sans_correspondance: sansCorrespondance.map(p => ({ id: p.identifiant, nom: p.nom })),
+      apercu: plats.slice(0, 3),
+    })
+  }
+
   // On accepte aussi bien `{ commandes: [...] }` qu'une réponse Zelty brute
   // collée telle quelle : au moment du branchement, chaque friction compte.
   const liste = Array.isArray(b.commandes) ? b.commandes : extraireListe(body)

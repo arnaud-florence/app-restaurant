@@ -700,6 +700,45 @@ confirmer sur une charge utile réelle.
 est une seconde barrière, pas la première. Le statut documenté est une chaîne
 (`opened`) ; la forme numérique 255 est aussi acceptée par prudence.
 
+#### Miroir du catalogue — `GET /catalog/dishes`
+
+`/api/cron/caisse/zelty/catalogue[?dry=1]`. Zelty devient maître des données
+**commerciales** — nom, prix, TVA, disponibilité, ce qui s'imprime sur le
+ticket. L'outil garde ce qu'aucune caisse ne portera jamais : photos,
+allergènes, prix d'achat réels, correspondance « Panuozzi ← pâton ».
+
+Ce que la doc apporte, et qui tombe étonnamment bien :
+
+- **`remote_id`** est un champ libre côté Zelty : on peut y écrire NOTRE
+  identifiant. Un rapprochement par le nom suffit **une seule fois**, ensuite
+  le lien est exact des deux côtés et les noms peuvent changer librement ;
+- **`price_togo` et `tax_takeaway`** existent séparément de `price`/`tax` :
+  le 5,5 % / 10 % français est natif, sans calcul de notre côté. Le Fournil
+  vendant à emporter, ce sont eux qui font foi ;
+- **`disable_takeaway` / `disable_delivery`** donnent la structure 7
+  (disponibilités) sans rien inventer ;
+- `fab_name` est le poste de production — l'équivalent de `tag_destination`.
+
+⚠️ **La TVA arrive en MILLIÈMES : 1000 = 10 %, 550 = 5,5 %.** La prendre pour
+un pourcentage facturerait une TVA à 1000 %.
+
+⚠️ **`zc_only` veut dire « caisse seulement ».** Publier ces plats sur le site
+afficherait des produits que le client ne peut pas commander (café offert,
+gestes commerciaux). Ils restent actifs mais jamais `vendable_online`.
+
+⚠️ **`limit=0` renvoie TOUT**, pas zéro — c'est documenté et contre-intuitif.
+Une pagination de repli existe au cas où ce comportement changerait : un
+catalogue tronqué en silence casserait le rapprochement sans le dire.
+
+⚠️ **Rien n'est créé automatiquement.** Un plat Zelty sans correspondance est
+REMONTÉ, pas inventé : créer à l'aveugle doublonnerait nos 85 fiches du
+Fournil dès le premier appel. Et un écart de prix supérieur à 0,50 € est
+signalé au lieu d'être appliqué en silence — ce n'est pas un arrondi, c'est
+une décision commerciale.
+
+Test : `PORT=3000 node scripts/test-zelty-catalogue.mjs` — 16 assertions, sans
+compte ni clé.
+
 #### Émission des commandes web — `POST /orders`
 
 Confirmé par la documentation : on **crée une commande déjà réglée** en
@@ -746,9 +785,10 @@ Tant que rien n'est configuré, la route répond **200** avec
 `{ configure: false }` : une caisse pas encore branchée n'est pas une panne,
 et le monitoring compte tout code ≠ 200 comme une erreur.
 
-Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 28 assertions sur des
-commandes fictives conformes à la doc, à travers le banc d'essai. Aucun compte
-ni clé nécessaire.
+Tests, tous sans compte ni clé, à travers le banc d'essai
+`/api/integrations/zelty/verifier` :
+`PORT=3000 node scripts/test-zelty-mapper.mjs` (28 assertions, commandes) et
+`PORT=3000 node scripts/test-zelty-catalogue.mjs` (16 assertions, catalogue).
 
 ### Rapprochement quotidien caisse ↔ outil (0139)
 
@@ -1096,7 +1136,8 @@ node scripts/test-ventilation-activite.mjs      # CA/marge/food cost par étage 
 node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ + TVA 2,1 %
 PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : journal + correspondances
 PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs compris
-PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty (fictive, sans compte)
+PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty — commandes (sans compte)
+PORT=3000 node scripts/test-zelty-catalogue.mjs # traduction Zelty — catalogue (sans compte)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
