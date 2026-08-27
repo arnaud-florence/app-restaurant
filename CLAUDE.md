@@ -142,11 +142,12 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Ventilation par activité | CA, marge et food cost par point de vente — calculés sur les LIGNES | — |
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
+| Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0142.**
+**Migrations actuelles : 0001 → 0143.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -1079,6 +1080,39 @@ la vraie unité de saisie est la famille. On coche une fois, on décoche les
 exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
 une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
 effacer.
+
+### Ce que l'affaire VAUT — lecture patrimoniale (0143)
+
+`/admin/patrimoine`. Tout le reste de l'outil mesure ce qui entre en caisse.
+Cette page mesure ce qui se **construit** : l'EBE récurrent, et la valeur de
+fonds qu'il porte.
+
+Le chiffre qui résume la thèse : **1 000 € de résultat MENSUEL récurrent valent
+30 000 à 48 000 € de valeur de fonds** (multiples 2,5 à 4 × l'EBE annuel). Un
+euro qui reste et se répète vaut trente fois un euro sorti une fois — et sorti
+en prime, il coûte 1 420 € à la société pour qu'il en reste ~700.
+
+⚠️ **La page REFUSE d'afficher une valorisation sous 30 jours de vente.**
+Annualiser huit jours d'ouverture — avec leur effet de nouveauté — produirait
+un chiffre faux affiché en gros caractères. Trois niveaux : `insuffisant`
+(< 30 j), `indicatif` (30-90 j), `solide` (> 90 j), toujours affichés avec le
+nombre de jours réellement observés.
+
+⚠️ Ce sont les **jours AVEC VENTE** qui comptent, pas les jours calendaires :
+un établissement fermé trois semaines pour incendie ne doit pas voir son EBE
+divisé par la durée de la fermeture.
+
+⚠️ Les produits en **commission** (0136) sont exclus du taux de charges
+variables : ils n'ont pas de coût matière et le fausseraient.
+
+⚠️ Une valorisation **négative n'existe pas** : un fonds déficitaire ne vaut
+pas moins que rien, il vaut son bail et son emplacement. Plancher à 0.
+
+Deux méthodes en parallèle — multiple d'EBE et pourcentage du CA annuel —
+parce qu'aucune ne fait autorité seule ; l'écart entre elles dit si la valeur
+tient au résultat ou au volume. Multiples réglables dans `config_patrimoine` :
+ils varient selon l'emplacement, le bail et l'époque, c'est au comptable de
+les arbitrer, pas au code.
 
 ### Le pont caisse ↔ outil (0137)
 
