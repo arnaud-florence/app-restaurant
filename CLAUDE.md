@@ -1064,6 +1064,39 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### Produits arrivés par la caisse : classer, nommer, illustrer
+
+Les produits créés automatiquement depuis les tickets arrivent en catégorie
+**« À classer »**, sans photo, sans description et `vendable_online = false`.
+Le menu public exige **DEUX** conditions — une famille valide ET une image
+(`.not('image_url','is',null).neq('categorie','À classer')`) — donc ils
+restent invisibles du site tant que les deux ne sont pas remplies.
+
+Traité le 28/08/2026 pour 13 produits : classement en familles (dont une
+nouvelle, **Glace**, pour quatre glaces qui ne se rangeaient nulle part),
+fusion de « Gourmandises » au pluriel dans « Gourmandise », correction des
+noms d'affichage (« Fusee » → « Fusée », « Paris brest » → « Paris-Brest »…)
+et plaques d'attente.
+
+⚠️ **Corriger `nom` ne casse RIEN.** Le rapprochement des tickets passe
+d'abord par `nom_caisse`, et `norm()` retire les accents — « Fusée » et
+« Fusee » se normalisent pareil. `nom_caisse` doit rester le libellé BRUT de
+la caisse ; c'est `nom` qu'on soigne pour la vitrine.
+
+**`vendable_online` suit une règle établie, pas une intuition** : vérifiée sur
+les 66 produits déjà photographiés — 0/6 pour les boissons chaudes, 0/8 pour
+les formules (règle de la 0115), 100 % partout ailleurs.
+
+`scripts/generer-visuels-sans-photo.mjs [--ecrire]` : plaques typographiques
+pour tout produit actif sans photo, pilotées par la base (l'ancien
+`generer-visuels-manquants.mjs` avait une liste figée, périmée depuis la purge
+des focaccias). Essai à blanc par défaut. Les composants de formule
+(`Formule — …`) sont exclus : ce ne sont pas des produits autonomes.
+
+⚠️ Ce sont des **visuels d'attente**. Dès que le fournil photographie, il
+suffit de remplacer les fichiers : les URL en base ne bougent pas. Et rien
+n'est visible avant **déploiement**.
+
 ### Carte du Fournil et photos produit
 
 Les 60 produits viennent des 13 affiches CasaTasia (migration 0113, prix TTC des affiches → HT en base). Les photos sont **découpées dans les affiches elles-mêmes** par `scripts/generer-photos-fournil.mjs` (sharp, rectangles en fractions de l'affiche) et déposées dans `public/produits/*.jpg`.
