@@ -400,6 +400,32 @@ Réouverture fin octobre : `/admin/etablissements` → groupe Restaurant → **�
 
 Tests : `node scripts/test-activation.mjs` (restaure toujours l'état initial), `node scripts/test-commande-statut.mjs`, `node scripts/test-fournil-circuit.mjs`, `node scripts/test-carte-fournil.mjs`.
 
+### 🧾 La frontière entre les caisses et l'outil (24 août 2026)
+
+**L'outil ne prend plus de commande et n'encaisse plus.** Chaque activité
+vend sur SA caisse (Fournil aujourd'hui ; bar / restaurant / pizzeria à la
+réouverture), l'outil reçoit les tickets et sert au pilotage. La règle vit
+dans **`src/lib/frontiere-caisse.ts`** — `VENTE_EN_CAISSE` est un
+interrupteur d'ARCHITECTURE, pas un réglage de confort.
+
+Pourquoi la frontière est nette : deux systèmes qui prennent des commandes
+divergent toujours ; la caisse agréée est la source légale (NF525) et un
+second encaissement produirait un CA parallèle sans valeur fiscale ; et
+l'équipe ne doit jamais se demander « je saisis où ? ».
+
+Écrans RETIRÉS (remplacés par une page d'explication, pas un 404) :
+`/serveur` (plan de salle, prise de commande, encaissement), `/caisse`
+(session, Z-report), `/emporter`. Leur code est dans l'historique git au
+commit du retrait. L'encaissement a aussi été retiré du KDS bar, qui
+PRÉPARE et n'encaisse plus.
+
+Écrans CONSERVÉS, parce qu'ils n'ont pas d'équivalent en caisse : la
+préparation (KDS), les commandes du site web, la tournée du livreur, et
+tout le pilotage.
+
+⚠️ Avant d'ajouter un écran qui saisit une vente, relire ce fichier : la
+réponse par défaut est « ça se fait sur la caisse ».
+
 ### Clôture des ventes au comptoir
 
 Une vente COMPTOIR sans table ni ardoise passe **directement à `encaisse`** quand tous ses articles sont `servi` (règle pure dans `src/lib/commande-statut.ts`).

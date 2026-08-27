@@ -15,7 +15,6 @@ import { toast } from '@/lib/toast'
 import type { OpsBottomNavProfil } from '@/components/ops-nav-types'
 import TachesSequentielles from '@/components/TachesSequentielles'
 import ComptoirOrderModal from './ComptoirOrderModal'
-import EncaissementModal from '../serveur/EncaissementModal'
 import { fmtPrix } from '@/lib/service'
 
 type Recette = {
@@ -46,7 +45,6 @@ export default function BarClient({
   const [now, setNow] = useState(() => Date.now())
   const [tab, setTab] = useState<'preparer' | 'comptoir'>('preparer')
   const [showComptoir, setShowComptoir] = useState(false)
-  const [encaissementCmd, setEncaissementCmd] = useState<CommandeService | null>(null)
   const [annulationCible, setAnnulationCible] = useState<CommandeService | null>(null)
   const [motifAnnulation, setMotifAnnulation] = useState('Erreur de saisie')
   const [, startTransition] = useTransition()
@@ -382,22 +380,21 @@ export default function BarClient({
                   <span className="text-lg">🛒</span>
                   Comptoir — {commandesComptoir.length} à encaisser
                 </p>
-                <p className="text-[11px] text-violet-400">Clic sur une note pour ouvrir l&apos;encaissement</p>
+                <p className="text-[11px] text-violet-400">À encaisser sur la caisse</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {commandesComptoir.map(c => {
                   const totalArticles = c.articles.reduce((s, a) => s + (a.quantite ?? 1), 0)
                   const ardoise = c.ardoise_nom?.trim()
+                  // Carte informative : le bar PRÉPARE, il n'encaisse plus
+                  // (cf. src/lib/frontiere-caisse.ts). Elle dit ce qui reste
+                  // dû ; le règlement se fait sur la caisse.
                   return (
                     <div
                       key={c.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setEncaissementCmd(c)}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEncaissementCmd(c) } }}
                       className={cn(
-                        'text-left p-3 rounded-md bg-zinc-900 border-2 transition-colors active:scale-[0.97] cursor-pointer',
-                        ardoise ? 'border-violet-400/80 ring-1 ring-violet-500/30' : 'border-violet-700/40 hover:border-violet-400',
+                        'text-left p-3 rounded-md bg-zinc-900 border-2',
+                        ardoise ? 'border-violet-400/80 ring-1 ring-violet-500/30' : 'border-violet-700/40',
                       )}
                     >
                       <div className="flex items-center justify-between">
@@ -455,20 +452,6 @@ export default function BarClient({
           onClose={() => setShowComptoir(false)}
           onSuccess={() => {
             setShowComptoir(false)
-            router.refresh()
-          }}
-        />
-      )}
-
-      {/* Modal encaissement */}
-      {encaissementCmd && (
-        <EncaissementModal
-          commande={encaissementCmd}
-          serveurId={barmanId ?? ''}
-          employes={employes}
-          onClose={() => setEncaissementCmd(null)}
-          onSuccess={() => {
-            setEncaissementCmd(null)
             router.refresh()
           }}
         />

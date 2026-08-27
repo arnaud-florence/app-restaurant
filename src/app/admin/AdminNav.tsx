@@ -109,7 +109,6 @@ const SHORTCUTS_OPS = [
   { href: '/serveur',   label: 'Serveur',   icon: BookOpen },
   { href: '/cuisine',   label: 'Cuisine',   icon: ChefHat },
   { href: '/bar',       label: 'Bar',       icon: Wine },
-  { href: '/emporter',  label: 'Snack',     icon: Store },
   { href: '/livreur',   label: 'Livreur',   icon: Truck },
   { href: '/reception', label: 'Réception', icon: Building2 },
 ]

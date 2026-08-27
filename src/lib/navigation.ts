@@ -70,13 +70,13 @@ export const CATEGORIES: Category[] = [
     items: [
       // Le comptoir Fournil est le point de vente actif pendant la période
       // « Fournil d'abord » → il ouvre la liste.
-      { href: '/comptoir/fournil', emoji: '🥖', label: 'Comptoir Fournil', description: 'Prise de commande boulangerie + KDS. Encaissement sur caisse agréée.', imageUrl: u('1509440159596-0249088772ff'), module: 'fournil' },
-      { href: '/serveur',         emoji: '🍽',   label: 'Salle / Serveur',  description: 'Plan de salle + prise de commande + encaissement.',  imageUrl: u('1414235077428-338989a2e8c0'), module: 'restaurant_salle' },
-      { href: '/caisse',          emoji: '💰',   label: 'Caisse',           description: 'Dashboard live, ouverture/clôture session, rapport Z.', imageUrl: u('1556742502-ec7c0e9f34b1') },
-      { href: '/cuisine',         emoji: '👨‍🍳', label: 'Cuisine',          description: 'Bons de prep cuisine + pizza, minuteur, ding sonore.', imageUrl: u('1556909114-f6e7ad7d3136'), module: 'restaurant_salle' },
-      { href: '/pizza',           emoji: '🍕',   label: 'Pizza',            description: 'KDS pizza dédié (filtre tag PIZZA).',                  imageUrl: u('1513104890138-7c749659a591'), module: 'pizzeria' },
-      { href: '/bar',             emoji: '🍷',   label: 'Bar',              description: 'KDS bar pour boissons en attente.',                    imageUrl: u('1514933651103-005eec06c04b'), module: 'bar' },
-      { href: '/emporter',        emoji: '🛒',   label: 'Snack / Emporter', description: 'Service ONLINE différencié (créneaux multi-zones).',   imageUrl: u('1568901346375-23c9450c58cd'), module: 'snack_emporter' },
+      // ⚠️ La VENTE se fait sur les caisses (cf. src/lib/frontiere-caisse.ts).
+      // Ne subsistent ici que les écrans sans équivalent en caisse : la
+      // préparation, les commandes du site web et la tournée de livraison.
+      { href: '/comptoir/fournil/kds', emoji: '🥖', label: 'Préparation Fournil', description: 'Commandes du site web à préparer. La vente au comptoir se fait sur la caisse.', imageUrl: u('1509440159596-0249088772ff'), module: 'fournil' },
+      { href: '/cuisine',         emoji: '👨‍🍳', label: 'Cuisine',          description: 'Bons de préparation cuisine, minuteur, ding sonore.', imageUrl: u('1556909114-f6e7ad7d3136'), module: 'restaurant_salle' },
+      { href: '/pizza',           emoji: '🍕',   label: 'Pizza',            description: 'Bons de préparation pizza (filtre tag PIZZA).',        imageUrl: u('1513104890138-7c749659a591'), module: 'pizzeria' },
+      { href: '/bar',             emoji: '🍷',   label: 'Bar',              description: 'Boissons à préparer.',                                 imageUrl: u('1514933651103-005eec06c04b'), module: 'bar' },
       { href: '/livreur',         emoji: '🛵',   label: 'Livreur',          description: 'Tournée du jour, Maps multi-points, retards par mail.', imageUrl: u('1558981852-426c6c22a060'), module: 'fournil_livraison' },
       { href: '/reception',       emoji: '🛎',   label: 'Réception',        description: 'Arrivées/départs jour, demandes résa, acomptes.',      imageUrl: u('1551882547-ff40c63fe5fa'), module: 'chambres' },
       { href: '/admin/affichage', emoji: '📺',   label: 'Affichage TV',     description: 'Menu du jour + promos rotatives en salle (Module 26).', imageUrl: u('1593359677879-a4bb92f829d1') },

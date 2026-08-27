@@ -46,7 +46,9 @@ type Tab = {
   badge?: number
 }
 
-const OPS_PREFIXES = ['/serveur', '/cuisine', '/bar', '/pizza', '/caisse', '/emporter', '/livreur', '/reception']
+// La vente se fait sur les caisses (src/lib/frontiere-caisse.ts) : ne
+// subsistent ici que les écrans de préparation, la tournée et la réception.
+const OPS_PREFIXES = ['/comptoir', '/cuisine', '/bar', '/pizza', '/livreur', '/reception', '/inventaire', '/invendus']
 
 function buildTabs(profil: MobileTabBarProfil, isManager: boolean, nbAlertes: number, nbService: number): Tab[] {
   // Kiosk (tablette partagée, pas de session) → tout passe par le Centre opérationnel.

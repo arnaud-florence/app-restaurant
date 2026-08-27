@@ -189,7 +189,7 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
 
   snack: {
     label: 'Snack / Comptoir',
-    main: '/emporter',
+    main: '/comptoir/fournil/kds',
     allowed: [
       '/emporter',                      // page principale — gère ONLINE/BORNE/COMPTOIR
       '/caisse',                        // Z-report
