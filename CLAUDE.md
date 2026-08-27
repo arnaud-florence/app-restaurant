@@ -143,8 +143,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
+| Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 
-**Migrations actuelles : 0001 → 0138.**
+**Migrations actuelles : 0001 → 0139.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -639,6 +640,52 @@ Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et pers
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
 
+### Rapprochement quotidien caisse ↔ outil (0139)
+
+Le miroir `encaissements_externes` dit ce qu'on a **reçu** ; les `commandes`
+disent ce qu'on en a **compris**. Entre les deux il y a du code, et du code se
+trompe en silence. Sans ce contrôle, une ingestion qui perd 3 % des lignes
+depuis six semaines ne se voit nulle part : le CA reste juste — il vient des
+totaux — et seules les marges dérivent. On finit par accuser les fournisseurs.
+
+`/api/cron/caisse/rapprochement?jours=N[&source=X]` (Bearer `CRON_SECRET`),
+rejouable, écrit une ligne figée par jour et par caisse. **À planifier dans
+pg_cron**, après la synchro des tickets.
+
+Trois états : `ok`, `incomplet` (le montant est juste, mais on ignore ce qui a
+été vendu — stock, food cost et marges restent aveugles sur ces tickets), et
+`ecart` (montant, nombre de tickets ou ventilation TVA divergents).
+
+Une journée sans aucun ticket n'écrit **pas** de ligne : une caisse fermée le
+lundi n'est pas une anomalie, et cent lignes vides rendraient le tableau
+illisible. Le calcul repart d'**hier** — rapprocher la journée en cours
+produirait un faux écart à chaque exécution.
+
+Trouvé au premier passage sur les données réelles : 2 tickets du 17 août
+(6 h 02 et 6 h 29, ouverture) arrivent sans aucun produit — des paiements à
+montant libre tapés sur le terminal avant que la carte SumUp ne soit prête.
+11,40 € dont on connaît le montant mais pas le contenu.
+
+Lecture : **`/admin/integrations`**. Un contrôle que personne ne lit ne sert à
+rien. Test : `PORT=3000 node scripts/test-rapprochement.mjs` — il FABRIQUE une
+anomalie et vérifie qu'elle est vue ; un contrôle qui ne dit jamais « écart »
+ne prouve rien.
+
+⚠️ **Une seule source pour la ventilation par point de vente.**
+`src/lib/ventes-par-pdv.ts` est partagé par `/admin/ventes` et
+`/admin/ventes-pdv`. Cette dernière sommait auparavant
+`commandes.etablissement_id` : correct tant que chaque activité a sa caisse,
+faux dès qu'une caisse unique envoie des tickets mixtes ou tait son point de
+vente. Deux pages qui ventilent différemment finissent par afficher deux
+chiffres, et personne ne sait lequel croire.
+
+⚠️ **Deux modèles de commission coexistent, et c'est voulu.**
+`etablissements.inclus_ca_principal` + `commissions_tiers` (0093) raisonnent
+par ÉTABLISSEMENT et par PÉRIODE — c'est le relevé mensuel du buraliste ou de
+la FDJ. `recettes.type_revenu` (0136) raisonne par VENTE — indispensable dès
+qu'une caisse unique vend du pain et du tabac sur le même ticket. Le premier
+sert à rapprocher, le second à estimer en continu.
+
 ### Allergènes : « rien déclaré » n'est pas « aucun allergène » (0138)
 
 Constaté le 27/08/2026 : la page publique du QR code affichait
@@ -929,6 +976,7 @@ node scripts/test-carte-fournil.mjs              # carte réelle (60 produits, p
 node scripts/test-ventilation-activite.mjs      # CA/marge/food cost par étage (lecture seule)
 node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ + TVA 2,1 %
 PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : journal + correspondances
+PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs compris
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26

@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { fmtPrix } from '@/lib/foodCost'
 import { ACTIVITES, activiteDe, type Activite } from '@/lib/activites'
+import { caParPointDeVente } from '@/lib/ventes-par-pdv'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Ventes — 2 activités' }
@@ -69,26 +70,38 @@ export default async function VentesPdvPage({ searchParams }: { searchParams: { 
   const today = new Date().toISOString().slice(0, 10)
   const startDate = startIso.slice(0, 10)
 
-  const [etabRes, cmdRes, commRes] = await Promise.all([
+  // La ventilation du CA ne passe plus par les en-têtes de commande :
+  // `caParPointDeVente` la calcule sur les lignes (voir plus bas).
+  const [etabRes, commRes] = await Promise.all([
     supabase.from('etablissements').select('id, nom, slug, categorie, couleur, ordre, inclus_ca_principal').eq('actif', true).order('ordre'),
-    supabase.from('commandes').select('etablissement_id, montant_total_ttc, statut').neq('statut', 'annule').gte('created_at', startIso),
     supabase.from('commissions_tiers').select('etablissement_id, montant_commission, montant_brut_transite, nb_operations, periode_debut, periode_fin')
       .gte('periode_fin', startDate).lte('periode_debut', today),
   ])
 
   const etabs = (etabRes.data ?? []) as Etab[]
-  const cmds = (cmdRes.data ?? []) as { etablissement_id: string | null; montant_total_ttc: number | null; statut: string | null }[]
   const comms = (commRes.data ?? []) as { etablissement_id: string; montant_commission: number | null; montant_brut_transite: number | null; nb_operations: number | null }[]
 
-  // Agrégation CA par établissement (+ bucket null = non attribué)
+  // Agrégation CA par établissement — sur les LIGNES de vente, pas sur
+  // l'en-tête des commandes.
+  //
+  // L'ancienne version sommait `commandes.etablissement_id`. Ça marche tant
+  // que chaque activité a sa propre caisse. Avec une caisse unique — ce vers
+  // quoi on va — un ticket mixte (un café du Fournil + une pizza) serait
+  // attribué en entier à un seul point de vente, et une caisse qui ne dit pas
+  // son point de vente enverrait tout dans « non attribué ».
+  //
+  // `caParPointDeVente` est la source partagée avec /admin/ventes : deux
+  // pages qui ventilent différemment finissent par afficher deux chiffres,
+  // et personne ne sait lequel croire.
+  const ventilation = await caParPointDeVente(startIso)
   const agg = new Map<string, Agg>()
   let nonAttr: Agg = { ca: 0, caEncaisse: 0, nb: 0 }
-  for (const c of cmds) {
-    const m = Number(c.montant_total_ttc ?? 0)
-    const target = c.etablissement_id ? (agg.get(c.etablissement_id) ?? { ca: 0, caEncaisse: 0, nb: 0 }) : nonAttr
-    target.ca += m; target.nb += 1
-    if (c.statut === 'encaisse') target.caEncaisse += m
-    if (c.etablissement_id) agg.set(c.etablissement_id, target)
+  for (const v of ventilation) {
+    // Tout ce qui est ventilé vient de commandes encaissées : les deux
+    // colonnes coïncident, et c'est voulu — la vérité fiscale est en caisse.
+    const cible: Agg = { ca: v.ca, caEncaisse: v.ca, nb: v.tickets }
+    if (v.etablissement_id) agg.set(v.etablissement_id, cible)
+    else nonAttr = cible
   }
   const commAgg = new Map<string, { commission: number; brut: number; ops: number }>()
   for (const c of comms) {
