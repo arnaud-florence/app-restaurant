@@ -141,8 +141,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Stock théorique & démarque | calcul à la lecture : comptage + factures − ventes | 0135 |
 | Ventilation par activité | CA, marge et food cost par point de vente — calculés sur les LIGNES | — |
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
+| Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 
-**Migrations actuelles : 0001 → 0136.**
+**Migrations actuelles : 0001 → 0137.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -637,6 +638,38 @@ Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et pers
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
 
+### Le pont caisse ↔ outil (0137)
+
+Deux fondations, agnostiques de la caisse : elles servent avec SumUp
+aujourd'hui et serviront telles quelles avec Zelty.
+
+**`integration_evenements`** — chaque échange laisse une trace avec sa charge
+utile BRUTE. Sans journal, un import qui échoue à 6 h du matin est invisible
+jusqu'à ce que quelqu'un s'étonne d'un chiffre trois semaines plus tard, et à
+ce moment-là la donnée du jour manqué n'est récupérable nulle part. Le brut
+permet de REJOUER. Helpers : `journaliser()` et `avecJournal()`
+(`src/lib/integrations/journal.ts`) — ils ne lèvent JAMAIS : perdre un import
+réussi parce que sa trace n'a pas pu s'écrire serait absurde.
+
+**`correspondances_catalogue`** — la clé stable entre les deux mondes.
+Le rattachement d'un ticket à un produit se faisait par le LIBELLÉ ; le jour
+où « Croissant » devient « Croissant beurre » côté caisse, l'outil créait un
+second produit et coupait la série statistique en deux, sans erreur ni alerte.
+L'identifiant de la caisse survit au renommage, donc **il passe AVANT le
+libellé** dans `/api/integrations/caisse/encaissements`.
+
+La correspondance se constitue toute seule : rattachement réussi par le nom +
+identifiant fourni → le lien est noté, et le rattachement suivant se passe du
+libellé. SumUp n'expose aucun identifiant produit : le chemin par le nom reste
+donc actif et testé.
+
+Test : `PORT=3000 node scripts/test-integration-correspondances.mjs` (le
+serveur de dev doit tourner, et `CRON_SECRET` être renseigné dans
+`.env.local` — il y est vide par défaut, la vraie valeur vit sur Vercel).
+
+⚠️ Les tickets de test créent des commandes `encaisse` qui entreraient dans le
+CA : le cleanup du script les supprime, il doit rester complet.
+
 ### Commissions : encaissé ≠ chiffre d'affaires (0136)
 
 Tabac, presse, FDJ et relais colis ne sont **pas des ventes de marchandise**.
@@ -856,6 +889,7 @@ node scripts/test-carte-fournil.mjs              # carte réelle (60 produits, p
 # Pilotage multi-activités (août 2026)
 node scripts/test-ventilation-activite.mjs      # CA/marge/food cost par étage (lecture seule)
 node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ + TVA 2,1 %
+PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : journal + correspondances
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26

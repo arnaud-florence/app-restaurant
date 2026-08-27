@@ -26,6 +26,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { journaliser } from '@/lib/integrations/journal'
+import { chargerCorrespondances, noterCorrespondance } from '@/lib/integrations/correspondances'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,6 +45,10 @@ function authCron(req: Request): boolean {
 // menu engineering restent aveugles.
 const produitSchema = z.object({
   nom_caisse: z.string().min(1),
+  /** Identifiant STABLE du produit côté caisse (0137). Quand la caisse en
+   *  fournit un, c'est lui qui fait foi : un renommage ne doit pas créer un
+   *  doublon chez nous. SumUp n'en donne pas ; Zelty devrait. */
+  identifiant_externe: z.string().min(1).optional(),
   quantite: z.number().positive(),
   prix_unitaire_ttc: z.number(),
   tva_taux: z.number().optional(),
@@ -97,6 +103,9 @@ export async function POST(req: Request) {
     x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
   const parCaisse = new Map<string, { id: string; tag: string }>()
   const parNom = new Map<string, { id: string; tag: string }>()
+  // Index prioritaire : l'identifiant stable de la caisse (0137).
+  const parId = await chargerCorrespondances(source_caisse).catch(() => new Map<string, string>())
+  const tagParRecette = new Map<string, string>()
   try {
     // Volontairement SANS filtre `actif` : un produit désactivé exprès
     // (focaccias arrêtées, « Jus de fruit » remplacé par orange/pomme) doit
@@ -111,9 +120,11 @@ export async function POST(req: Request) {
       const v = { id: String(r.id), tag: String(r.tag_destination ?? 'FOURNIL') }
       if (r.nom_caisse) parCaisse.set(norm(String(r.nom_caisse)), v)
       parNom.set(norm(String(r.nom)), v)
+      tagParRecette.set(String(r.id), v.tag)
     }
   } catch { /* carte injoignable → import sans lignes */ }
 
+  const t0 = Date.now()
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
   let lignesPosees = 0
   const inconnus = new Map<string, number>()
@@ -189,7 +200,24 @@ export async function POST(req: Request) {
             const aInserer = []
             for (const p of l.produits ?? []) {
               const cle = norm(p.nom_caisse)
-              let rec = parCaisse.get(cle) ?? parNom.get(cle)
+              // Ordre volontaire : l'identifiant stable AVANT le libellé.
+              // Le libellé change au gré des humeurs du back-office de la
+              // caisse ; l'identifiant, non.
+              const idExt = p.identifiant_externe
+              const parIdent = idExt ? parId.get(idExt) : undefined
+              let rec = parIdent
+                ? { id: parIdent, tag: tagParRecette.get(parIdent) ?? 'FOURNIL' }
+                : (parCaisse.get(cle) ?? parNom.get(cle))
+
+              // Rattaché par le nom alors que la caisse donnait un identifiant :
+              // on note le lien pour que la prochaine fois se passe du libellé.
+              if (rec && idExt && !parIdent) {
+                await noterCorrespondance({
+                  systeme: source_caisse, identifiant_externe: idExt,
+                  recette_id: rec.id, libelle_externe: p.nom_caisse,
+                })
+                parId.set(idExt, rec.id)
+              }
 
               // Libellé jamais vu : on crée sa fiche à la volée. SumUp n'expose
               // aucune API catalogue (vérifié : Checkouts, Readers, Customers,
@@ -219,7 +247,15 @@ export async function POST(req: Request) {
                 if (neuf) {
                   rec = { id: String(neuf.id), tag: String(neuf.tag_destination ?? 'FOURNIL') }
                   parCaisse.set(cle, rec)   // les lignes suivantes du même lot en profitent
+                  tagParRecette.set(rec.id, rec.tag)
                   crees.push(p.nom_caisse)
+                  if (idExt) {
+                    await noterCorrespondance({
+                      systeme: source_caisse, identifiant_externe: idExt,
+                      recette_id: rec.id, libelle_externe: p.nom_caisse,
+                    })
+                    parId.set(idExt, rec.id)
+                  }
                 }
               }
 
@@ -276,7 +312,7 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({
+  const bilan = {
     ok: erreurs.length === 0,
     source_caisse,
     recus,
@@ -293,5 +329,23 @@ export async function POST(req: Request) {
     produits_crees: crees,
     sans_commande: sansCommande,
     erreurs,
+  }
+
+  // Trace de l'échange (0137). On garde le payload BRUT : c'est ce qui permet
+  // de rejouer un import raté au lieu de perdre la journée. `journaliser` ne
+  // lève jamais — une trace manquée ne doit pas faire échouer un import qui a
+  // réussi.
+  await journaliser({
+    sens: 'entrant',
+    systeme: source_caisse,
+    type: 'tickets',
+    reference: `${encaissements.length} ticket(s)`,
+    payload: body as unknown,
+    resultat: bilan,
+    statut: erreurs.length === 0 ? 'succes' : 'echec',
+    erreur: erreurs.length ? erreurs.map(e => `${e.ticket}: ${e.error}`).join(' | ').slice(0, 2000) : null,
+    duree_ms: Date.now() - t0,
   })
+
+  return NextResponse.json(bilan)
 }
