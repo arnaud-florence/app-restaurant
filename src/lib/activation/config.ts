@@ -67,7 +67,10 @@ export const REPLI_FOURNIL_SEUL: EtatActivation = {
   fournil: true,
   fournil_commande_en_ligne: true,
   fournil_livraison: true,
-  relais_colis: true,
+  // Relais colis, FDJ, tabac : des projets, pas des activités ouvertes. Le
+  // repli n'a le droit d'allumer que ce qui tourne réellement — sinon une
+  // panne de base annonce au public un service qui n'existe pas.
+  relais_colis: false,
   fdj: false,
   tabac: false,
   restaurant_salle: false,
