@@ -10,13 +10,13 @@ import {
   type TypeProcedureUrgence, TYPE_PROC_URGENCE_INFO, type ProcedureUrgence,
 } from '@/lib/allergenes'
 import {
-  setAllergenesComplementaires,
+  setAllergenesComplementaires, validerAllergenesEnLot,
   creerProcedureUrgence, updateProcedureUrgence, supprimerProcedureUrgence,
 } from './actions'
 import { askConfirm } from '@/lib/confirm'
 import type { RecetteAllergenes } from './page'
 
-type Tab = 'catalogue' | 'procedures' | 'qr'
+type Tab = 'rapide' | 'catalogue' | 'procedures' | 'qr'
 
 export default function AllergenesClient({
   recettes, procedures, readOnly = false,
@@ -25,7 +25,7 @@ export default function AllergenesClient({
   procedures: ProcedureUrgence[]
   readOnly?: boolean
 }) {
-  const [tab, setTab] = useState<Tab>('catalogue')
+  const [tab, setTab] = useState<Tab>('rapide')
   const [erreur, setErreur] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -61,12 +61,14 @@ export default function AllergenesClient({
           }
         >
           <div className="flex gap-1 overflow-x-auto">
+            <TabBtn active={tab === 'rapide'}     onClick={() => setTab('rapide')}>⚡ Saisie par famille</TabBtn>
             <TabBtn active={tab === 'catalogue'}  onClick={() => setTab('catalogue')}>🍽️ Catalogue plats × allergènes</TabBtn>
             <TabBtn active={tab === 'procedures'} onClick={() => setTab('procedures')}>🚨 Procédures d&apos;urgence ({nbProc})</TabBtn>
             <TabBtn active={tab === 'qr'}         onClick={() => setTab('qr')}>📱 QR salle</TabBtn>
           </div>
         </AdminPageHeader>
 
+        {tab === 'rapide'     && <SaisieRapideTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'catalogue'  && <CatalogueTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'procedures' && <ProceduresTab procedures={procedures} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'qr'         && <QRTab />}
@@ -108,6 +110,205 @@ function suggestionsPour(r: { nom: string; categorie: string }): { allergenes: A
   const cible = `${r.categorie} ${r.nom}`
   for (const s of SUGGESTIONS) if (s.motif.test(cible)) return { allergenes: s.allergenes, pourquoi: s.pourquoi }
   return null
+}
+
+// ─── TAB 0 — Saisie par famille ────────────────────────────────────
+//
+// 85 produits ouverts un par un dans une fenêtre modale, personne ne le fera
+// un mercredi entre deux fournées. Or une baguette, un pain de campagne et
+// une ficelle portent exactement les mêmes allergènes : la vraie unité de
+// saisie est la FAMILLE.
+//
+// Le geste : choisir une famille, cocher ce qu'elle contient, décocher les
+// exceptions produit par produit, valider. Une famille en deux minutes.
+function SaisieRapideTab({
+  recettes, readOnly = false, onError, onOk,
+}: {
+  recettes: RecetteAllergenes[]
+  readOnly?: boolean
+  onError: (e: unknown) => void
+  onOk: (m: string) => void
+}) {
+  const router = useRouter()
+  const [famille, setFamille] = useState<string | null>(null)
+  const [coches, setCoches] = useState<Allergene[]>([])
+  const [exclus, setExclus] = useState<Set<string>>(new Set())
+  const [isPending, startTransition] = useTransition()
+
+  const familles = useMemo(() => {
+    const m = new Map<string, { total: number; aValider: number }>()
+    for (const r of recettes) {
+      const e = m.get(r.categorie) ?? { total: 0, aValider: 0 }
+      e.total++
+      if (!r.valide_le) e.aValider++
+      m.set(r.categorie, e)
+    }
+    // Les familles qui restent à faire d'abord : c'est là qu'on travaille.
+    return [...m.entries()].sort((a, b) => b[1].aValider - a[1].aValider || a[0].localeCompare(b[0], 'fr'))
+  }, [recettes])
+
+  const produits = useMemo(
+    () => recettes.filter(r => r.categorie === famille),
+    [recettes, famille],
+  )
+
+  function ouvrir(cat: string) {
+    setFamille(cat)
+    setExclus(new Set())
+    // On repart de ce qui est déjà déclaré sur la famille, quand c'est
+    // unanime : ré-ouvrir une famille validée ne doit pas tout effacer.
+    const dansTous = ALLERGENES_EU.filter(a => {
+      const liste = recettes.filter(r => r.categorie === cat)
+      return liste.length > 0 && liste.every(r => r.allergenes_finaux.includes(a))
+    })
+    setCoches(dansTous)
+  }
+
+  function valider() {
+    const cibles = produits.filter(p => !exclus.has(p.id)).map(p => p.id)
+    if (cibles.length === 0) { onError(new Error('Aucun produit sélectionné.')); return }
+    startTransition(async () => {
+      try {
+        const r = await validerAllergenesEnLot({ recette_ids: cibles, allergenes: coches })
+        onOk(`${r.valides} produit(s) validé(s)`)
+        setFamille(null)
+        router.refresh()
+      } catch (e) { onError(e) }
+    })
+  }
+
+  if (!famille) {
+    const restant = recettes.filter(r => !r.valide_le).length
+    return (
+      <div className="space-y-3">
+        <div className={cn('rounded-lg p-3 border-2',
+          restant === 0 ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50 border-amber-300')}>
+          <p className={cn('font-bold text-sm', restant === 0 ? 'text-emerald-900' : 'text-amber-900')}>
+            {restant === 0
+              ? '✓ Tous les produits ont une information allergène vérifiée'
+              : `${restant} produit(s) à vérifier sur ${recettes.length}`}
+          </p>
+          <p className="text-xs text-zinc-600 mt-1">
+            Choisissez une famille : les produits qui la composent portent presque
+            toujours les mêmes allergènes. Cochez une fois, décochez les
+            exceptions, validez. Une famille prend deux minutes.
+          </p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {familles.map(([cat, n]) => (
+            <button key={cat} onClick={() => ouvrir(cat)} disabled={readOnly}
+              className={cn('text-left p-3 rounded-lg border-2 transition-colors disabled:opacity-50',
+                n.aValider > 0
+                  ? 'border-amber-300 bg-amber-50 hover:bg-amber-100'
+                  : 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50')}>
+              <span className="font-bold text-sm block">{cat}</span>
+              <span className="text-xs text-zinc-600">
+                {n.aValider > 0
+                  ? `${n.aValider} à vérifier sur ${n.total}`
+                  : `${n.total} produit(s) · vérifiés ✓`}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const suggestion = suggestionsPour({ nom: '', categorie: famille })
+  const restants = suggestion?.allergenes.filter(a => !coches.includes(a)) ?? []
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <button onClick={() => setFamille(null)}
+          className="text-sm h-9 px-3 rounded-md border border-zinc-300 hover:bg-zinc-50 font-bold">
+          ← Familles
+        </button>
+        <h2 className="font-black text-lg">{famille}</h2>
+        <span className="text-sm text-zinc-500">{produits.length} produit(s)</span>
+      </div>
+
+      {restants.length > 0 && (
+        <div className="rounded border border-blue-200 bg-blue-50 p-2 flex items-start gap-2">
+          <p className="flex-1 text-sm text-blue-900">
+            <b>Suggestion</b> — {suggestion?.pourquoi}, donc probablement{' '}
+            {restants.map(a => ALLERGENE_INFO[a].label.toLowerCase()).join(', ')}.
+            <span className="block text-xs text-blue-700 mt-0.5">
+              À confirmer sur la fiche technique du fournisseur.
+            </span>
+          </p>
+          <button onClick={() => setCoches(p => [...new Set([...p, ...restants])])}
+            className="shrink-0 text-xs h-9 px-3 rounded-md bg-blue-600 text-white font-bold">
+            Appliquer
+          </button>
+        </div>
+      )}
+
+      <div>
+        <p className="text-[11px] uppercase tracking-wider font-bold text-zinc-500 mb-1.5">
+          Allergènes présents dans cette famille
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+          {ALLERGENES_EU.map(a => {
+            const info = ALLERGENE_INFO[a]
+            const sel = coches.includes(a)
+            return (
+              <button key={a}
+                onClick={() => setCoches(p => sel ? p.filter(x => x !== a) : [...p, a])}
+                className={cn('flex items-center gap-2 px-3 h-12 rounded-md border-2 text-sm font-bold',
+                  sel ? info.cls + ' border-current' : 'bg-white text-zinc-400 border-zinc-200 hover:bg-zinc-50')}>
+                <span className="text-lg">{info.emoji}</span>
+                <span className="flex-1 text-left truncate">{info.label}</span>
+                {sel && <span className="text-xs">✓</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] uppercase tracking-wider font-bold text-zinc-500 mb-1.5">
+          Produits concernés — décochez les exceptions
+        </p>
+        <ul className="rounded-lg border border-zinc-200 divide-y divide-zinc-100 bg-white">
+          {produits.map(p => {
+            const exclu = exclus.has(p.id)
+            return (
+              <li key={p.id}>
+                <label className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-zinc-50">
+                  <input type="checkbox" checked={!exclu} className="h-5 w-5"
+                    onChange={() => setExclus(prev => {
+                      const n = new Set(prev)
+                      if (exclu) n.delete(p.id); else n.add(p.id)
+                      return n
+                    })} />
+                  <span className={cn('text-sm flex-1', exclu && 'line-through text-zinc-400')}>{p.nom}</span>
+                  {p.valide_le && (
+                    <span className="text-[10px] text-emerald-700 shrink-0">déjà vérifié</span>
+                  )}
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      <div className="sticky bottom-0 bg-white border-t border-zinc-200 py-3 flex items-center gap-3">
+        <button onClick={valider} disabled={isPending || readOnly}
+          className="h-12 px-5 rounded-md bg-zinc-900 text-white font-bold disabled:opacity-50">
+          {isPending
+            ? 'Enregistrement…'
+            : `✓ Valider ${produits.length - exclus.size} produit(s)`}
+        </button>
+        <p className="text-xs text-zinc-500">
+          {coches.length === 0
+            ? 'Aucun allergène coché : ces produits seront déclarés sans aucun des 14 allergènes.'
+            : `${coches.length} allergène(s) appliqué(s) à la sélection.`}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function CatalogueTab({

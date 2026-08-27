@@ -267,6 +267,73 @@ export async function updateShift(input: unknown) {
   return { ok: true as const }
 }
 
+// ─── Rythme récurrent ──────────────────────────────────────────────
+//
+// Une personne sur cinq jours pendant quatre semaines, c'est vingt
+// formulaires ouverts un par un. Personne ne le fait, et la table reste vide —
+// donc aucun coût de service calculable, donc aucune idée de la rentabilité
+// d'une journée.
+//
+// Le rythme d'une boulangerie est régulier par nature : on décrit la semaine
+// type une fois, on la déroule sur N semaines.
+
+const rythmeSchema = z.object({
+  employe_id:   z.string().uuid(),
+  /** Jours de la semaine, 1 = lundi … 7 = dimanche. */
+  jours:        z.array(z.number().int().min(1).max(7)).min(1).max(7),
+  heure_debut:  z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  heure_fin:    z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  poste_jour:   z.string().max(50).nullable().optional(),
+  /** Premier jour couvert, format ISO. */
+  depuis:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  semaines:     z.number().int().min(1).max(26),
+})
+
+export async function genererRythme(input: unknown) {
+  const p = rythmeSchema.parse(input)
+  if (p.heure_fin <= p.heure_debut) {
+    throw new Error('L\'heure de fin doit être après l\'heure de début.')
+  }
+  const supabase = await createClient()
+
+  // Dates visées
+  const voulues: string[] = []
+  const depart = new Date(`${p.depuis}T12:00:00Z`)
+  for (let j = 0; j < p.semaines * 7; j++) {
+    const d = new Date(depart.getTime() + j * 86_400_000)
+    // getUTCDay : 0 = dimanche. On ramène sur 1 = lundi … 7 = dimanche.
+    const jourSemaine = d.getUTCDay() === 0 ? 7 : d.getUTCDay()
+    if (p.jours.includes(jourSemaine)) voulues.push(d.toISOString().slice(0, 10))
+  }
+  if (voulues.length === 0) return { ok: true as const, crees: 0, ignores: 0 }
+
+  // On ne touche JAMAIS à une journée déjà planifiée : un shift saisi à la
+  // main (remplacement, horaire décalé) doit survivre au passage du
+  // générateur, sinon on écrase le travail de quelqu'un sans le lui dire.
+  const { data: existants } = await supabase
+    .from('planning')
+    .select('date_travail')
+    .eq('employe_id', p.employe_id)
+    .in('date_travail', voulues)
+  const deja = new Set((existants ?? []).map(r => String(r.date_travail)))
+
+  const aCreer = voulues.filter(d => !deja.has(d)).map(d => ({
+    employe_id:   p.employe_id,
+    date_travail: d,
+    heure_debut:  p.heure_debut,
+    heure_fin:    p.heure_fin,
+    poste_jour:   p.poste_jour ?? null,
+    notes:        null,
+  }))
+
+  if (aCreer.length > 0) {
+    const { error } = await supabase.from('planning').insert(aCreer)
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath('/admin/rh')
+  return { ok: true as const, crees: aCreer.length, ignores: deja.size }
+}
+
 export async function supprimerShift(id: string) {
   if (!id) throw new Error('id manquant')
   const supabase = await createClient()

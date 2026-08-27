@@ -19,7 +19,7 @@ import {
   creerEmploye, updateEmploye, archiverEmploye, inviterEmploye,
   creerDocument, supprimerDocument,
   creerFormation, supprimerFormation,
-  creerShift, supprimerShift,
+  creerShift, supprimerShift, genererRythme,
   pointerArrivee, pointerDepart,
   demanderConge, validerConge, refuserConge, ajusterSoldeConges,
   setEmployePermissions, getEmployePermissions, setAutonomie, setPinEmploye,
@@ -311,6 +311,7 @@ function DocsFormationsPanel({
 // ─── TAB 2 — Planning & pointage ───────────────────────────────────
 function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unknown) => void; onOk: (m: string) => void }) {
   const [showShift, setShowShift] = useState<{ employe_id: string; date: string } | null>(null)
+  const [showRythme, setShowRythme] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string>(() => {
     const t = new Date().toISOString().slice(0, 10)
     return data.joursSemaine.some(j => j.iso === t) ? t : (data.joursSemaine[0]?.iso ?? t)
@@ -327,8 +328,14 @@ function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unkno
       <section className="hidden md:block rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <header className="px-4 py-2 border-b border-zinc-200 flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-700">📅 Planning de la semaine</h2>
-          <div className="text-xs text-zinc-600 tabular-nums">
-            <b>{fmtHeures(totalHeures)}</b> · <b>{fmtPrix(totalCout)}</b>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowRythme(true)}
+              className="text-xs h-8 px-3 rounded-md border border-zinc-300 hover:bg-zinc-50 font-bold">
+              ⟳ Semaine type
+            </button>
+            <div className="text-xs text-zinc-600 tabular-nums">
+              <b>{fmtHeures(totalHeures)}</b> · <b>{fmtPrix(totalCout)}</b>
+            </div>
           </div>
         </header>
         <div className="overflow-x-auto">
@@ -447,7 +454,139 @@ function PlanningTab({ data, onError, onOk }: { data: DataRH; onError: (e: unkno
         <ShiftModal employes={employesActifs} init={showShift} onClose={() => setShowShift(null)} onError={onError}
           onSuccess={() => { setShowShift(null); onOk('Shift créé') }} />
       )}
+      {showRythme && (
+        <RythmeModal employes={employesActifs} onClose={() => setShowRythme(false)} onError={onError}
+          onSuccess={(m) => { setShowRythme(false); onOk(m) }} />
+      )}
     </div>
+  )
+}
+
+// ─── Semaine type ──────────────────────────────────────────────────
+//
+// Décrire une fois le rythme, le dérouler sur N semaines. Les journées déjà
+// planifiées ne sont jamais touchées : un remplacement ou un horaire décalé
+// saisi à la main doit survivre au passage du générateur.
+const JOURS = [
+  { n: 1, court: 'Lu' }, { n: 2, court: 'Ma' }, { n: 3, court: 'Me' },
+  { n: 4, court: 'Je' }, { n: 5, court: 'Ve' }, { n: 6, court: 'Sa' },
+  { n: 7, court: 'Di' },
+]
+
+function RythmeModal({
+  employes, onClose, onError, onSuccess,
+}: {
+  employes: Employe[]
+  onClose: () => void
+  onError: (e: unknown) => void
+  onSuccess: (message: string) => void
+}) {
+  const router = useRouter()
+  const [employeId, setEmployeId] = useState(employes[0]?.id ?? '')
+  const [jours, setJours] = useState<number[]>([1, 2, 3, 4, 5])
+  const [debut, setDebut] = useState('06:30')
+  const [fin, setFin] = useState('13:30')
+  const [poste, setPoste] = useState('')
+  const [depuis, setDepuis] = useState(() => new Date().toISOString().slice(0, 10))
+  const [semaines, setSemaines] = useState(4)
+  const [isPending, startTransition] = useTransition()
+
+  const emp = employes.find(e => e.id === employeId)
+  // Heures par jour, arrondies à la minute — sert d'aperçu avant de générer.
+  const heuresJour = (() => {
+    const [h1, m1] = debut.split(':').map(Number)
+    const [h2, m2] = fin.split(':').map(Number)
+    const d = (h2 * 60 + m2) - (h1 * 60 + m1)
+    return d > 0 ? d / 60 : 0
+  })()
+  const totalHeures = heuresJour * jours.length * semaines
+  const heuresSemaine = heuresJour * jours.length
+
+  function generer() {
+    if (!employeId) { onError(new Error('Choisissez un employé.')); return }
+    if (jours.length === 0) { onError(new Error('Choisissez au moins un jour.')); return }
+    startTransition(async () => {
+      try {
+        const r = await genererRythme({
+          employe_id: employeId, jours, heure_debut: debut, heure_fin: fin,
+          poste_jour: poste || null, depuis, semaines,
+        })
+        onSuccess(
+          `${r.crees} journée(s) créée(s)` +
+          (r.ignores > 0 ? ` · ${r.ignores} déjà planifiée(s), laissée(s) intactes` : ''),
+        )
+        router.refresh()
+      } catch (e) { onError(e) }
+    })
+  }
+
+  return (
+    <Modal title="Semaine type" onClose={onClose} disabled={isPending}>
+      <p className="text-sm text-zinc-600 bg-zinc-50 border border-zinc-200 rounded p-2">
+        Décrivez la semaine une fois, elle se déroule sur la période choisie.
+        Les journées <b>déjà planifiées ne sont pas touchées</b> — un
+        remplacement saisi à la main survit au générateur.
+      </p>
+
+      <Field label="Employé">
+        <select value={employeId} onChange={e => setEmployeId(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300">
+          {employes.map(e => (
+            <option key={e.id} value={e.id}>{e.prenom} {e.nom} — {e.poste}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Jours travaillés">
+        <div className="flex gap-1.5 flex-wrap">
+          {JOURS.map(j => {
+            const sel = jours.includes(j.n)
+            return (
+              <button key={j.n} type="button"
+                onClick={() => setJours(p => sel ? p.filter(x => x !== j.n) : [...p, j.n].sort())}
+                className={cn('w-12 h-12 rounded-md border-2 font-bold text-sm',
+                  sel ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-500 border-zinc-200')}>
+                {j.court}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Début"><input type="time" value={debut} onChange={e => setDebut(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
+        <Field label="Fin"><input type="time" value={fin} onChange={e => setFin(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="À partir du"><input type="date" value={depuis} onChange={e => setDepuis(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
+        <Field label="Nombre de semaines">
+          <input type="number" min={1} max={26} value={semaines}
+            onChange={e => setSemaines(Math.max(1, Math.min(26, Number(e.target.value) || 1)))}
+            className="w-full h-12 px-3 rounded-md border border-zinc-300 tabular-nums" />
+        </Field>
+      </div>
+      <Field label="Poste (optionnel)">
+        <input value={poste} onChange={e => setPoste(e.target.value)} placeholder="ex : comptoir, fournil" className="w-full h-12 px-3 rounded-md border border-zinc-300" />
+      </Field>
+
+      {heuresJour > 0 && (
+        <div className={cn('rounded-md border p-2.5 text-sm',
+          emp && heuresSemaine > emp.heures_contrat
+            ? 'bg-amber-50 border-amber-300 text-amber-900'
+            : 'bg-zinc-50 border-zinc-200 text-zinc-700')}>
+          <b className="tabular-nums">{fmtHeures(heuresSemaine)}</b> par semaine ·{' '}
+          <b className="tabular-nums">{fmtHeures(totalHeures)}</b> au total sur {semaines} semaine(s)
+          {emp && heuresSemaine > emp.heures_contrat && (
+            <span className="block text-xs mt-0.5">
+              ⚠ Au-delà des {emp.heures_contrat} h du contrat de {emp.prenom} :
+              l&apos;écart partira en heures supplémentaires.
+            </span>
+          )}
+        </div>
+      )}
+
+      <ModalActions onClose={onClose} onValider={generer} pending={isPending}
+        validLabel="⟳ Générer le planning" />
+    </Modal>
   )
 }
 

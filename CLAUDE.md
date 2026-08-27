@@ -680,6 +680,27 @@ Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 23 assertions sur des
 commandes fictives, à travers le banc d'essai, donc c'est le vrai mapper qui
 est éprouvé. Aucun compte ni clé Zelty nécessaire.
 
+### Planning : la semaine type
+
+`genererRythme()` (`/admin/rh` → Planning → « ⟳ Semaine type ») déroule un
+rythme sur N semaines. Une personne sur cinq jours pendant quatre semaines,
+c'est vingt formulaires ouverts un par un : personne ne le fait, la table
+reste vide, et sans heures planifiées il n'y a **aucun coût de service
+calculable** — donc aucune idée de la rentabilité d'une journée.
+
+⚠️ Les journées **déjà planifiées ne sont jamais touchées** : un remplacement
+ou un horaire décalé saisi à la main doit survivre au passage du générateur.
+Le retour dit combien ont été créées et combien ont été laissées intactes.
+
+⚠️ Les dates sont calculées à **midi UTC**, pas à minuit : au passage à
+l'heure d'hiver, +24 h depuis minuit peut retomber sur la même date. Et
+`getUTCDay()` renvoie **0 pour dimanche** — la règle le ramène sur 7. Un
+décalage d'un rang planifierait toute l'équipe le mauvais jour, et un planning
+faux ressemble à un planning juste.
+
+Test : `node scripts/test-planning-rythme.mjs` (pur, sans base) — ⚠️ il
+RECOPIE la règle, modifier les deux ensemble.
+
 ### Rapprochement quotidien caisse ↔ outil (0139)
 
 Le miroir `encaissements_externes` dit ce qu'on a **reçu** ; les `commandes`
@@ -763,6 +784,15 @@ Les suggestions de l'écran d'admin sont volontairement **minimales** (gluten
 sur les produits à base de farine, rien d'autre) : une suggestion généreuse
 serait acceptée en bloc par habitude, et une déclaration fausse est plus
 dangereuse qu'une déclaration absente.
+
+**Saisie par FAMILLE**, onglet par défaut de `/admin/allergenes`. 85 produits
+ouverts un par un dans une fenêtre modale, personne ne le fait un mercredi
+entre deux fournées — et un écran qu'on n'utilise pas ne protège de rien. Or
+une baguette, un pain de campagne et une ficelle portent les mêmes allergènes :
+la vraie unité de saisie est la famille. On coche une fois, on décoche les
+exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
+une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
+effacer.
 
 ### Le pont caisse ↔ outil (0137)
 
@@ -1018,6 +1048,7 @@ node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ +
 PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : journal + correspondances
 PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs compris
 PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty (fictive, sans compte)
+node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
