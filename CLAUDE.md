@@ -144,6 +144,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
+| Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
 **Migrations actuelles : 0001 → 0139.**
 
@@ -640,6 +641,45 @@ Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et pers
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
 
+### Adaptateur Zelty — prêt, en attente de leur documentation
+
+Tout l'inconnu est enfermé dans **une seule fonction pure**,
+`src/lib/integrations/zelty/mapper.ts`. Le jour où la doc arrive, c'est le
+seul fichier à retoucher : le reste (client HTTP, route, connecteur) ne
+connaît pas Zelty.
+
+| Fichier | Rôle |
+|---|---|
+| `zelty/schema.ts` | Forme supposée d'une commande, alias tolérés. **Hypothèses à confirmer.** |
+| `zelty/mapper.ts` | Traduction pure vers le format du connecteur. Aucun réseau, aucune base. |
+| `zelty/client.ts` | HTTP : clé, pagination, réessais. Tout est réglable par variable d'environnement. |
+| `/api/cron/caisse/zelty` | Orchestration. `?dry=1` traduit et montre **sans rien écrire**. |
+| `/api/integrations/zelty/verifier` | Banc d'essai : on colle une vraie commande, il dit ce qu'il en fait. |
+
+**Le mode d'emploi du jour J.** Coller une vraie commande Zelty dans
+`/api/integrations/zelty/verifier` (aucune clé requise, rien n'est écrit) →
+corriger `mapper.ts` sur pièce → renseigner les variables sur Vercel →
+`?dry=1` → puis seulement laisser écrire.
+
+⚠️ **`ZELTY_MONTANTS_EN_CENTIMES` n'a volontairement pas de valeur par
+défaut.** Beaucoup d'API de caisse renvoient des centimes ; se tromper
+multiplie le chiffre d'affaires par cent, et rien dans les données ne le
+signale — les montants restent des nombres valides. La route refuse de
+démarrer tant que le réglage n'est pas déclaré, et le mapper crie si le panier
+moyen devient absurde.
+
+⚠️ **On ne devine jamais une valeur manquante.** Un total absent produit un
+rejet nommé, pas un ticket à 0 € qui entrerait dans le CA sans que personne
+ne le remarque. Idem pour une commande annulée.
+
+Tant que rien n'est configuré, la route répond **200** avec
+`{ configure: false }` : une caisse pas encore branchée n'est pas une panne,
+et le monitoring compte tout code ≠ 200 comme une erreur.
+
+Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 23 assertions sur des
+commandes fictives, à travers le banc d'essai, donc c'est le vrai mapper qui
+est éprouvé. Aucun compte ni clé Zelty nécessaire.
+
 ### Rapprochement quotidien caisse ↔ outil (0139)
 
 Le miroir `encaissements_externes` dit ce qu'on a **reçu** ; les `commandes`
@@ -977,6 +1017,7 @@ node scripts/test-ventilation-activite.mjs      # CA/marge/food cost par étage 
 node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ + TVA 2,1 %
 PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : journal + correspondances
 PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs compris
+PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty (fictive, sans compte)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
