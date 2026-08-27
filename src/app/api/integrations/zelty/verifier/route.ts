@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import { mapperCommandes } from '@/lib/integrations/zelty/mapper'
 import { normaliserPlat, rapprocher, type PlatNormalise } from '@/lib/integrations/zelty/catalogue'
 import { construireCommandeZelty } from '@/lib/integrations/zelty/emission'
+import { construireDisponibilites, type PlatCourant, type Voulu } from '@/lib/integrations/zelty/disponibilite'
 import { extraireListe } from '@/lib/integrations/zelty/client'
 
 export const runtime = 'nodejs'
@@ -31,6 +32,18 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 }) }
 
   const b = (body ?? {}) as Record<string, unknown>
+
+  // ── Disponibilités : que serait-il écrit dans la caisse ? ────────
+  // Le sens le plus dangereux : on veut absolument voir la charge utile
+  // avant qu'elle ne parte toucher au catalogue.
+  if (Array.isArray(b.courants)) {
+    const voulus = new Map<string, Voulu>(
+      Object.entries((b.voulus ?? {}) as Record<string, boolean>)
+        .map(([k, v]) => [k, { indisponibleEnLigne: Boolean(v) }]),
+    )
+    const res = construireDisponibilites(b.courants as PlatCourant[], voulus)
+    return NextResponse.json({ ok: res.refus.length === 0, ...res })
+  }
 
   // ── Émission : que partirait-il vers la caisse ? ─────────────────
   // Même principe que pour la lecture : on voit ce qui sortirait AVANT que

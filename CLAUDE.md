@@ -146,7 +146,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0140.**
+**Migrations actuelles : 0001 → 0141.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -804,6 +804,42 @@ d'un mode de paiement configuré dans Zelty : un nom inconnu renvoie 400
 Test : `PORT=3000 node scripts/test-zelty-emission.mjs` — 19 assertions, sans
 compte ni clé.
 
+#### Disponibilités — `POST /catalog/dishes` (0141)
+
+`/api/cron/caisse/zelty/disponibilites[?dry=1]`. L'inventaire du matin sait
+qu'il ne reste que quatre paninis ; sans le dire à la caisse, on continue de
+les vendre en ligne et il faut ensuite l'expliquer au client sur le pas de la
+porte.
+
+⚠️ **C'est le sens le plus dangereux de toute l'intégration.**
+`POST /catalog/dishes` est un **UPSERT** qui exige `name`, `price` et `tax`.
+Un objet incomplet peut **écraser le prix d'un plat dans la caisse** — c'est-
+à-dire ce qui s'imprime sur les tickets et fait foi fiscalement.
+
+La règle du fichier `zelty/disponibilite.ts` est donc absolue : on RELIT le
+catalogue juste avant, on **recopie** les champs obligatoires tels quels, on
+ne touche QUE les drapeaux, et on **REFUSE de construire** si l'un des trois
+manque. Aucun prix n'est jamais inventé.
+
+⚠️ **La rupture coupe `disable_takeaway` et `disable_delivery`, JAMAIS
+`disable`.** Éteindre `disable` ferait relire « produit inactif » par le
+miroir du catalogue, qui éteindrait la fiche chez nous — et le produit
+disparaîtrait définitivement, même réapprovisionné. Une boucle silencieuse
+dont personne ne trouverait la cause. Couper les canaux en ligne laisse aussi
+vendre au comptoir ce qui reste, ce qui est le bon comportement.
+
+`recettes.rupture_le` est **daté** : une rupture est une décision du jour et
+se périme seule. Sans date, personne ne penserait à la lever le lendemain et
+le produit resterait invisible.
+
+Seuls les plats dont l'état CHANGE sont renvoyés : réémettre le catalogue
+entier à chaque passage multiplierait le risque d'écrasement pour aucun gain.
+Une rupture sur un produit que la caisse ne connaît pas est **signalée**, pas
+perdue en silence.
+
+Test : `PORT=3000 node scripts/test-zelty-disponibilites.mjs` — 16 assertions,
+dont l'essentiel porte sur ce que le constructeur REFUSE de faire.
+
 **Le jour du branchement** : générer la clé depuis le back-office → la poser
 sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
 puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
@@ -1168,6 +1204,7 @@ PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs c
 PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty — commandes (sans compte)
 PORT=3000 node scripts/test-zelty-catalogue.mjs # traduction Zelty — catalogue (sans compte)
 PORT=3000 node scripts/test-zelty-emission.mjs  # émission vers la caisse (sans compte)
+PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (sans compte)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
