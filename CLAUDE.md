@@ -387,6 +387,15 @@ colisage et prix indicatif. Trois usages :
 chocolat » (Carigel) et les glaces n'y sont pas : `libelle_achat` reste la
 source pour ceux-là.
 
+⚠️ **Un produit créé par la caisse peut DOUBLONNER un produit des affiches.**
+Vécu : « Lin tournesol » (créé depuis un ticket SumUp) et « Pain
+lin-tournesol » (issu des affiches) — même prix, même coût, même famille, deux
+fiches. Fusion : on garde le nom de VITRINE, on lui transfère le `nom_caisse`
+du doublon pour que les tickets s'y rattachent, on **déplace les ventes**
+(sinon elles disparaissent du CA par produit alors qu'elles ont eu lieu), puis
+on désactive le doublon **en effaçant son `nom_caisse`** — sans ça le miroir
+pourrait encore le choisir et le rattachement redeviendrait ambigu.
+
 **Garde-fou anti-doublon de facture.** `createFacture` REFUSE un numéro déjà
 enregistré chez le même fournisseur et pour le même `type_document` — deux
 scans de la même facture Promocash avaient gonflé les achats de ~447 € en
