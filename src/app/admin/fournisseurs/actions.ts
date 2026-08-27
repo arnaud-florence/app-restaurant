@@ -38,6 +38,9 @@ const bonCommandeSchema = z.object({
 })
 
 const factureLigneSchema = z.object({
+  /** Référence article du fournisseur (0142). Clé de rapprochement EXACTE,
+   *  à préférer au libellé : elle ne change pas quand le libellé change. */
+  reference: z.string().max(60).nullable().optional(),
   description: z.string().min(1).max(300),
   quantite: z.number().nullable().optional(),
   unite: z.string().max(30).nullable().optional(),
@@ -576,18 +579,35 @@ export async function createFacture(input: unknown) {
   if (p.lignes.length > 0 && facture) {
     // Rapprochement en mémoire : ~100 ingrédients, inutile de requêter par ligne
     const { data: ings } = await supabase.from('ingredients')
-      .select('id, nom').eq('actif', true)
-    const ingredients = (ings ?? []).map(i => ({ id: i.id as string, nom: normaliserNom(i.nom as string) }))
+      .select('id, nom, reference_fournisseur').eq('actif', true)
+    const ingredientsBruts = ings ?? []
+    const ingredients = ingredientsBruts.map(i => ({ id: i.id as string, nom: normaliserNom(i.nom as string) }))
     // Achat-revente (Fournil) : le produit acheté EST souvent le produit vendu
     // (« Croissant » sur la facture Metro = le produit « Croissant » de la
     // carte). Quand une ligne se rapproche d'un produit par son nom, son prix
     // unitaire devient recettes.cout_achat_ht — la marge se met à jour toute
     // seule à chaque facture scannée. Même prudence que pour les ingrédients.
     const { data: recs } = await supabase.from('recettes')
-      .select('id, nom, nom_caisse, libelle_achat, unites_par_achat, prix_vente_ht').eq('actif', true)
+      .select('id, nom, nom_caisse, libelle_achat, unites_par_achat, prix_vente_ht, reference_fournisseur').eq('actif', true)
     // Un produit peut être reconnu par son nom, son libellé caisse OU son
     // libellé d'achat (0131) — « Panuozzi » ne ressemble pas à « PATON A
     // PIZZA », et les deux cafés sortent de la même capsule.
+    // Index par RÉFÉRENCE (0142) : rapprochement exact, évalué AVANT le nom.
+    // Une référence ne souffre ni des abréviations ni des accents, et ne
+    // confond pas deux produits proches.
+    const produitsParRef = new Map<string, Array<{ id: string; pv: number; parAchat: number }>>()
+    for (const r of recs ?? []) {
+      const ref = (r.reference_fournisseur as string | null)?.trim().toUpperCase()
+      if (!ref) continue
+      const l = produitsParRef.get(ref) ?? []
+      l.push({
+        id: r.id as string,
+        pv: Number(r.prix_vente_ht ?? 0),
+        parAchat: Number(r.unites_par_achat ?? 1) || 1,
+      })
+      produitsParRef.set(ref, l)
+    }
+
     const produits = (recs ?? []).flatMap(r => {
       const base = {
         id: r.id as string,
@@ -600,13 +620,27 @@ export async function createFacture(input: unknown) {
       return out
     })
 
+    // Index des références connues : c'est le rapprochement EXACT (0142).
+    // Le libellé ne sert plus qu'en second rang, quand la facture n'imprime
+    // pas de référence ou qu'elle nous est encore inconnue.
+    const parReference = new Map<string, string>()
+    for (const i of ingredientsBruts) {
+      const ref = (i.reference_fournisseur as string | null)?.trim()
+      if (ref) parReference.set(ref.toUpperCase(), String(i.id))
+    }
+
     const rows = p.lignes.map(l => {
+      const ref = l.reference?.trim().toUpperCase()
+      const parRef = ref ? parReference.get(ref) : undefined
       const desc = normaliserNom(l.description)
-      const match = ingredients.find(i =>
-        i.nom.length >= 4 && (desc.includes(i.nom) || (desc.length >= 4 && i.nom.includes(desc))),
-      )
+      const match = parRef
+        ? { id: parRef }
+        : ingredients.find(i =>
+            i.nom.length >= 4 && (desc.includes(i.nom) || (desc.length >= 4 && i.nom.includes(desc))),
+          )
       return {
         facture_id: facture.id as string,
+        reference: l.reference?.trim() || null,
         description: l.description,
         quantite: l.quantite ?? null,
         unite: l.unite ?? null,
@@ -630,11 +664,17 @@ export async function createFacture(input: unknown) {
         const prixLigne = r.prix_unitaire_ht
         if (prixLigne && prixLigne > 0) {
           const desc = normaliserNom(p.lignes[idx].description)
+          const refLigne = p.lignes[idx].reference?.trim().toUpperCase()
           // `filter` et non `find` : une même ligne de facture alimente
           // parfois PLUSIEURS produits (une capsule Lavazza = expresso ET
           // allongé). Dédupliqué par id — un produit peut matcher par son nom
           // et par son libellé d'achat à la fois.
-          const trouves = produits.filter(x =>
+          //
+          // La RÉFÉRENCE passe avant le nom quand elle est connue : elle est
+          // exacte, là où le libellé est une approximation qui peut écrire un
+          // faux prix — pire qu'aucun.
+          const parRef = refLigne ? produitsParRef.get(refLigne) : undefined
+          const trouves = parRef?.length ? parRef : produits.filter(x =>
             x.nom.length >= 4 && (desc.includes(x.nom) || (desc.length >= 4 && x.nom.includes(desc))),
           )
           const vus = new Set<string>()

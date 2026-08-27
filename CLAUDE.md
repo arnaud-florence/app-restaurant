@@ -146,7 +146,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0141.**
+**Migrations actuelles : 0001 → 0142.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -348,6 +348,27 @@ par nom **et** `nom_caisse`, même prudence que pour les ingrédients).
 Ne PAS relancer le chantier « saisir les 90 compositions » : il est hors
 modèle. Tests : `node scripts/test-facture-lignes.mjs`,
 `node scripts/test-achat-revente.mjs`.
+
+**La référence fournisseur prime sur le libellé** (0142). Le rapprochement
+d'une ligne de facture se faisait par le NOM normalisé, avec un seuil de
+4 caractères — fragile par construction, et la 0125 le disait déjà : « un faux
+rapprochement écrirait un faux prix, pire qu'aucun ».
+
+Les factures Gineys portent une **référence par ligne**, et c'est la même que
+celle du catalogue **Arti'Pat** — leur gamme boulangerie (« ARTIPAT » apparaît
+d'ailleurs dans les libellés). Une référence ne change pas quand le libellé
+change, ne souffre ni des accents ni des abréviations, et ne confond pas deux
+produits proches.
+
+Le scanner ne l'extrayait pas : elle était **perdue à chaque scan**. Il la
+demande désormais (`reference`, avec consigne explicite de ne jamais en
+inventer une — elle sert à écrire un prix d'achat). Elle est stockée sur
+`facture_lignes.reference`, et `recettes.reference_fournisseur` /
+`ingredients.reference_fournisseur` portent la contrepartie.
+
+Ordre de rapprochement : **référence d'abord, libellé ensuite**. Le chemin par
+le nom reste actif — toutes les factures antérieures n'ont pas de référence,
+et tous les fournisseurs n'en impriment pas.
 
 **Garde-fou anti-doublon de facture.** `createFacture` REFUSE un numéro déjà
 enregistré chez le même fournisseur et pour le même `type_document` — deux

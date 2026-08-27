@@ -38,6 +38,8 @@ type FactureExtraite = {
   montant_ttc: number | null
   montant_tva: number | null
   lignes: Array<{
+    /** Référence produit du fournisseur, quand la facture en imprime une. */
+    reference?: string | null
     description: string
     quantite: number | null
     unite: string | null
@@ -170,13 +172,14 @@ Un AVOIR (note de crédit) porte généralement la mention « AVOIR », « Note 
   "montant_ttc": number | null,
   "montant_tva": number | null,
   "lignes": [
-    { "description": string, "quantite": number | null, "unite": string | null, "prix_unitaire_ht": number | null, "total_ht": number | null }
+    { "reference": string | null, "description": string, "quantite": number | null, "unite": string | null, "prix_unitaire_ht": number | null, "total_ht": number | null }
   ],
   "confiance": number,
   "notes": string | null
 }
 
-Pour les lignes : sois exhaustif (toutes les lignes du document). Pour les tickets de caisse simples, type="ticket" et lignes peut être vide.${pages.length > 1 ? `
+Pour les lignes : sois exhaustif (toutes les lignes du document).
+La RÉFÉRENCE est le code article du fournisseur, généralement en début de ligne (chiffres, ou lettres et chiffres). Recopie-la EXACTEMENT, sans rien reformater. Si la ligne n'en porte pas, mets null — n'invente jamais une référence, elle servira à rapprocher un prix d'achat. Pour les tickets de caisse simples, type="ticket" et lignes peut être vide.${pages.length > 1 ? `
 
 IMPORTANT : les ${pages.length} images sont les pages successives d'UN SEUL ET MÊME document. Renvoie UN SEUL JSON couvrant l'ensemble : toutes les lignes de toutes les pages, et les montants totaux UNE seule fois (ceux de la dernière page font foi ; ignore les sous-totaux « report » ou « suite »).` : ''}`
 
