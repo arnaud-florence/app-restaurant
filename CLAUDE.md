@@ -641,80 +641,78 @@ Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et pers
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
 
-### Adaptateur Zelty — prêt, en attente de leur documentation
+### Adaptateur Zelty — écrit sur la documentation officielle
 
-Tout l'inconnu est enfermé dans **une seule fonction pure**,
-`src/lib/integrations/zelty/mapper.ts`. Le jour où la doc arrive, c'est le
-seul fichier à retoucher : le reste (client HTTP, route, connecteur) ne
-connaît pas Zelty.
+Écrit d'après **https://docs.zelty.fr (API 2.11)**, lue le 28/08/2026 avec le
+compte fourni par Zelty. Tout l'inconnu reste enfermé dans une fonction PURE,
+`src/lib/integrations/zelty/mapper.ts`.
 
 | Fichier | Rôle |
 |---|---|
-| `zelty/schema.ts` | Forme supposée d'une commande, alias tolérés. **Hypothèses à confirmer.** |
+| `zelty/schema.ts` | Forme réelle d'une commande (`OrderGet`, `OrderEntryGet`, `Transaction`). |
 | `zelty/mapper.ts` | Traduction pure vers le format du connecteur. Aucun réseau, aucune base. |
-| `zelty/client.ts` | HTTP : clé, pagination, réessais. Tout est réglable par variable d'environnement. |
+| `zelty/client.ts` | HTTP : Bearer, pagination, `expand[]`, réessais. |
 | `/api/cron/caisse/zelty` | Orchestration. `?dry=1` traduit et montre **sans rien écrire**. |
-| `/api/integrations/zelty/verifier` | Banc d'essai : on colle une vraie commande, il dit ce qu'il en fait. |
+| `/api/integrations/zelty/verifier` | Banc d'essai : on colle une commande, il dit ce qu'il en fait. |
 
-**Le mode d'emploi du jour J.** Coller une vraie commande Zelty dans
-`/api/integrations/zelty/verifier` (aucune clé requise, rien n'est écrit) →
-corriger `mapper.ts` sur pièce → renseigner les variables sur Vercel →
-`?dry=1` → puis seulement laisser écrire.
+**Le contrat, tel qu'il est vraiment :**
 
-⚠️ **`ZELTY_MONTANTS_EN_CENTIMES` n'a volontairement pas de valeur par
-défaut.** Beaucoup d'API de caisse renvoient des centimes ; se tromper
-multiplie le chiffre d'affaires par cent, et rien dans les données ne le
-signale — les montants restent des nombres valides. La route refuse de
-démarrer tant que le réglage n'est pas déclaré, et le mapper crie si le panier
-moyen devient absurde.
+- base `https://api.zelty.fr/{version}/{endpoint}`, version **2.11** ;
+- `Authorization: Bearer <clé>` — la clé se génère depuis le back-office ;
+- `from` / `to` au format **AAAA-MM-JJ**, pas de l'ISO complet ;
+- pagination `limit` (défaut 100, **max 200**) + `offset` ;
+- réponse enveloppée : `{ orders: [...], errno }` ;
+- **montants ENTIERS en centimes** (`total: 1240` = 12,40 €) ;
+- `price` et `tax` d'une ligne sont des **objets**
+  (`price.final_amount_inc_tax`, `tax.tax_rate`, `tax.tax_amount`) ;
+- l'identifiant stable d'un produit est `items[].item_id` — il alimente les
+  correspondances de catalogue (0137).
 
-⚠️ **On ne devine jamais une valeur manquante.** Un total absent produit un
-rejet nommé, pas un ticket à 0 € qui entrerait dans le CA sans que personne
-ne le remarque. Idem pour une commande annulée.
+⚠️ **`expand[]=items` est obligatoire pour obtenir le détail des lignes.**
+Sans lui, `items` revient **vide** et le CA serait juste pendant que stock,
+food cost et marges resteraient aveugles — sans la moindre erreur visible.
+C'est le piège principal de cette API, et c'est ce qui explique que le
+commercial n'ait pas su répondre en démo. Le client demande aussi
+`transactions`, `transactions.method` (mode de paiement) et `price.taxes`.
+Le mapper **signale** l'oubli si aucune commande ne porte de ligne.
 
-⚠️ **`order.status` est NUMÉRIQUE chez Zelty : 255 = clôturée.** Tout autre
-nombre est une commande partielle, annulée ou remboursée, et ne doit pas
-compter comme une vente. Source : documentation d'intégration KEYBAN et
-webhook `order.ended` — **à reconfirmer sur la doc officielle**. Le rejet est
-nommé (« statut 128 — non clôturée ») plutôt que silencieux : si l'hypothèse
-est fausse, `?dry=1` le montre tout de suite — « 40 commandes lues, 0
-traduites » se voit, un CA amputé de moitié ne se voit pas.
+⚠️ **La pagination n'est pas un confort.** Sans elle, l'API s'arrête à 100
+commandes. Le Fournil fait déjà 75 tickets un bon jour : deux jours suffiraient
+à perdre des ventes en silence, et le rapprochement quotidien crierait sans
+qu'on sache pourquoi.
 
-Autres éléments relevés hors documentation officielle, à confirmer :
-`order.ended` est signé en **HMAC SHA-256** (donc un webhook est possible, et
-préférable au sondage) ; l'authentification serait un **HTTP Digest + jeton
-Bearer** avec identifiant/mot de passe API et identifiant d'établissement —
-`ZELTY_AUTH` couvre le Bearer et `x-api-key`, à étendre si c'est bien du
-Digest.
+⚠️ **`is_sandbox=false`** est forcé : le mode entraînement de la caisse ne doit
+jamais entrer dans le chiffre d'affaires.
+
+⚠️ **`ZELTY_MONTANTS_EN_CENTIMES` n'a pas de valeur par défaut**, alors même
+que la doc dit « centimes ». Se tromper multiplie le CA par cent et rien dans
+les données ne le signale — les montants restent des nombres valides. La route
+refuse de démarrer sans le réglage, et le mapper crie si le panier moyen
+devient absurde.
+
+⚠️ **La quantité d'une ligne n'est PAS documentée sur `GET /orders`** (elle
+l'est sur la création). Le mapper prend 1 et le **dit** dans les
+avertissements : une quantité muette transformerait 3 croissants en 1. À
+confirmer sur une charge utile réelle.
+
+⚠️ **`GET /orders` exclut par défaut** les commandes annulées
+(`include_cancelled`) et ouvertes (`opened`). Le contrôle de statut du mapper
+est une seconde barrière, pas la première. Le statut documenté est une chaîne
+(`opened`) ; la forme numérique 255 est aussi acceptée par prudence.
+
+**Le jour du branchement** : générer la clé depuis le back-office → la poser
+sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
+puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
+commandes de casatasia.fr est confirmée par la documentation, pas seulement
+promise à l'oral.
 
 Tant que rien n'est configuré, la route répond **200** avec
 `{ configure: false }` : une caisse pas encore branchée n'est pas une panne,
 et le monitoring compte tout code ≠ 200 comme une erreur.
 
 Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 28 assertions sur des
-commandes fictives, à travers le banc d'essai, donc c'est le vrai mapper qui
-est éprouvé. Aucun compte ni clé Zelty nécessaire.
-
-### Planning : la semaine type
-
-`genererRythme()` (`/admin/rh` → Planning → « ⟳ Semaine type ») déroule un
-rythme sur N semaines. Une personne sur cinq jours pendant quatre semaines,
-c'est vingt formulaires ouverts un par un : personne ne le fait, la table
-reste vide, et sans heures planifiées il n'y a **aucun coût de service
-calculable** — donc aucune idée de la rentabilité d'une journée.
-
-⚠️ Les journées **déjà planifiées ne sont jamais touchées** : un remplacement
-ou un horaire décalé saisi à la main doit survivre au passage du générateur.
-Le retour dit combien ont été créées et combien ont été laissées intactes.
-
-⚠️ Les dates sont calculées à **midi UTC**, pas à minuit : au passage à
-l'heure d'hiver, +24 h depuis minuit peut retomber sur la même date. Et
-`getUTCDay()` renvoie **0 pour dimanche** — la règle le ramène sur 7. Un
-décalage d'un rang planifierait toute l'équipe le mauvais jour, et un planning
-faux ressemble à un planning juste.
-
-Test : `node scripts/test-planning-rythme.mjs` (pur, sans base) — ⚠️ il
-RECOPIE la règle, modifier les deux ensemble.
+commandes fictives conformes à la doc, à travers le banc d'essai. Aucun compte
+ni clé nécessaire.
 
 ### Rapprochement quotidien caisse ↔ outil (0139)
 

@@ -53,7 +53,7 @@ async function traiter(req: Request) {
   const debut = new Date(fin.getTime() - jours * 86_400_000)
 
   try {
-    const { commandes, url: appelee } = await recupererCommandes(cfg.config, debut, fin)
+    const { commandes, url: appelee, pages } = await recupererCommandes(cfg.config, debut, fin)
     const mapping = mapperCommandes(commandes, {
       montantsEnCentimes: cfg.config.montantsEnCentimes,
       etablissementSlug: cfg.config.etablissementSlug,
@@ -62,6 +62,7 @@ async function traiter(req: Request) {
     const base = {
       configure: true,
       url_appelee: appelee,
+      pages,
       recues: commandes.length,
       traduites: mapping.encaissements.length,
       rejets: mapping.rejets,

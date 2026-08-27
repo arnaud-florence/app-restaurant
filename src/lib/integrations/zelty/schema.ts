@@ -1,20 +1,24 @@
-// Format d'une commande Zelty — HYPOTHÈSES, à confirmer sur leur documentation.
+// Format d'une commande Zelty — d'après la documentation officielle
+// https://docs.zelty.fr (API 2.11), lue le 28/08/2026.
 //
-// Rémi Guidot a confirmé en démo (27/08/2026) qu'une clé d'API est fournie en
-// direct, sans intermédiaire, et qu'il envoie la documentation développeur.
-// Tant qu'elle n'est pas arrivée, on ne connaît pas le nom exact des champs.
+// Ce qui compte, et qui n'était pas devinable :
 //
-// Stratégie : tolérer les alias PLAUSIBLES sur le nom du champ, mais JAMAIS
-// deviner une valeur manquante. Un champ absent doit faire échouer bruyamment
-// avec un message qui dit lequel — pas produire un ticket à 0 €.
+//   · les MONTANTS sont des ENTIERS, en centimes. `total: 555` = 5,55 € ;
+//   · le détail des lignes n'arrive QUE si on demande `expand[]=items` —
+//     sans lui, `items` est un tableau vide. C'est ce qui a fait croire en
+//     démo que l'API ne rendait pas le détail ;
+//   · le prix d'une ligne est un OBJET (`price.final_amount_inc_tax`), pas un
+//     nombre, et la TVA aussi (`tax.tax_rate`, `tax.tax_amount`) ;
+//   · le mode de paiement vient de `transactions[].name`, et exige
+//     `expand[]=transactions&expand[]=transactions.method`.
 //
-// Le jour où la doc arrive, seul CE fichier change.
+// Les alias tolérés en second rang ne coûtent rien et protègent d'un
+// changement de version.
 //
 // Client + server safe (aucun accès base, aucun réseau).
 
 import { z } from 'zod'
 
-/** Un nombre qui peut arriver en chaîne (« 12.34 ») selon les API. */
 const nombre = z.union([z.number(), z.string()]).transform(v => {
   const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'))
   return Number.isFinite(n) ? n : NaN
@@ -22,79 +26,69 @@ const nombre = z.union([z.number(), z.string()]).transform(v => {
 
 const texte = z.union([z.string(), z.number()]).transform(v => String(v))
 
-/** Ligne de commande. Les alias couvrent les conventions les plus répandues. */
+/** Prix d'une ligne. Tous les montants sont en centimes. */
+const prixLigneSchema = z.object({
+  final_amount_inc_tax:      nombre.optional(),
+  discounted_amount_inc_tax: nombre.optional(),
+  original_amount_inc_tax:   nombre.optional(),
+  base_original_amount_inc_tax: nombre.optional(),
+}).passthrough()
+
+const taxeLigneSchema = z.object({
+  tax_amount: nombre.optional(),
+  tax_rate:   nombre.optional(),
+}).passthrough()
+
+/** Une ligne de commande — `OrderEntryGet`. */
 export const ligneZeltySchema = z.object({
-  id:            texte.optional(),
-  product_id:    texte.optional(),
-  item_id:       texte.optional(),
+  /** Identifiant STABLE du produit côté Zelty. Alimente les correspondances (0137). */
+  item_id:   texte.optional(),
+  name:      z.string().optional(),
+  type:      z.string().optional(),   // dish | menu
+  price:     prixLigneSchema.optional(),
+  tax:       taxeLigneSchema.optional(),
+  /** ⚠️ Non documenté sur GET (présent sur POST). Lu s'il existe, 1 sinon. */
+  qty:       nombre.optional(),
+  quantity:  nombre.optional(),
+  // Alias de repli
+  product_id: texte.optional(),
+  label:      z.string().optional(),
+}).passthrough()
 
-  name:          z.string().optional(),
-  label:         z.string().optional(),
-  product_name:  z.string().optional(),
-
-  quantity:      nombre.optional(),
-  qty:           nombre.optional(),
-
-  /** Prix unitaire TTC. */
-  price:         nombre.optional(),
-  unit_price:    nombre.optional(),
-  price_ttc:     nombre.optional(),
-
-  /** Total TTC de la ligne, quand seul le total est fourni. */
-  total:         nombre.optional(),
-  total_price:   nombre.optional(),
-
-  vat:           nombre.optional(),
-  vat_rate:      nombre.optional(),
-  tax_rate:      nombre.optional(),
+/** Un règlement — `Transaction`. `price` est documenté en chaîne. */
+export const transactionZeltySchema = z.object({
+  name:   z.string().optional(),
+  price:  nombre.optional(),
+  id_transaction_method: nombre.optional(),
 }).passthrough()
 
 export const commandeZeltySchema = z.object({
-  id:            texte.optional(),
-  order_id:      texte.optional(),
-  reference:     texte.optional(),
+  id:          texte.optional(),
+  remote_id:   texte.optional(),
+  display_id:  texte.optional(),
+  ref:         texte.optional(),
 
-  /** Total TTC de la commande. */
-  total:         nombre.optional(),
-  total_price:   nombre.optional(),
-  amount:        nombre.optional(),
+  /** Total TTC en centimes. */
+  total:       nombre.optional(),
 
-  total_ht:      nombre.optional(),
-  total_excl_tax: nombre.optional(),
-  vat_amount:    nombre.optional(),
-  tax_amount:    nombre.optional(),
+  created_at:  z.string().optional(),
+  closed_at:   z.string().optional(),
+  due_date:    z.string().optional(),
 
-  /** Horodatage de l'encaissement. */
-  date:          z.string().optional(),
-  closed_at:     z.string().optional(),
-  paid_at:       z.string().optional(),
-  created_at:    z.string().optional(),
+  /** eat_in | takeaway | delivery — décide du taux de TVA côté français. */
+  mode:        z.string().optional(),
+  /** web | mobile | kiosk | pos | remote_pos | ubereats | … */
+  source:      z.string().optional(),
+  /** L'exemple officiel montre « opened » (chaîne). Voir mapper.ts. */
+  status:      z.union([z.string(), z.number()]).optional(),
 
-  payment_method: z.string().optional(),
-  payment_type:   z.string().optional(),
-  payments:       z.array(z.object({
-    method: z.string().optional(),
-    type:   z.string().optional(),
-    amount: nombre.optional(),
-  }).passthrough()).optional(),
+  items:        z.array(ligneZeltySchema).optional(),
+  transactions: z.array(transactionZeltySchema).optional(),
 
-  tip:           nombre.optional(),
-  tips:          nombre.optional(),
-
-  items:         z.array(ligneZeltySchema).optional(),
-  products:      z.array(ligneZeltySchema).optional(),
-  lines:         z.array(ligneZeltySchema).optional(),
-
-  /** Point de vente / caisse d'origine, s'il est fourni. */
-  pos_id:        texte.optional(),
-  point_of_sale: texte.optional(),
-
-  /** Statut. Zelty l'exprime en NOMBRE : 255 = commande clôturée. Les autres
-   *  valeurs couvrent les commandes partielles, annulées ou remboursées.
-   *  (Source : documentation d'intégration KEYBAN, à reconfirmer sur la doc
-   *  officielle.) On accepte aussi la forme texte, par prudence. */
-  status:        z.union([z.string(), z.number()]).optional(),
-  cancelled:     z.boolean().optional(),
+  table:       nombre.optional(),
+  seats:       nombre.optional(),
+  first_name:  z.string().optional(),
+  id_restaurant: nombre.optional(),
 }).passthrough()
 
 export type CommandeZelty = z.infer<typeof commandeZeltySchema>

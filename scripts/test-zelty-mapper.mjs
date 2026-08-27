@@ -42,50 +42,59 @@ console.log('\n── Traduction Zelty ──\n')
 if (!env.CRON_SECRET) { console.log('  ✗ CRON_SECRET absent'); process.exit(1) }
 
 // ── 1. Commande nominale, en euros ──────────────────────────────────
+// Forme RÉELLE d'après docs.zelty.fr : montants entiers en centimes,
+// `price` et `tax` sont des objets, la ligne porte `item_id`.
 const nominale = {
-  id: 'ZEL-1001',
-  total: 12.40, total_ht: 11.28, vat_amount: 1.12,
+  id: 1001,
+  total: 1240,
   closed_at: '2026-09-15T08:30:00Z',
-  payment_method: 'CARD',
+  transactions: [{ name: 'CB', price: 1240 }],
   items: [
-    { product_id: 'P-77', name: 'Croissant', quantity: 2, price: 1.20, vat_rate: 5.5 },
-    { product_id: 'P-88', name: 'Panuozzi',  quantity: 1, price: 10.00, vat_rate: 10 },
+    { item_id: 'P-77', name: 'Croissant', qty: 2,
+      price: { final_amount_inc_tax: 240 }, tax: { tax_rate: 550, tax_amount: 13 } },
+    { item_id: 'P-88', name: 'Panuozzi', qty: 1,
+      price: { final_amount_inc_tax: 1000 }, tax: { tax_rate: 1000, tax_amount: 91 } },
   ],
 }
-let r = await verifier([nominale])
+let r = await verifier([nominale], true)
 t('la route répond', r.status === 200, `HTTP ${r.status}`)
 t('la commande est traduite', r.body.traduites === 1, JSON.stringify(r.body).slice(0, 200))
-t('le montant est repris tel quel', r.body.total_ttc === 12.40, `${r.body.total_ttc}`)
+t('les centimes sont convertis en euros', r.body.total_ttc === 12.40, `${r.body.total_ttc}`)
 t('le détail produit est présent', r.body.detail_produits_present === true)
 t('les deux lignes passent', r.body.lignes_produits === 2, `${r.body.lignes_produits}`)
 let e = r.body.apercu?.[0] ?? {}
 t("l'identifiant produit est conservé",
   e.produits?.[0]?.identifiant_externe === 'P-77', JSON.stringify(e.produits?.[0]))
-t('le mode de paiement est normalisé', e.mode_paiement === 'carte', e.mode_paiement)
+t('le mode de paiement vient des transactions', e.mode_paiement === 'carte', e.mode_paiement)
+t('le prix unitaire est ramené à la pièce',
+  e.produits?.[0]?.prix_unitaire_ttc === 1.20, `${e.produits?.[0]?.prix_unitaire_ttc}`)
+t('un taux en points de base devient un pourcentage',
+  e.produits?.[0]?.tva_taux === 5.5, `${e.produits?.[0]?.tva_taux}`)
+t('la TVA est ventilée par taux',
+  JSON.stringify(e.ventilation_tva) === JSON.stringify({ '5.5': 0.13, '10': 0.91 }),
+  JSON.stringify(e.ventilation_tva))
 t("la date d'encaissement est reprise",
   String(e.encaisse_at).startsWith('2026-09-15T08:30'), e.encaisse_at)
 
-// ── 2. Les mêmes montants en CENTIMES ───────────────────────────────
-const enCentimes = {
-  ...nominale, id: 'ZEL-1002',
-  total: 1240, total_ht: 1128, vat_amount: 112,
-  items: [{ product_id: 'P-77', name: 'Croissant', quantity: 2, price: 120, vat_rate: 5.5 }],
-}
-r = await verifier([enCentimes], true)
-t('les centimes sont convertis', r.body.total_ttc === 12.40, `${r.body.total_ttc}`)
-t('le prix unitaire aussi',
-  r.body.apercu?.[0]?.produits?.[0]?.prix_unitaire_ttc === 1.20,
-  `${r.body.apercu?.[0]?.produits?.[0]?.prix_unitaire_ttc}`)
-
-// ── 3. Mauvaise unité : le garde-fou doit crier ─────────────────────
-const lot = Array.from({ length: 6 }, (_, i) => ({ ...enCentimes, id: `ZEL-20${i}` }))
+// ── 2. Mauvaise unité : le garde-fou doit crier ─────────────────────
+const lot = Array.from({ length: 6 }, (_, i) => ({ ...nominale, id: 2000 + i }))
 r = await verifier(lot, false)   // centimes déclarés faux à tort
 t('un panier moyen absurde déclenche un avertissement',
   (r.body.avertissements ?? []).some(a => /montantsEnCentimes/.test(a)),
   JSON.stringify(r.body.avertissements))
 
+// ── 3. expand[]=items oublié : le piège principal de cette API ──────
+r = await verifier([
+  { id: 5001, total: 500, closed_at: '2026-09-15T08:00:00Z', items: [] },
+  { id: 5002, total: 700, closed_at: '2026-09-15T08:05:00Z', items: [] },
+], true)
+t('deux commandes sans lignes sont comptées', r.body.traduites === 2)
+t('mais l\'oubli de expand[]=items est signalé',
+  (r.body.avertissements ?? []).some(a => /expand\[\]=items/.test(a)),
+  JSON.stringify(r.body.avertissements))
+
 // ── 4. Commande annulée ─────────────────────────────────────────────
-r = await verifier([{ id: 'ZEL-3001', total: 20, status: 'CANCELLED' }])
+r = await verifier([{ id: 3001, total: 2000, status: 'CANCELLED' }], true)
 t('une commande annulée est écartée', r.body.traduites === 0)
 t('et le statut brut est nommé dans le rejet',
   (r.body.rejets ?? []).some(x => /CANCELLED/.test(x.raison)), JSON.stringify(r.body.rejets))
@@ -93,53 +102,53 @@ t('et le statut brut est nommé dans le rejet',
 // ── 4 bis. Statut NUMÉRIQUE : 255 seul vaut une vente ───────────────
 // Zelty exprime le statut en nombre. Une commande partielle ou remboursée
 // comptée comme une vente gonflerait le CA sans que rien ne le signale.
-r = await verifier([{ id: 'ZEL-3100', total: 15, status: 255, date: '2026-09-15T09:00:00Z' }])
-t('le statut 255 est accepté', r.body.traduites === 1, JSON.stringify(r.body.rejets))
-
-r = await verifier([{ id: 'ZEL-3101', total: 15, status: 128, date: '2026-09-15T09:00:00Z' }])
-t('un statut non clôturé est écarté', r.body.traduites === 0)
-t('et le statut fautif est nommé',
-  (r.body.rejets ?? []).some(x => /128/.test(x.raison)), JSON.stringify(r.body.rejets))
-
-r = await verifier([{ id: 'ZEL-3102', total: 15, status: '255', date: '2026-09-15T09:00:00Z' }])
-t('le statut 255 en chaîne est accepté aussi', r.body.traduites === 1)
-
-r = await verifier([{ id: 'ZEL-3103', total: 15, status: 'REFUNDED', date: '2026-09-15T09:00:00Z' }])
-t('un remboursement textuel est écarté', r.body.traduites === 0,
+r = await verifier([{ id: 3100, total: 1500, status: 'opened', closed_at: '2026-09-15T09:00:00Z' }], true)
+t('une commande encore ouverte est écartée', r.body.traduites === 0,
   JSON.stringify(r.body.rejets))
 
+r = await verifier([{ id: 3101, total: 1500, status: 255, closed_at: '2026-09-15T09:00:00Z' }], true)
+t('le statut numérique 255 est accepté', r.body.traduites === 1, JSON.stringify(r.body.rejets))
+
+r = await verifier([{ id: 3102, total: 1500, status: 128, closed_at: '2026-09-15T09:00:00Z' }], true)
+t('un statut numérique non clôturé est écarté', r.body.traduites === 0)
+
+r = await verifier([{ id: 3103, total: 1500, status: 'REFUNDED', closed_at: '2026-09-15T09:00:00Z' }], true)
+t('un remboursement est écarté', r.body.traduites === 0, JSON.stringify(r.body.rejets))
+
 // ── 5. Total manquant : surtout pas 0 € ─────────────────────────────
-r = await verifier([{ id: 'ZEL-4001', items: [{ name: 'X', quantity: 1, price: 3 }] }])
+r = await verifier([{ id: 4001, items: [{ name: 'X', qty: 1, price: { final_amount_inc_tax: 300 } }] }], true)
 t('un total manquant ne produit pas de ticket', r.body.traduites === 0)
 t('il est rejeté explicitement',
   (r.body.rejets ?? []).some(x => /montant/i.test(x.raison)), JSON.stringify(r.body.rejets))
 
-// ── 6. Ligne sans prix unitaire, seulement un total ─────────────────
+// ── 6. Quantité absente : comptée 1, et DITE ────────────────────────
+// La quantité n'est pas documentée sur GET. La taire transformerait
+// 3 croissants en 1 sans que rien ne le signale.
 r = await verifier([{
-  id: 'ZEL-5001', total: 9, date: '2026-09-15T10:00:00Z',
-  products: [{ name: 'Part de flan', qty: 3, total_price: 9, tax_rate: 0.055 }],
-}])
+  id: 5001, total: 900, closed_at: '2026-09-15T10:00:00Z',
+  items: [{ item_id: 'F-1', name: 'Part de flan',
+            price: { final_amount_inc_tax: 300 }, tax: { tax_rate: 5.5, tax_amount: 16 } }],
+}], true)
 const l6 = r.body.apercu?.[0]?.produits?.[0] ?? {}
-t('le prix unitaire est déduit du total de ligne', l6.prix_unitaire_ttc === 3, `${l6.prix_unitaire_ttc}`)
-t('un taux en fraction est ramené en pourcentage', l6.tva_taux === 5.5, `${l6.tva_taux}`)
-t("l'alias « products » est accepté", r.body.lignes_produits === 1)
+t('une ligne sans quantité est comptée pour 1', l6.quantite === 1, `${l6.quantite}`)
+t('et le doute est signalé',
+  (r.body.avertissements ?? []).some(a => /quantité absente/.test(a)),
+  JSON.stringify(r.body.avertissements))
+t('un taux déjà en pourcentage est laissé tel quel', l6.tva_taux === 5.5, `${l6.tva_taux}`)
 
-// ── 7. Alias « lines » et paiement en tableau ───────────────────────
+// ── 7. Espèces, et repli sur created_at ─────────────────────────────
 r = await verifier([{
-  order_id: 'ZEL-6001', amount: 5, paid_at: '2026-09-15T11:00:00Z',
-  payments: [{ method: 'CASH', amount: 5 }],
-  lines: [{ label: 'Café', qty: 1, unit_price: 5 }],
-}])
-t("l'alias « lines » est accepté", r.body.lignes_produits === 1)
+  id: 6001, total: 500, created_at: '2026-09-15T11:00:00Z',
+  transactions: [{ name: 'Espèces', price: 500 }],
+  items: [{ item_id: 'C-1', name: 'Café', qty: 1, price: { final_amount_inc_tax: 500 } }],
+}], true)
 t('les espèces sont reconnues', r.body.apercu?.[0]?.mode_paiement === 'especes',
   r.body.apercu?.[0]?.mode_paiement)
-t("l'alias « order_id » sert de référence",
-  r.body.apercu?.[0]?.ticket_externe === 'ZEL-6001', r.body.apercu?.[0]?.ticket_externe)
-
-// ── 8. Commande sans aucune ligne : le CA passe, le détail manque ───
-r = await verifier([{ id: 'ZEL-7001', total: 4.5, date: '2026-09-15T12:00:00Z' }])
-t('une commande sans ligne est quand même comptée', r.body.traduites === 1)
-t('mais signalée comme sans détail', r.body.detail_produits_present === false)
+t("created_at sert de repli quand closed_at manque",
+  String(r.body.apercu?.[0]?.encaisse_at).startsWith('2026-09-15T11:00'),
+  r.body.apercu?.[0]?.encaisse_at)
+t("l'identifiant numérique devient la référence du ticket",
+  r.body.apercu?.[0]?.ticket_externe === '6001', r.body.apercu?.[0]?.ticket_externe)
 
 console.log(`\n── ${ok} ✓   ${ko} ✗ ──\n`)
 process.exit(ko === 0 ? 0 : 1)
