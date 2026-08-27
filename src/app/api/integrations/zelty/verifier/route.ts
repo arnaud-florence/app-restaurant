@@ -14,6 +14,7 @@
 import { NextResponse } from 'next/server'
 import { mapperCommandes } from '@/lib/integrations/zelty/mapper'
 import { normaliserPlat, rapprocher, type PlatNormalise } from '@/lib/integrations/zelty/catalogue'
+import { construireCommandeZelty } from '@/lib/integrations/zelty/emission'
 import { extraireListe } from '@/lib/integrations/zelty/client'
 
 export const runtime = 'nodejs'
@@ -30,6 +31,30 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 }) }
 
   const b = (body ?? {}) as Record<string, unknown>
+
+  // ── Émission : que partirait-il vers la caisse ? ─────────────────
+  // Même principe que pour la lecture : on voit ce qui sortirait AVANT que
+  // quoi que ce soit ne parte.
+  if (b.sortante && typeof b.sortante === 'object') {
+    const e = b.sortante as Record<string, unknown>
+    const res = construireCommandeZelty({
+      numero: String(e.numero ?? ''),
+      mode: (e.mode as 'takeaway' | 'delivery' | 'eat_in') ?? 'takeaway',
+      lignes: Array.isArray(e.lignes) ? e.lignes as never : [],
+      montantTotalTtc: Number(e.montantTotalTtc ?? 0),
+      correspondances: new Map(Object.entries((e.correspondances ?? {}) as Record<string, string>)),
+      modePaiement: typeof e.modePaiement === 'string' ? e.modePaiement : undefined,
+      creneau: typeof e.creneau === 'string' ? e.creneau : null,
+      commentaire: typeof e.commentaire === 'string' ? e.commentaire : null,
+      prenom: typeof e.prenom === 'string' ? e.prenom : null,
+      telephone: typeof e.telephone === 'string' ? e.telephone : null,
+    })
+    return NextResponse.json(
+      res.refus
+        ? { ok: false, refus: true, raisons: res.raisons }
+        : { ok: true, refus: false, commande: res.commande },
+    )
+  }
 
   // ── Catalogue ────────────────────────────────────────────────────
   // Même usage que pour les commandes : on colle des plats Zelty et on voit

@@ -146,7 +146,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0139.**
+**Migrations actuelles : 0001 → 0140.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -775,6 +775,35 @@ plateformes de livraison sont réservées aux agrégateurs) ; `due_date` doit
 être ISO-8601 et dans le futur. L'endpoint répond 404 sur une version d'API
 antérieure à 2.11.
 
+**Envoi effectif** : `/api/cron/caisse/zelty/emission[?commande=<uuid>][&dry=1]`
+(migration 0140 : `commandes.caisse_externe_systeme` / `_id` / `_at`, colonnes
+volontairement GÉNÉRIQUES — le connecteur survivra à un changement de caisse).
+
+Deux usages, une seule route : appelée avec `?commande=` juste après un
+paiement pour l'immédiateté, et sans paramètre par le cron pour rattraper ce
+qui n'est pas parti. **C'est la file d'attente** : un envoi échoué laisse
+`caisse_externe_id` à NULL et repart au tour suivant, sans risque de double
+vente grâce à l'idempotence de `remote_id`.
+
+⚠️ **TOUT OU RIEN.** Si une seule ligne du panier n'a pas de correspondance
+Zelty, la commande entière est REFUSÉE. Envoyer le panier amputé serait
+accepté sans erreur, et la caisse créerait une remise égale à la ligne
+manquante : le client paierait chez nous ce que la caisse offrirait chez elle.
+
+⚠️ Un règlement n'est joint **que s'il a vraiment eu lieu chez nous**. Une
+commande à payer au comptoir doit rester à encaisser dans la caisse.
+
+⚠️ Reprise bornée à **7 jours**. Au-delà, une commande jamais partie relève du
+diagnostic, pas de la reprise automatique — l'injecter des semaines plus tard
+fausserait le Z du jour.
+
+`ZELTY_MODE_PAIEMENT_EN_LIGNE` doit correspondre **exactement** au libellé
+d'un mode de paiement configuré dans Zelty : un nom inconnu renvoie 400
+« Méthode de paiement invalide ».
+
+Test : `PORT=3000 node scripts/test-zelty-emission.mjs` — 19 assertions, sans
+compte ni clé.
+
 **Le jour du branchement** : générer la clé depuis le back-office → la poser
 sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
 puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
@@ -1138,6 +1167,7 @@ PORT=3000 node scripts/test-integration-correspondances.mjs   # pont caisse : jo
 PORT=3000 node scripts/test-rapprochement.mjs   # contrôle quotidien reçu vs compris
 PORT=3000 node scripts/test-zelty-mapper.mjs   # traduction Zelty — commandes (sans compte)
 PORT=3000 node scripts/test-zelty-catalogue.mjs # traduction Zelty — catalogue (sans compte)
+PORT=3000 node scripts/test-zelty-emission.mjs  # émission vers la caisse (sans compte)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
