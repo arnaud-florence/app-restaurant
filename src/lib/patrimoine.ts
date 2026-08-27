@@ -31,10 +31,14 @@ export type Patrimoine = {
   couverturePct: number
   tauxChargesVariables: number
   chargesFixes: number
+  /** Remboursement du crédit du fonds — exclu de l'EBE, mais bien décaissé. */
+  chargesFinancieres: number
   masseSalariale: number
-  /** Excédent brut d'exploitation, mensuel puis annualisé. */
+  /** Excédent brut d'exploitation (AVANT financement), mensuel puis annualisé. */
   ebeMensuel: number
   ebeAnnuel: number
+  /** Ce qui reste réellement en caisse, une fois le crédit remboursé. */
+  resultatDisponibleMensuel: number
   valorisation: {
     parEbeBas: number; parEbeHaut: number
     parCaBas: number; parCaHaut: number
@@ -63,7 +67,7 @@ export async function getPatrimoine(jours = 90): Promise<Patrimoine> {
     sb.from('config_patrimoine').select('*').limit(1).maybeSingle(),
     sb.from('commandes').select('id, montant_total_ttc, created_at')
       .eq('statut', 'encaisse').gte('created_at', debut.toISOString()),
-    sb.from('charges_fixes_recurrentes').select('montant_mensuel_eur').eq('actif', true),
+    sb.from('charges_fixes_recurrentes').select('libelle, montant_mensuel_eur').eq('actif', true),
     sb.from('employes').select('salaire_horaire, heures_contrat, coef_charges_patronales, avantages_mensuel_eur')
       .eq('actif', true),
   ])
@@ -107,7 +111,20 @@ export async function getPatrimoine(jours = 90): Promise<Patrimoine> {
   const tauxChargesVariables = caHtCouvert > 0 ? cout / caHtCouvert : 0.40
   const couverturePct = caHtTotal > 0 ? Math.round(caHtCouvert / caHtTotal * 100) : 0
 
-  const chargesFixes = (fixesRes.data ?? []).reduce((s, c) => s + Number(c.montant_mensuel_eur ?? 0), 0)
+  // ⚠️ L'EBE se calcule AVANT le financement. Le remboursement du crédit du
+  // fonds n'est pas une charge d'exploitation : c'est le prix d'acquisition
+  // étalé. Le laisser dans les charges fixes revient à faire payer deux fois
+  // le même fonds — une fois à l'achat, une fois dans sa propre valorisation —
+  // et sous-estime la valeur d'environ un multiple × la mensualité annuelle.
+  // Il reste affiché à part, parce qu'il sort bel et bien de la trésorerie.
+  const EST_FINANCIER = /cr[ée]dit|emprunt|remboursement|pr[êe]t\b/i
+  const fixesLignes = (fixesRes.data ?? []) as Array<{ libelle: string | null; montant_mensuel_eur: number | string | null }>
+  let chargesFixes = 0, chargesFinancieres = 0
+  for (const c of fixesLignes) {
+    const m = Number(c.montant_mensuel_eur ?? 0)
+    if (EST_FINANCIER.test(String(c.libelle ?? ''))) chargesFinancieres += m
+    else chargesFixes += m
+  }
   const masseSalariale = (empRes.data ?? []).reduce((s, e) => {
     const h = Number(e.heures_contrat ?? 0), t = Number(e.salaire_horaire ?? 0)
     const c = Number(e.coef_charges_patronales ?? 1.42)
@@ -150,7 +167,7 @@ export async function getPatrimoine(jours = 90): Promise<Patrimoine> {
 
   const paliers = [25000, 31200, 40000, 45000, 55000].map(caTtc => {
     const ht = caTtc / 1.07
-    const e = (ht * (1 - tauxChargesVariables) - chargesFixes - masseSalariale) * 12
+    const e = (ht * (1 - tauxChargesVariables) - chargesFixes - masseSalariale) * 12  // EBE, hors financement
     return {
       caTtcMensuel: caTtc,
       ebeAnnuel: arrondi(e),
@@ -170,8 +187,10 @@ export async function getPatrimoine(jours = 90): Promise<Patrimoine> {
     couverturePct,
     tauxChargesVariables: arrondi(tauxChargesVariables * 100) / 100,
     chargesFixes: arrondi(chargesFixes),
+    chargesFinancieres: arrondi(chargesFinancieres),
     masseSalariale: arrondi(masseSalariale),
     ebeMensuel: arrondi(ebeMensuel),
+    resultatDisponibleMensuel: arrondi(ebeMensuel - chargesFinancieres),
     ebeAnnuel: arrondi(ebeAnnuel),
     valorisation: {
       parEbeBas: arrondi(parEbeBas), parEbeHaut: arrondi(parEbeHaut),

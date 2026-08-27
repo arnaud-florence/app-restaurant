@@ -83,7 +83,7 @@ export default async function PatrimoinePage() {
             [`Achats de marchandises (${Math.round(p.tauxChargesVariables * 100)} %)`,
               -(p.caHtMensuel * p.tauxChargesVariables),
               `mesuré sur ${p.couverturePct} % du CA, extrapolé au reste`],
-            ['Charges fixes', -p.chargesFixes, null],
+            ['Charges fixes d\'exploitation', -p.chargesFixes, 'hors remboursement du crédit'],
             ['Salaires chargés', -p.masseSalariale, null],
           ].map(([label, val, note]) => (
             <div key={String(label)} className="py-2 flex items-baseline justify-between gap-3">
@@ -108,6 +108,27 @@ export default async function PatrimoinePage() {
               {fmtPrix(p.ebeAnnuel)}
             </span>
           </div>
+          {p.chargesFinancieres > 0 && (
+            <div className="pt-3 mt-1 border-t border-dashed border-zinc-200">
+              <div className="flex items-baseline justify-between gap-3">
+                <div>
+                  <span className="text-sm text-zinc-800">Remboursement du crédit</span>
+                  <span className="block text-[11px] text-zinc-400">
+                    hors EBE — c\'est le prix d\'achat étalé, pas une charge d\'exploitation
+                  </span>
+                </div>
+                <span className="tabular-nums font-medium shrink-0 text-zinc-500">
+                  {fmtPrix(-p.chargesFinancieres)}
+                </span>
+              </div>
+              <div className="pt-2 flex items-baseline justify-between gap-3">
+                <span className="text-sm font-semibold text-zinc-900">Ce qui reste en caisse</span>
+                <span className={`tabular-nums font-bold ${p.resultatDisponibleMensuel < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                  {fmtPrix(p.resultatDisponibleMensuel)}
+                </span>
+              </div>
+            </div>
+          )}
         </dl>
       </section>
 

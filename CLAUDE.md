@@ -1102,6 +1102,17 @@ nombre de jours réellement observés.
 un établissement fermé trois semaines pour incendie ne doit pas voir son EBE
 divisé par la durée de la fermeture.
 
+⚠️ **L'EBE se calcule AVANT le financement.** Le remboursement du crédit du
+fonds (1 900 €/mois) n'est pas une charge d'exploitation : c'est le prix
+d'acquisition étalé. Le laisser dans les charges fixes fait payer deux fois le
+même fonds — une fois à l'achat, une fois dans sa propre valorisation — et
+sous-estimait la valeur d'environ un multiple × 22 800 €, soit 57 000 à
+91 000 €. Les lignes de `charges_fixes_recurrentes` dont le libellé porte
+crédit / emprunt / remboursement / prêt sont donc sorties de l'EBE et rendues
+à part (`chargesFinancieres`), avec `resultatDisponibleMensuel` = ce qui reste
+réellement en caisse. Deux chiffres, deux usages : on se partage le
+disponible, on valorise sur l'EBE.
+
 ⚠️ Les produits en **commission** (0136) sont exclus du taux de charges
 variables : ils n'ont pas de coût matière et le fausseraient.
 
