@@ -700,6 +700,42 @@ confirmer sur une charge utile réelle.
 est une seconde barrière, pas la première. Le statut documenté est une chaîne
 (`opened`) ; la forme numérique 255 est aussi acceptée par prudence.
 
+#### Émission des commandes web — `POST /orders`
+
+Confirmé par la documentation : on **crée une commande déjà réglée** en
+joignant le tableau `transactions` (`name` = libellé EXACT d'un mode de
+paiement du restaurant, `price` en centimes). La réponse revient en
+`status: 255`. casatasia.fr reste donc notre site.
+
+**Idempotence native** : un `remote_id` stable rend le renvoi sûr après un
+timeout — l'API répond 200 avec `already_registred: true` et la commande
+existante au lieu d'en créer une seconde. C'est exactement ce qu'il faut pour
+une file d'attente avec reprise.
+
+⚠️ **Le piège qui coûte de l'argent.** Si le `total` envoyé est **INFÉRIEUR**
+au total recalculé par Zelty, la commande est **acceptée en silence** et Zelty
+crée une remise globale égale à l'écart. Aucune erreur. Un décalage de tarif
+entre notre catalogue et le leur ferait donc fuiter la marge sur **chaque**
+commande web, invisiblement. Un `total` supérieur, lui, est rejeté en 400.
+→ Toujours **vérifier l'égalité côté client** avant d'envoyer, ne jamais
+compter sur un 400 pour l'attraper.
+
+⚠️ **`item_id` est un champ MORT sur POST** — il faut envoyer `id` (entier).
+Sur GET c'est l'inverse : `items[].item_id` porte l'identifiant. Les
+correspondances de catalogue (0137) doivent donc stocker l'identifiant
+numérique, utilisable dans les deux sens.
+
+⚠️ **Deux validations que Zelty ne fait pas** : un menu envoyé avec MOINS de
+parties que sa configuration est accepté et facturé plein tarif ; et une
+`option_value_id` valide mais non rattachée au plat passe sans erreur, la
+commande arrive incohérente en caisse. Construire les options depuis le
+catalogue Zelty, jamais depuis notre propre correspondance.
+
+`mode` est obligatoire ; `source` doit rester `web` (les valeurs des
+plateformes de livraison sont réservées aux agrégateurs) ; `due_date` doit
+être ISO-8601 et dans le futur. L'endpoint répond 404 sur une version d'API
+antérieure à 2.11.
+
 **Le jour du branchement** : générer la clé depuis le back-office → la poser
 sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
 puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
