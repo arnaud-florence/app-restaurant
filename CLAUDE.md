@@ -142,8 +142,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Ventilation par activité | CA, marge et food cost par point de vente — calculés sur les LIGNES | — |
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
+| Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 
-**Migrations actuelles : 0001 → 0137.**
+**Migrations actuelles : 0001 → 0138.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -637,6 +638,44 @@ Le **2,1 % (presse)** est supporté depuis la 0136 : `TauxTva = 2.1 | 5.5 | 10
 Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0113) porte les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries/gourmandises, 10 % snacking, pizzas et boissons.
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
+
+### Allergènes : « rien déclaré » n'est pas « aucun allergène » (0138)
+
+Constaté le 27/08/2026 : la page publique du QR code affichait
+**« ✓ Aucun allergène déclaré »**, en vert, pour les 85 produits actifs — dont
+les croissants, sandwiches et paninis. Aucun n'avait d'allergène renseigné, et
+un tableau vide était rendu comme une absence d'allergène. Ce n'est pas une
+information manquante : c'est une **affirmation fausse et rassurante**, lue
+par un client allergique au gluten sur un croissant.
+
+Un tableau vide ne peut pas porter deux sens. D'où
+`recettes.allergenes_valides_le` (+ `_par`, nominatif — une déclaration
+d'allergènes engage) :
+
+- **NULL** → personne n'a vérifié → le public lit « information non
+  disponible, demandez-nous » ;
+- **renseigné** → un humain a validé → un tableau vide veut alors vraiment
+  dire « aucun des 14 allergènes ».
+
+Trois endroits corrigés, et les trois mentaient séparément :
+
+1. le libellé du produit (coche verte → avertissement ambre) ;
+2. le **filtre** « j'évite le gluten » — un produit non vérifié a une liste
+   vide, il passait donc le filtre comme s'il était sûr. Il est désormais
+   marqué « ne peut pas être garanti sans allergène » ;
+3. le **compteur** — il annonçait « 85 / 85 plats compatibles » à un
+   allergique. Un plat non vérifié n'est pas compatible, il est inconnu.
+
+⚠️ `recette_ingredients` est à **0** : le modèle achat-revente n'a pas de
+composition, donc la voie « allergènes déduits des ingrédients » est fermée
+ici. Tout passe par `allergenes_complementaires`, saisi à la main.
+`setAllergenesComplementaires()` **vaut validation** — c'est l'enregistrement
+qui pose la date.
+
+Les suggestions de l'écran d'admin sont volontairement **minimales** (gluten
+sur les produits à base de farine, rien d'autre) : une suggestion généreuse
+serait acceptée en bloc par habitude, et une déclaration fausse est plus
+dangereuse qu'une déclaration absente.
 
 ### Le pont caisse ↔ outil (0137)
 

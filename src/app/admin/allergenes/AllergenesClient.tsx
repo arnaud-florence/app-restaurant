@@ -92,6 +92,24 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 
 // ─── TAB 1 — Catalogue plats × allergènes ──────────────────────────
+// Suggestions par famille de produit. VOLONTAIREMENT MINIMALES : on ne
+// propose que ce qui est certain par nature (de la farine dans un pain), et
+// jamais ce qui dépend de la recette du fournisseur (lait, œufs, sésame).
+//
+// Une suggestion trop généreuse serait acceptée en bloc par habitude, et une
+// déclaration d'allergènes fausse est plus dangereuse qu'une déclaration
+// absente. Le reste vient des fiches techniques Gineys et Promocash.
+const SUGGESTIONS: Array<{ motif: RegExp; allergenes: Allergene[]; pourquoi: string }> = [
+  { motif: /pain|baguette|viennoiser|croissant|p[âa]tisser|sandwich|panini|panuozzi|pizza|focaccia|brioche|tarte|chausson/i,
+    allergenes: ['gluten'], pourquoi: 'produit à base de farine de blé' },
+]
+
+function suggestionsPour(r: { nom: string; categorie: string }): { allergenes: Allergene[]; pourquoi: string } | null {
+  const cible = `${r.categorie} ${r.nom}`
+  for (const s of SUGGESTIONS) if (s.motif.test(cible)) return { allergenes: s.allergenes, pourquoi: s.pourquoi }
+  return null
+}
+
 function CatalogueTab({
   recettes, readOnly = false, onError, onOk,
 }: {
@@ -102,6 +120,7 @@ function CatalogueTab({
 }) {
   const [search, setSearch] = useState('')
   const [filtre, setFiltre] = useState<Allergene | ''>('')
+  const [seulementAValider, setSeulementAValider] = useState(false)
   const [editing, setEditing] = useState<RecetteAllergenes | null>(null)
 
   const categories = useMemo(() => {
@@ -109,14 +128,33 @@ function CatalogueTab({
     for (const r of recettes) {
       if (search.trim() && !r.nom.toLowerCase().includes(search.toLowerCase())) continue
       if (filtre && !r.allergenes_finaux.includes(filtre)) continue
+      if (seulementAValider && r.valide_le) continue
       if (!m.has(r.categorie)) m.set(r.categorie, [])
       m.get(r.categorie)!.push(r)
     }
     return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b, 'fr'))
-  }, [recettes, search, filtre])
+  }, [recettes, search, filtre, seulementAValider])
+
+  const aValider = recettes.filter(r => !r.valide_le)
 
   return (
     <div className="space-y-3">
+      {aValider.length > 0 && (
+        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3">
+          <p className="font-bold text-amber-900 text-sm">
+            {aValider.length} produit{aValider.length > 1 ? 's' : ''} sans information allergène vérifiée
+          </p>
+          <p className="text-xs text-amber-800 mt-1">
+            Tant qu&apos;un produit n&apos;est pas validé, la page publique du QR code
+            affiche « information non disponible » plutôt qu&apos;une liste vide —
+            elle ne peut pas laisser croire à un client allergique qu&apos;un
+            croissant ne contient pas de gluten. Ouvrez chaque produit, cochez
+            ce qu&apos;il contient, enregistrez : c&apos;est l&apos;enregistrement qui vaut
+            validation.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 items-center">
         <input
           value={search} onChange={e => setSearch(e.target.value)}
@@ -124,10 +162,15 @@ function CatalogueTab({
           className="h-10 px-3 rounded-md border border-zinc-300 text-sm w-64"
         />
         <div className="flex flex-wrap gap-1">
-          <button onClick={() => setFiltre('')}
+          <button onClick={() => { setFiltre(''); setSeulementAValider(false) }}
             className={cn('px-3 h-9 rounded-full text-xs font-bold border',
-              filtre === '' ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300')}>
+              filtre === '' && !seulementAValider ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-300')}>
             Tous
+          </button>
+          <button onClick={() => { setSeulementAValider(v => !v); setFiltre('') }}
+            className={cn('px-3 h-9 rounded-full text-xs font-bold border',
+              seulementAValider ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-300')}>
+            À valider ({aValider.length})
           </button>
           {ALLERGENES_EU.map(a => {
             const info = ALLERGENE_INFO[a]
@@ -159,8 +202,12 @@ function CatalogueTab({
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-sm">{r.nom}</h3>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {r.allergenes_finaux.length === 0 ? (
-                      <span className="text-[11px] text-emerald-700">✓ Aucun allergène détecté</span>
+                    {!r.valide_le ? (
+                      <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5">
+                        ⚠ Non vérifié
+                      </span>
+                    ) : r.allergenes_finaux.length === 0 ? (
+                      <span className="text-[11px] text-emerald-700">✓ Aucun des 14 allergènes</span>
                     ) : r.allergenes_finaux.map(a => {
                       const info = ALLERGENE_INFO[a]
                       const isComplement = r.allergenes_complementaires.includes(a)
@@ -174,6 +221,12 @@ function CatalogueTab({
                       )
                     })}
                   </div>
+                  {r.valide_le && (
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Vérifié le {new Date(r.valide_le).toLocaleDateString('fr-FR')}
+                      {r.valide_par && <> par {r.valide_par}</>}
+                    </p>
+                  )}
                   {r.ingredients_avec_allergenes.filter(i => i.allergenes.length > 0).length > 0 && (
                     <p className="text-[10px] text-zinc-500 mt-1">
                       Ingrédients avec allergènes : {r.ingredients_avec_allergenes.filter(i => i.allergenes.length > 0).map(i => i.nom).join(', ')}
@@ -182,8 +235,11 @@ function CatalogueTab({
                 </div>
                 {!readOnly && (
                   <button onClick={() => setEditing(r)}
-                    className="shrink-0 text-xs h-8 px-3 rounded-md border border-zinc-300 hover:bg-zinc-50 font-bold">
-                    Override
+                    className={cn('shrink-0 text-xs h-9 px-3 rounded-md border font-bold',
+                      r.valide_le
+                        ? 'border-zinc-300 hover:bg-zinc-50'
+                        : 'border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200')}>
+                    {r.valide_le ? 'Modifier' : 'Renseigner'}
                   </button>
                 )}
               </article>
@@ -215,6 +271,13 @@ function OverrideModal({
   ])
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const suggestion = useMemo(() => {
+    const s = suggestionsPour(recette)
+    if (!s) return null
+    // Inutile de proposer ce qui est déjà coché.
+    const restants = s.allergenes.filter(a => !selected.includes(a))
+    return restants.length > 0 ? { ...s, allergenes: restants } : null
+  }, [recette, selected])
 
   function toggle(a: Allergene) {
     setSelected(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a])
@@ -236,12 +299,32 @@ function OverrideModal({
   }
 
   return (
-    <Modal title={`Override allergènes — ${recette.nom}`} onClose={onClose} disabled={isPending}>
+    <Modal title={`Allergènes — ${recette.nom}`} onClose={onClose} disabled={isPending}>
       <p className="text-sm text-zinc-600 bg-zinc-50 border border-zinc-200 rounded p-2">
-        Coche tous les allergènes présents dans ce plat. Les allergènes <b>auto-détectés</b> via les ingrédients
-        sont préchochés. Les allergènes que tu ajoutes manuellement (trace, contamination croisée) seront marqués
-        d&apos;une étoile <b>*</b> dans la liste.
+        Cochez tous les allergènes présents dans ce produit, puis enregistrez.
+        <b> L&apos;enregistrement vaut vérification</b> : c&apos;est lui qui autorise la
+        page publique à afficher une information plutôt qu&apos;un avertissement.
+        Un produit sans aucun des 14 allergènes se valide en enregistrant sans
+        rien cocher.
       </p>
+
+      {suggestion && (
+        <div className="rounded border border-blue-200 bg-blue-50 p-2 flex items-start gap-2">
+          <div className="flex-1 text-sm text-blue-900">
+            <b>Suggestion</b> — {suggestion.pourquoi}, donc probablement{' '}
+            {suggestion.allergenes.map(a => ALLERGENE_INFO[a].label.toLowerCase()).join(', ')}.
+            <span className="block text-xs text-blue-700 mt-0.5">
+              À confirmer sur la fiche technique du fournisseur. Rien n&apos;est
+              enregistré tant que vous n&apos;avez pas validé.
+            </span>
+          </div>
+          <button
+            onClick={() => setSelected(prev => [...new Set([...prev, ...suggestion.allergenes])])}
+            className="shrink-0 text-xs h-9 px-3 rounded-md bg-blue-600 text-white font-bold">
+            Appliquer
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {ALLERGENES_EU.map(a => {
@@ -266,7 +349,8 @@ function OverrideModal({
         })}
       </div>
 
-      <ModalActions onClose={onClose} onValider={valider} pending={isPending} validLabel="✓ Sauvegarder" />
+      <ModalActions onClose={onClose} onValider={valider} pending={isPending}
+        validLabel={recette.valide_le ? '✓ Enregistrer' : '✓ Enregistrer et valider'} />
     </Modal>
   )
 }

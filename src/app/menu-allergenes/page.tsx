@@ -15,6 +15,9 @@ export type PlatPublic = {
   prix_vente_ht: number
   description: string | null
   allergenes: Allergene[]
+  /** Un humain a-t-il vérifié ? Sans validation, une liste vide ne veut PAS
+   *  dire « aucun allergène » — elle veut dire « on n'en sait rien ». */
+  valide: boolean
 }
 
 export default async function MenuAllergenesPage() {
@@ -23,6 +26,7 @@ export default async function MenuAllergenesPage() {
     supabase
       .from('recettes')
       .select(`id, nom, categorie, prix_vente_ht, description, allergenes_complementaires,
+               allergenes_valides_le,
                recette_ingredients(ingredient:ingredients(allergenes))`)
       .eq('actif', true)
       .order('categorie')
@@ -37,6 +41,7 @@ export default async function MenuAllergenesPage() {
   type RecRow = { id: string; nom: string; categorie: string;
     prix_vente_ht: number | string; description: string | null;
     allergenes_complementaires: string[] | null;
+    allergenes_valides_le?: string | null;
     recette_ingredients: RIRow[] | null }
 
   const plats: PlatPublic[] = ((recettesRes.data ?? []) as RecRow[]).map(r => {
@@ -49,6 +54,7 @@ export default async function MenuAllergenesPage() {
       prix_vente_ht: Number(r.prix_vente_ht ?? 0),
       description: r.description,
       allergenes: allergenesRecette(ingArrs, compl),
+      valide: Boolean(r.allergenes_valides_le),
     }
   })
 

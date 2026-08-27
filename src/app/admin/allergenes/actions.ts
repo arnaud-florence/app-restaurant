@@ -26,9 +26,17 @@ export async function setAllergenesComplementaires(input: unknown) {
       throw new Error('Cette recette n\'est pas dans votre périmètre.')
     }
   }
+  // Enregistrer, c'est VALIDER (0138). Sans cette date, une liste vide reste
+  // ambiguë — « aucun allergène » ou « personne n'a regardé » ? — et la page
+  // publique affichait une coche verte rassurante sur un croissant.
+  // La validation est nominative : une déclaration d'allergènes engage.
   const { error } = await supabase
     .from('recettes')
-    .update({ allergenes_complementaires: p.allergenes_complementaires })
+    .update({
+      allergenes_complementaires: p.allergenes_complementaires,
+      allergenes_valides_le: new Date().toISOString(),
+      allergenes_valides_par: profil.email ?? profil.id ?? null,
+    })
     .eq('id', p.recette_id)
   if (error) throw new Error(error.message)
   revalidatePath('/admin/allergenes')

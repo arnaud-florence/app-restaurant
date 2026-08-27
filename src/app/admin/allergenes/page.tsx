@@ -16,6 +16,10 @@ export type RecetteAllergenes = {
   allergenes_complementaires: Allergene[]  // override manuel
   allergenes_finaux: Allergene[]        // union des deux
   ingredients_avec_allergenes: Array<{ nom: string; allergenes: string[] }>
+  /** Un humain a-t-il vérifié ce produit ? Tant que non, une liste vide ne
+   *  veut PAS dire « aucun allergène » — elle veut dire « on n'en sait rien ». */
+  valide_le: string | null
+  valide_par: string | null
 }
 
 export default async function AllergenesPage() {
@@ -28,6 +32,7 @@ export default async function AllergenesPage() {
   let recettesQuery = supabase
     .from('recettes')
     .select(`id, nom, categorie, tag_destination, allergenes_complementaires,
+             allergenes_valides_le, allergenes_valides_par,
              recette_ingredients(ingredient:ingredients(nom, allergenes))`)
     .eq('actif', true)
   if (filter.recetteTags && filter.recetteTags.length > 0) {
@@ -47,6 +52,8 @@ export default async function AllergenesPage() {
   type RIRow = { ingredient?: { nom?: string; allergenes?: string[] | null } | null }
   type RecRow = { id: string; nom: string; categorie: string; tag_destination: string;
     allergenes_complementaires: string[] | null;
+    allergenes_valides_le?: string | null;
+    allergenes_valides_par?: string | null;
     recette_ingredients: RIRow[] | null }
 
   const recettes: RecetteAllergenes[] = ((recettesRes.data ?? []) as RecRow[]).map(r => {
@@ -67,6 +74,8 @@ export default async function AllergenesPage() {
       allergenes_complementaires: compl.filter(a => !calc.includes(a)),
       allergenes_finaux: fin,
       ingredients_avec_allergenes: ingDetails,
+      valide_le: r.allergenes_valides_le ?? null,
+      valide_par: r.allergenes_valides_par ?? null,
     }
   })
 

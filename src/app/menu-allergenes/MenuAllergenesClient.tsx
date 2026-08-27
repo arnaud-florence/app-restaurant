@@ -35,9 +35,13 @@ export default function MenuAllergenesClient({
     return Array.from(m.entries()).sort(([a], [b]) => a.localeCompare(b, 'fr'))
   }, [plats])
 
+  // ⚠️ Un plat non vérifié n'est PAS compatible : il est inconnu. Le compter
+  // comme compatible annonçait « 85 / 85 plats compatibles » à un client
+  // allergique au gluten, alors qu'aucun produit n'avait été vérifié.
   const nbPlatsCompatibles = eviter.size === 0
     ? plats.length
-    : plats.filter(p => !p.allergenes.some(a => eviter.has(a))).length
+    : plats.filter(p => p.valide && !p.allergenes.some(a => eviter.has(a))).length
+  const nbPlatsInconnus = plats.filter(p => !p.valide).length
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -91,6 +95,12 @@ export default function MenuAllergenesClient({
           {eviter.size > 0 && (
             <p className="text-xs text-zinc-600 mt-2">
               <b className="text-emerald-700">{nbPlatsCompatibles}</b> / {plats.length} plats compatibles avec votre régime.
+              {nbPlatsInconnus > 0 && (
+                <span className="block text-amber-800 font-semibold mt-0.5">
+                  {nbPlatsInconnus} plat{nbPlatsInconnus > 1 ? 's' : ''} dont la composition
+                  n&apos;est pas encore vérifiée — demandez-nous avant de commander.
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -106,15 +116,33 @@ export default function MenuAllergenesClient({
             <ul className="divide-y divide-zinc-100 bg-white rounded-lg border border-zinc-200 overflow-hidden">
               {items.map(p => {
                 const incompatible = eviter.size > 0 && p.allergenes.some(a => eviter.has(a))
+                // Un produit non vérifié ne peut pas passer un filtre « sans
+                // gluten » comme s'il était sûr : sa liste est vide parce que
+                // personne n'a regardé, pas parce qu'il ne contient rien.
+                const incertain = eviter.size > 0 && !p.valide
                 return (
-                  <li key={p.id} className={cn('px-3 py-2.5', incompatible && 'plat-incompatible opacity-30')}>
+                  <li key={p.id} className={cn(
+                    'px-3 py-2.5',
+                    incompatible && 'plat-incompatible opacity-30',
+                    !incompatible && incertain && 'bg-amber-50/60 border-l-4 border-amber-400',
+                  )}>
                     <div className="flex items-baseline justify-between gap-3">
                       <h3 className="font-bold text-sm">{p.nom}</h3>
                       <span className="text-sm font-bold tabular-nums text-zinc-700 shrink-0">{fmtPrix(p.prix_vente_ht)}</span>
                     </div>
                     {p.description && <p className="text-xs text-zinc-600 mt-0.5">{p.description}</p>}
-                    {p.allergenes.length === 0 ? (
-                      <p className="text-[10px] text-emerald-700 mt-1">✓ Aucun allergène déclaré</p>
+                    {/* ⚠️ Une liste vide ne suffit PAS à dire « aucun allergène ».
+                        Tant que personne n'a vérifié le produit, afficher une
+                        coche verte revient à affirmer à un client allergique
+                        qu'un croissant ne contient pas de gluten. */}
+                    {!p.valide ? (
+                      <p className="text-[10px] text-amber-900 bg-amber-100 border border-amber-300 rounded px-1.5 py-1 mt-1 font-semibold">
+                        ⚠ Information allergènes non disponible — {incertain
+                          ? 'ne peut pas être garanti sans allergène, demandez-nous'
+                          : 'demandez-nous avant de commander'}
+                      </p>
+                    ) : p.allergenes.length === 0 ? (
+                      <p className="text-[10px] text-emerald-700 mt-1">✓ Aucun des 14 allergènes réglementaires</p>
                     ) : (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {p.allergenes.map(a => {
