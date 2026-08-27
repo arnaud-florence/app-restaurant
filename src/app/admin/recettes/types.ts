@@ -37,6 +37,9 @@ export type Recette = {
   /** Unités vendues tirées d'une unité achetée (flan entier → 10 parts) */
   unites_par_achat: number
   tva: number
+  type_revenu: 'vente' | 'commission'
+  commission_pct: number | null
+  commission_forfait_ht: number | null
   contient_alcool: boolean
   actif: boolean
   photo_url: string | null
@@ -81,6 +84,9 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     nom_matiere: '',
     unites_par_achat: 1,
     tva: 10,
+    type_revenu: 'vente',
+    commission_pct: null,
+    commission_forfait_ht: null,
     contient_alcool: false,
     actif: true,
     photo_url: '',

@@ -1,8 +1,10 @@
 // TVA multi-taux — règles fiscales restauration France.
 //
-// 20% : alcool (peu importe sur place/emporter)
-// 10% : plat ou soft sur place
+// 20%  : alcool (peu importe sur place/emporter)
+// 10%  : plat ou soft sur place
 // 5.5% : plat ou soft à emporter
+// 2.1% : presse (journaux, périodiques) — porté par le produit uniquement,
+//        aucune règle de consommation ne peut le déduire.
 //
 // Server + Client safe (pure logic).
 
@@ -12,9 +14,14 @@ export const TAUX_TVA = {
   ALCOOL:    20,
   SUR_PLACE: 10,
   EMPORTER:  5.5,
+  PRESSE:    2.1,
 } as const
 
-export type TauxTva = 5.5 | 10 | 20
+export type TauxTva = 2.1 | 5.5 | 10 | 20
+
+/** Taux légalement admis. Sert de garde à `tauxTvaVente` : un taux saisi hors
+ *  de cette liste est une erreur de saisie, pas un taux exotique à honorer. */
+export const TAUX_ADMIS: readonly TauxTva[] = [2.1, 5.5, 10, 20]
 
 /** Détermine le taux de TVA applicable à une ligne d'article. */
 export function tauxTvaArticle(
@@ -40,6 +47,10 @@ export function tauxTvaArticle(
  *
  * L'alcool reste à 20 % quoi qu'il arrive : c'est la loi, pas une donnée de
  * carte. Sans taux en base, on retombe sur la règle sur place / à emporter.
+ *
+ * Le 2,1 % (presse) ne peut venir QUE du produit : aucune règle de
+ * consommation ne le déduit. Il était rejeté silencieusement avant la
+ * migration 0136 — un journal sortait à 5,5 % sans la moindre alerte.
  */
 export function tauxTvaVente(
   produit: { tva?: number | string | null; contient_alcool?: boolean | null },
@@ -47,7 +58,7 @@ export function tauxTvaVente(
 ): TauxTva {
   if (produit.contient_alcool) return 20
   const porte = Number(produit.tva)
-  if (porte === 5.5 || porte === 10 || porte === 20) return porte
+  if ((TAUX_ADMIS as readonly number[]).includes(porte)) return porte as TauxTva
   return tauxTvaArticle(false, consommation)
 }
 

@@ -43,6 +43,9 @@ const formSchema = z.object({
   unites_par_achat: z.number().positive().max(1000),
   tva: z.number().min(0).max(100),
   contient_alcool: z.boolean(),
+  type_revenu: z.enum(['vente', 'commission']),
+  commission_pct: z.number().min(0).max(100).nullable(),
+  commission_forfait_ht: z.number().min(0).max(9999).nullable(),
   photo_url: z.string().max(2000),
   actif: z.boolean(),
   vendable_online: z.boolean(),
@@ -82,6 +85,9 @@ export default function RecetteFormModal({
         nom_matiere: recette.nom_matiere ?? '',
         unites_par_achat: recette.unites_par_achat ?? 1,
         tva: recette.tva,
+        type_revenu: recette.type_revenu ?? 'vente',
+        commission_pct: recette.commission_pct,
+        commission_forfait_ht: recette.commission_forfait_ht,
         contient_alcool: recette.contient_alcool ?? false,
         photo_url: recette.photo_url ?? '',
         actif: recette.actif,
@@ -101,6 +107,7 @@ export default function RecetteFormModal({
   const nb_portions   = watch('nb_portions')
   const prix_vente_ht = watch('prix_vente_ht')
   const tvaCourante   = watch('tva')
+  const typeRevenu    = watch('type_revenu')
   const cout_achat_ht = watch('cout_achat_ht')
   const tag           = watch('tag_destination')
   const photo_url     = watch('photo_url')
@@ -177,9 +184,21 @@ export default function RecetteFormModal({
     // compris un simple changement de prix. On exige désormais l'un OU
     // l'autre : une composition, ou un coût d'achat (0 accepté si le champ a
     // été volontairement renseigné, mais vide = rien du tout → on guide).
-    if (lignes.length === 0 && (data.cout_achat_ht == null || Number.isNaN(data.cout_achat_ht))) {
+    // Une commission échappe à cette règle : vous n'achetez pas le produit,
+    // vous le revendez à un prix imposé et touchez une remise. Il n'a donc
+    // ni coût d'achat ni composition — et rien à optimiser.
+    if (data.type_revenu === 'vente'
+        && lignes.length === 0
+        && (data.cout_achat_ht == null || Number.isNaN(data.cout_achat_ht))) {
       setError('root', {
         message: 'Indique soit un coût d\'achat (produit revendu tel quel), soit au moins un ingrédient (produit fabriqué).',
+      })
+      return
+    }
+    if (data.type_revenu === 'commission'
+        && data.commission_pct == null && data.commission_forfait_ht == null) {
+      setError('root', {
+        message: 'Une activité à commission doit dire comment elle vous rémunère : un pourcentage du prix, ou un forfait par opération.',
       })
       return
     }
@@ -436,6 +455,50 @@ export default function RecetteFormModal({
                   {/* Ce qu'on compte dans le congélateur : « Pâton à pizza »,
                       pas « PATON A PIZZA 250G C=40 ». Les produits qui
                       partagent ce nom forment UNE ligne d'inventaire. */}
+                  {/* ─── Nature du revenu (0136) ───────────────────────
+                      Tabac, presse, FDJ, relais colis : le montant encaissé
+                      n'est pas à vous. Le compter comme du chiffre d'affaires
+                      gonflerait le CA et écraserait tous les taux de marge. */}
+                  <Field label="Ce que ce produit vous rapporte" error={errors.type_revenu?.message}>
+                    <Select {...register('type_revenu')}>
+                      <option value="vente">Une vente — le prix encaissé est mon chiffre d&apos;affaires</option>
+                      <option value="commission">Une commission — tabac, presse, FDJ, relais colis</option>
+                    </Select>
+                    {typeRevenu === 'commission' && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Le prix est imposé et l&apos;argent ne fait que transiter :
+                        seule votre commission compte comme chiffre d&apos;affaires,
+                        et ce produit reste hors du food cost.
+                      </p>
+                    )}
+                  </Field>
+
+                  {typeRevenu === 'commission' && (
+                    <div className="grid grid-cols-2 gap-3 rounded-md border border-amber-200 bg-amber-50/50 p-3">
+                      <Field label="Remise (% du prix TTC)" error={errors.commission_pct?.message}>
+                        <Input
+                          type="number" step="0.001" min="0" max="100" placeholder="ex : 8"
+                          className="tabular-nums"
+                          {...register('commission_pct', {
+                            setValueAs: v => (v === '' || v == null ? null : Number(v)),
+                          })}
+                        />
+                      </Field>
+                      <Field label="ou forfait HT par opération (€)" error={errors.commission_forfait_ht?.message}>
+                        <Input
+                          type="number" step="0.0001" min="0" placeholder="ex : 0,55"
+                          className="tabular-nums"
+                          {...register('commission_forfait_ht', {
+                            setValueAs: v => (v === '' || v == null ? null : Number(v)),
+                          })}
+                        />
+                      </Field>
+                      <p className="col-span-2 text-[10px] text-muted-foreground">
+                        Le forfait l&apos;emporte si les deux sont renseignés.
+                      </p>
+                    </div>
+                  )}
+
                   <Field label="Nom en stock (ce qu'on compte)" error={errors.nom_matiere?.message}>
                     <Input placeholder="ex : Pâton à pizza, Dosette de café" {...register('nom_matiere')} />
                   </Field>
@@ -449,14 +512,15 @@ export default function RecetteFormModal({
                   </Field>
                   <Field label="TVA (%)" error={errors.tva?.message}>
                     <Select {...register('tva', { valueAsNumber: true })}>
-                      <option value={10}>10% — restauration sur place</option>
-                      <option value={5.5}>5,5% — vente à emporter</option>
+                      <option value={10}>10% — snacking, pizzas, boissons</option>
+                      <option value={5.5}>5,5% — pains, viennoiseries, pâtisseries</option>
                       <option value={20}>20% — boissons alcoolisées</option>
+                      <option value={2.1}>2,1% — presse (journaux, magazines)</option>
                       <option value={0}>0%</option>
                     </Select>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Indicatif. La TVA réelle est calculée auto à la commande
-                      (10% sur place / 5,5% emporter / 20% si alcool).
+                      C&apos;est ce taux qui fait foi à la vente : il vient de la carte
+                      affichée en boutique. L&apos;alcool reste à 20 % quoi qu&apos;il arrive.
                     </p>
                   </Field>
                 </div>

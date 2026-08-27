@@ -9,6 +9,7 @@
 // lundi, c'est bien ou mal ? La question n'a de sens que face au lundi d'avant.
 
 import { createClient } from '@/lib/supabase/server'
+import { activiteDe, activiteDef, type Activite } from '@/lib/activites'
 
 export type Periode = 'jour' | 'semaine' | 'mois'
 
@@ -54,6 +55,41 @@ export type VentesStats = {
     foodCostPct: number | null
     couverturePct: number
   }
+  /** CA ventilé par point de vente, puis par activité.
+   *
+   * ⚠️ Calculé sur les LIGNES, pas sur l'en-tête de commande. Deux raisons :
+   * une caisse ne nous donne pas toujours le point de vente du ticket (Zelty
+   * ne le fait pas), et un même ticket peut mélanger les activités — un café
+   * du Fournil et une pizza sur la même addition. En partant du produit
+   * vendu, le rattachement est juste dans les deux cas.
+   *
+   * Repli quand le produit n'a pas d'établissement : celui de la commande. */
+  parPointDeVente: Array<{
+    slug: string; nom: string; activite: Activite
+    quantite: number; ca: number; caHT: number
+    /** Ce qui vous reste : CA HT pour une vente, commission pour le reste. */
+    revenu: number
+    /** Marge brute HT sur le périmètre couvert par un coût d'achat. */
+    marge: number | null
+    /** Food cost sur le CA HT COUVERT, jamais sur le CA HT total. */
+    foodCostPct: number | null
+    /** Part du CA HT dont le coût d'achat est connu — sans elle, le food
+     *  cost ci-dessus n'est pas interprétable. */
+    couverturePct: number
+    part: number
+  }>
+  parActivite: Array<{
+    cle: Activite; nom: string; emoji: string
+    ca: number; caHT: number; revenu: number; marge: number | null
+    foodCostPct: number | null; couverturePct: number; part: number
+  }>
+  /** Activités à commission (tabac, presse, FDJ, relais colis) — 0136.
+   *
+   * `encaisse` est l'argent qui TRANSITE par le tiroir, `revenu` ce qui vous
+   * revient réellement. Confondre les deux gonfle le chiffre d'affaires et
+   * écrase tous les taux de marge. Bloc vide tant qu'aucun produit n'est en
+   * `type_revenu = 'commission'`. */
+  commissions: { encaisse: number; revenu: number; lignes: number }
   /** Casse (invendus du soir) sur la même période — vient en déduction. */
   casse: {
     total: number
@@ -89,14 +125,22 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
   // mémoire plutôt que de refaire un aller-retour.
   const { data: cmds } = await sb
     .from('commandes')
-    .select('id, montant_total_ttc, mode_paiement, created_at, ventilation_tva')
+    .select('id, montant_total_ttc, mode_paiement, created_at, ventilation_tva, etablissement_id')
     .eq('statut', 'encaisse')
     .gte('created_at', debutPrec.toISOString())
+
+  // Points de vente : sept lignes, lues une fois. `etablissements.activite`
+  // n'existe pas en base — c'est le slug qui décide, via ACTIVITE_PAR_SLUG.
+  const { data: etabs } = await sb.from('etablissements').select('id, slug, nom')
+  type Etab = { id: string; slug: string; nom: string }
+  const posParId = new Map<string, Etab>()
+  for (const e of (etabs ?? []) as Etab[]) posParId.set(String(e.id), e)
 
   type Cmd = {
     id: string; montant_total_ttc: number | string | null
     mode_paiement: string | null; created_at: string
     ventilation_tva: Record<string, number> | null
+    etablissement_id: string | null
   }
   const toutes = (cmds ?? []) as unknown as Cmd[]
   const actuelles: Cmd[] = [], precedentes: Cmd[] = []
@@ -150,20 +194,30 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
 
   // ── Lignes : produits et catégories ───────────────────────────────
   const ids = actuelles.map(c => String(c.id))
+  const posDeCommande = new Map<string, string | null>()
+  for (const c of actuelles) posDeCommande.set(String(c.id), c.etablissement_id)
   const prodMap = new Map<string, { q: number; ca: number; caHT: number; cout: number; couvert: boolean }>()
   const catMap = new Map<string, { q: number; ca: number }>()
+  const posMap = new Map<string, { q: number; ca: number; caHT: number; caHTCouvert: number; revenu: number; cout: number; couvert: boolean }>()
   const vendus = new Set<string>()
   let mCaHT = 0, mCaHTCouvert = 0, mCout = 0
+  let comEncaisse = 0, comRevenu = 0, comLignes = 0
 
   if (ids.length > 0) {
     // Supabase borne la taille d'un `in` : on découpe.
     for (let i = 0; i < ids.length; i += 200) {
       const { data: arts } = await sb
         .from('commande_articles')
-        .select('quantite, prix_unitaire_ttc, tva_taux, recette:recettes(nom, categorie, cout_achat_ht, tva)')
+        .select('commande_id, quantite, prix_unitaire_ttc, tva_taux, recette:recettes(nom, categorie, cout_achat_ht, tva, etablissement_id, type_revenu, commission_pct, commission_forfait_ht)')
         .in('commande_id', ids.slice(i, i + 200))
       for (const a of arts ?? []) {
-        const r = a.recette as { nom?: string; categorie?: string; cout_achat_ht?: number | string | null; tva?: number | string | null } | null
+        const r = a.recette as {
+          nom?: string; categorie?: string
+          cout_achat_ht?: number | string | null; tva?: number | string | null
+          etablissement_id?: string | null; type_revenu?: string | null
+          commission_pct?: number | string | null
+          commission_forfait_ht?: number | string | null
+        } | null
         const nom = r?.nom ?? '—'
         const cat = r?.categorie ?? 'Sans catégorie'
         const q = Number(a.quantite ?? 0)
@@ -173,20 +227,100 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
         const taux = Number(a.tva_taux ?? r?.tva ?? 5.5)
         const caHT = ca / (1 + taux / 100)
         const coutU = r?.cout_achat_ht == null ? null : Number(r.cout_achat_ht)
-        const couvert = coutU != null && coutU > 0
-        mCaHT += caHT
-        if (couvert) { mCaHTCouvert += caHT; mCout += q * coutU }
+
+        // ── Vente ou commission ? (0136) ────────────────────────────
+        // Sur une commission, l'argent encaissé n'est pas à vous : un paquet
+        // de cigarettes à 12 € laisse quelques dizaines de centimes. Le
+        // compter comme du CA gonflerait le chiffre d'affaires et écraserait
+        // tous les taux de marge — de la boulangerie à 70 % noyée dans du
+        // tabac à quelques pour cent. Ces lignes sortent donc AUSSI du food
+        // cost : leur prix est imposé, il n'y a rien à optimiser.
+        const commission = r?.type_revenu === 'commission'
+        const forfait = r?.commission_forfait_ht == null ? null : Number(r.commission_forfait_ht)
+        const pct = r?.commission_pct == null ? null : Number(r.commission_pct)
+        const revenu = !commission ? caHT
+          : forfait != null ? q * forfait
+          : pct != null ? ca * (pct / 100)
+          : 0
+        if (commission) { comEncaisse += ca; comRevenu += revenu; comLignes++ }
+
+        const couvert = !commission && coutU != null && coutU > 0
+        if (!commission) mCaHT += caHT
+        if (couvert && coutU != null) { mCaHTCouvert += caHT; mCout += q * coutU }
         vendus.add(nom)
         const p = prodMap.get(nom) ?? { q: 0, ca: 0, caHT: 0, cout: 0, couvert: false }
         p.q += q; p.ca += ca; p.caHT += caHT
-        if (couvert) { p.cout += q * coutU; p.couvert = true }
+        if (couvert && coutU != null) { p.cout += q * coutU; p.couvert = true }
         prodMap.set(nom, p)
         const c2 = catMap.get(cat) ?? { q: 0, ca: 0 }; c2.q += q; c2.ca += ca; catMap.set(cat, c2)
+
+        // Rattachement du CA au point de vente : le produit d'abord, la
+        // commande en repli. Une ligne sans aucun des deux tombe dans
+        // « non rattaché » plutôt que d'être silencieusement absorbée.
+        const posId = r?.etablissement_id ?? posDeCommande.get(String(a.commande_id)) ?? null
+        const cle = posId != null && posParId.has(String(posId)) ? String(posId) : '—'
+        const pv = posMap.get(cle) ?? { q: 0, ca: 0, caHT: 0, caHTCouvert: 0, revenu: 0, cout: 0, couvert: false }
+        pv.q += q; pv.ca += ca; pv.revenu += revenu
+        if (!commission) pv.caHT += caHT
+        if (couvert && coutU != null) { pv.caHTCouvert += caHT; pv.cout += q * coutU; pv.couvert = true }
+        posMap.set(cle, pv)
       }
     }
   }
 
   const caLignes = [...prodMap.values()].reduce((s, v) => s + v.ca, 0) || 1
+
+  // ── Ventilation par point de vente, puis par activité ─────────────
+  // ⚠️ Le food cost se divise par le CA HT COUVERT — les produits sans coût
+  // d'achat connu n'ont rien à faire au dénominateur. Divisé par le CA HT
+  // total, il tombait à 26,2 % au lieu de 39,8 % sur août 2026 : un taux
+  // flatteur qui donne l'illusion que les marges vont bien.
+  const fc = (cout: number, caHTCouvert: number, couvert: boolean) =>
+    couvert && caHTCouvert > 0 ? Math.round(cout / caHTCouvert * 1000) / 10 : null
+  const couverture = (caHTCouvert: number, caHT: number) =>
+    caHT > 0 ? Math.round(caHTCouvert / caHT * 100) : 0
+  const rangPos = [...posMap.entries()]
+    .map(([id, v]) => {
+      const e = posParId.get(id)
+      return {
+        slug: e?.slug ?? '—',
+        nom: e?.nom ?? 'Non rattaché',
+        activite: activiteDe(e?.slug),
+        quantite: v.q,
+        ca: Math.round(v.ca * 100) / 100,
+        caHT: Math.round(v.caHT * 100) / 100,
+        revenu: Math.round(v.revenu * 100) / 100,
+        marge: v.couvert ? Math.round((v.caHTCouvert - v.cout) * 100) / 100 : null,
+        foodCostPct: fc(v.cout, v.caHTCouvert, v.couvert),
+        couverturePct: couverture(v.caHTCouvert, v.caHT),
+        part: v.ca / caLignes,
+      }
+    })
+    .sort((a, b) => b.ca - a.ca)
+
+  const actMap = new Map<Activite, { ca: number; caHT: number; caHTCouvert: number; revenu: number; cout: number; couvert: boolean }>()
+  for (const [id, v] of posMap) {
+    const cle = activiteDe(posParId.get(id)?.slug)
+    const cur = actMap.get(cle) ?? { ca: 0, caHT: 0, caHTCouvert: 0, revenu: 0, cout: 0, couvert: false }
+    cur.ca += v.ca; cur.caHT += v.caHT; cur.caHTCouvert += v.caHTCouvert; cur.revenu += v.revenu
+    if (v.couvert) { cur.cout += v.cout; cur.couvert = true }
+    actMap.set(cle, cur)
+  }
+  const rangActivites = [...actMap.entries()]
+    .map(([cle, v]) => {
+      const d = activiteDef(cle)
+      return {
+        cle, nom: d.nom, emoji: d.emoji,
+        ca: Math.round(v.ca * 100) / 100,
+        caHT: Math.round(v.caHT * 100) / 100,
+        revenu: Math.round(v.revenu * 100) / 100,
+        marge: v.couvert ? Math.round((v.caHTCouvert - v.cout) * 100) / 100 : null,
+        foodCostPct: fc(v.cout, v.caHTCouvert, v.couvert),
+        couverturePct: couverture(v.caHTCouvert, v.caHT),
+        part: v.ca / caLignes,
+      }
+    })
+    .sort((a, b) => b.ca - a.ca)
   const rangProduits = [...prodMap.entries()]
     .map(([nom, v]) => ({
       nom, quantite: v.q, ca: Math.round(v.ca * 100) / 100, part: v.ca / caLignes,
@@ -202,11 +336,16 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
   // C'est l'information que la caisse ne donne pas — elle ne connaît que ce
   // qui s'est vendu. Or savoir ce qui NE se vend pas, c'est ce qui permet
   // d'arrêter d'en produire.
+  //
+  // ⚠️ Pas de filtre sur `tag_destination` : il était figé sur 'FOURNIL', ce
+  // qui rendait tout produit du bar ou de la pizzeria structurellement
+  // invisible ici. `actif = true` suffit — un produit éteint n'a pas à
+  // remonter comme dormant, et à la réouverture les cartes du haut
+  // apparaissent d'elles-mêmes.
   const { data: actifs } = await sb
     .from('recettes')
     .select('nom, categorie')
     .eq('actif', true)
-    .eq('tag_destination', 'FOURNIL')
   const dormants = (actifs ?? [])
     .filter(r => !vendus.has(String(r.nom)))
     .map(r => ({ nom: String(r.nom), categorie: String(r.categorie ?? '—') }))
@@ -255,6 +394,13 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
       .map(([taux, montant]) => ({ taux, montant: Math.round(montant * 100) / 100 }))
       .sort((a, b) => Number(a.taux) - Number(b.taux)),
     dormants,
+    parPointDeVente: rangPos,
+    parActivite: rangActivites,
+    commissions: {
+      encaisse: Math.round(comEncaisse * 100) / 100,
+      revenu: Math.round(comRevenu * 100) / 100,
+      lignes: comLignes,
+    },
     marge: {
       caHT: Math.round(mCaHT * 100) / 100,
       caHTCouvert: Math.round(mCaHTCouvert * 100) / 100,

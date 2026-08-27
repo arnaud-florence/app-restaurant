@@ -139,17 +139,58 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Nom de la matière | `recettes.nom_matiere` — « Pâton à pizza » à l'inventaire | 0132 |
 | Stock des matières | `ingredients.stocke`, `inventaires.ingredient_id` + `cible_id` | 0133, 0134 |
 | Stock théorique & démarque | calcul à la lecture : comptage + factures − ventes | 0135 |
+| Ventilation par activité | CA, marge et food cost par point de vente — calculés sur les LIGNES | — |
+| Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 
-**Migrations actuelles : 0001 → 0135.**
+**Migrations actuelles : 0001 → 0136.**
 
-### Réouverture d'octobre — deux gestes, pas un
+### Réouverture de septembre — un seul geste, et une carte à saisir
 
-Le bouton « Ouvrir le restaurant » de `/admin/etablissements` ne rallume que
-`activites_modules`. Les ~71 produits endormis par la 0118 portent
-`masque_hors_saison = true` et restent éteints : il faut aussi jouer
-**`sql/reveil-restaurant.sql`**, qui ne rallume que ces lignes-là (les recettes
-retirées à la main avant — doublons, seed de démo — doivent rester éteintes).
-Sans ce second geste, le restaurant rouvre avec une carte vide.
+Le bouton « Ouvrir le restaurant » de `/admin/etablissements` rallume
+`activites_modules`. **C'est désormais le seul geste technique.**
+
+`sql/reveil-restaurant.sql` ne fait plus rien : les 150 produits
+restaurant/bar/pizza/snack étaient des **produits de test** (seed de
+développement, mai-juin 2026 — Ricard, Burger Fermier, Tacos 2 viandes) et ont
+été purgés le 27 août 2026, avec leurs 353 compositions et les 7 commandes
+annulées qui les référençaient. Sauvegarde JSON conservée hors dépôt avant
+suppression.
+
+⚠️ Le piège évité : 71 de ces produits de test portaient `masque_hors_saison`,
+donc la procédure documentée les aurait **mis en ligne** à la réouverture — sur
+la caisse et sur casatasia.fr. Un « Coteaux Varois Rosé » et des « Tacos
+2 viandes » qui n'existent pas.
+
+La vraie carte du haut sera saisie quand le gérant l'aura arrêtée, et créée
+directement `actif = true`. La base ne contient plus que les 96 produits du
+Fournil (85 actifs).
+
+### Ventilation par activité — sur les lignes, jamais sur l'en-tête
+
+`getVentesStats()` rend `parPointDeVente` et `parActivite` : le CA, la marge et
+le food cost de chaque étage. Le rattachement se fait sur la **ligne de vente**
+(`recettes.etablissement_id`, repli `commandes.etablissement_id`), jamais sur
+l'en-tête du ticket. Deux raisons, et elles sont structurelles :
+
+- **une caisse ne donne pas toujours le point de vente.** Zelty l'a confirmé en
+  démo le 27/08/2026 : sur un compte unique, ses statistiques ventilent par
+  sur place / à emporter / livraison, jamais par activité ;
+- **un même ticket mélange les activités** — un café du Fournil et une pizza
+  sur la même addition.
+
+C'est ce qui permet de rester sur **un seul abonnement caisse** (89 € + 39 €
+la caisse secondaire) au lieu de deux comptes complets.
+
+⚠️ Le food cost se divise par le CA HT **couvert** (produits dont le coût
+d'achat est connu), pas par le CA HT total — sinon il est dilué par les
+produits sans coût et paraît bien meilleur qu'il n'est : 26,2 % au lieu de
+39,8 % sur les 30 jours d'août 2026. Toujours afficher la couverture à côté
+du taux. Test : `node scripts/test-ventilation-activite.mjs`.
+
+⚠️ La liste des **produits dormants** ne filtre plus sur
+`tag_destination = 'FOURNIL'` : figée ainsi, aucun produit du bar ou de la
+pizzeria n'aurait jamais pu y apparaître à la réouverture. `actif = true`
+suffit.
 
 ### TVA : le taux du produit prime
 
@@ -582,6 +623,10 @@ Trigger Module 7 : à chaque article qui passe à `servi`, déduction automatiqu
 
 Multi-taux depuis la migration 0066 — source de vérité `src/lib/tva.ts` :
 
+Le **2,1 % (presse)** est supporté depuis la 0136 : `TauxTva = 2.1 | 5.5 | 10
+| 20`, et `TAUX_ADMIS` sert de garde à `tauxTvaVente()`. Auparavant ce taux
+était rejeté en silence et un journal sortait à 5,5 %.
+
 | Cas | Taux |
 |---|---|
 | Alcool (sur place ou emporter) | 20 % |
@@ -591,6 +636,35 @@ Multi-taux depuis la migration 0066 — source de vérité `src/lib/tva.ts` :
 Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0113) porte les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries/gourmandises, 10 % snacking, pizzas et boissons.
 
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
+
+### Commissions : encaissé ≠ chiffre d'affaires (0136)
+
+Tabac, presse, FDJ et relais colis ne sont **pas des ventes de marchandise**.
+`recettes.type_revenu = 'commission'` les distingue, et la rémunération se dit
+soit en pourcentage du prix TTC (`commission_pct` — remise du débitant de
+tabac, dépôt-vente presse), soit en forfait HT par opération
+(`commission_forfait_ht` — un colis remis). **Le forfait prime** si les deux
+sont renseignés.
+
+Pourquoi ça ne pouvait pas rester modélisé en vente : un paquet à 12 € encaissé
+laisse quelques dizaines de centimes. Compté comme du CA, il gonfle le chiffre
+d'affaires et écrase tous les taux — la boulangerie à 70 % de marge noyée dans
+du tabac à quelques pour cent. Ces lignes sortent **aussi du food cost** : le
+prix est imposé, il n'y a rien à optimiser.
+
+`getVentesStats()` expose `commissions: { encaisse, revenu, lignes }` et un
+`revenu` par point de vente et par activité — CA HT pour une vente, commission
+pour le reste.
+
+Garde-fous : une contrainte CHECK refuse un produit en commission sans
+rémunération (son revenu serait silencieusement nul) ; côté action, repasser un
+produit de commission à vente **efface** les deux champs, sinon un taux fantôme
+survivrait (la contrainte ne contrôle que l'autre sens) ; et la règle « coût
+d'achat OU composition » de la fiche produit ne s'applique pas à une commission.
+
+Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules de
+`src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
+Aucune commande n'y est créée : le circuit de vente est réel.
 
 ### Carte du Fournil et photos produit
 
@@ -778,6 +852,10 @@ node scripts/test-commande-statut.mjs            # règle de statut + clôture c
 node scripts/test-activation.mjs                 # interrupteurs par activité (restaure l'état initial)
 node scripts/test-fournil-circuit.mjs            # circuit de vente Fournil bout en bout
 node scripts/test-carte-fournil.mjs              # carte réelle (60 produits, prix affiches, photos)
+
+# Pilotage multi-activités (août 2026)
+node scripts/test-ventilation-activite.mjs      # CA/marge/food cost par étage (lecture seule)
+node scripts/test-commission-tva.mjs            # commissions tabac/presse/FDJ + TVA 2,1 %
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26

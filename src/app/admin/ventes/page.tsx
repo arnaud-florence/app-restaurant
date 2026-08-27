@@ -227,6 +227,89 @@ export default async function VentesPage({
         </Bloc>
       )}
 
+      {s.parActivite.length > 0 && (
+        <Bloc
+          titre="Par activité"
+          aide="Rattachement calculé sur le produit vendu, pas sur l'en-tête du ticket — une même addition peut mélanger un café du Fournil et une pizza."
+        >
+          <ul className="space-y-3">
+            {s.parActivite.map(a => {
+              const pos = s.parPointDeVente.filter(p => p.activite === a.cle)
+              return (
+                <li key={a.cle}>
+                  <div className="flex justify-between gap-2 items-baseline">
+                    <span className="font-bold text-zinc-900">
+                      <span aria-hidden="true">{a.emoji}</span> {a.nom}
+                    </span>
+                    <span className="tabular-nums font-black text-zinc-900 shrink-0">
+                      {eur(a.ca, 2)}{' '}
+                      <span className="text-zinc-400 font-normal text-sm">{Math.round(a.part * 100)} %</span>
+                    </span>
+                  </div>
+                  <span className="block h-1.5 mt-1 rounded-full bg-emerald-500"
+                        style={{ width: `${Math.max(2, a.part * 100)}%` }} />
+                  <p className="text-xs text-zinc-500 mt-1 tabular-nums">
+                    {eur(a.caHT, 2)} HT
+                    {a.marge != null && <> · marge {eur(a.marge, 2)}</>}
+                    {a.foodCostPct != null && (
+                      <> · food cost{' '}
+                        <span className={a.foodCostPct > 33 ? 'text-red-600 font-bold'
+                          : a.foodCostPct >= 28 ? 'text-amber-600 font-bold' : 'text-emerald-700 font-bold'}>
+                          {a.foodCostPct.toLocaleString('fr-FR')} %
+                        </span>
+                        {/* Jamais le taux sans sa couverture : à 66 %, un tiers
+                            du CA n'a pas de coût connu et le chiffre ne vaut
+                            que pour les deux tiers restants. */}
+                        <span className="text-zinc-400"> sur {a.couverturePct} % du CA</span>
+                      </>
+                    )}
+                  </p>
+                  {pos.length > 1 && (
+                    <ul className="mt-1.5 pl-3 border-l-2 border-zinc-200 space-y-1">
+                      {pos.map(p => (
+                        <li key={p.slug} className="flex justify-between gap-2 text-sm">
+                          <span className="truncate text-zinc-600">{p.nom}</span>
+                          <span className="tabular-nums text-zinc-700 shrink-0">
+                            {eur(p.ca, 2)}
+                            {p.foodCostPct != null && (
+                              <span className="text-zinc-400 font-normal"> · {p.foodCostPct.toLocaleString('fr-FR')} %</span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </Bloc>
+      )}
+
+      {s.commissions.lignes > 0 && (
+        <Bloc
+          titre="Tabac, presse, FDJ, relais colis"
+          aide="Ces activités rapportent une commission, pas le montant du ticket. Elles sont exclues du food cost : leur prix est imposé, il n'y a rien à optimiser."
+        >
+          <dl className="grid grid-cols-2 gap-4">
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Encaissé</dt>
+              <dd className="text-xl font-black text-zinc-500 tabular-nums">{eur(s.commissions.encaisse, 2)}</dd>
+              <p className="text-xs text-zinc-400 mt-0.5">transite par le tiroir</p>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Vous revient</dt>
+              <dd className="text-xl font-black text-zinc-900 tabular-nums">{eur(s.commissions.revenu, 2)}</dd>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                {s.commissions.encaisse > 0
+                  ? `${(s.commissions.revenu / s.commissions.encaisse * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % du encaissé`
+                  : '—'}
+              </p>
+            </div>
+          </dl>
+        </Bloc>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         {s.parCategorie.length > 0 && (
           <Bloc titre="Par famille">

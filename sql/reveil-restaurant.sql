@@ -6,8 +6,15 @@
 -- mais pas les produits : la migration 0118 les avait endormis pour ne pas
 -- encombrer l'outil pendant que seul le Fournil tournait.
 --
--- Ne rallume QUE les lignes marquées par la 0118. Les recettes retirées à la
--- main avant (doublons, seed de démo) restent éteintes, comme voulu.
+-- ⚠️ DEVENU SANS EFFET LE 27 AOÛT 2026 — à ne plus considérer comme une
+-- étape de la réouverture. Les 150 produits restaurant/bar/pizza/snack
+-- étaient des produits de TEST (seed de développement, mai-juin 2026) et ont
+-- été purgés : plus aucune ligne ne porte `masque_hors_saison`, donc cette
+-- requête met désormais 0 ligne à jour.
+--
+-- La vraie carte du haut sera saisie quand elle sera arrêtée, et créée
+-- directement `actif = true`. Ce fichier ne subsiste que pour l'historique et
+-- au cas où un endormissement saisonnier serait remis en place un jour.
 --
 -- Rejouable sans dommage.
 -- ════════════════════════════════════════════════════════════════════

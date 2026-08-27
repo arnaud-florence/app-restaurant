@@ -27,6 +27,10 @@ const recetteSchema = z.object({
   unites_par_achat: z.coerce.number().positive().max(1000).optional().default(1),
   tva: z.coerce.number().min(0).max(100),
   contient_alcool: z.boolean().default(false),
+  // Revenus de commission (0136) — tabac, presse, FDJ, relais colis.
+  type_revenu: z.enum(['vente', 'commission']).default('vente'),
+  commission_pct: z.coerce.number().min(0).max(100).nullable().optional(),
+  commission_forfait_ht: z.coerce.number().min(0).max(9999).nullable().optional(),
   photo_url: z.string().max(2000).optional().nullable(),
   actif: z.boolean().default(true),
   // Phase 0 : exposition site web
@@ -66,6 +70,9 @@ function mapRecette(r: Record<string, unknown>): Recette {
     unites_par_achat: Number(r.unites_par_achat ?? 1),
     tva: Number(r.tva ?? 10),
     contient_alcool: !!r.contient_alcool,
+    type_revenu: (r.type_revenu as 'vente' | 'commission') ?? 'vente',
+    commission_pct: r.commission_pct == null ? null : Number(r.commission_pct),
+    commission_forfait_ht: r.commission_forfait_ht == null ? null : Number(r.commission_forfait_ht),
     actif: r.actif as boolean,
     photo_url: (r.photo_url as string) ?? null,
     vendable_online: !!r.vendable_online,
@@ -178,6 +185,12 @@ export async function createRecette(payload: unknown): Promise<{ id: string }> {
       unites_par_achat: recette.unites_par_achat ?? 1,
       tva: recette.tva,
       contient_alcool: recette.contient_alcool,
+      type_revenu: recette.type_revenu,
+      // Une vente ne porte pas de commission : on efface, sinon un produit
+      // repassé de commission à vente garderait un taux fantôme que la
+      // contrainte 0136 n'attrape pas (elle ne contrôle que l'inverse).
+      commission_pct: recette.type_revenu === 'commission' ? (recette.commission_pct ?? null) : null,
+      commission_forfait_ht: recette.type_revenu === 'commission' ? (recette.commission_forfait_ht ?? null) : null,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
       vendable_online: recette.vendable_online,
@@ -244,6 +257,12 @@ export async function updateRecette(id: string, payload: unknown) {
       unites_par_achat: recette.unites_par_achat ?? 1,
       tva: recette.tva,
       contient_alcool: recette.contient_alcool,
+      type_revenu: recette.type_revenu,
+      // Une vente ne porte pas de commission : on efface, sinon un produit
+      // repassé de commission à vente garderait un taux fantôme que la
+      // contrainte 0136 n'attrape pas (elle ne contrôle que l'inverse).
+      commission_pct: recette.type_revenu === 'commission' ? (recette.commission_pct ?? null) : null,
+      commission_forfait_ht: recette.type_revenu === 'commission' ? (recette.commission_forfait_ht ?? null) : null,
       photo_url: recette.photo_url || null,
       actif: recette.actif,
       vendable_online: recette.vendable_online,
