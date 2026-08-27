@@ -828,6 +828,15 @@ disparaîtrait définitivement, même réapprovisionné. Une boucle silencieuse
 dont personne ne trouverait la cause. Couper les canaux en ligne laisse aussi
 vendre au comptoir ce qui reste, ce qui est le bon comportement.
 
+Saisie : **`(ops)/ruptures`** — une liste, un appui, c'est marqué. Le moment
+où l'on constate une rupture, c'est au comptoir en plein service, une tablette
+à la main : si le geste prend plus de deux secondes il ne sera pas fait, et on
+continuera de vendre en ligne ce qu'on n'a plus. Bascule optimiste (attendre
+le serveur pour voir la couleur changer donne l'impression que rien ne s'est
+passé, et on tape deux fois), et la date est posée **côté serveur** — une
+tablette dont l'horloge dérive marquerait une rupture pour hier, que la caisse
+ne verrait jamais.
+
 `recettes.rupture_le` est **daté** : une rupture est une décision du jour et
 se périme seule. Sans date, personne ne penserait à la lever le lendemain et
 le produit resterait invisible.
