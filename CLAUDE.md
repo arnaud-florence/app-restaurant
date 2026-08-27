@@ -639,6 +639,22 @@ Le **2,1 % (presse)** est supporté depuis la 0136 : `TauxTva = 2.1 | 5.5 | 10
 
 Le taux est calculé par `tauxTvaArticle(contient_alcool, consommation)` et persisté par ligne (`commande_articles.tva_taux`, `tva_eur`) avec une ventilation par taux sur la commande (`ventilation_tva`). La carte Fournil (0113) porte les bons taux par produit : 5,5 % pains/viennoiseries/pâtisseries/gourmandises, 10 % snacking, pizzas et boissons.
 
+⚠️ **20 % sur une denrée alimentaire est presque toujours une erreur de
+CAISSE.** Constaté le 28/08/2026 : 7 produits actifs du Fournil (Paris-Brest,
+moelleux choco, croque-monsieur, glace Mario, cône vanille, fusée, Sunroll)
+étaient à 20 % sans contenir d'alcool. Tous créés automatiquement depuis les
+tickets — **le taux venait de SumUp**. 8,13 € de TVA sur-collectée en 11 jours
+de vente, soit ~270 €/an : pas un risque légal (sur-collecter ne se sanctionne
+pas) mais de la marge pure, le prix du panneau ne bougeant pas.
+
+Corrigé en recalculant `prix_vente_ht` pour que **le TTC affiché reste
+identique au centime** — c'est le net qui monte, jamais le tarif.
+
+⚠️ **La correction dans l'outil ne corrige PAS la caisse.** Le taux facturé
+au client vient du ticket, donc de SumUp : tant qu'il n'y est pas changé, les
+nouvelles ventes continuent d'arriver à 20 %. Le connecteur signale désormais
+ces créations dans `tva_20_suspecte` pour que ça ne repasse plus inaperçu.
+
 ⚠️ **Formules petit-déjeuner : 10 % assumé.** Une « Formule Express » (café à 10 % + croissant à 5,5 %) est un panier mixte, mais `recettes.tva` ne porte qu'un taux. Le choix est le taux haut : sur-collecter est rattrapable, sous-collecter ne l'est pas. À revoir si ces formules pèsent lourd dans le CA.
 
 ### Adaptateur Zelty — écrit sur la documentation officielle

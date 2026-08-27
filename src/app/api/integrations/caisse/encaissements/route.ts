@@ -125,6 +125,11 @@ export async function POST(req: Request) {
   } catch { /* carte injoignable → import sans lignes */ }
 
   const t0 = Date.now()
+  // Denrées alimentaires créées à 20 % : le taux vient du ticket, donc de la
+  // caisse. 20 % sur un produit non alcoolisé est presque toujours une erreur
+  // de paramétrage côté caisse — vécu sur 7 produits du Fournil, ~270 €/an de
+  // TVA sur-collectée, invisibles jusqu'à ce qu'on les cherche.
+  const tauxSuspects: string[] = []
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
   let lignesPosees = 0
   const inconnus = new Map<string, number>()
@@ -245,6 +250,7 @@ export async function POST(req: Request) {
                 }).select('id, tag_destination').maybeSingle()
 
                 if (neuf) {
+                  if (taux === 20) tauxSuspects.push(p.nom_caisse)
                   rec = { id: String(neuf.id), tag: String(neuf.tag_destination ?? 'FOURNIL') }
                   parCaisse.set(cle, rec)   // les lignes suivantes du même lot en profitent
                   tagParRecette.set(rec.id, rec.tag)
@@ -327,6 +333,9 @@ export async function POST(req: Request) {
     // Fiches créées à la volée depuis un libellé de caisse jamais vu.
     // À relire dans /admin/recettes : catégorie « À classer », sans photo.
     produits_crees: crees,
+    // À vérifier dans la caisse : 20 % sur une denrée alimentaire est presque
+    // toujours un mauvais paramétrage, et il sur-collecte en silence.
+    ...(tauxSuspects.length > 0 ? { tva_20_suspecte: tauxSuspects } : {}),
     sans_commande: sansCommande,
     erreurs,
   }
