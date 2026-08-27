@@ -942,6 +942,36 @@ perdue en silence.
 Test : `PORT=3000 node scripts/test-zelty-disponibilites.mjs` — 16 assertions,
 dont l'essentiel porte sur ce que le constructeur REFUSE de faire.
 
+#### Webhooks — temps réel plutôt que sondage
+
+`POST /api/integrations/zelty/webhook`. Le sondage horaire a deux défauts :
+les écrans de préparation voient les commandes en retard, et une heure creuse
+coûte un appel pour rien.
+
+Traités : `order.ended` (le ticket entre dans le CA immédiatement, via le
+connecteur normalisé — jamais en écrivant directement). Tracés sans agir :
+`till.close` (la clôture de caisse, future pièce du rapprochement),
+`dish.availability_update`, et le reste — le jour où on les branche, on aura
+des charges utiles RÉELLES sous la main au lieu d'hypothèses.
+
+⚠️ **Signature obligatoire.** Cet endpoint écrit des VENTES : accepter un
+corps non authentifié permettrait à n'importe qui de gonfler le chiffre
+d'affaires. Sans signature valide → 401.
+
+⚠️ Le nom de l'en-tête de signature n'est pas documenté (la page ne se
+charge pas). On teste donc les en-têtes vraisemblables, en hexadécimal comme
+en base64, préfixe `sha256=` toléré, comparaison à **temps constant**. Un
+refus enregistre les **NOMS** d'en-têtes reçus — jamais leurs valeurs — pour
+identifier le bon au premier appel réel. `ZELTY_WEBHOOK_HEADER` le fige
+ensuite.
+
+⚠️ Une erreur de traitement chez nous répond quand même **200** : sinon Zelty
+réessaie indéfiniment. Le journal garde le brut, on rejoue.
+
+Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 11 assertions, dont
+l'essentiel porte sur ce qui est REFUSÉ (corps non signé, signature fausse,
+corps altéré après signature).
+
 **Le jour du branchement** : générer la clé depuis le back-office → la poser
 sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
 puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
@@ -1341,6 +1371,7 @@ PORT=3000 node scripts/test-zelty-catalogue.mjs # traduction Zelty — catalogue
 PORT=3000 node scripts/test-zelty-emission.mjs  # émission vers la caisse (sans compte)
 PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (sans compte)
 PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (sans compte)
+PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test local)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
