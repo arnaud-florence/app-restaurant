@@ -672,11 +672,26 @@ moyen devient absurde.
 rejet nommé, pas un ticket à 0 € qui entrerait dans le CA sans que personne
 ne le remarque. Idem pour une commande annulée.
 
+⚠️ **`order.status` est NUMÉRIQUE chez Zelty : 255 = clôturée.** Tout autre
+nombre est une commande partielle, annulée ou remboursée, et ne doit pas
+compter comme une vente. Source : documentation d'intégration KEYBAN et
+webhook `order.ended` — **à reconfirmer sur la doc officielle**. Le rejet est
+nommé (« statut 128 — non clôturée ») plutôt que silencieux : si l'hypothèse
+est fausse, `?dry=1` le montre tout de suite — « 40 commandes lues, 0
+traduites » se voit, un CA amputé de moitié ne se voit pas.
+
+Autres éléments relevés hors documentation officielle, à confirmer :
+`order.ended` est signé en **HMAC SHA-256** (donc un webhook est possible, et
+préférable au sondage) ; l'authentification serait un **HTTP Digest + jeton
+Bearer** avec identifiant/mot de passe API et identifiant d'établissement —
+`ZELTY_AUTH` couvre le Bearer et `x-api-key`, à étendre si c'est bien du
+Digest.
+
 Tant que rien n'est configuré, la route répond **200** avec
 `{ configure: false }` : une caisse pas encore branchée n'est pas une panne,
 et le monitoring compte tout code ≠ 200 comme une erreur.
 
-Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 23 assertions sur des
+Test : `PORT=3000 node scripts/test-zelty-mapper.mjs` — 28 assertions sur des
 commandes fictives, à travers le banc d'essai, donc c'est le vrai mapper qui
 est éprouvé. Aucun compte ni clé Zelty nécessaire.
 

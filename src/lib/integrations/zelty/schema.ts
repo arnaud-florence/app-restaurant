@@ -89,7 +89,11 @@ export const commandeZeltySchema = z.object({
   pos_id:        texte.optional(),
   point_of_sale: texte.optional(),
 
-  status:        z.string().optional(),
+  /** Statut. Zelty l'exprime en NOMBRE : 255 = commande clôturée. Les autres
+   *  valeurs couvrent les commandes partielles, annulées ou remboursées.
+   *  (Source : documentation d'intégration KEYBAN, à reconfirmer sur la doc
+   *  officielle.) On accepte aussi la forme texte, par prudence. */
+  status:        z.union([z.string(), z.number()]).optional(),
   cancelled:     z.boolean().optional(),
 }).passthrough()
 

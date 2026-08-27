@@ -56,6 +56,9 @@ export type ResultatMapping = {
 
 const arrondi = (n: number) => Math.round(n * 100) / 100
 
+/** Statut Zelty d'une commande clôturée — le seul qui vaille une vente. */
+export const STATUT_CLOTUREE = 255
+
 /** Normalise un mode de paiement Zelty vers notre vocabulaire. */
 export function normaliserPaiement(brut: string | undefined): string {
   const s = (brut ?? '').toLowerCase()
@@ -120,8 +123,27 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
     const ref = premier(c.id, c.order_id, c.reference)
     if (!ref) { rejets.push({ reference: `#${i}`, raison: 'commande sans identifiant' }); continue }
 
-    if (c.cancelled === true || /cancel|annul|void/i.test(c.status ?? '')) {
+    // ── La commande est-elle FINALE ? ───────────────────────────────
+    // Zelty exprime le statut en nombre : 255 = clôturée. Tout le reste est
+    // une commande partielle, annulée ou remboursée, qu'il ne faut surtout
+    // pas compter comme une vente.
+    //
+    // Le rejet est nommé plutôt que silencieux : si cette hypothèse est
+    // fausse, le mode ?dry=1 le montre immédiatement — « 40 commandes lues,
+    // 0 traduites » se voit, un CA amputé de moitié ne se voit pas.
+    if (c.cancelled === true) {
       rejets.push({ reference: String(ref), raison: 'commande annulée' })
+      continue
+    }
+    const statut = c.status
+    if (typeof statut === 'number' || (typeof statut === 'string' && /^\d+$/.test(statut))) {
+      const n = Number(statut)
+      if (n !== STATUT_CLOTUREE) {
+        rejets.push({ reference: String(ref), raison: `statut ${n} — non clôturée (attendu ${STATUT_CLOTUREE})` })
+        continue
+      }
+    } else if (typeof statut === 'string' && /cancel|annul|void|refund|rembours/i.test(statut)) {
+      rejets.push({ reference: String(ref), raison: `statut « ${statut} »` })
       continue
     }
 

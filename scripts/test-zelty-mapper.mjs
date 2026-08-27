@@ -87,8 +87,26 @@ t('un panier moyen absurde déclenche un avertissement',
 // ── 4. Commande annulée ─────────────────────────────────────────────
 r = await verifier([{ id: 'ZEL-3001', total: 20, status: 'CANCELLED' }])
 t('une commande annulée est écartée', r.body.traduites === 0)
-t('et la raison est dite',
-  (r.body.rejets ?? []).some(x => /annul/i.test(x.raison)), JSON.stringify(r.body.rejets))
+t('et le statut brut est nommé dans le rejet',
+  (r.body.rejets ?? []).some(x => /CANCELLED/.test(x.raison)), JSON.stringify(r.body.rejets))
+
+// ── 4 bis. Statut NUMÉRIQUE : 255 seul vaut une vente ───────────────
+// Zelty exprime le statut en nombre. Une commande partielle ou remboursée
+// comptée comme une vente gonflerait le CA sans que rien ne le signale.
+r = await verifier([{ id: 'ZEL-3100', total: 15, status: 255, date: '2026-09-15T09:00:00Z' }])
+t('le statut 255 est accepté', r.body.traduites === 1, JSON.stringify(r.body.rejets))
+
+r = await verifier([{ id: 'ZEL-3101', total: 15, status: 128, date: '2026-09-15T09:00:00Z' }])
+t('un statut non clôturé est écarté', r.body.traduites === 0)
+t('et le statut fautif est nommé',
+  (r.body.rejets ?? []).some(x => /128/.test(x.raison)), JSON.stringify(r.body.rejets))
+
+r = await verifier([{ id: 'ZEL-3102', total: 15, status: '255', date: '2026-09-15T09:00:00Z' }])
+t('le statut 255 en chaîne est accepté aussi', r.body.traduites === 1)
+
+r = await verifier([{ id: 'ZEL-3103', total: 15, status: 'REFUNDED', date: '2026-09-15T09:00:00Z' }])
+t('un remboursement textuel est écarté', r.body.traduites === 0,
+  JSON.stringify(r.body.rejets))
 
 // ── 5. Total manquant : surtout pas 0 € ─────────────────────────────
 r = await verifier([{ id: 'ZEL-4001', items: [{ name: 'X', quantity: 1, price: 3 }] }])
