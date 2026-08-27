@@ -370,6 +370,23 @@ Ordre de rapprochement : **référence d'abord, libellé ensuite**. Le chemin pa
 le nom reste actif — toutes les factures antérieures n'ont pas de référence,
 et tous les fournisseurs n'en impriment pas.
 
+**Le catalogue Arti'Pat comme pièce de contrôle.** 292 pages, 146 Mo —
+indexé par `scripts/indexer-catalogue-artipat.mjs`, 599 références avec
+colisage et prix indicatif. Trois usages :
+
+1. **vérifier le colisage** — 20 sur 34 concordent exactement avec le `C=N`
+   lu sur les factures ;
+2. **vérifier un prix** — le tarif catalogue est INDICATIF ; Gineys consent
+   20 à 30 % de remise. Un prix payé calculé AU-DESSUS du tarif signale un
+   mauvais rapprochement, pas une hausse ;
+3. **récupérer les vraies photos produit** — extraction des images intégrées
+   via pdfjs (`page.getOperatorList()` + `page.objs`), recadrées en 900×675
+   comme le reste de la grille.
+
+⚠️ Le catalogue ne couvre QUE la gamme Arti'Pat. Le « Coulant Gourmand au
+chocolat » (Carigel) et les glaces n'y sont pas : `libelle_achat` reste la
+source pour ceux-là.
+
 **Garde-fou anti-doublon de facture.** `createFacture` REFUSE un numéro déjà
 enregistré chez le même fournisseur et pour le même `type_document` — deux
 scans de la même facture Promocash avaient gonflé les achats de ~447 € en
