@@ -1281,6 +1281,40 @@ exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
 une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
 effacer.
 
+### L'historique économique des produits (0146)
+
+`historique_prix_ingredients` existait depuis le module 3 — 184 lignes. Les
+**produits**, eux, n'avaient aucune trace. Or dans le modèle achat-revente,
+c'est sur `recettes` que vivent les trois chiffres qui font la marge :
+`cout_achat_ht`, `prix_vente_ht`, `tva`.
+
+Mesuré le jour même : le café est passé de 1,20 à 1,40 €, quatre formules ont
+pris 20 centimes, trois prix ont été corrigés et un taux de TVA rectifié — et
+**rien ne l'a enregistré**. Dans un mois, personne n'aurait su ni quand, ni
+depuis quel prix.
+
+C'est le socle de toute lecture causale : on ne peut pas expliquer un mouvement
+de marge si on ignore ce que valait le produit la semaine d'avant.
+
+⚠️ **C'est un TRIGGER, pas du code applicatif, et c'est délibéré.** Le
+28/08/2026, les prix ont été modifiés depuis cinq scripts différents, la
+propagation des lignes de facture et le miroir du catalogue caisse. Une
+écriture posée dans une server action en aurait manqué l'essentiel — et l'aurait
+manqué EN SILENCE, le pire cas pour un journal. Le trigger ne se contourne pas.
+
+⚠️ Seuls les champs **économiques** déclenchent une trace. Une photo remplacée
+ou un libellé corrigé n'ont rien à faire dans un historique de prix : le bruit
+rendrait la lecture inutilisable. Réécrire la même valeur ne trace pas non plus.
+
+⚠️ La `source` vaut `inconnu` par défaut, et c'est honnête : un trigger ne peut
+pas savoir POURQUOI un prix change. Elle s'infère après coup, en rapprochant la
+date d'une facture ou d'une synchro. Mieux vaut « inconnu » qu'une source
+inventée. Une ligne de reprise par produit sert de point de départ — sans elle,
+le premier changement n'aurait rien à quoi se comparer.
+
+Test : `node scripts/test-historique-prix-produits.mjs` (11 assertions, crée et
+supprime son propre produit).
+
 ### Ce que l'affaire VAUT — lecture patrimoniale (0143)
 
 `/admin/patrimoine`. Tout le reste de l'outil mesure ce qui entre en caisse.
