@@ -56,11 +56,14 @@ const AFFICHES = {
   'Formule Express': 2.20, 'Formule Douceur chaude': 3.40,
   'Formule Petit-déjeuner complet': 3.80, 'Formule Tartine': 4.20,
 }
-const TVA_REDUITE = new Set(['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise'])
+// « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
+// SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent
+// le taux réduit comme les autres gourmandises.
+const TVA_REDUITE = new Set(['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise', 'Glace'])
 // Produits indicatifs de la carte de démarrage 0095 : ne doivent plus être vendus.
 const CARTE_0095 = ['Pain', 'Pain de campagne', 'Pain aux céréales', 'Baguette tradition',
   'Brioche', 'Macaron', 'Mille-feuille', 'Tarte aux pommes (part)', 'Soda / Eau', 'Café crème',
-  'Croque-monsieur', 'Quiche lorraine (part)', 'Pizza fournil (part)', 'Sandwich jambon-beurre',
+  'Quiche lorraine (part)', 'Pizza fournil (part)', 'Sandwich jambon-beurre',
   'Sandwich poulet crudités']
 
 console.log('╔══════════════════════════════════════════════════════════╗')
@@ -81,6 +84,12 @@ const HORS_AFFICHE = new Set([
   'Red Bull 25 cl', 'Salade',
   'Formule — sandwich ou panini', 'Formule — boisson', 'Formule — dessert',
   'Formule — croissant ou pain au chocolat', 'Formule — expresso ou allongé',
+  // Arrivés par les tickets SumUp puis classés le 28/08/2026 : ils ne figurent
+  // sur aucune affiche, ce qui ne les rend pas illégitimes.
+  'Croque-monsieur', 'Paris-Brest', 'Moelleux au chocolat', 'Pain restaurant',
+  'Panuozzi', 'Donuts', 'Cappuccino ou chocolat chaud',
+  'Pago orange 20 cl', 'Pago pomme 20 cl', 'Pago pomme 33 cl', 'Red Bull Ice',
+  'Sunroll', 'Fusée', 'Mario', 'Cône vanille',
 ])
 
 // Retirés du click & collect par la 0115 : une tasse ne voyage pas, et une
@@ -96,12 +105,17 @@ const HORS_LIGNE_VOULU = new Set([
 ])
 
 await step('périmètre de la carte', async () => {
-  const attendu = Object.keys(AFFICHES).length + HORS_AFFICHE.size
+  // Les produits d'affiche retirés de la vente ne comptent plus dans l'actif.
+  const retires = Object.keys(AFFICHES).filter(n => carte.some(r => r.nom === n && !r.actif)).length
+  const attendu = Object.keys(AFFICHES).length - retires + HORS_AFFICHE.size
   if (actifs.length === attendu) ok(`${actifs.length} produits actifs (${Object.keys(AFFICHES).length} affichés + ${HORS_AFFICHE.size} connus de la caisse)`)
   else ko('nombre de produits', `${actifs.length} en base, ${attendu} attendus`)
 
   const enBase = new Set(actifs.map(r => r.nom))
-  const manquants = Object.keys(AFFICHES).filter(n => !enBase.has(n))
+  // Un produit d'affiche DÉSACTIVÉ n'est pas manquant : il a été retiré de la
+  // vente et reste en base parce qu'il figure sur une commande passée.
+  const tousNoms = new Set(carte.map(r => r.nom))
+  const manquants = Object.keys(AFFICHES).filter(n => !enBase.has(n) && !tousNoms.has(n))
   const enTrop = [...enBase].filter(n => !(n in AFFICHES) && !HORS_AFFICHE.has(n))
   if (manquants.length === 0) ok('aucun produit d’affiche manquant')
   else ko('produits manquants', manquants.join(', '))
@@ -132,6 +146,28 @@ await step('TVA par famille (vente à emporter)', async () => {
   })
   if (mauvais.length === 0) ok('5,5 % pain/viennoiserie/pâtisserie/gourmandise, 10 % ailleurs')
   else ko('TVA incorrecte', mauvais.map(r => `${r.nom} (${r.categorie} → ${r.tva} %)`).join(', '))
+})
+
+// Les produits nés des tickets échappent au contrôle « famille → taux » faute
+// d'affiche de référence. Ce contrôle-ci ne dépend d'aucune référence : à
+// l'intérieur d'une même famille, deux produits ne peuvent pas être à des taux
+// différents. C'est ainsi qu'on attrape l'intrus — et un taux TROP BAS est le
+// seul qui ne se rattrape pas.
+await step('cohérence des taux au sein d’une famille', async () => {
+  const parFamille = {}
+  for (const r of actifs) {
+    if (r.contient_alcool) continue
+    // Un composant de formule suit le taux de ce qu'il contient, pas celui de
+    // sa famille : « croissant ou pain au chocolat » est de la viennoiserie.
+    if (r.nom.startsWith('Formule — ')) continue
+    ;(parFamille[r.categorie] ??= new Map()).set(Number(r.tva),
+      [...((parFamille[r.categorie].get(Number(r.tva))) ?? []), r.nom])
+  }
+  const melangees = Object.entries(parFamille).filter(([, m]) => m.size > 1)
+  if (melangees.length === 0) ok(`${Object.keys(parFamille).length} familles à taux unique`)
+  else ko('taux mélangés dans une même famille', melangees.map(([c, m]) =>
+    `${c} : ` + [...m.entries()].map(([t, noms]) =>
+      `${t} % (${noms.length === 1 ? noms[0] : noms.length + ' produits'})`).join(' vs ')).join(' | '))
 })
 
 await step('photos', async () => {

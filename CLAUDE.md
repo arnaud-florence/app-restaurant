@@ -1259,6 +1259,24 @@ Les 60 produits viennent des 13 affiches CasaTasia (migration 0113, prix TTC des
 
 `image_url` doit rester une **URL absolue** (`https://app-restaurant-livid.vercel.app/produits/<slug>.jpg`) : le site vitrine est un projet distinct qui consomme `/api/public/menu` en CORS, une URL relative y pointerait sur son propre domaine. Corollaire : **une photo n'est visible qu'après déploiement de l'app**.
 
+**Contrôle de la carte poussée** : `node scripts/verifier-carte-zelty.mjs`
+compare la caisse à notre base, produit par produit — prix TTC au centime, TVA
+à emporter ET sur place, photo, nom, état. Lecture seule. 84/84 conformes au
+28/08/2026.
+
+⚠️ La TVA **sur place** vérifiée est celle de la LOI (10 %, ou 20 % alcool,
+ou 2,1 % presse), pas celle du panneau : recopier le taux d'emporter
+sous-déclarerait un croissant mangé à table.
+
+⚠️ **Un contrôle « famille → taux » ne suffit pas** pour les produits nés des
+tickets : ils n'ont aucune affiche de référence, donc ils échappaient au
+contrôle. D'où le contrôle de **cohérence interne** : dans une même famille,
+deux produits ne peuvent pas être à des taux différents. C'est lui qui a
+trouvé « Pago pomme 33 cl » à 5,5 % quand les seize autres boissons fraîches
+sont à 10 %. Un taux trop BAS est le seul qui ne se rattrape pas.
+Les composants de formule (`Formule — …`) en sont exclus : leur taux suit ce
+qu'ils contiennent, pas leur famille.
+
 Vérification : `node scripts/test-carte-fournil.mjs` (compare la base aux prix des affiches, la TVA par famille, et l'existence réelle de chaque fichier photo).
 
 ### Realtime obligatoire
