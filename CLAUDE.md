@@ -256,6 +256,13 @@ jambon sont entrées dans les sandwichs (il faudrait une recette chiffrée,
 hors modèle). Pour une matière première, on affiche les entrées seules et
 AUCUN théorique : mieux vaut pas de chiffre qu'un chiffre faux.
 
+**40 matières suivies au 28/08/2026** (36 + ketchup, sauce barbecue, farine
+T55, sacs à croissants). Sur les 134 lignes de facture : 60 rattachées à un
+produit, 45 à une matière, 23 écartées, **6 en attente** — trois visent des
+produits désactivés (focaccia, pain aux céréales, pizza à la plaque), un Pago
+orange 33 cl qui n'existe pas au catalogue, le déca et un kit café mixte. Ce
+sont des décisions commerciales, pas des correspondances à forcer.
+
 ⚠️ L'unité d'une matière (`ingredients.unite`) doit être celle de la LIGNE DE
 FACTURE, pas une unité « logique » : Gineys facture la mozzarella au kg même
 si elle arrive en sacs de 2 kg. Compter en sacs rendrait les entrées
