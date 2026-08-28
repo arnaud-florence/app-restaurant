@@ -42,6 +42,17 @@ const BASE_URL = 'https://app-restaurant-livid.vercel.app/produits'
 // vérifiée sur les 66 produits déjà photographiés : 0 sur 6 pour les boissons
 // chaudes, 0 sur 8 pour les formules, 100 % partout ailleurs.
 const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Formule', 'Formule petit-déjeuner'])
+
+// ⚠️ Une règle par FAMILLE ne suffit plus depuis la carte du bar (28/08/2026).
+// Les familles Bière, Apéritif, Alcool et Vin n'y figuraient pas, donc le
+// générateur aurait mis l'alcool en vente en ligne — sans contrôle d'âge.
+// Deux garde-fous, et le premier est légal, pas commercial :
+//  · `contient_alcool` interdit la vente en ligne, quelle que soit la famille.
+//    C'est ce qui laisse passer la bière SANS alcool, qui a le droit d'y être ;
+//  · un produit du BAR ne se retire pas au comptoir : un sirop à l'eau ou un
+//    diabolo se servent au verre, ils n'ont rien à faire au click & collect.
+const jamaisEnLigne = (r) =>
+  JAMAIS_EN_LIGNE.has(r.categorie) || r.contient_alcool === true || r.tag_destination === 'BAR'
 // Les composants de formule ne sont pas des produits autonomes : ils n'ont
 // rien à faire sur la vitrine, avec ou sans visuel.
 const EXCLUS = /^Formule\s*—/
@@ -66,7 +77,12 @@ function titreEtFormat(nom, categorie) {
   return [nom, fam === nom.toLowerCase() ? 'fait maison' : fam]
 }
 
-function plaque(nom, format) {
+// Le pied de la plaque nomme l'ACTIVITÉ, pas la maison : « Le Fournil » sous
+// un demi pression n'a aucun sens, et ces visuels finissent sur la vitrine et
+// sur la caisse.
+const MAISON = { FOURNIL: 'Le Fournil', BAR: 'Le Bar', PIZZA: 'La Pizzeria', CUISINE: 'Le Restaurant' }
+
+function plaque(nom, format, destination) {
   const t = taille(nom)
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${H_IMG}">
   <defs><linearGradient id="fond" x1="0" y1="0" x2="0" y2="1">
@@ -88,13 +104,13 @@ function plaque(nom, format) {
   <text x="${L / 2}" y="586" text-anchor="middle" fill="${OR}" fill-opacity="0.6"
         font-family="Georgia, 'Times New Roman', serif" font-size="21" letter-spacing="6">CASATASIA</text>
   <text x="${L / 2}" y="618" text-anchor="middle" fill="${OR}" fill-opacity="0.4"
-        font-family="Georgia, 'Times New Roman', serif" font-size="16" letter-spacing="3" font-style="italic">Le Fournil</text>
+        font-family="Georgia, 'Times New Roman', serif" font-size="16" letter-spacing="3" font-style="italic">${esc(MAISON[destination] ?? 'Le Fournil')}</text>
 </svg>`
 }
 
 const q = async p => (await fetch(`${U}/rest/v1/${p}`, { headers: H })).json()
 
-const sans = await q('recettes?select=id,nom,categorie&actif=eq.true&image_url=is.null&order=categorie,nom')
+const sans = await q('recettes?select=id,nom,categorie,contient_alcool,tag_destination&actif=eq.true&image_url=is.null&order=categorie,nom')
 const cibles = sans.filter(r => !EXCLUS.test(r.nom))
 const ignores = sans.filter(r => EXCLUS.test(r.nom))
 
@@ -107,11 +123,11 @@ let n = 0
 for (const r of cibles) {
   const [titre, format] = titreEtFormat(r.nom, r.categorie)
   const s = slug(r.nom)
-  const enLigne = !JAMAIS_EN_LIGNE.has(r.categorie)
+  const enLigne = !jamaisEnLigne(r)
   console.log(`  ${r.nom.padEnd(30)} → ${s}.jpg   « ${titre} · ${format} »   en ligne : ${enLigne ? 'oui' : 'non'}`)
   if (!ECRIRE) continue
 
-  await sharp(Buffer.from(plaque(titre, format))).jpeg({ quality: 86 }).toFile(`public/produits/${s}.jpg`)
+  await sharp(Buffer.from(plaque(titre, format, r.tag_destination))).jpeg({ quality: 86 }).toFile(`public/produits/${s}.jpg`)
   const rep = await fetch(`${U}/rest/v1/recettes?id=eq.${r.id}`, {
     method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' },
     body: JSON.stringify({ image_url: `${BASE_URL}/${s}.jpg`, vendable_online: enLigne }),
