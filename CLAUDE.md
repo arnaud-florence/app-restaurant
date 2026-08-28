@@ -143,7 +143,8 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
-| Registre légal d'ouverture | 21 obligations, drapeau `bloquant` sans date | 0147 |
+| Registre légal d'ouverture | 24 obligations, drapeau `bloquant` sans date | 0147 |
+| Bar : vendu ↔ acheté | `nom_matiere` + rendements, inventaire par poste | — |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
@@ -1643,6 +1644,62 @@ des focaccias). Essai à blanc par défaut. Les composants de formule
 suffit de remplacer les fichiers : les URL en base ne bougent pas. Et rien
 n'est visible avant **déploiement**.
 
+### Le bar sait ce qu'il achète — inventaire par poste
+
+Le bar ouvrait avec 36 produits tarifés et poussés en caisse, et **pas un seul
+lien vers une matière**. Il se serait allumé aveugle : aucune bouteille à
+l'inventaire, aucune commande conseillée, et une marge fondée sur les
+estimations qui avaient servi à bâtir la carte.
+
+`node scripts/matieres-bar.mjs [--ecrire]` pose la correspondance vendu ↔
+acheté : `nom_matiere` dit ce qu'on COMPTE, `unites_par_achat` combien on en
+tire. Même patron que « Panuozzi ← pâton » (0131/0132). **26 liens,
+25 matières.**
+
+Les rendements sont **arithmétiques, pas estimés** : 30 L / 25 cl = 120 demis,
+70 cl / 4 cl = 17,5 doses, 75 cl / 12 cl = 6 verres. La mousse et les purges ne
+sont pas déduites — les inventer ferait un chiffre faux ; l'écart réel se lit
+dans la démarque, où il est une information (un fût qui rend 105 demis au lieu
+de 120 se règle au tirage).
+
+⚠️ **Aucun `libelle_achat` n'est écrit, et c'est délibéré** : c'est le texte
+LITTÉRAL du fournisseur, et aucune facture France Boissons n'est encore
+arrivée. L'inventer produirait une clé qui ne correspondrait à rien. Il
+s'apprendra au premier scan (0142) ou se posera dans `/admin/correspondances`.
+Aucun **prix** non plus : remonter les coûts par dose en prix de bouteille
+transformerait des estimations en données mesurées.
+
+⚠️ **Huit produits restent DEHORS, exprès** — Kir, Kir royal, Spritz, Monaco,
+Panaché, Picon bière, Diabolo, Alcool + soft. Ils mélangent deux matières ; les
+rattacher à une seule en perdrait l'autre, qui sortirait du stock sans que rien
+ne le signale. Ils relèvent d'une composition, pas d'une correspondance
+d'achat. Les deux **pichets** attendent une décision : un pichet ne dit pas sa
+couleur.
+
+**`(ops)/inventaire?poste=fournil|bar`.** L'écran filtrait `tag_destination =
+'FOURNIL'` en dur — les 25 matières du bar n'y seraient jamais apparues. Le bar
+et le Fournil ne se comptent ni au même moment, ni par la même personne, ni
+dans la même pièce : mélanger leurs lignes rallongerait le comptage du matin
+pour rien, et **un inventaire qu'on abrège est un inventaire faux**.
+
+⚠️ Au bar, un produit **sans `nom_matiere` est EXCLU** de l'inventaire. Le repli
+en cascade `nom_matiere ?? libelle_achat ?? nom` ferait sinon apparaître « Kir »
+comme une ligne de stock — et personne ne stocke des kirs.
+
+⚠️ Le repère « la dernière fois » et la valeur du stock précédent sont
+**filtrés sur le poste**. Sans ça, la page du bar affichait les 457 € du
+Fournil : un chiffre juste, au mauvais endroit, donc faux pour qui le lit.
+
+⚠️ Les matières de `ingredients` (jambon, mozzarella, emballages) ne
+s'affichent **que sous le Fournil** : la table n'a pas de colonne d'activité,
+et le bar n'en a pas encore — ses matières sont portées par les produits
+eux-mêmes, une bouteille de whisky se vendant à la dose.
+
+**France Boissons** est créé comme fournisseur actif, pour que la première
+facture scannée se rattache au lieu de produire 25 lignes orphelines.
+
+Test : `PORT=3000 node scripts/test-matieres-bar.mjs` — 24 assertions.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
@@ -1947,6 +2004,7 @@ PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (
 PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (sans compte)
 PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test local)
 PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
+PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 

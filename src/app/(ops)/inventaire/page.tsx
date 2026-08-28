@@ -7,10 +7,23 @@ import { createClient } from '@/lib/supabase/server'
 import { extraireConditionnement } from '@/lib/commande-fournisseur'
 import InventaireClient from './InventaireClient'
 
-export const metadata = { title: 'Inventaire — Fournil' }
+export const metadata = { title: 'Inventaire' }
 export const dynamic = 'force-dynamic'
 
-export default async function InventairePage() {
+// Le bar et le Fournil ne se comptent ni au même moment, ni par la même
+// personne, ni dans la même pièce. Mélanger leurs lignes dans un seul écran
+// rendrait le comptage du matin plus long pour rien — et un inventaire qu'on
+// abrège est un inventaire faux. D'où un écran par poste.
+const POSTES = {
+  fournil: { tag: 'FOURNIL' as const, libelle: 'Fournil', emoji: '🥖' },
+  bar:     { tag: 'BAR'     as const, libelle: 'Bar',     emoji: '🍷' },
+}
+type ClePoste = keyof typeof POSTES
+
+export default async function InventairePage({
+  searchParams,
+}: { searchParams?: { poste?: string } }) {
+  const poste: ClePoste = searchParams?.poste === 'bar' ? 'bar' : 'fournil'
   const supabase = await createClient()
   const aujourdhui = new Intl.DateTimeFormat('fr-CA', {
     timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -19,14 +32,25 @@ export default async function InventairePage() {
   // Tous les produits actifs, boissons comprises (le frigo à canettes se
   // compte aussi) — seules les formules, qui ne sont pas un stock, sortent.
   const [prodRes, jourRes, dernierRes, matRes, flRes] = await Promise.all([
-    supabase.from('recettes')
-      .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
-      .eq('tag_destination', 'FOURNIL').eq('actif', true)
+    (() => {
+      const q = supabase.from('recettes')
+        .select('id, nom, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
+        .eq('tag_destination', POSTES[poste].tag).eq('actif', true)
       // Un sandwich, un panini, une salade ou une formule ne se STOCKE pas :
       // ça s'assemble à la commande. Ce qui se compte, ce sont leurs
       // matières — chargées juste après depuis `ingredients`.
-      .not('categorie', 'in', '("Formule","Formule petit-déjeuner","Sandwich","Panini","Salade")')
-      .order('categorie').order('nom'),
+      if (poste === 'fournil') {
+        return q.not('categorie', 'in', '("Formule","Formule petit-déjeuner","Sandwich","Panini","Salade")')
+          .order('categorie').order('nom')
+      }
+      // Au bar, un Kir, un Spritz ou un panaché mélangent DEUX matières :
+      // on ne les compte pas, on compte les bouteilles dont ils sortent.
+      // Tout ce qui est comptable porte donc un `nom_matiere` explicite
+      // (scripts/matieres-bar.mjs) — l'absence de lien vaut exclusion,
+      // parce qu'un repli sur le nom du produit ferait apparaître « Kir »
+      // comme une ligne de stock, et personne ne stocke des kirs.
+      return q.not('nom_matiere', 'is', null).order('categorie').order('nom')
+    })(),
     supabase.from('inventaires')
       .select('recette_id, ingredient_id, quantite')
       .eq('date_inventaire', aujourdhui),
@@ -39,10 +63,16 @@ export default async function InventairePage() {
     // Matières premières réellement stockées (0133) : jambon, rosette,
     // mozzarella, emballages… `stocke` sépare le réel des 100 lignes de démo
     // héritées du modèle restaurant.
-    supabase.from('ingredients')
-      .select('id, nom, categorie, unite, prix_achat_ht, libelle_achat')
-      .eq('stocke', true).eq('actif', true)
-      .order('categorie').order('nom'),
+    // Les matières de `ingredients` sont celles du Fournil (jambon, mozza,
+    // emballages). Le bar n'en a pas encore : ses matières sont portées par
+    // les produits eux-mêmes (une bouteille de whisky SE VEND à la dose).
+    // Les afficher sous le bar y mettrait le jambon du sandwich.
+    poste === 'fournil'
+      ? supabase.from('ingredients')
+          .select('id, nom, categorie, unite, prix_achat_ht, libelle_achat')
+          .eq('stocke', true).eq('actif', true)
+          .order('categorie').order('nom')
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
     // Lignes de facture — entrées de stock (dates portées par la facture)
     supabase.from('facture_lignes')
       .select('description, quantite, unite, facture:factures_fournisseurs(date_emission, type_document)'),
@@ -107,12 +137,20 @@ export default async function InventairePage() {
   }
 
   // Ne garder que le dernier inventaire (une seule date)
-  const datePrecedente = (dernierRes.data ?? [])[0]?.date_inventaire as string | undefined
+  // ⚠️ Le repère « la dernière fois » doit être celui de CE poste. Prendre la
+  // dernière ligne toutes activités confondues afficherait au bar la valeur du
+  // stock du Fournil — un chiffre juste, au mauvais endroit, donc un chiffre
+  // faux pour qui le lit.
+  const idsDuPoste = new Set(Array.from(groupes.values(), g => g.id))
+  const cleLigne = (l: { ingredient_id?: unknown; recette_id?: unknown }) =>
+    l.ingredient_id ? `ing:${l.ingredient_id}` : String(l.recette_id)
+  const lignesDuPoste = (dernierRes.data ?? []).filter(l => idsDuPoste.has(cleLigne(l)))
+  const datePrecedente = lignesDuPoste[0]?.date_inventaire as string | undefined
   const precedent: Record<string, number> = {}
   let valeurPrecedente = 0
-  for (const l of dernierRes.data ?? []) {
+  for (const l of lignesDuPoste) {
     if (l.date_inventaire !== datePrecedente) continue
-    precedent[l.ingredient_id ? `ing:${l.ingredient_id}` : (l.recette_id as string)] = Number(l.quantite)
+    precedent[cleLigne(l)] = Number(l.quantite)
     valeurPrecedente += Number(l.quantite) * Number(l.cout_unitaire_ht ?? 0)
   }
 
@@ -203,6 +241,8 @@ export default async function InventairePage() {
       datePrecedente={datePrecedente ?? null}
       valeurPrecedente={Math.round(valeurPrecedente * 100) / 100}
       dateJour={aujourdhui}
+      poste={poste}
+      postes={Object.entries(POSTES).map(([cle, p]) => ({ cle, ...p }))}
     />
   )
 }

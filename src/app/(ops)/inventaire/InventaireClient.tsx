@@ -18,7 +18,7 @@ const fmtEur = (n: number) =>
 
 export default function InventaireClient({
   produits, dejaSaisi, precedent, datePrecedente, valeurPrecedente, dateJour,
-  entrees, sorties, theorique,
+  entrees, sorties, theorique, poste, postes,
 }: {
   produits: Produit[]
   dejaSaisi: Record<string, number>
@@ -32,6 +32,9 @@ export default function InventaireClient({
   sorties: Record<string, number>
   /** Stock attendu = comptage + entrées − sorties. Null si non calculable. */
   theorique: Record<string, number | null>
+  /** Poste compté : le bar et le Fournil ne se comptent pas ensemble. */
+  poste: string
+  postes: Array<{ cle: string; libelle: string; emoji: string }>
 }) {
   const [quantites, setQuantites] = useState<Record<string, number>>(dejaSaisi)
   const [date, setDate] = useState(dateJour)
@@ -85,9 +88,24 @@ export default function InventaireClient({
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <div className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-lg font-bold">📦 Inventaire du stock</h1>
+            <h1 className="text-lg font-bold">
+              📦 Inventaire — {postes.find(p => p.cle === poste)?.libelle ?? ''}
+            </h1>
             <Link href="/comptoir/fournil/kds" className="text-xs text-zinc-400 hover:text-zinc-200 shrink-0">← Comptoir</Link>
           </div>
+          {postes.length > 1 && (
+            <div className="flex gap-2">
+              {postes.map(p => (
+                <Link key={p.cle} href={`/inventaire?poste=${p.cle}`}
+                  className={cn('min-h-[44px] px-4 flex items-center rounded-lg text-sm font-bold ring-1',
+                    p.cle === poste
+                      ? 'bg-zinc-100 text-zinc-900 ring-zinc-100'
+                      : 'bg-zinc-900 text-zinc-400 ring-zinc-800 hover:text-zinc-200')}>
+                  {p.emoji} {p.libelle}
+                </Link>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
             <input type="date" value={date} max={dateJour}
               onChange={e => setDate(e.target.value)}
