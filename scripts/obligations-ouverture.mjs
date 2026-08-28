@@ -9,6 +9,18 @@
 // bar-restaurant-pizzeria en France, à confirmer avec la mairie, le comptable
 // et le SDIS. Elle sert à ce que rien ne soit OUBLIÉ, pas à trancher.
 //
+// ⚠️ C'EST UNE REPRISE DE FONDS, PAS UNE CRÉATION. La distinction change la
+// nature de la moitié des lignes : on MUTE une licence au lieu de l'ouvrir, on
+// RETROUVE un dossier d'accessibilité au lieu de le constituer, on MET À JOUR
+// la déclaration DDPP au lieu de la déposer. Beaucoup de ces démarches ont pu
+// être faites par le notaire au moment de la cession — d'où des notes qui
+// disent « vérifier dans l'acte » plutôt que « faire ».
+//
+// Et une reprise ajoute ce qu'une création n'a pas : le transfert des contrats
+// du cédant, la reprise des contrats de travail (L1224-1), la solidarité
+// fiscale du repreneur. Le piège d'une reprise n'est pas ce qu'on oublie de
+// créer — c'est ce qu'on croit hérité et qui ne l'est pas.
+//
 // ⚠️ AUCUNE DATE N'EST INVENTÉE. Une échéance fausse dans un registre légal
 // est pire que pas d'échéance : elle rassure. Toutes les lignes arrivent sans
 // date, à `a_faire`. C'est le gérant qui pose les dates au fur et à mesure
@@ -59,11 +71,15 @@ const REGISTRE = [
     notes: B + "Exigé À L'APPUI de la déclaration en mairie : sans lui, la déclaration n'est pas recevable.",
   },
   {
-    titre: 'Déclaration préalable en mairie (Cerfa 11542)',
-    categorie: 'licence_iv', frequence: 'à chaque ouverture / mutation',
+    titre: 'Déclaration de MUTATION du débit de boissons (Cerfa 11542)',
+    categorie: 'licence_iv', frequence: 'à chaque mutation',
     description:
-      "Déclaration d'ouverture, mutation, translation ou transfert d'un débit de boissons, à déposer en mairie. Un récépissé est délivré.",
-    notes: B + "À déposer AU MOINS 15 JOURS avant l'ouverture au public. C'est une date qui se calcule à rebours : la fixer dès que la date d'ouverture est arrêtée.",
+      "Reprise de fonds : le débit de boissons change d'exploitant. C'est une MUTATION, pas une ouverture — même Cerfa 11542, case différente, récépissé délivré par la mairie.",
+    notes: B + "à VÉRIFIER avant de faire quoi que ce soit d'autre.\n\n"
+      + "Sur une reprise, cette déclaration a très souvent été faite AU MOMENT DE LA CESSION, par le notaire ou le rédacteur de l'acte. "
+      + "Si c'est le cas, elle est déjà acquise et il suffit de classer le récépissé.\n\n"
+      + "→ Chercher le récépissé de mutation dans l'acte de cession. S'il y est : marquer « fait » et déposer le document dans le coffre. "
+      + "S'il n'y est pas : déclarer, au moins 15 jours avant la reprise d'activité.",
   },
   {
     titre: 'Affichages du débit de boissons (protection des mineurs, ivresse)',
@@ -91,11 +107,13 @@ const REGISTRE = [
     notes: "L'application l'imprime : /admin/legal → Registre de sécurité. Encore faut-il que les contrôles y soient saisis.",
   },
   {
-    titre: 'Accessibilité PMR — attestation',
+    titre: "Registre public d'accessibilité (ERP existant)",
     categorie: 'securite_erp', frequence: 'permanent',
     description:
-      "Un ERP doit être accessible aux personnes handicapées, ou disposer d'une dérogation motivée. Les travaux en cours sont l'occasion de le régler.",
-    notes: B + "À vérifier avec le maître d'œuvre pendant que les travaux sont ouverts : après, chaque correction coûte dix fois plus.",
+      "Un ERP déjà ouvert au public possède un dossier d'accessibilité : attestation, dérogations éventuelles, registre public consultable. La reprise en HÉRITE — il ne s'agit pas de le créer mais de le retrouver, et de vérifier que les travaux en cours ne le remettent pas en cause.",
+    notes: B + "mais probablement déjà à moitié fait.\n\n"
+      + "→ Demander au cédant le dossier d'accessibilité de l'établissement. Un ERP qui recevait du public en avait un, ou une dérogation motivée.\n\n"
+      + "⚠️ Ce que les travaux changent : si l'aménagement modifie les circulations, les sanitaires ou l'entrée, l'accessibilité doit être revérifiée sur le NOUVEAU plan. C'est le moment, pendant que c'est ouvert.",
   },
   {
     titre: 'Vérification annuelle des extincteurs et RIA',
@@ -124,11 +142,12 @@ const REGISTRE = [
 
   // ── Hygiène ──────────────────────────────────────────────────────
   {
-    titre: "Déclaration d'activité à la DDPP (Cerfa 13984)",
-    categorie: 'hygiene', frequence: 'à chaque ouverture',
+    titre: "Mise à jour de la déclaration DDPP (changement d'exploitant)",
+    categorie: 'hygiene', frequence: "à chaque changement d'exploitant",
     description:
-      "Déclaration obligatoire de tout établissement manipulant des denrées animales ou d'origine animale, auprès de la direction départementale de la protection des populations.",
-    notes: "À vérifier : le Fournil est déjà déclaré ? L'extension au restaurant et à la pizzeria peut nécessiter une mise à jour.",
+      "L'établissement est déclaré, mais au nom de l'ancien exploitant. Un changement d'exploitant doit être déclaré à la direction départementale de la protection des populations (Cerfa 13984).",
+    notes: "Sur une reprise, ce n'est pas une première déclaration mais une mise à jour. Facile à oublier justement parce que « c'est déjà déclaré ».\n\n"
+      + "→ Vérifier au passage que la déclaration couvre les activités RÉELLES : boulangerie + restauration + pizzeria + débit de boissons.",
   },
   {
     titre: 'Formation HACCP — au moins une personne dans l\'établissement',
@@ -149,7 +168,10 @@ const REGISTRE = [
     titre: 'Bail commercial — échéance triennale',
     categorie: 'bail_commercial', frequence: '3 ans',
     description: "Échéance triennale, révision du loyer, et conformité de la destination des lieux aux activités réellement exercées.",
-    notes: "⚠️ Vérifier que la destination du bail autorise le DÉBIT DE BOISSONS. Un bail limité à la boulangerie ne le couvre pas.",
+    notes: B + "REPRISE : le bail a été cédé avec le fonds — il n'est pas nouveau.\n\n"
+      + "→ Relire la clause de DESTINATION du bail cédé. C'est le piège classique d'une reprise avec extension d'activité : un bail rédigé pour "
+      + "« boulangerie-pâtisserie » ne couvre PAS le débit de boissons ni la restauration. Il faut alors une déspécialisation, avec l'accord du bailleur et un délai.\n\n"
+      + "⚠️ Ce point se règle avec le bailleur, donc pas en une journée. À vérifier maintenant, pas en septembre.",
   },
   {
     titre: 'Autorisation d\'occupation du domaine public (terrasse)',
@@ -192,6 +214,33 @@ const REGISTRE = [
     categorie: 'visite_medicale_employeur', frequence: 'à chaque embauche',
     description: "Visite d'information et de prévention, à organiser dans les délais suivant l'embauche.",
     notes: "À prévoir pour les recrutements de septembre, avant qu'ils ne soient oubliés dans le rush de l'ouverture.",
+  },
+
+  // ── Ce qu'une REPRISE ajoute, et qu'une création n'a pas ─────────
+  {
+    titre: "Transfert des contrats de l'ancien exploitant",
+    categorie: 'autre', frequence: 'une fois',
+    description:
+      "Énergie, eau, télécom, assurance, maintenance (hotte, extincteurs, froid), monétique, SACEM, contrats fournisseurs. Sur une reprise, aucun ne se transfère tout seul.",
+    notes: "Le piège d'une reprise n'est pas ce qu'on oublie de créer, c'est ce qu'on croit hérité et qui ne l'est pas. "
+      + "Un contrat resté au nom du cédant se résilie à son initiative, ou n'est plus payé — et ça se découvre le jour où l'électricité est coupée.\n\n"
+      + "→ Faire la liste depuis les FACTURES du cédant, pas de mémoire.",
+  },
+  {
+    titre: 'Reprise des contrats de travail (art. L1224-1)',
+    categorie: 'personnel', frequence: 'une fois',
+    description:
+      "Si l'établissement repris employait du personnel, les contrats de travail sont transférés de plein droit au repreneur, avec l'ancienneté, les congés acquis et les conditions en cours.",
+    notes: "S'applique automatiquement : ce n'est pas une option, et un salarié omis reste salarié. À traiter avec le comptable si le cédant avait des employés.\n\n"
+      + "→ Sans objet si la reprise s'est faite sans personnel : marquer « fait ».",
+  },
+  {
+    titre: 'Solidarité fiscale du repreneur',
+    categorie: 'autre', frequence: 'une fois',
+    description:
+      "L'acquéreur d'un fonds de commerce est solidairement responsable des impôts dus par le vendeur pendant un délai qui court à compter de la déclaration de cession. Le prix est séquestré pendant cette période.",
+    notes: "À faire confirmer par le comptable ou le rédacteur de l'acte : le délai et la levée du séquestre dépendent de la date de déclaration de cession.\n\n"
+      + "Inscrit ici pour que la date de fin de séquestre soit SUIVIE — c'est de la trésorerie immobilisée, et personne ne prévient qu'elle est libérable.",
   },
 ]
 

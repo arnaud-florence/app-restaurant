@@ -1399,7 +1399,7 @@ et n'a jamais été nourri — donc l'alerte à J-30 de l'agent HACCP ne pouvait
 déclencher sur rien, et le registre ne protégeait de rien. Or on ouvre un
 **débit de boissons** en septembre 2026.
 
-Amorçage : `node scripts/obligations-ouverture.mjs [--ecrire]` — 21
+Amorçage : `node scripts/obligations-ouverture.mjs [--ecrire]` — 24
 obligations, idempotent (rapproché sur le titre, n'écrase jamais une ligne
 renseignée à la main).
 
@@ -1419,12 +1419,33 @@ bloquante sans date ne dit pas « rien à faire », elle dit « pas commencé »
 Le défaut est `false` : un défaut à `true` crierait sur tout le registre et
 serait ignoré au bout d'une semaine.
 
-**Cinq bloquantes au 28/08/2026** : permis d'exploitation, déclaration
-préalable en mairie (Cerfa 11542), autorisation de travaux ERP + visite de la
-commission de sécurité, attestation d'accessibilité PMR, assurance
-multirisque + RC.
+⚠️ **C'est une REPRISE de fonds, pas une création** — et la distinction change
+la nature de la moitié du registre : on **mute** une licence au lieu de
+l'ouvrir, on **retrouve** un dossier d'accessibilité au lieu de le constituer,
+on **met à jour** la déclaration DDPP au lieu de la déposer. Beaucoup de ces
+démarches ont pu être faites par le notaire à la cession, d'où des lignes qui
+disent « vérifier dans l'acte » plutôt que « faire ».
 
-✅ **La licence IV est ACQUISE** (confirmé par le gérant le 28/08/2026). C'était
+Une reprise ajoute en revanche ce qu'une création n'a pas : transfert des
+contrats du cédant, reprise des contrats de travail (art. L1224-1), solidarité
+fiscale du repreneur. **Le piège d'une reprise n'est pas ce qu'on oublie de
+créer, c'est ce qu'on croit hérité et qui ne l'est pas** — un contrat resté au
+nom du cédant se découvre le jour où l'électricité est coupée.
+
+⚠️ Le **bail** est le point sensible de cette reprise : cédé avec le fonds, sa
+clause de DESTINATION peut ne couvrir que la boulangerie. Ni le débit de
+boissons ni la restauration n'y entreraient alors, et la déspécialisation
+suppose l'accord du bailleur — donc du délai.
+
+**Bloquantes au 28/08/2026** : déclaration de mutation du débit de boissons
+(Cerfa 11542), autorisation de travaux ERP + visite de la commission de
+sécurité, registre public d'accessibilité, assurance multirisque + RC,
+destination du bail.
+
+✅ **Acquis** : licence IV, permis d'exploitation, formation HACCP.
+
+✅ **La licence IV est ACQUISE** — transférée avec le fonds, confirmé par le
+gérant le 28/08/2026. C'était
 le seul point dont le délai ne dépendait pas de nous — les licences IV sont
 contingentées (1 pour 450 habitants) et ne se créent plus depuis 1959. Elle
 couvre les spiritueux de la carte bar (0144) : whisky, vodka, gin, rhum et
