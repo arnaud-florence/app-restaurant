@@ -186,19 +186,24 @@ if (BASE) {
     catch { console.log('  ⚠ pas de dev server'); return }
     if (!serverUp) { console.log('  ⚠ injoignable'); return }
 
-    const r1 = await fetch(`${BASE}/admin/rh`, { signal: AbortSignal.timeout(60000) })
-    if (r1.status !== 200) { ko('GET /admin/rh', `HTTP ${r1.status}`); return }
-    const html1 = await r1.text()
-    ok(`GET /admin/rh → 200 (${html1.length} bytes)`)
-    if (html1.includes('Ressources humaines')) ok('contient titre RH')
-    else ko('contenu /admin/rh', 'titre absent')
-
-    const r2 = await fetch(`${BASE}/admin/rh/registre/print`, { signal: AbortSignal.timeout(60000) })
-    if (r2.status !== 200) { ko('GET /admin/rh/registre/print', `HTTP ${r2.status}`); return }
-    const html2 = await r2.text()
-    ok(`GET /admin/rh/registre/print → 200 (${html2.length} bytes)`)
-    if (html2.includes('Registre unique')) ok('mention "Registre unique du personnel"')
-    else ko('contenu registre', 'mention légale absente')
+    // ⚠️ Ce test lisait le CONTENU de /admin/rh sans être authentifié. Depuis
+    // le module 28, le middleware protège tout /admin/* : la réponse est un
+    // 307 vers /login, et les deux assertions de contenu échouaient donc en
+    // permanence — pour un comportement CORRECT. Un test rouge en
+    // permanence finit par être ignoré, et ce jour-là il ne protège plus rien.
+    //
+    // On vérifie maintenant la propriété qui compte vraiment : ces pages
+    // exposent des salaires et des données personnelles, elles ne doivent
+    // JAMAIS répondre à un appel non authentifié.
+    for (const route of ['/admin/rh', '/admin/rh/registre/print']) {
+      const r = await fetch(`${BASE}${route}`, {
+        redirect: 'manual', signal: AbortSignal.timeout(60000),
+      })
+      const protege = r.status === 307 || r.status === 308 || r.status === 401 || r.status === 403
+      if (protege) ok(`${route} refuse un appel non authentifié (HTTP ${r.status})`)
+      else if (r.status === 200) ko(`${route}`, 'répond 200 SANS authentification — salaires exposés')
+      else ko(`GET ${route}`, `HTTP ${r.status}`)
+    }
   })
 } else {
   console.log('\n→ HTTP : skip (PORT non défini)')

@@ -18,7 +18,10 @@ const employeSchema = z.object({
   email:              z.string().email().nullable().or(z.literal('').transform(() => null)),
   telephone:          z.string().max(30).nullable(),
   salaire_horaire:    z.number().min(0),
-  heures_contrat:     z.number().int().min(0),
+  // Décimal depuis la 0148 : un mi-temps fait 17,5 h, pas 17 ni 18. Arrondir
+  // décale le salaire mensuel d'une trentaine d'euros, et ce décalage remonte
+  // jusqu'à la masse salariale, à l'alerte « > 35 % du CA » et à l'EBE.
+  heures_contrat:     z.number().min(0).max(60),
   date_embauche:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   date_sortie:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   solde_conges_jours: z.number().min(0).default(25),

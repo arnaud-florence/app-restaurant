@@ -144,6 +144,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
 | Registre légal d'ouverture | 24 obligations, drapeau `bloquant` sans date | 0147 |
+| Heures de contrat décimales | un mi-temps fait 17,5 h, pas 17 ni 18 | 0148 |
 | Bar : vendu ↔ acheté | `nom_matiere` + rendements, inventaire par poste | — |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
@@ -1392,6 +1393,51 @@ la vraie unité de saisie est la famille. On coche une fois, on décoche les
 exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
 une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
 effacer.
+
+### Paie : les heures de contrat sont décimales (0148)
+
+`employes.heures_contrat` était un **entier**. Le temps partiel le plus courant
+en France — la moitié de 35 h — y était donc inexprimable : PostgREST refusait
+l'écriture (22P02), et le formulaire d'admin l'arrondissait en silence
+(`parseInt`).
+
+Refuser vaut mieux qu'arrondir, mais le bon comportement est d'accepter :
+17 h ou 18 h à la place de 17,5 décalent le salaire mensuel d'une trentaine
+d'euros, et ce décalage remonte jusqu'à la masse salariale, à l'alerte
+« > 35 % du CA », au coût par shift du planning et à l'EBE — donc à la
+valorisation du fonds. Personne ne remonterait de là jusqu'à une colonne mal
+typée. 24 h, 28 h, 30,5 h sont la règle en restauration, pas l'exception.
+
+Trois endroits à garder cohérents : la colonne (`numeric(5,2)`), le schéma zod
+de `/admin/rh` (plus de `.int()`), et le champ du formulaire (`step="0.5"` +
+`parseFloat`).
+
+⚠️ **`salaire_horaire` est un taux BRUT.** Les salaires se négocient en NET :
+la conversion utilisée ici est `brut = net / 0,78` (non-cadre). C'est une
+ESTIMATION — c'est le comptable qui fixe le brut du contrat. Reporté dans
+`notes_internes` de chaque fiche pour que l'hypothèse reste lisible.
+
+⚠️ Le **coefficient de charges patronales à 1,45** est à vérifier : sous
+1,6 SMIC la réduction générale s'applique encore largement, et un coefficient
+trop haut sous-estime l'EBE — donc la valeur du fonds, dans le mauvais sens.
+
+⚠️ Un statut de **président de SAS (assimilé-salarié)** ne suit ni le ratio
+net/brut de 78 % ni le coefficient 1,45 : ses charges sont sensiblement plus
+lourdes. À trancher pour Arnaud.
+
+⚠️ **Désactiver un employé ne ferme PAS son compte.** `employes.actif = false`
+le sort de la masse salariale et des plannings ; `profils` est une autre table,
+et l'ex-salarié peut toujours se connecter. Les deux gestes sont à faire.
+Constaté le 28/08/2026 en sortant Joris. On DÉSACTIVE plutôt qu'on ne supprime :
+la suppression effacerait l'historique de ventes et de formation, et ne se
+défait pas.
+
+⚠️ `scripts/test-rh.mjs` lisait le CONTENU de `/admin/rh` sans authentification.
+Depuis le module 28 le middleware renvoie un 307 vers `/login` : deux
+assertions échouaient donc **en permanence, pour un comportement correct**. Un
+test rouge en permanence finit par être ignoré, et ce jour-là il ne protège
+plus rien. Il vérifie désormais la propriété qui compte : ces pages exposent
+des salaires, elles ne doivent jamais répondre à un appel non authentifié.
 
 ### Accueillir une manageuse — accès et parcours (28/08/2026)
 

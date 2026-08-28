@@ -948,7 +948,9 @@ function EmployeModal({ employe, onClose, onError, onSuccess }: { employe: Emplo
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Field label="Salaire €/h"><input type="number" step="0.01" value={salaire} onChange={e => setSalaire(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
-        <Field label="Heures/sem"><input type="number" value={heures} onChange={e => setHeures(parseInt(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
+        {/* step 0,5 et parseFloat : un mi-temps fait 17,5 h (0148). Un parseInt
+            ici ramenait 17,5 à 17 sans le dire, et le salaire mensuel avec. */}
+        <Field label="Heures/sem"><input type="number" step="0.5" value={heures} onChange={e => setHeures(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
         <Field label="Solde congés"><input type="number" step="0.5" value={solde} onChange={e => setSolde(parseFloat(e.target.value) || 0)} className="w-full h-12 px-3 rounded-md border border-zinc-300 text-right tabular-nums" /></Field>
       </div>
       <Field label="Date embauche"><input type="date" value={embauche} onChange={e => setEmbauche(e.target.value)} className="w-full h-12 px-3 rounded-md border border-zinc-300" /></Field>
