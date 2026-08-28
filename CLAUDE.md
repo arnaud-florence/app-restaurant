@@ -1393,6 +1393,53 @@ exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
 une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
 effacer.
 
+### Accueillir une manageuse — accès et parcours (28/08/2026)
+
+Ambre rejoint l'équipe comme manageuse. Deux gestes, `scripts/acces-ambre.mjs`
+et `scripts/parcours-manageuse.mjs`, tous deux rejouables.
+
+⚠️ **Le poste `manager` COURT-CIRCUITE le système de permissions.** Il porte
+`allowed: ['*']`, et `isReadOnly()` rend `false` avant même de lire
+`custom_permissions` — un réglage « lecture seule » posé sur un manager est
+purement **ignoré**. Il n'existe donc pas de « manager en lecture » : soit
+tout ouvert, soit un poste non-manager plus des permissions sur mesure.
+
+D'où le montage de prise en main : `profils.poste = 'polyvalent'` +
+`custom_permissions` — **10 écrans en écriture** (comptoir, inventaire,
+invendus, ruptures, KDS, journal de bord) et **25 en lecture seule**, dont
+TOUT l'argent : ventes, marges, finances, patrimoine, pilotage.
+
+La lecture est volontairement totale. Une manageuse qui entre au capital sera
+payée sur le résultat : lui cacher ces écrans serait le mauvais signal et
+l'empêcherait de comprendre ce sur quoi on la juge. Elle voit les chiffres
+avant de pouvoir les modifier, pas l'inverse.
+
+⚠️ Les trois écrans couverts le sont parce qu'ils **se trompent en silence** —
+l'erreur y ressemble à une réussite : `/admin/allergenes` (valider = signer une
+déclaration légale nominative), `/admin/fournisseurs` (un scan écrit les prix
+d'achat — le croissant à 40 € du 22/08), `/admin/recettes` (pousser vers Zelty
+est un upsert qui écrase le prix imprimé sur les tickets). Aucune vigilance ne
+rattrape une erreur qui ne se signale pas.
+
+⚠️ **Aucun compte n'est créé par script.** Ambre s'inscrit elle-même sur
+`/login` (elle choisit son mot de passe), puis on relance
+`node scripts/acces-ambre.mjs --email=… --ecrire` pour rattacher le profil à
+la fiche et poser les permissions. Passage en manager le jour venu :
+`/admin/securite` → Profils → rôle `manager`, et effacer `custom_permissions`.
+
+**Parcours « Manageuse » — 5 guides, 25 étapes, 17 questions** (poste
+`manager` dans le module 27). L'ordre n'est pas celui du menu : (1) pourquoi
+l'outil ne prend pas les commandes — sans ça tout le reste paraît incohérent,
+(2) la caisse pendant qu'elle est en mode école, (3) lire les chiffres avant
+de les modifier, (4) les gestes du quotidien, (5) les trois écrans dangereux.
+
+⚠️ Le guide 5 exige **100 %** au quiz, contre 80 % partout ailleurs : sur ces
+écrans, « à peu près compris » ne suffit pas.
+
+⚠️ Le **mode école** de Zelty est une fenêtre qui se ferme. Tant qu'il dure,
+un ticket d'entraînement n'entre pas dans le CA — c'est le meilleur terrain
+d'apprentissage possible, et il disparaît au passage en mode réel.
+
 ### Le registre légal d'ouverture (0147)
 
 `obligations_legales` était **vide**. Le module 17 est livré depuis des mois
@@ -2006,6 +2053,8 @@ PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test 
 PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
 PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
+node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
+node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
