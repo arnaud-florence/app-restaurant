@@ -23,6 +23,8 @@ export type ProduitLocalComplet = {
   description: string | null
   /** Prix de vente HT — celui du panneau, à emporter. */
   prix_vente_ht: number | null
+  /** Prix TTC en salle / au bar. NULL = même prix qu'à emporter. */
+  prix_sur_place_ttc?: number | null
   /** Taux porté par le produit : 2.1, 5.5, 10 ou 20. */
   tva: number | null
   contient_alcool: boolean
@@ -104,6 +106,15 @@ export function construireImport(
     }
     const surPlace = tauxSurPlace(p.contient_alcool, tauxEmporter)
 
+    // ⚠️ Un Coca ne vaut pas le même prix dans sa canette au comptoir et dans
+    // un verre consigné à une table. Envoyer le même montant des deux côtés
+    // ferait facturer le tarif comptoir en salle — 70 centimes perdus à chaque
+    // verre, sans que rien ne le signale. NULL = pas de tarif distinct.
+    const surPlaceTtc = p.prix_sur_place_ttc == null ? null : Number(p.prix_sur_place_ttc)
+    const ttcSurPlace = surPlaceTtc != null && Number.isFinite(surPlaceTtc) && surPlaceTtc > 0
+      ? surPlaceTtc
+      : ttcEmporter
+
     aCreer.push({
       // Le lien exact, écrit dès la création.
       remote_id: p.id,
@@ -111,10 +122,10 @@ export function construireImport(
       ...(p.description?.trim() ? { description: p.description.trim() } : {}),
       // Zelty attend une URL : les nôtres sont absolues, elles fonctionnent.
       ...(p.image_url ? { image: p.image_url } : {}),
-      // Le prix affiché ne change pas selon le lieu : c'est le taux qui change,
-      // donc la marge sur place est légèrement moindre. C'est la règle
-      // française, et c'est ce que fait la caisse d'à côté.
-      price: centimes(ttcEmporter),
+      // `price` = salle, `price_togo` = comptoir. Zelty les porte séparément,
+      // et le taux change aussi : un croissant mangé à table est à 10 %, pas
+      // à 5,5 %. Le prix du panneau, lui, ne bouge que si on l'a décidé.
+      price: centimes(ttcSurPlace),
       price_togo: centimes(ttcEmporter),
       tax: millieme(surPlace),
       tax_takeaway: millieme(tauxEmporter),

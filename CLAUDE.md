@@ -1354,6 +1354,56 @@ des focaccias). Essai à blanc par défaut. Les composants de formule
 suffit de remplacer les fichiers : les URL en base ne bougent pas. Et rien
 n'est visible avant **déploiement**.
 
+### La carte du bar (0144, 28 août 2026)
+
+36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
+7 alcools, 7 vins, 4 softs manquants (sirop à l'eau, diabolo, limonade,
+Perrier). Le bar partait de **zéro produit alcoolisé**. Fournisseur retenu :
+**France Boissons** (groupe Heineken) — pression, softs et cave chez le même.
+
+**Les prix sont posés sur le coût du SERVICE, pas sur le coût d'achat.** Une
+heure de service coûte 17,23 € chargés, donc une consommation coûte 1,72 € de
+main-d'œuvre à dix consos/heure et 0,43 € à quarante. Le plancher réel est
+là — un verre servi prend le même temps qu'il soit vendu 2,50 € ou 4 €. La
+carte est volontairement basse (demi 2,50 €, pastis 2,50 €, verre de vin
+2,80 €) : elle est rentable au-dessus de 15 consos/heure et perd de l'argent
+sous 10. C'est cohérent avec la stratégie du passage obligé, mais **ça la rend
+obligatoire**. Repère à suivre dès l'ouverture : consommations par heure de
+présence.
+
+⚠️ L'alcool n'est **jamais** `vendable_online` : pas de contrôle d'âge sur le
+click & collect.
+
+⚠️ La **bière sans alcool est à 10 %**, pas 20 % — ce n'est pas une boisson
+alcoolique au sens fiscal. Elle reste dans la famille « Bière » sur l'ardoise,
+d'où une exception documentée dans le contrôle de cohérence des taux par
+famille (l'autre étant le composant viennoiserie des formules).
+
+### `prix_sur_place_ttc` — un produit, deux prix (0144)
+
+Un Coca ne se vend pas au même prix dans sa canette au comptoir (1,80 €) et
+dans un verre consigné à une table (2,50 €). Zelty porte nativement `price`
+(salle) et `price_togo` (emporter) ; **notre base n'avait qu'un seul prix**, et
+l'import envoyait la même valeur des deux côtés — soit 70 centimes perdus à
+chaque verre servi en salle, sans que rien ne le signale.
+
+`recettes.prix_sur_place_ttc` est **en TTC**, contrairement à `prix_vente_ht` :
+c'est le prix de l'ardoise, celui que le gérant décide et que le client lit.
+Le convertir en HT à la saisie ferait dériver l'arrondi. **NULL = pas de tarif
+distinct**, le prix de vente s'applique partout — c'est le cas de tout le
+Fournil et de tout le bar, où le sur place EST le prix.
+
+Le verre consigné n'est pas qu'un choix commercial : la loi AGEC interdit le
+jetable pour la consommation sur place.
+
+⚠️ `verifier-carte-zelty.mjs` contrôle désormais **les deux prix**. N'en
+vérifier qu'un laissait passer exactement l'écart qu'on venait de créer.
+
+⚠️ **Une lecture de l'API juste après une écriture peut revenir vide** :
+constaté le 28/08, un `GET /catalog/dishes` immédiatement après un POST a rendu
+0 plat (limite de débit), ce qu'un script naïf prend pour un catalogue vide.
+Attendre quelques secondes, et ne jamais conclure d'une seule lecture.
+
 ### Carte du Fournil et photos produit
 
 Les 60 produits viennent des 13 affiches CasaTasia (migration 0113, prix TTC des affiches → HT en base). Les photos sont **découpées dans les affiches elles-mêmes** par `scripts/generer-photos-fournil.mjs` (sharp, rectangles en fractions de l'affiche) et déposées dans `public/produits/*.jpg`.

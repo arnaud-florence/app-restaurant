@@ -32,6 +32,10 @@ const step = async (n, fn) => {
 }
 
 // Prix TTC des affiches — la source de vérité de ce test.
+// ⚠️ Prix RELEVÉS SUR LES AFFICHES, sauf décision explicite du gérant.
+// 28/08/2026 : le café passe à 1,40 € partout (comptoir, bar, salle) et les
+// quatre formules petit-déjeuner suivent de 20 centimes, pour que l'écart
+// entre la formule et les produits séparés reste intact.
 const AFFICHES = {
   'Baguette classique': 1.20, 'Baguette Victoire': 1.40, 'Campestre multicéréales': 1.80,
   'Pain complet': 2.30, 'Bâtard céréales': 2.80, 'Bâtard maïs et graines': 2.80,
@@ -49,12 +53,12 @@ const AFFICHES = {
   'Eau plate 50 cl': 1.00, 'Eau gazeuse 50 cl': 1.50, 'Coca-Cola 33 cl': 1.80,
   'Coca-Cola Zéro 33 cl': 1.80, 'Ice Tea 33 cl': 1.80, 'Orangina 33 cl': 1.80,
   "Jus d'orange 33 cl": 1.80, 'Jus de pomme 33 cl': 1.80,
-  'Café expresso': 1.20, 'Café allongé': 1.20, 'Café noisette': 1.50,
+  'Café expresso': 1.40, 'Café allongé': 1.40, 'Café noisette': 1.50,
   'Cappuccino': 2.50, 'Chocolat chaud': 2.50, 'Thé': 2.00,
   'Formule salade + boisson': 5.80, 'Formule sandwich ou panini + boisson': 6.20,
   'Formule salade + boisson + dessert': 8.10, 'Formule sandwich ou panini + boisson + dessert': 8.50,
-  'Formule Express': 2.20, 'Formule Douceur chaude': 3.40,
-  'Formule Petit-déjeuner complet': 3.80, 'Formule Tartine': 4.20,
+  'Formule Express': 2.40, 'Formule Douceur chaude': 3.60,
+  'Formule Petit-déjeuner complet': 4.00, 'Formule Tartine': 4.40,
 }
 // « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
 // SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent
@@ -163,7 +167,15 @@ await step('cohérence des taux au sein d’une famille', async () => {
     ;(parFamille[r.categorie] ??= new Map()).set(Number(r.tva),
       [...((parFamille[r.categorie].get(Number(r.tva))) ?? []), r.nom])
   }
-  const melangees = Object.entries(parFamille).filter(([, m]) => m.size > 1)
+  // Deux exceptions VRAIES, documentées plutôt que masquées :
+  //  · « Bière » contient la bière SANS alcool, à 10 % — ce n'est pas une
+  //    boisson alcoolique au sens fiscal, mais elle a sa place sur l'ardoise
+  //    à côté des autres bières ;
+  //  · « Formule » contient le composant viennoiserie à 5,5 %, dont le taux
+  //    suit ce qu'il contient et non sa famille.
+  const EXCEPTIONS = new Set(['Bière', 'Formule'])
+  const melangees = Object.entries(parFamille)
+    .filter(([c, m]) => m.size > 1 && !EXCEPTIONS.has(c))
   if (melangees.length === 0) ok(`${Object.keys(parFamille).length} familles à taux unique`)
   else ko('taux mélangés dans une même famille', melangees.map(([c, m]) =>
     `${c} : ` + [...m.entries()].map(([t, noms]) =>

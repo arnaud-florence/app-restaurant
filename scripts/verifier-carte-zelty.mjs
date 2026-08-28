@@ -23,7 +23,7 @@ const plats = (await rz.json()).dishes ?? []
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const sb = async p => (await fetch(`${U}/rest/v1/${p}`,
   { headers: { apikey: K, Authorization: `Bearer ${K}` } })).json()
-const nous = await sb('recettes?select=id,nom,prix_vente_ht,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
+const nous = await sb('recettes?select=id,nom,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
 
 // La TVA sur place suit la LOI, pas le panneau : un croissant mangé à table
 // est à 10 %, pas à 5,5 %. L'alcool reste à 20 %, la presse à 2,1 %.
@@ -41,6 +41,12 @@ for (const r of nous) {
   let bon = true
   const attTtc = ttc(r)
   if (p.price_togo !== attTtc) { dire(r, 'prix à emporter', eur(attTtc / 100), eur((p.price_togo ?? 0) / 100)); bon = false }
+  // Le prix SALLE est distinct dès qu'un tarif sur place est renseigné : un
+  // Coca en canette au comptoir et le même dans un verre consigné à table.
+  // Ne contrôler que l'emporter laisserait passer 70 centimes par verre.
+  const attSalle = r.prix_sur_place_ttc == null
+    ? attTtc : Math.round(Number(r.prix_sur_place_ttc) * 100)
+  if (p.price !== attSalle) { dire(r, 'prix sur place', eur(attSalle / 100), eur((p.price ?? 0) / 100)); bon = false }
   if (p.tax_takeaway !== Number(r.tva) * 100) { dire(r, 'TVA à emporter', `${r.tva} %`, `${(p.tax_takeaway ?? 0) / 100} %`); bon = false }
   if (p.tax !== tvaSurPlace(r) * 100) { dire(r, 'TVA sur place', `${tvaSurPlace(r)} %`, `${(p.tax ?? 0) / 100} %`); bon = false }
   if (r.image_url && !p.image) { dire(r, 'photo', 'une image', 'aucune'); bon = false }

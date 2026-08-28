@@ -49,7 +49,7 @@ async function traiter(req: Request) {
   try {
     const sb = await createClient()
     let q = sb.from('recettes')
-      .select('id, nom, description, prix_vente_ht, tva, contient_alcool, image_url, actif, tag_destination')
+      .select('id, nom, description, prix_vente_ht, prix_sur_place_ttc, tva, contient_alcool, image_url, actif, tag_destination')
       .eq('actif', true)
       .order('categorie').order('nom')
     if (tag) q = q.eq('tag_destination', tag)

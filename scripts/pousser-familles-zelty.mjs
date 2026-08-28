@@ -32,7 +32,10 @@ const zl = async (p, o = {}) => {
 // L'ordre du service : à 6 h 20 on vend du pain et du café, pas des pizzas.
 const ORDRE = ['Pain', 'Viennoiserie', 'Boisson chaude', 'Formule petit-déjeuner',
   'Pâtisserie', 'Gourmandise', 'Glace', 'Sandwich', 'Panini', 'Salade', 'Pizza',
-  'Formule', 'Boisson fraîche']
+  'Formule', 'Boisson fraîche',
+  // ── Bar (septembre 2026) — après le Fournil : le comptoir sert le pain
+  //    à 6 h 20, l'apéritif ne commence qu'à midi.
+  'Bière', 'Apéritif', 'Vin', 'Alcool']
 
 const tags = (await zl('catalog/tags')).body.tags ?? []
 const manquantes = ORDRE.filter(n => !tags.some(t => t.name === n))
