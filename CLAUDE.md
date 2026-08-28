@@ -542,6 +542,18 @@ met à jour, donc sur une table vide il ne fait rien et le dit comme une
 réussite. Découvert le jour de l'ouverture, à 6 h 20, c'était une matinée
 perdue.
 
+**Répétition générale** : `PORT=3000 node scripts/test-ouverture-septembre.mjs`
+joue le geste en entier — bascule du groupe restaurant, vérification de ce que
+le public et la caisse voient, puis **restauration systématique** de l'état
+initial, même en cas d'échec. Le 30 septembre à 6 h 20 ne doit pas être le
+premier essai.
+
+⚠️ Il échoue aujourd'hui sur **un seul point, et c'est voulu** : les activités
+CUISINE et PIZZA n'ont **aucun produit**. Allumer un module ne crée pas une
+carte — le module s'allume, la carte reste vide, et le client ne voit rien. Ce
+test repassera au vert le jour où la carte du restaurant et de la pizzeria
+sera saisie. C'est le dernier verrou avant septembre.
+
 **Contrôle à faire avant toute ouverture** : `select count(*) from
 activites_modules` doit rendre **14**. Le repli est une sécurité, pas un état
 normal — s'il est actif, c'est que la configuration a disparu. Tout est piloté par une seule table, `activites_modules` (migration 0110), et **aucun code n'est à modifier pour rouvrir**.
