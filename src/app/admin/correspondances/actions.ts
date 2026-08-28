@@ -41,16 +41,37 @@ export async function rattacherLigne(input: z.infer<typeof schema>) {
   // Et une référence fausse passe avant le nom — elle se tromperait en
   // silence et pour toujours.
   let referenceApprise = false
+  let libelleAppris = false
+  const table = type === 'rec' ? 'recettes' : 'ingredients'
+  const { data: cible } = await sb.from(table)
+    .select('reference_fournisseur, libelle_achat').eq('id', id).maybeSingle()
+
   const ref = ligne.reference?.trim()
-  if (d.apprendreReference && ref) {
-    const table = type === 'rec' ? 'recettes' : 'ingredients'
-    const { data: cible } = await sb.from(table)
-      .select('reference_fournisseur').eq('id', id).maybeSingle()
-    if (cible && !cible.reference_fournisseur?.trim()) {
-      const { error: eRef } = await sb.from(table)
-        .update({ reference_fournisseur: ref }).eq('id', id)
-      referenceApprise = !eRef
-    }
+  if (d.apprendreReference && ref && cible && !cible.reference_fournisseur?.trim()) {
+    const { error: eRef } = await sb.from(table)
+      .update({ reference_fournisseur: ref }).eq('id', id)
+    referenceApprise = !eRef
+  }
+
+  // ─── Le libellé d'achat, sans quoi ce geste ne sert qu'à vider une liste ──
+  // `libelle_achat` est ce qui pilote le stock théorique, la démarque et la
+  // commande conseillée : c'est LA clé de regroupement. Un rattachement qui ne
+  // l'écrivait pas laissait ces trois fonctions à 12 produits sur 120 — la
+  // liste se vidait, rien ne se débloquait.
+  //
+  // Ici on peut se le permettre là où l'apprentissage automatique ne le
+  // pouvait pas : ce n'est pas une déduction sur un nom, c'est un HUMAIN qui
+  // a désigné la cible. On n'écrase jamais un libellé déjà en place.
+  // ⚠️ Certaines lignes Gineys sont préfixées par un en-tête de bon de
+  // livraison : « BORMES LES MIMOSAS B.L. 3447302 du 20/08/26 CROISSANT … ».
+  // Écrit tel quel, ce libellé ne correspondrait JAMAIS à une autre facture —
+  // il porte un numéro de BL et une date. On ne garde que ce qui suit.
+  const libelle = (ligne.description ?? '')
+    .replace(/^.*?\bdu \d{2}\/\d{2}\/\d{2}\s*/i, '').trim()
+  if (cible && !cible.libelle_achat?.trim() && libelle) {
+    const { error: eLib } = await sb.from(table)
+      .update({ libelle_achat: libelle }).eq('id', id)
+    libelleAppris = !eLib
   }
 
   // ⚠️ Le PRIX n'est volontairement PAS propagé ici. Le calcul du prix à la
@@ -61,7 +82,7 @@ export async function rattacherLigne(input: z.infer<typeof schema>) {
 
   revalidatePath('/admin/correspondances')
   revalidatePath('/admin/ingredients')
-  return { ok: true as const, referenceApprise }
+  return { ok: true as const, referenceApprise, libelleAppris }
 }
 
 /** Écarter une ligne : ni produit ni matière, et on ne la reproposera plus. */

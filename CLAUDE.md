@@ -415,6 +415,25 @@ chaud » en partagent autant avec une ligne « PAIN AU CHOCOLAT PREPOUSSE ». Un
 cible dont TOUS les mots sont retrouvés passe devant. 77 % des orphelines ont
 au moins une piste.
 
+⚠️ **Le rattachement écrit aussi `libelle_achat`**, et c'est ce qui compte : sans
+lui, le geste ne faisait que vider une liste. `libelle_achat` est LA clé de
+regroupement du stock théorique, de la démarque et de la commande conseillée —
+les rattacher sans l'écrire laissait ces trois fonctions à 12 produits sur 120.
+On peut se le permettre ici alors que l'apprentissage automatique ne le
+pouvait pas : ce n'est pas une déduction sur un nom, c'est un humain qui a
+désigné la cible. Jamais écrasé s'il existe.
+
+⚠️ **L'en-tête de bon de livraison est retiré du libellé.** Certaines lignes
+Gineys sont préfixées « BORMES LES MIMOSAS B.L. 3447302 du 20/08/26 CROISSANT
+… ». Écrit tel quel, ce libellé ne correspondrait JAMAIS à une autre facture :
+il porte un numéro de BL et une date.
+
+⚠️ **Le FORMAT doit concorder** dans le rattachement de masse
+(`scripts/rattacher-lignes-certaines.mjs`). « PAGO NECTAR ORANGE PET 33CL » se
+rapprochait de « Pago orange 20 cl » — tous les mots de la cible étaient
+présents, le contenant ne l'était pas. Il n'existe pas de Pago orange 33 cl :
+c'est un produit à créer, pas une correspondance à forcer.
+
 ⚠️ Le rattachement **ne propage PAS le prix**. Le calcul à la pièce dépend de
 l'unité de ligne et du C=N ; se tromper écrit un coût faux qui détruit une
 marge en silence — un croissant à 40 € a déjà été vécu. La prochaine facture le

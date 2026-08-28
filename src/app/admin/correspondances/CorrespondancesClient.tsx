@@ -51,7 +51,8 @@ function Rangee({ ligne, cibles, enCours, onFait, demarrer }: {
 
   const rattacher = (cle: string) => demarrer(async () => {
     const r = await rattacherLigne({ ligneId: ligne.id, cible: cle, apprendreReference: true })
-    if (r.ok) onFait(r.referenceApprise ? 'rattachée, référence apprise' : 'rattachée')
+    if (r.ok) onFait([r.referenceApprise && 'référence', r.libelleAppris && 'libellé d’achat']
+      .filter(Boolean).join(' et ') ? 'rattachée, ' + [r.referenceApprise && 'référence', r.libelleAppris && 'libellé d’achat'].filter(Boolean).join(' et ') + ' appris' : 'rattachée')
     else setErreur(r.error)
   })
 
