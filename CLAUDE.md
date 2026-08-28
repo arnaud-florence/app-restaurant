@@ -1419,17 +1419,23 @@ bloquante sans date ne dit pas « rien à faire », elle dit « pas commencé »
 Le défaut est `false` : un défaut à `true` crierait sur tout le registre et
 serait ignoré au bout d'une semaine.
 
-**Les six bloquantes au 28/08/2026** : licence IV, permis d'exploitation,
-déclaration préalable en mairie (Cerfa 11542), autorisation de travaux ERP +
-visite de la commission de sécurité, attestation d'accessibilité PMR,
-assurance multirisque + RC.
+**Cinq bloquantes au 28/08/2026** : permis d'exploitation, déclaration
+préalable en mairie (Cerfa 11542), autorisation de travaux ERP + visite de la
+commission de sécurité, attestation d'accessibilité PMR, assurance
+multirisque + RC.
 
-⚠️ **La licence IV est le seul point dont le délai ne dépend pas de nous.**
-Elle est obligatoire pour servir des spiritueux — whisky, vodka, gin, rhum et
-digestifs de la carte bar (0144). Une licence III ne couvre que le groupe 3 :
-avec une III, sept produits sortent de la carte. Or les licences IV sont
-contingentées (1 pour 450 habitants) et ne se créent plus depuis 1959 : il
-faut en acheter ou en faire transférer une.
+✅ **La licence IV est ACQUISE** (confirmé par le gérant le 28/08/2026). C'était
+le seul point dont le délai ne dépendait pas de nous — les licences IV sont
+contingentées (1 pour 450 habitants) et ne se créent plus depuis 1959. Elle
+couvre les spiritueux de la carte bar (0144) : whisky, vodka, gin, rhum et
+digestifs, soit sept produits qu'une licence III n'aurait pas permis de servir.
+
+⚠️ Trois choses restent attachées à cette licence : **l'afficher** dans
+l'établissement (la ligne « Licence IV » d'`affichages_verifications` est
+encore marquée absente), la **mentionner au Cerfa 11542**, et faire confirmer
+sa validité si le débit de boissons est resté fermé longtemps — une licence IV
+**non exploitée pendant 5 ans d'affilée est périmée** (art. L3333-1 CSP).
+Vérifiable en une visite en mairie, irrattrapable le jour de l'ouverture.
 
 ⚠️ **La visite de la commission de sécurité est le chemin critique du
 planning.** L'établissement est en travaux ; la réouverture au public après
