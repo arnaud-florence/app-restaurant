@@ -1332,6 +1332,56 @@ sur les produits à base de farine, rien d'autre) : une suggestion généreuse
 serait acceptée en bloc par habitude, et une déclaration fausse est plus
 dangereuse qu'une déclaration absente.
 
+**Le scanner d'emballages — la composition n'est écrite qu'au dos du carton.**
+`POST /api/agents/scanner-allergenes` + onglet « 📷 Scanner un emballage ».
+Photos de la liste d'ingrédients → Claude Vision → relecture ligne à ligne →
+déclaration signée. Même patron que `scanner-lots` (8 photos par appel,
+réduction à 1600 px côté client, rien n'est écrit par la route).
+
+C'était le vrai blocage : un croissant contient du gluten **par définition**,
+mais qu'il contienne du lait, des œufs ou du soja dépend de la recette de
+Gineys — et cette recette n'existe qu'imprimée sur l'emballage. Sans lecture,
+la seule déclaration honnête est « on ne sait pas », ce qui n'aide aucun
+client allergique.
+
+⚠️ **Une étiquette illisible rend des listes VIDES et ne peut pas être
+appliquée.** C'est le garde-fou central : une liste vide, une fois signée,
+se lit « aucun allergène ». Le modèle a consigne explicite de ne rien déduire
+du NOM du produit.
+
+⚠️ **« Contient » et « peut contenir des traces de » ne sont jamais
+fusionnés**, et se tromper est fautif dans les deux sens : déclarer une trace
+comme un ingrédient fait fuir un client sans motif, taire une trace expose un
+allergique sévère. Les traces remontent marquées `~` et **ne sont pas
+pré-cochées**.
+
+⚠️ Les catégories rendues par le modèle sont **filtrées sur les 14** : un
+« lactose » ou une « noix de coco » remonterait sinon jusqu'à l'écran comme
+s'il était réglementaire.
+
+**Pré-remplissage : `node scripts/prefill-allergenes.mjs [--ecrire]`.**
+70 produits sur 120 au 28/08/2026 — gluten là où la farine est
+définitionnelle (pain, viennoiserie, panini, pizza, sandwich, pâtisserie,
+gourmandise), sulfites sur les vins et apéritifs à base de vin, gluten sur
+les bières, lait sur les boissons lactées.
+
+⚠️ **Le script ne pose JAMAIS `allergenes_valides_le`** — il propose, il ne
+signe pas. Et il n'écrit que ce qui est vrai **par définition du produit**,
+jamais par probabilité.
+
+⚠️ **Valider affirme que la liste est COMPLÈTE**, pas seulement que ce qui est
+coché est exact. D'où le piège que le pré-remplissage ouvrait : signer la
+famille « Viennoiserie » telle que proposée déclarerait qu'un croissant ne
+contient **pas de lait**. La validation groupée pose donc la question au
+moment du clic — « avez-vous lu l'emballage ? » — et renvoie vers le scanner.
+
+⚠️ Les distillats (whisky, vodka, gin, rhum) sont **exemptés** d'étiquetage
+gluten par l'annexe II du règlement, même issus de céréales. Ne pas les
+déclarer par analogie avec la bière.
+
+Test : `PORT=3000 node scripts/test-scanner-allergenes.mjs` — 14 assertions,
+sans consommer Claude Vision ; l'essentiel porte sur ce qui est REFUSÉ.
+
 **Saisie par FAMILLE**, onglet par défaut de `/admin/allergenes`. 85 produits
 ouverts un par un dans une fenêtre modale, personne ne le fait un mercredi
 entre deux fournées — et un écran qu'on n'utilise pas ne protège de rien. Or
@@ -1816,6 +1866,7 @@ PORT=3000 node scripts/test-zelty-emission.mjs  # émission vers la caisse (sans
 PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (sans compte)
 PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (sans compte)
 PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test local)
+PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)

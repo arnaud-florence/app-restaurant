@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,7 @@ import {
 import { askConfirm } from '@/lib/confirm'
 import type { RecetteAllergenes } from './page'
 
-type Tab = 'rapide' | 'catalogue' | 'procedures' | 'qr'
+type Tab = 'rapide' | 'scanner' | 'catalogue' | 'procedures' | 'qr'
 
 export default function AllergenesClient({
   recettes, procedures, readOnly = false,
@@ -62,6 +62,7 @@ export default function AllergenesClient({
         >
           <div className="flex gap-1 overflow-x-auto">
             <TabBtn active={tab === 'rapide'}     onClick={() => setTab('rapide')}>⚡ Saisie par famille</TabBtn>
+            <TabBtn active={tab === 'scanner'}    onClick={() => setTab('scanner')}>📷 Scanner un emballage</TabBtn>
             <TabBtn active={tab === 'catalogue'}  onClick={() => setTab('catalogue')}>🍽️ Catalogue plats × allergènes</TabBtn>
             <TabBtn active={tab === 'procedures'} onClick={() => setTab('procedures')}>🚨 Procédures d&apos;urgence ({nbProc})</TabBtn>
             <TabBtn active={tab === 'qr'}         onClick={() => setTab('qr')}>📱 QR salle</TabBtn>
@@ -69,6 +70,7 @@ export default function AllergenesClient({
         </AdminPageHeader>
 
         {tab === 'rapide'     && <SaisieRapideTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
+        {tab === 'scanner'    && <ScannerTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'catalogue'  && <CatalogueTab recettes={recettes} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'procedures' && <ProceduresTab procedures={procedures} readOnly={readOnly} onError={flashKo} onOk={flashOk} />}
         {tab === 'qr'         && <QRTab />}
@@ -110,6 +112,286 @@ function suggestionsPour(r: { nom: string; categorie: string }): { allergenes: A
   const cible = `${r.categorie} ${r.nom}`
   for (const s of SUGGESTIONS) if (s.motif.test(cible)) return { allergenes: s.allergenes, pourquoi: s.pourquoi }
   return null
+}
+
+// ─── TAB — Scanner un emballage ──────────────────────────────────────
+//
+// La composition d'un produit acheté surgelé n'est écrite qu'à un seul
+// endroit : le dos du carton. On ne peut ni la deviner, ni la déduire du
+// nom — un croissant contient du gluten par définition, mais qu'il
+// contienne du lait, des œufs ou du soja dépend de la recette de Gineys.
+//
+// Le geste : on photographie la liste d'ingrédients, Claude la lit, et on
+// RELIT avant de signer. La relecture n'est pas une formalité : une
+// déclaration d'allergènes engage, et c'est un allergique qui la lira.
+
+type EtiquetteScannee = {
+  produit: string | null
+  marque: string | null
+  ingredients: string | null
+  presents: Allergene[]
+  traces: Allergene[]
+  liste_lisible: boolean
+  confiance: number
+  cible: string          // recette_id visée, '' tant que non choisie
+  retenus: Allergene[]   // ce qui sera réellement déclaré
+}
+
+function reduirePhotoEtiquette(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader()
+    r.onerror = () => rej(new Error('Lecture du fichier échouée'))
+    r.onloadend = () => {
+      const img = new Image()
+      img.onerror = () => rej(new Error('Image illisible'))
+      img.onload = () => {
+        const MAX = 1600
+        const ratio = Math.min(1, MAX / Math.max(img.width, img.height))
+        if (ratio === 1 && file.size < 1024 * 1024) return res(r.result as string)
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.width * ratio); c.height = Math.round(img.height * ratio)
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+        res(c.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = r.result as string
+    }
+    r.readAsDataURL(file)
+  })
+}
+
+/** Rapproche le nom lu sur l'emballage d'un produit de la carte. Sert à
+ *  pré-sélectionner la cible, jamais à l'imposer : « CROISSANT PUR BEURRE
+ *  PREPOUSSE 60G » et « Croissant » ne se ressemblent qu'à moitié. */
+function suggererCible(lu: string | null, recettes: RecetteAllergenes[]): string {
+  if (!lu) return ''
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const mots = norm(lu).split(/[^a-z0-9]+/).filter(m => m.length >= 4)
+  if (mots.length === 0) return ''
+  let best = '', score = 0
+  for (const r of recettes) {
+    const cible = norm(r.nom)
+    const communs = mots.filter(m => cible.includes(m)).length
+    // La couverture départage : un nom court entièrement retrouvé vaut
+    // mieux qu'un nom long qui partage deux mots par hasard.
+    const couverture = communs / norm(r.nom).split(/[^a-z0-9]+/).filter(Boolean).length
+    const s = communs + couverture
+    if (communs > 0 && s > score) { score = s; best = r.id }
+  }
+  return score >= 1.5 ? best : ''
+}
+
+function ScannerTab({
+  recettes, readOnly, onError, onOk,
+}: {
+  recettes: RecetteAllergenes[]
+  readOnly: boolean
+  onError: (e: unknown) => void
+  onOk: (m: string) => void
+}) {
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galerieRef = useRef<HTMLInputElement>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [etiquettes, setEtiquettes] = useState<EtiquetteScannee[] | null>(null)
+  const [chargement, setChargement] = useState(false)
+  const [envoi, setEnvoi] = useState(false)
+  const router = useRouter()
+
+  const triees = useMemo(
+    () => [...recettes].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')),
+    [recettes])
+
+  async function ajouter(files: FileList) {
+    try {
+      const nouvelles = await Promise.all(Array.from(files)
+        .filter(f => f.type.startsWith('image/')).map(reduirePhotoEtiquette))
+      setPhotos(p => [...p, ...nouvelles].slice(0, 8))
+      setEtiquettes(null)
+    } catch (e) { onError(e) }
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galerieRef.current) galerieRef.current.value = ''
+  }
+
+  async function analyser() {
+    setChargement(true)
+    try {
+      const images = photos.map(p => {
+        const m = p.match(/^data:(image\/[a-z]+);base64,(.+)$/)
+        if (!m) throw new Error('Format image non reconnu')
+        return { image_base64: m[2], media_type: m[1] }
+      })
+      const r = await fetch('/api/agents/scanner-allergenes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images }),
+      })
+      const json = await r.json()
+      if (!r.ok || !json.ok) throw new Error(json.error ?? `HTTP ${r.status}`)
+      type Brut = Omit<EtiquetteScannee, 'cible' | 'retenus'>
+      setEtiquettes((json.etiquettes as Brut[]).map(e => ({
+        ...e,
+        cible: suggererCible(e.produit, triees),
+        // Les traces ne sont PAS cochées d'office : « peut contenir » n'est
+        // pas « contient », et les confondre fait fuir un client sans motif.
+        retenus: e.presents,
+      })))
+    } catch (e) { onError(e) } finally { setChargement(false) }
+  }
+
+  function maj(i: number, patch: Partial<EtiquetteScannee>) {
+    setEtiquettes(es => es!.map((e, j) => j === i ? { ...e, ...patch } : e))
+  }
+  function bascule(i: number, a: Allergene) {
+    setEtiquettes(es => es!.map((e, j) => j !== i ? e
+      : { ...e, retenus: e.retenus.includes(a) ? e.retenus.filter(x => x !== a) : [...e.retenus, a] }))
+  }
+
+  const prets = (etiquettes ?? []).filter(e => e.cible && e.liste_lisible)
+
+  async function appliquer() {
+    if (prets.length === 0) { onError(new Error('Aucune étiquette visée sur un produit')); return }
+    setEnvoi(true)
+    let n = 0
+    try {
+      for (const e of prets) {
+        await setAllergenesComplementaires({
+          recette_id: e.cible,
+          allergenes_complementaires: e.retenus,
+        })
+        n++
+      }
+      onOk(`${n} produit(s) déclarés et validés`)
+      setPhotos([]); setEtiquettes(null)
+      router.refresh()
+    } catch (err) { onError(err) } finally { setEnvoi(false) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        <p className="font-bold">Photographiez la liste d&apos;ingrédients, pas le devant du paquet.</p>
+        <p className="mt-1">
+          Les allergènes y sont imprimés en gras ou en majuscules — c&apos;est une obligation
+          européenne. Jusqu&apos;à 8 photos par lecture. <strong>Rien n&apos;est enregistré avant
+          votre relecture</strong> : c&apos;est vous qui signez la déclaration.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" multiple className="hidden"
+          onChange={e => e.target.files && ajouter(e.target.files)} />
+        <input ref={galerieRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={e => e.target.files && ajouter(e.target.files)} />
+        <button onClick={() => cameraRef.current?.click()} disabled={readOnly || photos.length >= 8}
+          className="min-h-[48px] px-5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 text-white font-bold">
+          📷 Photographier
+        </button>
+        <button onClick={() => galerieRef.current?.click()} disabled={readOnly || photos.length >= 8}
+          className="min-h-[48px] px-5 rounded-md bg-zinc-100 hover:bg-zinc-200 disabled:opacity-50 font-bold">
+          🖼️ Choisir des photos
+        </button>
+        {photos.length > 0 && (
+          <button onClick={analyser} disabled={chargement}
+            className="min-h-[48px] px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-300 text-white font-bold">
+            {chargement ? 'Lecture en cours…' : `Lire ${photos.length} étiquette(s)`}
+          </button>
+        )}
+      </div>
+
+      {photos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((p, i) => (
+            <div key={i} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p} alt={`Étiquette ${i + 1}`} className="h-24 w-24 object-cover rounded-md border border-zinc-300" />
+              <button onClick={() => { setPhotos(ps => ps.filter((_, j) => j !== i)); setEtiquettes(null) }}
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-zinc-900 text-white text-xs">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {etiquettes && etiquettes.length === 0 && (
+        <p className="text-sm text-zinc-600">Aucune étiquette exploitable sur ces photos.</p>
+      )}
+
+      {etiquettes && etiquettes.map((e, i) => (
+        <div key={i} className={cn('rounded-lg border p-4 space-y-3',
+          e.liste_lisible ? 'border-zinc-200 bg-white' : 'border-amber-300 bg-amber-50')}>
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="font-bold">{e.produit ?? '— nom illisible —'}</span>
+            {e.marque && <span className="text-sm text-zinc-500">{e.marque}</span>}
+            <span className="ml-auto text-xs text-zinc-500 tabular-nums">
+              confiance {Math.round(e.confiance * 100)} %
+            </span>
+          </div>
+
+          {!e.liste_lisible ? (
+            <p className="text-sm text-amber-900">
+              <strong>Liste d&apos;ingrédients illisible sur cette photo.</strong> Rien n&apos;est proposé :
+              une liste vide serait lue comme « aucun allergène ». Reprenez la photo de plus près.
+            </p>
+          ) : (
+            <>
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Produit de la carte</span>
+                <select value={e.cible} onChange={ev => maj(i, { cible: ev.target.value })}
+                  className="mt-1 w-full min-h-[48px] rounded-md border border-zinc-300 px-3">
+                  <option value="">— choisir le produit à déclarer —</option>
+                  {triees.map(r => <option key={r.id} value={r.id}>{r.nom} · {r.categorie}</option>)}
+                </select>
+              </label>
+
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wide text-zinc-500">Déclaré comme présent</span>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {ALLERGENES_EU.map(a => {
+                    const on = e.retenus.includes(a)
+                    const lu = e.presents.includes(a)
+                    const tr = e.traces.includes(a)
+                    return (
+                      <button key={a} onClick={() => bascule(i, a)} disabled={readOnly}
+                        title={lu ? 'Lu sur l’étiquette' : tr ? 'Mentionné en traces' : undefined}
+                        className={cn('min-h-[40px] px-3 rounded-md border text-sm font-semibold',
+                          on ? ALLERGENE_INFO[a].cls : 'bg-white text-zinc-400 border-zinc-200',
+                          !on && tr && 'border-dashed border-amber-400 text-amber-700')}>
+                        {ALLERGENE_INFO[a].emoji} {ALLERGENE_INFO[a].label}
+                        {lu && ' ✓'}{!lu && tr && ' ~'}
+                      </button>
+                    )
+                  })}
+                </div>
+                {e.traces.length > 0 && (
+                  <p className="mt-1.5 text-xs text-amber-800">
+                    ~ = mentionné en <strong>traces</strong> (« peut contenir »), pas en ingrédient.
+                    À cocher seulement si vous voulez l&apos;annoncer comme présent.
+                  </p>
+                )}
+              </div>
+
+              {e.ingredients && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-zinc-600">Liste d&apos;ingrédients lue</summary>
+                  <p className="mt-1 text-zinc-700 leading-relaxed">{e.ingredients}</p>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      ))}
+
+      {prets.length > 0 && (
+        <div className="sticky bottom-4 rounded-lg border border-zinc-300 bg-white p-3 shadow-lg flex items-center gap-3">
+          <span className="text-sm">
+            <strong>{prets.length}</strong> produit(s) prêts à déclarer.
+            Votre nom sera enregistré comme validateur.
+          </span>
+          <button onClick={appliquer} disabled={readOnly || envoi}
+            className="ml-auto min-h-[48px] px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:bg-zinc-300 text-white font-bold">
+            {envoi ? '…' : 'Déclarer et signer'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── TAB 0 — Saisie par famille ────────────────────────────────────
@@ -167,7 +449,16 @@ function SaisieRapideTab({
   function valider() {
     const cibles = produits.filter(p => !exclus.has(p.id)).map(p => p.id)
     if (cibles.length === 0) { onError(new Error('Aucun produit sélectionné.')); return }
+    // Valider, c'est affirmer que la liste est COMPLÈTE — pas seulement que
+    // ce qui est coché est exact. Les allergènes pré-remplis par script ne
+    // portent que ce qui est vrai par définition (le gluten d'une farine) :
+    // signer sans avoir lu l'emballage déclarerait qu'un croissant ne
+    // contient pas de lait. D'où cette question, à ce moment précis.
     startTransition(async () => {
+      if (!(await askConfirm(
+        `Vous allez déclarer que ces ${cibles.length} produit(s) ne contiennent AUCUN autre allergène que ceux cochés.\n\n` +
+        `Avez-vous lu la liste d'ingrédients sur l'emballage ?\n\n` +
+        `Si non : l'onglet « 📷 Scanner un emballage » la lit pour vous.`))) return
       try {
         const r = await validerAllergenesEnLot({ recette_ids: cibles, allergenes: coches })
         onOk(`${r.valides} produit(s) validé(s)`)
