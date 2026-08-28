@@ -17,6 +17,14 @@ const nombre = z.union([z.number(), z.string()]).transform(v => {
   return Number.isFinite(n) ? n : NaN
 }).refine(n => Number.isFinite(n))
 
+// ⚠️ Zelty renvoie `null` — pas l'absence — pour tout prix ou taxe non
+// renseigné : `price_delivery`, `cost_price`, `tax_delivery` sur un produit
+// qui n'est pas livré. `.optional()` accepte `undefined` mais REJETTE `null`,
+// et un seul champ nul faisait tomber le plat entier dans « illisible ».
+// Vécu le 28/08/2026 : 84 plats reçus, 84 rejetés, sans qu'aucune erreur ne
+// remonte — le miroir se croyait vide. `.nullish()` accepte les deux.
+const nombreOuNul = nombre.nullish()
+
 /** Un plat — schéma `Dish`. Montants en CENTIMES, TVA en millièmes (1000 = 10 %). */
 export const platZeltySchema = z.object({
   id:            z.union([z.number(), z.string()]).transform(v => String(v)),
@@ -28,16 +36,16 @@ export const platZeltySchema = z.object({
   image:         z.string().nullable().optional(),
 
   /** Prix sur place, TTC, en centimes. */
-  price:         nombre.optional(),
+  price:         nombreOuNul,
   /** Prix à emporter, TTC, en centimes. */
-  price_togo:    nombre.optional(),
-  price_delivery: nombre.optional(),
-  cost_price:    nombre.optional(),
+  price_togo:    nombreOuNul,
+  price_delivery: nombreOuNul,
+  cost_price:    nombreOuNul,
 
   /** TVA sur place, en millièmes : 1000 = 10 %, 550 = 5,5 %. */
-  tax:           nombre.optional(),
-  tax_takeaway:  nombre.optional(),
-  tax_delivery:  nombre.optional(),
+  tax:           nombreOuNul,
+  tax_takeaway:  nombreOuNul,
+  tax_delivery:  nombreOuNul,
 
   disable:          z.boolean().nullable().optional(),
   disable_takeaway: z.boolean().nullable().optional(),
@@ -46,7 +54,7 @@ export const platZeltySchema = z.object({
   zc_only:       z.boolean().nullable().optional(),
 
   /** Poste de production — correspond à notre `tag_destination`. */
-  id_fabrication_place: nombre.optional(),
+  id_fabrication_place: nombreOuNul,
   fab_name:      z.string().nullable().optional(),
 }).passthrough()
 
@@ -74,7 +82,7 @@ export type PlatNormalise = {
 const arrondi = (n: number) => Math.round(n * 100) / 100
 
 /** TVA Zelty (millièmes) → pourcentage. 1000 → 10 · 550 → 5,5. */
-export function tvaDepuisZelty(brut: number | undefined): number | null {
+export function tvaDepuisZelty(brut: number | null | undefined): number | null {
   if (brut == null || !Number.isFinite(brut)) return null
   // 1000 = 10 % : le facteur est 100. Un taux déjà en pourcentage (10, 5.5)
   // reste tel quel — aucune TVA française ne dépasse 100.
@@ -83,7 +91,7 @@ export function tvaDepuisZelty(brut: number | undefined): number | null {
 }
 
 /** Centimes → euros, en tolérant l'absence. */
-const euros = (c: number | undefined): number | null =>
+const euros = (c: number | null | undefined): number | null =>
   c == null || !Number.isFinite(c) ? null : arrondi(c / 100)
 
 export function normaliserPlat(brut: unknown): PlatNormalise | { erreur: string } {

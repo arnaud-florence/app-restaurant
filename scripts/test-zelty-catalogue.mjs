@@ -58,6 +58,23 @@ t('la TVA en millièmes devient un pourcentage', p.tva === 5.5, `${p.tva}`)
 t('le poste de production est repris', p.posteProduction === 'Fournil', p.posteProduction)
 t('le plat est vendable en ligne', p.vendableEnLigne === true)
 
+// ── 1 bis. Les champs NULS de Zelty ─────────────────────────────────
+// Zelty renvoie `null` — et non l'absence — pour tout prix ou taxe non
+// renseigné. `.optional()` accepte `undefined` mais rejette `null` : le
+// 28/08/2026, 84 plats réels ont été reçus et 84 rejetés en « illisible »,
+// et le miroir se croyait vide sans qu'aucune erreur ne remonte.
+r = await verifier([{
+  ...croissant, id: 1975,
+  price_delivery: null, cost_price: null, tax_delivery: null,
+  sku: null, description: null, fab_name: null, image: null,
+  id_fabrication_place: null,
+}])
+const illisibles = Array.isArray(r.body.illisibles) ? r.body.illisibles.length : (r.body.illisibles ?? 0)
+t('un plat aux champs nuls reste lisible', illisibles === 0,
+  `illisibles=${JSON.stringify(r.body.illisibles)}`)
+t('et il est bien normalisé', (r.body.apercu?.[0] ?? {}).prixTtc === 1.20,
+  `${(r.body.apercu?.[0] ?? {}).prixTtc}`)
+
 // ── 2. « Caisse seulement » ne va JAMAIS sur le site ─────────────────
 r = await verifier([{ ...croissant, id: 2000, name: 'Café offert', zc_only: true }])
 t('un plat « caisse seulement » reste actif', r.body.apercu?.[0]?.actif === true)

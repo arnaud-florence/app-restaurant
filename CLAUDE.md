@@ -790,6 +790,15 @@ un pourcentage facturerait une TVA à 1000 %.
 afficherait des produits que le client ne peut pas commander (café offert,
 gestes commerciaux). Ils restent actifs mais jamais `vendable_online`.
 
+⚠️ **Zelty renvoie `null`, pas l'absence**, pour tout prix ou taxe non
+renseigné : `price_delivery`, `cost_price`, `tax_delivery` sur un produit non
+livré. En zod, `.optional()` accepte `undefined` mais REJETTE `null` — un seul
+champ nul faisait tomber le plat entier dans « illisible ». Vécu sur les
+données réelles : **84 plats reçus, 84 rejetés**, et le miroir se croyait vide
+sans qu'aucune erreur ne remonte. Les champs numériques du schéma sont donc en
+`.nullish()`. Cas de non-régression dans `test-zelty-catalogue.mjs` (18
+assertions) — il échoue bien si on retire le correctif.
+
 ⚠️ **`limit=0` renvoie TOUT**, pas zéro — c'est documenté et contre-intuitif.
 Une pagination de repli existe au cas où ce comportement changerait : un
 catalogue tronqué en silence casserait le rapprochement sans le dire.
@@ -975,8 +984,10 @@ corps altéré après signature).
 
 **Compte réel branché le 28/08/2026.** Clé #23628 « Claude » (portée
 Casatasia), posée dans `.env.local` avec `ZELTY_MONTANTS_EN_CENTIMES=true`.
-Les deux sens répondent en `?dry=1` : `/catalog/dishes` (0 plat — le catalogue
-Zelty est vide) et `/orders` (0 commande). Contrat confirmé à l'écran par
+**Les 84 produits du Fournil ont été poussés le 28/08/2026** : 84 créés, 84
+liens enregistrés, 0 sans retour. Le miroir les relit et les apparie **tous
+par `remote_id`** — 84/84, aucun rapprochement par le nom, aucun écart de prix.
+Rejouer l'import ne recrée rien (`a_creer: 0`, `deja_lies: 84`). Contrat confirmé à l'écran par
 **Configuration → Widgets et API → Accès API** : base
 `https://api.zelty.fr/2.11/`, version 2.11, `Authorization: Bearer` — soit
 exactement nos valeurs par défaut. `POST /orders` existe : l'injection des
