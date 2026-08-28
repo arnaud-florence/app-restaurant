@@ -34,7 +34,7 @@ export default async function LegalPage() {
 
   const [oblRes, accRes, affRes, empRes, docRes] = await Promise.all([
     supabase.from('obligations_legales')
-      .select('id, titre, categorie, description, date_echeance, frequence, statut, prestataire, document_url, notes')
+      .select('id, titre, categorie, description, date_echeance, frequence, statut, prestataire, document_url, notes, bloquant')
       .order('date_echeance', { nullsFirst: false }),
     supabase.from('accidents_travail')
       .select('*, employe:employes!employe_id(prenom, nom)')
@@ -54,6 +54,7 @@ export default async function LegalPage() {
     date_echeance: (o.date_echeance as string) ?? null,
     frequence: (o.frequence as string) ?? null,
     statut: (o.statut as StatutObligation) ?? 'a_faire',
+    bloquant: Boolean(o.bloquant),
     prestataire: (o.prestataire as string) ?? null,
     document_url: (o.document_url as string) ?? null,
     notes: (o.notes as string) ?? null,

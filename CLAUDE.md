@@ -143,11 +143,12 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Commissions + TVA presse | `type_revenu`, `commission_pct`/`_forfait_ht`, taux 2,1 % | 0136 |
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
+| Registre légal d'ouverture | 21 obligations, drapeau `bloquant` sans date | 0147 |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0143.**
+**Migrations actuelles : 0001 → 0147.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -1391,6 +1392,58 @@ exceptions produit par produit, on valide (`validerAllergenesEnLot`). Ré-ouvrir
 une famille repart de ce qui y est déjà déclaré **à l'unanimité**, pour ne rien
 effacer.
 
+### Le registre légal d'ouverture (0147)
+
+`obligations_legales` était **vide**. Le module 17 est livré depuis des mois
+et n'a jamais été nourri — donc l'alerte à J-30 de l'agent HACCP ne pouvait se
+déclencher sur rien, et le registre ne protégeait de rien. Or on ouvre un
+**débit de boissons** en septembre 2026.
+
+Amorçage : `node scripts/obligations-ouverture.mjs [--ecrire]` — 21
+obligations, idempotent (rapproché sur le titre, n'écrase jamais une ligne
+renseignée à la main).
+
+⚠️ **Aucune date n'est inventée.** Une échéance fausse dans un registre légal
+est pire que pas d'échéance : elle rassure. Toutes les lignes arrivent sans
+date, en `a_faire`. C'est le gérant qui les pose au fur et à mesure.
+
+⚠️ **`obligations_legales.bloquant`** (0147) existe pour une raison précise :
+l'agent HACCP ne lisait que les obligations **datées**
+(`.not('date_echeance','is',null)`). Suffisant pour des renouvellements — un
+contrôle gaz a toujours une date. Faux pour une ouverture : les six
+obligations qui peuvent **empêcher d'ouvrir** sont justement celles qui n'ont
+pas de date, parce que personne ne les a encore engagées. Sans ce drapeau,
+elles auraient été les **seules du registre à n'alerter jamais**. Une
+bloquante sans date ne dit pas « rien à faire », elle dit « pas commencé ».
+
+Le défaut est `false` : un défaut à `true` crierait sur tout le registre et
+serait ignoré au bout d'une semaine.
+
+**Les six bloquantes au 28/08/2026** : licence IV, permis d'exploitation,
+déclaration préalable en mairie (Cerfa 11542), autorisation de travaux ERP +
+visite de la commission de sécurité, attestation d'accessibilité PMR,
+assurance multirisque + RC.
+
+⚠️ **La licence IV est le seul point dont le délai ne dépend pas de nous.**
+Elle est obligatoire pour servir des spiritueux — whisky, vodka, gin, rhum et
+digestifs de la carte bar (0144). Une licence III ne couvre que le groupe 3 :
+avec une III, sept produits sortent de la carte. Or les licences IV sont
+contingentées (1 pour 450 habitants) et ne se créent plus depuis 1959 : il
+faut en acheter ou en faire transférer une.
+
+⚠️ **La visite de la commission de sécurité est le chemin critique du
+planning.** L'établissement est en travaux ; la réouverture au public après
+aménagement d'un ERP est subordonnée à un avis favorable, et la commission ne
+se réunit pas à la demande.
+
+⚠️ Le registre est une **liste de contrôle**, pas un avis juridique : à
+confirmer avec la mairie, le comptable et le SDIS. Il sert à ce que rien ne
+soit oublié, pas à trancher.
+
+Test : `node scripts/test-obligations-ouverture.mjs` — 14 assertions ; il
+CRÉE une obligation témoin bloquante sans date et vérifie qu'elle est vue,
+puis la supprime.
+
 ### L'historique économique des produits (0146)
 
 `historique_prix_ingredients` existait depuis le module 3 — 184 lignes. Les
@@ -1867,6 +1920,7 @@ PORT=3000 node scripts/test-zelty-disponibilites.mjs # ruptures vers la caisse (
 PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (sans compte)
 PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test local)
 PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
+node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)

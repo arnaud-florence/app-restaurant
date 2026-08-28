@@ -293,6 +293,35 @@ async function analyseEcheancesLegales(ctx: AgentContext) {
       data: { obligation_id: o.id, titre: o.titre, date_echeance: o.date_echeance, jours_restants: j },
     })
   }
+
+  // Les obligations BLOQUANTES sans date (0147). Le filtre ci-dessus exige
+  // une échéance — et les obligations qui peuvent empêcher d'OUVRIR sont
+  // justement celles qui n'en ont pas : licence IV, permis d'exploitation,
+  // visite de la commission de sécurité. Personne ne leur a encore donné de
+  // date parce que personne ne les a engagées. Sans ce second passage,
+  // elles seraient les seules du registre à n'alerter jamais.
+  const { data: bloquantes } = await ctx.supabase
+    .from('obligations_legales')
+    .select('id, titre, categorie')
+    .eq('bloquant', true)
+    .not('statut', 'eq', 'fait')
+    .is('date_echeance', null)
+
+  for (const o of (bloquantes ?? []) as Array<{ id: string; titre: string; categorie: string | null }>) {
+    nbAlertes++
+    if (await findingDejaActif(ctx, 'echeance_legale', { obligation_id: o.id })) continue
+    await emitFinding(ctx, {
+      urgence: 'rouge',
+      type: 'echeance_legale',
+      titre: `Bloquant, aucune date : ${o.titre}`,
+      message: `${o.categorie ?? 'Obligation'} — empêche l'exploitation et n'est pas engagée. `
+        + `Poser une date dans /admin/legal dès qu'une démarche est lancée.`,
+      action_label: 'Voir l\'obligation',
+      action_url:   '/admin/legal',
+      data: { obligation_id: o.id, titre: o.titre, date_echeance: null, bloquant: true },
+    })
+  }
+
   return { nbAlertes }
 }
 

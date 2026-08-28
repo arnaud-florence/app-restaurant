@@ -115,12 +115,17 @@ function ObligationsTab({ obligations, onError, onOk }: { obligations: Obligatio
   const router = useRouter()
 
   const filtered = useMemo(() => {
+    const bloquantDabord = (a: Obligation, b: Obligation) => {
+      const pa = a.bloquant && a.statut !== 'fait' ? 0 : 1
+      const pb = b.bloquant && b.statut !== 'fait' ? 0 : 1
+      return pa - pb
+    }
     return obligations.filter(o => {
       if (filtre === 'a_venir') return o.statut !== 'fait' && (!o.date_echeance || statutEcheance(o.date_echeance) !== 'expire')
       if (filtre === 'expirees') return o.statut !== 'fait' && o.date_echeance && statutEcheance(o.date_echeance) === 'expire'
       if (filtre === 'fait') return o.statut === 'fait'
       return true
-    })
+    }).sort(bloquantDabord)
   }, [obligations, filtre])
 
   return (
@@ -147,7 +152,12 @@ function ObligationsTab({ obligations, onError, onOk }: { obligations: Obligatio
               const styEch = STATUT_ECHEANCE_STYLE[sEch]
               const j = joursRestants(o.date_echeance)
               return (
-                <li key={o.id} className={cn('px-4 py-3', sEch === 'expire' && 'bg-red-50', sEch === 'critique' && 'bg-red-50', sEch === 'proche' && 'bg-amber-50')}>
+                <li key={o.id} className={cn('px-4 py-3',
+                  // Une bloquante non satisfaite se voit AVANT tout le reste,
+                  // qu'elle ait une date ou non : sans date, c'est qu'elle
+                  // n'est même pas engagée (0147).
+                  o.bloquant && o.statut !== 'fait' && 'bg-red-50 border-l-4 border-l-red-600',
+                  sEch === 'expire' && 'bg-red-50', sEch === 'critique' && 'bg-red-50', sEch === 'proche' && 'bg-amber-50')}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -155,6 +165,16 @@ function ObligationsTab({ obligations, onError, onOk }: { obligations: Obligatio
                         <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', sObl.cls)}>{sObl.label}</span>
                         {o.date_echeance && (
                           <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', styEch.cls)}>{styEch.label}</span>
+                        )}
+                        {o.bloquant && o.statut !== 'fait' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-red-600 text-white border-red-700">
+                            ⛔ BLOQUE L&apos;OUVERTURE
+                          </span>
+                        )}
+                        {o.bloquant && o.statut !== 'fait' && !o.date_echeance && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-white text-red-800 border-red-300">
+                            aucune date — pas engagée
+                          </span>
                         )}
                       </div>
                       <h3 className="font-bold text-sm mt-1">{o.titre}</h3>
@@ -164,6 +184,7 @@ function ObligationsTab({ obligations, onError, onOk }: { obligations: Obligatio
                         {o.frequence && <>🔄 {o.frequence} · </>}
                         {o.prestataire && <>👤 {o.prestataire}</>}
                       </p>
+                      {o.notes && <p className="text-[11px] text-zinc-700 mt-1 whitespace-pre-line">{o.notes}</p>}
                       {o.document_url && <a href={o.document_url} target="_blank" rel="noopener" className="text-[11px] text-blue-600 hover:underline">📎 Document</a>}
                     </div>
                     <div className="flex flex-col gap-1">

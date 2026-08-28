@@ -5,7 +5,8 @@ import { fr } from 'date-fns/locale'
 
 export type CategorieObligation =
   | 'licence_iv' | 'permis_exploitation' | 'assurance' | 'bail_commercial'
-  | 'autorisation_terrasse' | 'douane' | 'urssaf' | 'visite_medicale_employeur' | 'autre'
+  | 'autorisation_terrasse' | 'douane' | 'urssaf' | 'visite_medicale_employeur'
+  | 'securite_erp' | 'hygiene' | 'personnel' | 'droits_musique' | 'autre'
 
 export const CATEGORIE_OBLIGATION_INFO: Record<CategorieObligation, { label: string; emoji: string; cls: string }> = {
   licence_iv:                { label: 'Licence IV',                 emoji: '🍷', cls: 'bg-violet-100 text-violet-900 border-violet-300' },
@@ -16,6 +17,10 @@ export const CATEGORIE_OBLIGATION_INFO: Record<CategorieObligation, { label: str
   douane:                    { label: 'Douane (Contributions)',     emoji: '🇫🇷', cls: 'bg-red-100    text-red-900    border-red-300' },
   urssaf:                    { label: 'URSSAF',                     emoji: '📋', cls: 'bg-stone-100  text-stone-800  border-stone-300' },
   visite_medicale_employeur: { label: 'Visite médicale employeur',  emoji: '🩺', cls: 'bg-cyan-100   text-cyan-900   border-cyan-300' },
+  securite_erp:              { label: 'Sécurité ERP',               emoji: '🧯', cls: 'bg-orange-100 text-orange-900 border-orange-300' },
+  hygiene:                   { label: 'Hygiène / DDPP',             emoji: '🧼', cls: 'bg-teal-100   text-teal-900   border-teal-300' },
+  personnel:                 { label: 'Personnel',                  emoji: '👥', cls: 'bg-indigo-100 text-indigo-900 border-indigo-300' },
+  droits_musique:            { label: 'SACEM / SPRE',               emoji: '🎵', cls: 'bg-pink-100   text-pink-900   border-pink-300' },
   autre:                     { label: 'Autre',                      emoji: '•',  cls: 'bg-zinc-100   text-zinc-700   border-zinc-300' },
 }
 
@@ -38,6 +43,10 @@ export type Obligation = {
   prestataire: string | null
   document_url: string | null
   notes: string | null
+  /** Empêche l'exploitation tant qu'elle n'est pas satisfaite (0147). Une
+   *  bloquante SANS date alerte quand même : l'absence de date y est le
+   *  symptôme — personne ne l'a engagée — pas une raison de se taire. */
+  bloquant: boolean
 }
 
 // ─── Accidents du travail ───────────────────────────────────────────
