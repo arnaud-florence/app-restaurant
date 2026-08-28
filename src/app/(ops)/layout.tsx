@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
 import OperateurBar from '@/components/ops/OperateurBar'
 import CoupDeMainArnaud from './CoupDeMainArnaud'
+import VisiteGuidee from '@/components/VisiteGuidee'
 import { getProfile } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -54,6 +55,16 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
       <OperateurBar />
       <CoupDeMainArnaud />
       {children}
+      {/* Les écrans (ops) sont ceux du service : la visite s'y affiche parce
+          que c'est là qu'on apprend les gestes, mais elle ne bloque rien et
+          se réduit en pastille. Absente si aucun profil n'est connecté — le
+          comptoir tourne souvent sans session ouverte. */}
+      {profil && (
+        <div className="print:hidden">
+          <VisiteGuidee poste={profil.poste} role={profil.role}
+            etapeInitiale={profil.visite_guidee_etape ?? null} />
+        </div>
+      )}
     </div>
   )
 }

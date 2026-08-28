@@ -37,6 +37,8 @@ export type Profil = {
   poste: string | null                  // dénormalisé depuis employes.poste si lien actif
   employe_id: string | null
   custom_permissions: CustomPermissions | null
+  /** Visite guidée (0149) : null = jamais commencée, -1 = terminée, N = en cours. */
+  visite_guidee_etape: number | null
   totp_enabled: boolean
   derniere_connexion: string | null
   derniere_activite: string | null
@@ -48,7 +50,7 @@ export type Profil = {
   apercu?: ApercuInfo | null
 }
 
-const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, derniere_activite, created_at, onboarding_completed_at'
+const COLS = 'id, email, prenom, nom, role, poste, employe_id, custom_permissions, totp_enabled, derniere_connexion, derniere_activite, created_at, onboarding_completed_at, visite_guidee_etape'
 
 /**
  * Renvoie le profil de l'utilisateur connecté, ou null.

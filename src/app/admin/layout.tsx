@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation'
 import AdminNav from './AdminNav'
 import TopActionBar, { type TopActionBarProfil } from '@/components/TopActionBar'
 import BackToCategoryButton from '@/components/BackToCategoryButton'
+import VisiteGuidee from '@/components/VisiteGuidee'
 import StoriesNav from '@/components/StoriesNav'
 import { createClient } from '@/lib/supabase/server'
 import { CATEGORIES, filtrerCategories } from '@/lib/navigation'
@@ -63,6 +64,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <StoriesNav categories={categoriesNav} nbAlertes={(findingsRouges ?? []).length} />
         </div>
         <div className="flex-1 min-w-0">{children}</div>
+      </div>
+      {/* Hors du chrome imprimable : une visite guidée n'a rien à faire sur
+          un bon de préparation ou un rapport envoyé au comptable. */}
+      <div className="print:hidden">
+        <VisiteGuidee poste={profil.poste} role={profil.role}
+          etapeInitiale={profil.visite_guidee_etape ?? null} />
       </div>
     </div>
   )

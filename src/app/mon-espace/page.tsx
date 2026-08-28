@@ -43,6 +43,7 @@ import { evaluerChallengesEmploye, partSurplusPondereeHeures } from '@/lib/chall
 import { calculerMetrique, METRIQUE_LABEL, periodeMoisCourant } from '@/lib/challenges-metrics'
 import { leaderboardsPourEmploye, type ChallengeLeaderboard } from '@/lib/challenges-leaderboards'
 import ChallengeSurplusViz from '@/components/ChallengeSurplusViz'
+import RelancerVisite from '@/components/RelancerVisite'
 
 export const metadata = { title: 'Mon espace — Tableau de bord' }
 export const dynamic = 'force-dynamic'
@@ -477,6 +478,13 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
           sublabel="atteints ce mois"
           tone={evaluations.filter(e => e.cible_atteinte).length > 0 ? 'emerald' : 'zinc'}
         />
+      </section>
+
+      {/* Reprise de la visite guidée. Sans ce bouton, un « Non merci » cliqué
+          par réflexe le premier jour est définitif : le panneau ne se propose
+          qu'une fois, et personne ne devine qu'il existe encore. */}
+      <section className="px-4 sm:px-6 max-w-md">
+        <RelancerVisite etat={profil.visite_guidee_etape ?? null} />
       </section>
 
       {/* Stats poste + 7 jours en 2 colonnes desktop */}

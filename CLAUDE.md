@@ -145,12 +145,13 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
 | Registre légal d'ouverture | 24 obligations, drapeau `bloquant` sans date | 0147 |
 | Heures de contrat décimales | un mi-temps fait 17,5 h, pas 17 ni 18 | 0148 |
+| Visite guidée | accompagnement écran par écran, reprenable | 0149 |
 | Bar : vendu ↔ acheté | `nom_matiere` + rendements, inventaire par poste | — |
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 
-**Migrations actuelles : 0001 → 0147.**
+**Migrations actuelles : 0001 → 0149.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -1439,6 +1440,56 @@ test rouge en permanence finit par être ignoré, et ce jour-là il ne protège
 plus rien. Il vérifie désormais la propriété qui compte : ces pages exposent
 des salaires, elles ne doivent jamais répondre à un appel non authentifié.
 
+### La visite guidée — accompagner les premières connexions (0149)
+
+L'onboarding existant (`/formation/onboarding`, imposé par le middleware) est
+une **porte** : lire un guide, réussir un quiz, l'accès s'ouvre. Après quoi on
+est lâché sur vingt-huit modules sans savoir par où commencer.
+
+`<VisiteGuidee />` est l'autre moitié. Elle emmène la personne **d'écran en
+écran**, dit ce qu'il faut y regarder, et nomme les pièges **à l'endroit exact
+où on peut tomber dedans** — un avertissement lu dans un manuel s'oublie, le
+même lu devant le bouton concerné, non.
+
+Deux parcours dans `src/lib/visite-guidee.ts` (client-safe) : **manager**
+(12 étapes, de la frontière avec la caisse jusqu'au journal de bord) et
+**comptoir** (6 étapes). Le repli est la courte : montrer trop à quelqu'un dont
+ce n'est pas le métier le décourage plus que ça ne l'aide.
+
+⚠️ **Trois règles de conception, qui comptent plus que le contenu :**
+
+1. **Elle ne bloque JAMAIS.** Panneau posé dans un coin, jamais une fenêtre
+   modale. Un accompagnement qui empêche de travailler est fermé au premier
+   client qui entre, et jamais rouvert.
+2. **Elle se reprend.** L'étape vit sur `profils.visite_guidee_etape` (0149),
+   pas dans le navigateur : commencée au bureau, reprise sur la tablette du
+   comptoir, et un localStorage vidé ne la fait pas recommencer.
+3. **Elle se passe.** Un accompagnement qu'on ne peut pas quitter devient une
+   corvée, et une corvée se traverse sans rien lire. « Non merci » est aussi
+   visible que « Commencer » — sinon c'est un piège à clic.
+
+⚠️ Un « Non merci » cliqué par réflexe le premier jour serait **définitif** :
+le panneau ne se propose qu'une fois. D'où `<RelancerVisite />` sur
+`/mon-espace`, qui rattrape le geste.
+
+⚠️ Montée dans les layouts admin ET (ops), sous `print:hidden` : une visite
+guidée n'a rien à faire sur un bon de préparation ou un rapport comptable.
+Absente si aucun profil n'est connecté — le comptoir tourne souvent sans
+session ouverte.
+
+⚠️ L'avancement passe par `POST /api/visite-guidee`, pas par une server action :
+le panneau écrit depuis n'importe quelle page, et une revalidation sous les yeux
+de quelqu'un qui lit lui ferait perdre le fil. L'écriture n'est jamais bloquante
+— on avance à l'écran d'abord, on enregistre ensuite.
+
+⚠️ Le test vérifie que **chaque étape pointe vers une page qui existe**, en
+résolvant les segments DYNAMIQUES (`/comptoir/fournil/kds` est servi par
+`/comptoir/[slug]/kds`). Une visite qui envoie sur un 404 est pire que pas de
+visite : elle apprend que l'outil est cassé.
+
+Test : `PORT=3000 node scripts/test-visite-guidee.mjs` — 20 assertions, il
+restaure l'état initial du profil qu'il modifie.
+
 ### Accueillir une manageuse — accès et parcours (28/08/2026)
 
 Ambre rejoint l'équipe comme manageuse. Deux gestes, `scripts/acces-ambre.mjs`
@@ -2101,6 +2152,7 @@ PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ achet�
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
+PORT=3000 node scripts/test-visite-guidee.mjs  # visite guidée (contrat d'accompagnement)
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
