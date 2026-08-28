@@ -973,11 +973,34 @@ Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 11 assertions, dont
 l'essentiel porte sur ce qui est REFUSÉ (corps non signé, signature fausse,
 corps altéré après signature).
 
-**Le jour du branchement** : générer la clé depuis le back-office → la poser
-sur Vercel (`ZELTY_API_KEY`, `ZELTY_MONTANTS_EN_CENTIMES=true`) → `?dry=1` →
-puis laisser écrire. `POST /orders` (`Create order`) existe : l'injection des
-commandes de casatasia.fr est confirmée par la documentation, pas seulement
-promise à l'oral.
+**Compte réel branché le 28/08/2026.** Clé #23628 « Claude » (portée
+Casatasia), posée dans `.env.local` avec `ZELTY_MONTANTS_EN_CENTIMES=true`.
+Les deux sens répondent en `?dry=1` : `/catalog/dishes` (0 plat — le catalogue
+Zelty est vide) et `/orders` (0 commande). Contrat confirmé à l'écran par
+**Configuration → Widgets et API → Accès API** : base
+`https://api.zelty.fr/2.11/`, version 2.11, `Authorization: Bearer` — soit
+exactement nos valeurs par défaut. `POST /orders` existe : l'injection des
+commandes de casatasia.fr est confirmée par la documentation.
+
+⚠️ **L'établissement est en MODE ÉCOLE.** Les commandes qui y sont créées
+n'entrent pas dans le chiffre d'affaires, et notre client force
+`is_sandbox=false`. Ne rien brancher en production tant que le passage en mode
+réel n'a pas été fait (bandeau bleu du back-office) : on ingérerait des tickets
+d'entraînement, ou rien du tout. C'est une décision du gérant, liée à la date
+d'ouverture.
+
+⚠️ **Aucune méthode de paiement n'est configurée** dans Zelty
+(`/transaction-methods` est vide). Tant que c'est le cas,
+`ZELTY_MODE_PAIEMENT_EN_LIGNE` n'a pas de valeur possible et l'ÉMISSION des
+commandes web est bloquée — un libellé inconnu renvoie 400. La lecture, elle,
+fonctionne déjà.
+
+⚠️ Abonnement Zelty **expirant le 03/10/2026**, sans moyen de paiement
+enregistré : le renouvellement automatique échouera.
+
+**Reste à faire pour la production** : poser `ZELTY_API_KEY` et
+`ZELTY_MONTANTS_EN_CENTIMES=true` sur Vercel — après le passage en mode réel,
+pas avant.
 
 Tant que rien n'est configuré, la route répond **200** avec
 `{ configure: false }` : une caisse pas encore branchée n'est pas une panne,
