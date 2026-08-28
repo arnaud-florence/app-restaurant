@@ -392,6 +392,38 @@ n'enseigne rien. Une référence déjà en place n'est jamais écrasée.
 Test : `node scripts/test-apprentissage-references.mjs` — ⚠️ il RECOPIE la
 règle, modifier les deux ensemble.
 
+**`/admin/correspondances` — les lignes que rien n'a reconnu (0145).** La
+moitié manquante de l'apprentissage : une ligne rapprochée par le nom apprend
+sa référence toute seule, mais une ligne que rien ne reconnaît restait
+**invisible**. Mesure au 28/08/2026 : **127 lignes sur 134 orphelines, 95 %**.
+Chacune est un prix d'achat perdu — stock théorique, démarque, commande
+conseillée et marge du produit ignorent qu'elle existe.
+
+`facture_lignes.recette_id` (0145) manquait pour ça : la ligne disait à quelle
+MATIÈRE elle se rattachait, jamais à quel PRODUIT VENDU — le cas courant en
+achat-revente. Une ligne qui nourrissait un produit était donc indistinguable
+d'une orpheline, les deux ayant `ingredient_id` à NULL.
+
+⚠️ Les composants **« Formule — … » sont exclus des cibles** : ils ne
+s'achètent pas. Sans ça ils sortaient EN TÊTE pour les lignes croissant et pain
+au chocolat — leur nom contient les deux mots — et un rattachement y aurait
+écrit un prix d'achat sur un produit qui n'existe pas.
+
+⚠️ Le score de suggestion départage par la **couverture**, pas seulement par le
+nombre de mots communs : « Pain au chocolat » et « Cappuccino ou chocolat
+chaud » en partagent autant avec une ligne « PAIN AU CHOCOLAT PREPOUSSE ». Une
+cible dont TOUS les mots sont retrouvés passe devant. 77 % des orphelines ont
+au moins une piste.
+
+⚠️ Le rattachement **ne propage PAS le prix**. Le calcul à la pièce dépend de
+l'unité de ligne et du C=N ; se tromper écrit un coût faux qui détruit une
+marge en silence — un croissant à 40 € a déjà été vécu. La prochaine facture le
+fera correctement, avec toutes ses données sous la main.
+
+`facture_lignes.ignoree` écarte définitivement ce qui ne correspond à rien de
+vendable (port, consigne, remise de fin de mois) : sans ça elles reviennent à
+chaque ouverture et rendent l'écran illisible, donc inutilisé.
+
 **Le catalogue Arti'Pat comme pièce de contrôle.** 292 pages, 146 Mo —
 indexé par `scripts/indexer-catalogue-artipat.mjs`, 599 références avec
 colisage et prix indicatif. Trois usages :

@@ -665,7 +665,8 @@ export async function createFacture(input: unknown) {
 
     // L'échec des lignes ne doit PAS annuler la facture : les totaux sont
     // déjà enregistrés, on signale seulement dans la réponse.
-    const { error: eLignes } = await supabase.from('facture_lignes').insert(rows)
+    const { data: lignesCreees, error: eLignes } = await supabase
+      .from('facture_lignes').insert(rows).select('id')
     if (!eLignes) {
       lignesInserees = rows.length
 
@@ -733,6 +734,16 @@ export async function createFacture(input: unknown) {
               //   · seulement si le nom a désigné UN SEUL produit — une ligne
               //     qui en nourrit plusieurs (la capsule des quatre cafés)
               //     n'enseigne rien de sûr.
+              // La ligne dit désormais ce qu'elle a nourri. Sans ça, une ligne
+              // qui alimente un PRODUIT (le cas courant en achat-revente)
+              // restait indistinguable d'une ligne orpheline : les deux avaient
+              // ingredient_id à NULL, et les orphelines étaient invisibles.
+              const idLigne = lignesCreees?.[idx]?.id
+              if (idLigne) {
+                await supabase.from('facture_lignes')
+                  .update({ recette_id: prod.id }).eq('id', idLigne)
+              }
+
               if (refLigne && !parRef && trouves.length === 1 && !dejaRefProduit.has(prod.id)) {
                 const { error } = await supabase.from('recettes')
                   .update({ reference_fournisseur: p.lignes[idx].reference?.trim() })

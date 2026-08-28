@@ -149,6 +149,7 @@ export const CATEGORIES: Category[] = [
       { href: '/admin/finances', emoji: '💰', label: 'Finances / TVA',    description: 'P&L live, trésorerie 30/60/90j, simulateurs.',  imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin/ventes-pdv', emoji: '📊', label: 'Ventes — 2 activités', description: 'Vision consolidée Restaurant + Fournil, CA ventilé par point de vente + commissions.', imageUrl: u('1460925895917-afdab827c52f') },
       { href: '/admin/ventes', emoji: '📈', label: 'Statistiques de vente', description: 'CA, heures de pointe, meilleures ventes, comparaisons.', imageUrl: u('1543286386-713bdd548da4') },
+      { href: '/admin/correspondances', emoji: '🔗', label: 'Correspondances d\'achat', description: 'Les lignes de facture que rien n\'a reconnu — chacune est un prix d\'achat perdu.', imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin/patrimoine', emoji: '🏛', label: 'Valeur de l\'affaire', description: 'EBE récurrent, valeur du fonds, plus-value latente — ce qui se construit, pas ce qui entre.', imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin/integrations', emoji: '🔌', label: 'Pont caisse ↔ outil', description: 'Ce que la caisse a poussé vs ce que l\'outil en a fait, échanges et écarts.', imageUrl: u('1518770660439-4636190af475') },
       { href: '/admin/economie', emoji: '🧮', label: 'Centre économique', description: 'Point mort, marges, surplus, redistribution.', imageUrl: u('1611532736597-de2d4265fba3') },
