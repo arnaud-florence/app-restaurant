@@ -256,6 +256,16 @@ jambon sont entrées dans les sandwichs (il faudrait une recette chiffrée,
 hors modèle). Pour une matière première, on affiche les entrées seules et
 AUCUN théorique : mieux vaut pas de chiffre qu'un chiffre faux.
 
+**Trois produits remis à la carte le 28/08/2026** : pain aux céréales (3,20 €)
+et les deux pizzas à la plaque (2,90 €), désactivés lors de la purge d'août.
+Ils avaient déjà photo, prix et taux.
+
+⚠️ Le libellé d'achat « PLAQUE PIZZA CRUE » est posé sur les **DEUX** pizzas.
+Une plaque crue donne la margherita ET la jambon-fromage : n'en marquer qu'une
+aurait laissé la seconde sans savoir d'où vient son coût, et sa marge se serait
+affichée fausse sans que rien ne le signale. C'est le cas documenté du `filter`
+plutôt que du `find`.
+
 **40 matières suivies au 28/08/2026** (36 + ketchup, sauce barbecue, farine
 T55, sacs à croissants). Sur les 134 lignes de facture : 60 rattachées à un
 produit, 45 à une matière, 23 écartées, **6 en attente** — trois visent des
