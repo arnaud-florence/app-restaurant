@@ -3,8 +3,9 @@
 // Ce fichier est importé côté SERVEUR **et** CLIENT → aucun import server-only,
 // aucun accès base. La lecture en base est dans `./server.ts`.
 //
-// Contexte : le Fournil ouvre seul (juillet-septembre 2026), le restaurant
-// n'ouvre que fin octobre 2026. Chaque brique du produit est allumée ou éteinte
+// Contexte : le Fournil a ouvert seul en août 2026 ; TOUTES les activités
+// ouvrent en septembre 2026 (date corrigée le 28/08 — la mention « fin
+// octobre » qui traînait partout était périmée). Chaque brique est allumée
 // par une ligne de la table `activites_modules` (migration 0110), pilotée depuis
 // /admin/etablissements → onglet « Activités ».
 

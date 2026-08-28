@@ -102,8 +102,13 @@ const activiteSchema = z.object({
   actif: z.boolean(),
 })
 
-/** Bascule TOUTE une activité d'un coup — le bouton « Ouvrir le restaurant »
- *  prévu pour fin octobre 2026. */
+/** Bascule TOUTE une activité d'un coup — le bouton « Ouvrir le restaurant »,
+ *  prévu pour l'ouverture de septembre 2026.
+ *
+ *  ⚠️ Sur une table `activites_modules` VIDE, cette action met à jour zéro
+ *  ligne et renvoie `{ ok: true, nb: 0 }` — un succès qui n'a rien fait.
+ *  C'est arrivé : la table était vide le 28/08/2026 et l'app tournait sur son
+ *  repli. Vérifier `nb` côté appelant vaut mieux que de croire le `ok`. */
 export async function basculerActivite(input: z.infer<typeof activiteSchema>) {
   const d = activiteSchema.parse(input)
   const sb = await createClient()

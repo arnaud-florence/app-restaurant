@@ -473,9 +473,25 @@ clôt, pas la brigade.
 ⚠️ `scripts/test-commande-statut.mjs` **recopie** cette règle au lieu de
 l'importer (la source est en TS) : modifier les deux ensemble.
 
-### Activation par activité — « Fournil d'abord » (août 2026)
+### Activation par activité — TOUT ouvre en septembre 2026
 
-Le Fournil ouvre seul (juillet-septembre 2026) ; restaurant, bar, pizzeria, chambres et événementiel n'ouvrent que **fin octobre 2026**. Tout est piloté par une seule table, `activites_modules` (migration 0110), et **aucun code n'est à modifier pour rouvrir**.
+⚠️ **Date corrigée le 28/08/2026 : l'ouverture de TOUTES les activités est
+visée en septembre**, pas fin octobre. Les travaux sont en cours, et c'est la
+fenêtre pour structurer. Toute la documentation antérieure qui parle de « fin
+octobre » pour le restaurant est périmée.
+
+⚠️ **La table `activites_modules` était VIDE** (constaté le 28/08/2026, jeu de
+la migration 0110 rejoué depuis). L'application tournait donc sur son repli
+`REPLI_FOURNIL_SEUL` — ce qui donnait le bon résultat par accident, et masquait
+la panne. Le bouton « Ouvrir le restaurant » aurait mis à jour **zéro ligne** et
+renvoyé un succès : `basculerActivite()` lit les modules de l'activité puis les
+met à jour, donc sur une table vide il ne fait rien et le dit comme une
+réussite. Découvert le jour de l'ouverture, à 6 h 20, c'était une matinée
+perdue.
+
+**Contrôle à faire avant toute ouverture** : `select count(*) from
+activites_modules` doit rendre **14**. Le repli est une sécurité, pas un état
+normal — s'il est actif, c'est que la configuration a disparu. Tout est piloté par une seule table, `activites_modules` (migration 0110), et **aucun code n'est à modifier pour rouvrir**.
 
 | Où | Quoi |
 |---|---|
@@ -489,7 +505,7 @@ Le Fournil ouvre seul (juillet-septembre 2026) ; restaurant, bar, pizzeria, cham
 
 **Points de branchement** : `lib/navigation.ts` (`filtrerCategories`), les pages ops/admin (`gardeModule` + `<ModuleEnVeille />`), `/api/public/menu` (filtre par `tag_destination`), et `lib/agents/runner.ts` (`agentEnVeille`).
 
-Réouverture fin octobre : `/admin/etablissements` → groupe Restaurant → **« Ouvrir le restaurant »**. Le site suit en moins d'une minute. Ne pas rejouer 0111, qui est la migration de fermeture.
+Ouverture de septembre : `/admin/etablissements` → groupe Restaurant → **« Ouvrir le restaurant »** (7 modules d'un coup). Le site suit en moins d'une minute. Ne pas rejouer 0111, qui est la migration de fermeture.
 
 Tests : `node scripts/test-activation.mjs` (restaure toujours l'état initial), `node scripts/test-commande-statut.mjs`, `node scripts/test-fournil-circuit.mjs`, `node scripts/test-carte-fournil.mjs`.
 
