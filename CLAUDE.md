@@ -1025,6 +1025,31 @@ Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 11 assertions, dont
 l'essentiel porte sur ce qui est REFUSÉ (corps non signé, signature fausse,
 corps altéré après signature).
 
+**Planification (`sql/setup-pgcron-zelty.sql`, appliqué le 28/08/2026)** —
+cinq routes cron existaient pour le pont, **aucune n'était appelée**. Le
+webhook couvre le temps réel, mais un webhook n'a pas de mémoire : une
+livraison ratée perd la vente définitivement. Le sondage est son filet, pas
+son doublon.
+
+| Tâche | Rythme | Rôle |
+|---|---|---|
+| `zelty-commandes` | HH:20, 2 j de fenêtre | filet du webhook |
+| `zelty-catalogue` | 03:10 | ce que la caisse a changé de son côté |
+| `zelty-disponibilites` | `*/15 4-20` | ruptures → caisse, pendant le service |
+| `caisse-rapprochement` | 05:30, 3 j | reçu vs compris |
+
+Le secret n'est écrit nulle part : `call_zelty()` le lit dans le source de
+`call_agent()`, comme `call_sumup()`. Le fichier est committable.
+
+⚠️ **`emission` n'est PAS planifié** : sans méthode de paiement dans Zelty,
+chaque passage échouerait en 400 et le monitoring compte tout code ≠ 200
+comme une panne. À planifier le jour où le mode de paiement existe.
+
+⚠️ **`sumup-sync` tourne toujours** (toutes les 2 min). Voulu tant que Zelty
+est en mode école et ne rend aucune commande. **Le jour du basculement,
+`select cron.unschedule('sumup-sync')`** — sinon deux caisses alimentent le
+même chiffre d'affaires.
+
 **Compte réel branché le 28/08/2026.** Clé #23628 « Claude » (portée
 Casatasia), posée dans `.env.local` avec `ZELTY_MONTANTS_EN_CENTIMES=true`.
 **Les 84 produits du Fournil ont été poussés le 28/08/2026** : 84 créés, 84
