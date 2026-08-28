@@ -1280,6 +1280,22 @@ doublons au sens technique, mais c'est peut-être le même produit vendu sous
 deux noms. À vérifier en boutique avant de fusionner : une fusion déplace
 l'historique des ventes et ne se défait pas.
 
+**Ranger la carte par familles** : `node scripts/pousser-familles-zelty.mjs
+[--ecrire]`. L'import crée les produits mais les laisse **à plat** — 84 boutons
+sans classement, inutilisables au comptoir. Le script crée les 13 familles côté
+Zelty et y rattache chaque produit. `remote_id` du tag = notre nom de famille,
+donc lien exact des deux côtés.
+
+⚠️ **L'ordre des familles est celui du SERVICE, pas l'alphabet** : à 6 h 20 on
+vend du pain et du café, pas des pizzas. Le champ `o` du tag pilote l'affichage
+de la caisse.
+
+⚠️ **Zelty limite le débit de son API — la documentation ne le dit pas.**
+Treize créations de tags à la file ont donné cinq `429` à partir du cinquième
+appel. Tout doit partir en **un seul appel** avec un tableau : c'est déjà ce que
+fait l'import (84 plats, un POST), et c'est pour ça qu'il passait. Le client de
+lecture réessaie 3 fois sur 429 ; les écritures, elles, doivent grouper.
+
 **Contrôle de la carte poussée** : `node scripts/verifier-carte-zelty.mjs`
 compare la caisse à notre base, produit par produit — prix TTC au centime, TVA
 à emporter ET sur place, photo, nom, état. Lecture seule. 84/84 conformes au
