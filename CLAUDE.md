@@ -986,6 +986,19 @@ corrigé trois hypothèses fausses :
 `dish.availability_update`, plus `order.status.update` et `catalog.push` pour
 plus tard. Un webhook se déclare avec `target` (URL) et `version`.
 
+**Le secret est CHOISI par nous, pas fourni par Zelty.** `POST /webhooks`
+accepte `secret_key` : inutile de leur réclamer une clé, on impose la nôtre et
+on la reporte sur Vercel. C'est ce qui a débloqué le branchement.
+Gestion : `node scripts/webhooks-zelty.mjs [--declarer] [--retirer <event>]
+[--nouveau-secret]`.
+
+**Déclaré le 28/08/2026** : `order.ended` → `/api/integrations/zelty/webhook`,
+version **v2**.
+
+⚠️ La version s'écrit **`v2`**, pas `2` (valeurs admises : `v1`, `v2`), et la
+signature n'existe qu'à partir de v2 : en v1 le corps arrive nu, donc refusé
+par notre propre route.
+
 ⚠️ **Ne rien déclarer avant d'avoir le secret en place sur Vercel** : notre
 route refuse un corps non signé par 401, et Zelty réessaierait en boucle.
 
