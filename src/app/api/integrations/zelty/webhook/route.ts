@@ -91,7 +91,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 })
   }
 
-  const evenement = String(corps.event ?? corps.type ?? corps.name ?? 'inconnu')
+  // ⚠️ La spec nomme le champ `event_name`. Le lire en dernier, ou pas du tout,
+  // faisait tomber CHAQUE webhook dans « inconnu » : tracé, jamais traité.
+  const evenement = String(
+    corps.event_name ?? corps.event ?? corps.type ?? corps.name ?? 'inconnu')
   const donnees = (corps.data ?? corps.payload ?? corps) as Record<string, unknown>
 
   try {

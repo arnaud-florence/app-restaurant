@@ -78,6 +78,22 @@ r = await envoyer({ event: 'dish.availability_update', data: { id: 1974, disable
 t('un événement non encore branché est accepté et tracé',
   r.status === 200 && r.body.evenement === 'dish.availability_update', JSON.stringify(r.body))
 
+// ── L'enveloppe RÉELLE, telle que la spec OpenAPI la décrit ─────────
+// Le champ est `event_name`, pas `event`, et les lignes sont dans
+// `contents`, pas `items`. Lire les mauvais noms faisait tomber chaque
+// webhook dans « inconnu », ou l'aurait traité sans une seule ligne : CA
+// juste, stock et marges aveugles, et rien pour le signaler.
+r = await envoyer({
+  event_id: '00000000-0000-4000-8000-000000000000',
+  event_name: 'dish.availability_update',
+  created_at: '2026-08-28T09:00:00Z',
+  version: '2', brand_id: 1, restaurant_id: 10445,
+  data: { id: 1974, disable: true },
+})
+t('le champ `event_name` de la spec est reconnu',
+  r.status === 200 && r.body.evenement === 'dish.availability_update',
+  JSON.stringify(r.body))
+
 // ── Journal ─────────────────────────────────────────────────────────
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const H = { apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json' }

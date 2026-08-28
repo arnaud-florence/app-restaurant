@@ -82,7 +82,13 @@ export const commandeZeltySchema = z.object({
   /** L'exemple officiel montre « opened » (chaîne). Voir mapper.ts. */
   status:      z.union([z.string(), z.number()]).optional(),
 
+  // ⚠️ Deux noms pour la même chose selon la porte d'entrée : `GET /orders`
+  // rend `items`, le WEBHOOK `order.ended` rend `contents`. Confirmé sur la
+  // spec OpenAPI de la doc (28/08/2026), où `contents` est même REQUIS.
+  // Ne lire que `items` ferait entrer chaque ticket web sans une seule ligne —
+  // CA juste, stock et marges aveugles, et aucune erreur pour le dire.
   items:        z.array(ligneZeltySchema).optional(),
+  contents:     z.array(ligneZeltySchema).optional(),
   transactions: z.array(transactionZeltySchema).optional(),
 
   table:       nombre.optional(),

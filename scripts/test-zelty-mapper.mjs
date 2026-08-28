@@ -56,6 +56,19 @@ const nominale = {
       price: { final_amount_inc_tax: 1000 }, tax: { tax_rate: 1000, tax_amount: 91 } },
   ],
 }
+// Le webhook `order.ended` nomme les lignes `contents`, pas `items` :
+// c'est REQUIS dans sa spec OpenAPI. Ne lire que `items` ferait entrer
+// chaque ticket sans une seule ligne — CA juste, marges aveugles.
+{
+  const { items, ...sansItems } = nominale
+  const parWebhook = { ...sansItems, id: 2999, contents: items }
+  const w = await verifier([parWebhook], true)
+  t('les lignes arrivent aussi par `contents` (webhook)',
+    w.body.lignes_produits === 2, `${w.body.lignes_produits}`)
+  t('et le détail produit est vu comme présent',
+    w.body.detail_produits_present === true, JSON.stringify(w.body).slice(0, 160))
+}
+
 let r = await verifier([nominale], true)
 t('la route répond', r.status === 200, `HTTP ${r.status}`)
 t('la commande est traduite', r.body.traduites === 1, JSON.stringify(r.body).slice(0, 200))

@@ -170,7 +170,8 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
     if (!quand) avertissements.push(`${ref} : aucune date, l'heure d'import fera foi`)
 
     // ── Lignes ──────────────────────────────────────────────────────
-    const lignesBrutes = c.items ?? []
+    // `items` sur GET /orders, `contents` sur le webhook order.ended.
+    const lignesBrutes = c.items ?? c.contents ?? []
     if (lignesBrutes.length === 0) sansItems++
     const produits: NonNullable<EncaissementNormalise['produits']> = []
     for (const l of lignesBrutes) {

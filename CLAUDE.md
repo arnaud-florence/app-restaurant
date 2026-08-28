@@ -968,6 +968,27 @@ des charges utiles RÉELLES sous la main au lieu d'hypothèses.
 corps non authentifié permettrait à n'importe qui de gonfler le chiffre
 d'affaires. Sans signature valide → 401.
 
+**La spec OpenAPI, lue le 28/08/2026** (`docs.zelty.fr`, section Webhooks) a
+corrigé trois hypothèses fausses :
+
+- l'événement se nomme **`event_name`**, pas `event`. Notre route ne le lisait
+  pas : CHAQUE webhook serait tombé dans « inconnu » — tracé, jamais traité ;
+- les lignes de commande sont dans **`contents`**, pas `items` — et `contents`
+  y est **requis**. Ne lire que `items` aurait fait entrer chaque ticket sans
+  une seule ligne : CA juste, stock et marges aveugles, aucune erreur pour le
+  dire. C'est le même piège que `expand[]=items` sur `GET /orders`, par l'autre
+  porte. Le schéma accepte désormais les deux noms ;
+- la signature n'existe **qu'à partir de la version 2** du webhook. Un webhook
+  déclaré sans `version: 2` arriverait non signé, donc refusé par notre route.
+
+`GET /webhooks` liste les **22 événements** disponibles et le `secret_key`
+(masqué). Ceux qui nous intéressent : `order.ended`, `till.close`,
+`dish.availability_update`, plus `order.status.update` et `catalog.push` pour
+plus tard. Un webhook se déclare avec `target` (URL) et `version`.
+
+⚠️ **Ne rien déclarer avant d'avoir le secret en place sur Vercel** : notre
+route refuse un corps non signé par 401, et Zelty réessaierait en boucle.
+
 ⚠️ Le nom de l'en-tête de signature n'est pas documenté (la page ne se
 charge pas). On teste donc les en-têtes vraisemblables, en hexadécimal comme
 en base64, préfixe `sha256=` toléré, comparaison à **temps constant**. Un
