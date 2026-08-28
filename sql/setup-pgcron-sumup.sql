@@ -1,4 +1,23 @@
 -- ════════════════════════════════════════════════════════════════════
+-- ⛔ RETIRÉ LE 28 AOÛT 2026 — NE PAS REJOUER
+-- ════════════════════════════════════════════════════════════════════
+-- SumUp est abandonné : l'établissement passe sur UN logiciel Zelty et
+-- DEUX caisses Zelty couvrant toutes les activités. `sumup-sync` a été
+-- déplanifié (select cron.unschedule('sumup-sync')) au moment où le
+-- Fournil était fermé — dernier ticket le 24 août — donc aucune vente
+-- n'a été perdue dans la bascule.
+--
+-- ⚠️ LES DONNÉES SUMUP RESTENT, ET DOIVENT RESTER. 426 tickets, 2 357 €
+-- du 17 au 24 août : c'est TOUT l'historique de vente réel de la maison.
+-- Il alimente /admin/ventes, /admin/patrimoine, le rapprochement et le
+-- calcul du food cost. Ne jamais purger `encaissements_externes` sur
+-- source_caisse = 'sumup', ni les commandes qui en découlent.
+--
+-- Ce fichier est conservé pour mémoire : si un écart apparaît un jour sur
+-- les chiffres d'août, il documente comment ils sont entrés.
+-- ════════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════════
 -- Synchro SumUp automatique — APPLIQUÉ le 20 août 2026
 -- ════════════════════════════════════════════════════════════════════
 -- Sans planification, le chiffre d'affaires n'entrait dans l'outil que si

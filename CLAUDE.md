@@ -1045,10 +1045,18 @@ Le secret n'est écrit nulle part : `call_zelty()` le lit dans le source de
 chaque passage échouerait en 400 et le monitoring compte tout code ≠ 200
 comme une panne. À planifier le jour où le mode de paiement existe.
 
-⚠️ **`sumup-sync` tourne toujours** (toutes les 2 min). Voulu tant que Zelty
-est en mode école et ne rend aucune commande. **Le jour du basculement,
-`select cron.unschedule('sumup-sync')`** — sinon deux caisses alimentent le
-même chiffre d'affaires.
+**SumUp est abandonné (28/08/2026).** L'établissement passe sur UN logiciel
+Zelty et DEUX caisses Zelty couvrant toutes les activités. `sumup-sync` est
+déplanifié. La coupure a eu lieu pendant la fermeture — dernier ticket SumUp le
+24 août — donc aucune vente n'a été perdue.
+
+⚠️ **Les données SumUp restent, et doivent rester.** 426 tickets, 2 357 €, du
+17 au 24 août : c'est TOUT l'historique de vente réel de la maison. Il alimente
+`/admin/ventes`, `/admin/patrimoine`, le rapprochement et le food cost. Ne
+jamais purger `encaissements_externes` sur `source_caisse = 'sumup'` ni les
+commandes qui en découlent. Le connecteur reste source-agnostique : c'est lui
+qui permet à un historique SumUp et à un flux Zelty de cohabiter sans que rien
+n'ait à savoir d'où vient quoi.
 
 **Compte réel branché le 28/08/2026.** Clé #23628 « Claude » (portée
 Casatasia), posée dans `.env.local` avec `ZELTY_MONTANTS_EN_CENTIMES=true`.
