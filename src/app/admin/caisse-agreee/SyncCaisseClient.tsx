@@ -1,23 +1,24 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { synchroniserSumUp, type ResultatSync } from './actions'
+import { synchroniserCaisse, type ResultatSync } from './actions'
 
-export default function SyncSumUpClient() {
+export default function SyncCaisseClient() {
   const [jours, setJours] = useState(7)
   const [res, setRes] = useState<ResultatSync | null>(null)
   const [enCours, demarrer] = useTransition()
 
   function lancer() {
     setRes(null)
-    demarrer(async () => setRes(await synchroniserSumUp(jours)))
+    demarrer(async () => setRes(await synchroniserCaisse(jours)))
   }
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5">
-      <h2 className="font-bold text-zinc-900">Synchroniser SumUp</h2>
+      <h2 className="font-bold text-zinc-900">Synchroniser la caisse</h2>
       <p className="text-sm text-zinc-600 mt-1">
-        Récupère les transactions SumUp et les fait entrer dans le chiffre d’affaires.
+        Récupère les tickets de la caisse Zelty et les fait entrer dans le chiffre d’affaires.
+        Le cron s’en charge chaque heure ; ce bouton sert à ne pas l’attendre.
         Rejouable sans risque : un ticket déjà importé n’est jamais compté deux fois.
       </p>
 

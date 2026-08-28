@@ -1045,6 +1045,15 @@ Le secret n'est écrit nulle part : `call_zelty()` le lit dans le source de
 chaque passage échouerait en 400 et le monitoring compte tout code ≠ 200
 comme une panne. À planifier le jour où le mode de paiement existe.
 
+**`/admin/caisse-agreee` a suivi la bascule** : le bouton « Synchroniser
+SumUp » est devenu « Synchroniser la caisse » et vise
+`/api/cron/caisse/zelty`. Il reste utile malgré le cron — celui-ci passe à
+HH:20, et quand on regarde le chiffre du jour à 11 h on ne veut pas attendre
+l'heure suivante. La server action garde son principe : le `CRON_SECRET` ne
+quitte jamais le serveur. Elle remonte aussi les **avertissements** du mapper
+(`expand[]=items` oublié, panier moyen absurde, quantité muette) — les taire
+les rendrait invisibles pour la seule personne qui regarde cet écran.
+
 **SumUp est abandonné (28/08/2026).** L'établissement passe sur UN logiciel
 Zelty et DEUX caisses Zelty couvrant toutes les activités. `sumup-sync` est
 déplanifié. La coupure a eu lieu pendant la fermeture — dernier ticket SumUp le
