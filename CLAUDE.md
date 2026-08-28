@@ -993,7 +993,16 @@ Gestion : `node scripts/webhooks-zelty.mjs [--declarer] [--retirer <event>]
 [--nouveau-secret]`.
 
 **Déclaré le 28/08/2026** : `order.ended` → `/api/integrations/zelty/webhook`,
-version **v2**.
+version **v2**. Production vérifiée le même jour : `ZELTY_API_KEY`,
+`ZELTY_MONTANTS_EN_CENTIMES` et `ZELTY_WEBHOOK_SECRET` posées sur Vercel,
+déploiement effectué. La route accepte une signature valide (200) et refuse
+tout le reste (401) — signature d'un autre secret, signature de zéros, corps
+altéré après signature, absence de signature. Chaque refus est tracé dans
+`integration_evenements` avec les NOMS d'en-têtes reçus, jamais leurs valeurs.
+
+⚠️ Contrôler une signature en modifiant un seul caractère est un mauvais test :
+remplacer le dernier caractère par `0` ne change rien une fois sur seize, et
+laisse croire à une faille. Signer avec un AUTRE secret est le contrôle juste.
 
 ⚠️ La version s'écrit **`v2`**, pas `2` (valeurs admises : `v1`, `v2`), et la
 signature n'existe qu'à partir de v2 : en v1 le corps arrive nu, donc refusé
