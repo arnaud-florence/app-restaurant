@@ -65,7 +65,7 @@ const AFFICHES = {
 // le taux réduit comme les autres gourmandises.
 const TVA_REDUITE = new Set(['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise', 'Glace'])
 // Produits indicatifs de la carte de démarrage 0095 : ne doivent plus être vendus.
-const CARTE_0095 = ['Pain', 'Pain de campagne', 'Pain aux céréales', 'Baguette tradition',
+const CARTE_0095 = ['Pain', 'Pain de campagne', 'Baguette tradition',
   'Brioche', 'Macaron', 'Mille-feuille', 'Tarte aux pommes (part)', 'Soda / Eau', 'Café crème',
   'Quiche lorraine (part)', 'Pizza fournil (part)', 'Sandwich jambon-beurre',
   'Sandwich poulet crudités']
@@ -94,6 +94,12 @@ const HORS_AFFICHE = new Set([
   'Panuozzi', 'Donuts', 'Cappuccino ou chocolat chaud',
   'Pago orange 20 cl', 'Pago pomme 20 cl', 'Pago pomme 33 cl', 'Red Bull Ice',
   'Sunroll', 'Fusée', 'Mario', 'Cône vanille',
+  // Créés après coup, sur facture ou décision : ils ne figurent sur aucune
+  // affiche, ce qui ne les rend pas illégitimes.
+  'Pago orange 33 cl', 'Focaccia',
+  // Remis en vente le 28/08/2026. Il n'a pas d'affiche : les trois pains aux
+  // céréales imprimés sont le bâtard, le campestre et le pavé.
+  'Pain aux céréales',
 ])
 
 // Retirés du click & collect par la 0115 : une tasse ne voyage pas, et une

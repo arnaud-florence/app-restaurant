@@ -486,6 +486,30 @@ du doublon pour que les tickets s'y rattachent, on **déplace les ventes**
 on désactive le doublon **en effaçant son `nom_caisse`** — sans ça le miroir
 pourrait encore le choisir et le rattachement redeviendrait ambigu.
 
+Rejoué le 28/08/2026 sur **six** focaccias fondues en une seule (« Focaccia »,
+4,90 €) : les six déclinaisons ne se distinguaient que par leur garniture,
+qui se choisit au comptoir.
+
+⚠️ **Après une fusion ou une création, contrôler quatre champs**, chacun
+muet quand il manque :
+
+| Champ | Ce qui casse en silence |
+|---|---|
+| `etablissement_id` | les ventes sortent de la ventilation par activité |
+| `categorie` | famille inconnue de la caisse → **bouton sans famille**, introuvable au comptoir |
+| `vendable_online` | le produit reste hors click & collect sans raison |
+| `image_url` | pas d'image = invisible du site (le menu public exige famille ET photo) |
+
+Une famille à un seul produit n'a pas sa place sur une caisse : la Focaccia
+est rangée en **Sandwich**, où « Le Poulet » est au même prix. Contrôle :
+`sans famille` dans `verifier-carte-zelty.mjs`, et l'assertion « tous
+rattachés au point de vente » de `test-carte-fournil.mjs`.
+
+⚠️ **Une photo de banque d'images n'est pas une photo produit.** Le « Pain
+aux céréales » en portait une (Unsplash) : le client aurait vu le pain de
+quelqu'un d'autre. Remplacée par une plaque typographique — assumer qu'on
+n'a pas encore photographié vaut mieux que montrer autre chose.
+
 **Garde-fou anti-doublon de facture.** `createFacture` REFUSE un numéro déjà
 enregistré chez le même fournisseur et pour le même `type_document` — deux
 scans de la même facture Promocash avaient gonflé les achats de ~447 € en
