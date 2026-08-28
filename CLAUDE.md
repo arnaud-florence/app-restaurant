@@ -1259,6 +1259,27 @@ Les 60 produits viennent des 13 affiches CasaTasia (migration 0113, prix TTC des
 
 `image_url` doit rester une **URL absolue** (`https://app-restaurant-livid.vercel.app/produits/<slug>.jpg`) : le site vitrine est un projet distinct qui consomme `/api/public/menu` en CORS, une URL relative y pointerait sur son propre domaine. Corollaire : **une photo n'est visible qu'après déploiement de l'app**.
 
+**Corrections du 28/08/2026, appliquées des DEUX côtés** (base + caisse) :
+trois prix ramenés aux affiches (Salade saumon 4,90 → 5,50 € ; jus d'orange et
+jus de pomme 33 cl 2,00 → 1,80 €), « Pago pomme 33 cl » passé de 5,5 % à 10 %
+— seule boisson fraîche au taux réduit, donc **sous-collecte** — et Donuts
+remis en vente en ligne. Comme pour les 7 produits à 20 % d'août, la
+correction de TVA garde le **TTC du panneau identique** : c'est le net qui
+s'ajuste.
+
+⚠️ **Écrire dans le catalogue Zelty se fait en relisant d'abord.**
+`POST /catalog/dishes` est un upsert qui exige `name`, `price` et `tax` : on
+relit le plat, on recopie ces champs tels quels, on ne touche que ce qu'on
+veut, et on REFUSE de construire s'il en manque un. Un objet incomplet
+écraserait le prix qui s'imprime sur les tickets.
+
+⚠️ Reste à trancher : « Jus de pomme 33 cl » et « Pago pomme 33 cl » sont deux
+fiches distinctes, chacune avec son libellé de caisse (« Jus de pommes 33cl »
+et « Pago pommes 33cl ») — donc deux boutons sur la caisse. Ce ne sont pas des
+doublons au sens technique, mais c'est peut-être le même produit vendu sous
+deux noms. À vérifier en boutique avant de fusionner : une fusion déplace
+l'historique des ventes et ne se défait pas.
+
 **Contrôle de la carte poussée** : `node scripts/verifier-carte-zelty.mjs`
 compare la caisse à notre base, produit par produit — prix TTC au centime, TVA
 à emporter ET sur place, photo, nom, état. Lecture seule. 84/84 conformes au
