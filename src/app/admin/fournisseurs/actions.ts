@@ -569,6 +569,10 @@ export async function createFacture(input: unknown) {
   if (error) throw new Error(error.message)
 
   let lignesInserees = 0
+
+  // Ce que ce scan aura APPRIS : nombre de références rattachées.
+
+  let apprises = 0
   let prixMisAJour = 0
 
   // Un avoir référence des marchandises rendues ou un geste commercial : ses
@@ -620,6 +624,15 @@ export async function createFacture(input: unknown) {
       return out
     })
 
+    // Qui possède DÉJÀ une référence : on n'en écrase jamais une. Une
+    // référence en place a été vérifiée ou apprise d'un rapprochement sûr ;
+    // la remplacer par une déduction serait un recul.
+    const dejaRefProduit = new Set(
+      (recs ?? []).filter(r => (r.reference_fournisseur as string | null)?.trim()).map(r => String(r.id)),
+    )
+    const dejaRefIngredient = new Set(
+      ingredientsBruts.filter(i => (i.reference_fournisseur as string | null)?.trim()).map(i => String(i.id)),
+    )
     // Index des références connues : c'est le rapprochement EXACT (0142).
     // Le libellé ne sert plus qu'en second rang, quand la facture n'imprime
     // pas de référence ou qu'elle nous est encore inconnue.
@@ -704,6 +717,28 @@ export async function createFacture(input: unknown) {
               await supabase.from('recettes')
                 .update({ cout_achat_ht: Math.round(prixPiece * 10000) / 10000 })
                 .eq('id', prod.id)
+
+              // ─── La correspondance s'apprend toute seule ───────────────
+              // La référence était extraite à chaque scan puis JETÉE : le
+              // rapprochement suivant repassait par le libellé, fragile par
+              // construction. On l'écrit sur le produit, et le scan d'après
+              // devient exact — comme le fait déjà le pont caisse.
+              //
+              // Trois verrous, parce qu'une référence fausse est pire qu'une
+              // référence absente : elle passe AVANT le nom, donc elle se
+              // trompe en silence et pour toujours.
+              //   · seulement si la ligne portait une référence ;
+              //   · seulement si le rapprochement s'est fait par le NOM
+              //     (sinon on réécrit ce qu'on savait déjà) ;
+              //   · seulement si le nom a désigné UN SEUL produit — une ligne
+              //     qui en nourrit plusieurs (la capsule des quatre cafés)
+              //     n'enseigne rien de sûr.
+              if (refLigne && !parRef && trouves.length === 1 && !dejaRefProduit.has(prod.id)) {
+                const { error } = await supabase.from('recettes')
+                  .update({ reference_fournisseur: p.lignes[idx].reference?.trim() })
+                  .eq('id', prod.id)
+                if (!error) { dejaRefProduit.add(prod.id); apprises++ }
+              }
             }
           }
         }
@@ -719,6 +754,16 @@ export async function createFacture(input: unknown) {
             source: 'livraison',
             note: `Facture ${p.numero} — ${r.description.slice(0, 120)}`,
           })
+
+          // Même apprentissage côté matières : la référence lue sur la ligne
+          // devient celle de l'ingrédient, si elle n'y était pas déjà.
+          const refIng = p.lignes[idx].reference?.trim()
+          if (refIng && !dejaRefIngredient.has(r.ingredient_id)) {
+            const { error } = await supabase.from('ingredients')
+              .update({ reference_fournisseur: refIng })
+              .eq('id', r.ingredient_id)
+            if (!error) { dejaRefIngredient.add(r.ingredient_id); apprises++ }
+          }
         }
       }
     }
@@ -726,7 +771,7 @@ export async function createFacture(input: unknown) {
 
   revalidatePath('/admin/fournisseurs')
   revalidatePath('/admin/ingredients')
-  return { ok: true as const, lignes: lignesInserees, prix_mis_a_jour: prixMisAJour }
+  return { ok: true as const, lignes: lignesInserees, prix_mis_a_jour: prixMisAJour, correspondances_apprises: apprises }
 }
 
 export async function changerStatutFacture(id: string, statut: 'a_payer'|'paye'|'en_retard'|'litige'|'annule') {

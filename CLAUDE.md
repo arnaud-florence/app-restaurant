@@ -371,6 +371,27 @@ Ordre de rapprochement : **référence d'abord, libellé ensuite**. Le chemin pa
 le nom reste actif — toutes les factures antérieures n'ont pas de référence,
 et tous les fournisseurs n'en impriment pas.
 
+**La correspondance s'APPREND au scan (28/08/2026).** Le scanner extrayait la
+référence, s'en servait pour rapprocher, puis la **jetait**. Chaque facture
+repassait donc par le libellé — fragile par construction — et les 134 lignes
+déjà scannées n'avaient laissé **aucune** référence derrière elles. La cause du
+14 % de `libelle_achat` renseigné est là : chaque correspondance demandait à un
+humain de taper un lien, et un humain ne le fait pas.
+
+Désormais, une ligne rapprochée par le NOM et portant une référence **écrit
+cette référence** sur le produit ou la matière. Le scan suivant est exact.
+C'est le motif déjà éprouvé par le pont caisse (0137), appliqué aux factures.
+
+⚠️ **Trois verrous, parce qu'une référence fausse est pire qu'une référence
+absente** — elle passe AVANT le nom, donc elle se trompe en silence et pour
+toujours : on n'apprend que si la ligne portait une référence, que si le
+rapprochement s'est fait par le nom, et que si le nom a désigné **un seul**
+produit. Une ligne qui en nourrit plusieurs (la capsule des quatre cafés)
+n'enseigne rien. Une référence déjà en place n'est jamais écrasée.
+`createFacture` rend `correspondances_apprises`.
+Test : `node scripts/test-apprentissage-references.mjs` — ⚠️ il RECOPIE la
+règle, modifier les deux ensemble.
+
 **Le catalogue Arti'Pat comme pièce de contrôle.** 292 pages, 146 Mo —
 indexé par `scripts/indexer-catalogue-artipat.mjs`, 599 références avec
 colisage et prix indicatif. Trois usages :
