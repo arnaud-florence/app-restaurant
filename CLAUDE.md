@@ -1490,6 +1490,53 @@ visite : elle apprend que l'outil est cassé.
 Test : `PORT=3000 node scripts/test-visite-guidee.mjs` — 20 assertions, il
 restaure l'état initial du profil qu'il modifie.
 
+### L'aide contextuelle — l'outil doit dire POURQUOI (28/08/2026)
+
+`src/lib/help-content.ts` + `<ContextualHelp />` (bouton « ? » flottant, monté
+dans le RootLayout) existaient depuis longtemps et couvraient **14 écrans sur
+49**. Sur les 41 autres le bouton ne s'affichait même pas — un module livré,
+jamais nourri, exactement comme `obligations_legales` avant la 0147.
+
+Porté à **26 entrées** (17 écrans `/admin` sur 49, plus les 5 écrans de
+service). Les douze ajoutées visent ce qu'une manageuse ouvre le plus.
+
+⚠️ **Une entrée d'aide dit le POURQUOI, pas le comment.** Le comment se devine
+en regardant l'écran ; le pourquoi ne se devine jamais. Chaque entrée nomme le
+piège de SON écran — un avertissement lu devant le bouton concerné se retient,
+le même lu dans un manuel s'oublie. C'est aussi ce qui survit au départ de
+celui qui savait.
+
+⚠️ Le lookup est **exact d'abord, puis par PRÉFIXE le plus long** : une entrée
+`/admin/ventes` ne couvre PAS `/admin/ventes-pdv` (le préfixe exige un `/`),
+mais couvre bien `/admin/ventes/detail`. Vérifier qu'on ne masque pas une
+page voisine en ajoutant une clé courte.
+
+⚠️ Contrôle à relancer après tout ajout : chaque clé doit désigner une page qui
+existe, et chaque `href` de raccourci aussi. Une aide qui renvoie sur un 404
+détruit la confiance qu'elle est censée construire.
+
+### Les accès d'une manageuse — le piège du préfixe
+
+⚠️ **`pathMatchPrefix` matche par PRÉFIXE.** Mettre `'/admin'` seul dans
+`custom_permissions.allowed` ouvre **TOUT** `/admin/*` d'un coup — sécurité,
+journal d'audit et assistant de configuration compris. Vécu le 28/08/2026 :
+les 23 écrans volontairement fermés sont passés à 0 en une ligne, sans le
+moindre message. **On liste écran par écran.**
+
+Le contrôle qui l'a attrapé, à relancer après toute modification des
+permissions : compter les écrans `/admin` fermés, et vérifier que
+`/admin/securite`, `/admin/setup` et `/admin/borne-pin` en font partie.
+
+⚠️ **`/admin/cat` est le Centre de contrôle** — la carte des 49 modules avec
+leur état en direct, déjà filtrée par rôle. C'est l'écran conçu pour comprendre
+ce que l'outil contient : le fermer à quelqu'un qui doit l'apprendre était le
+plus gros défaut du premier montage.
+
+⚠️ **`/admin/co-gerant` appelle `requireManager()`**, pas une permission : il
+ne s'ouvre pas par `custom_permissions`. Or c'est l'écran qui PROPOSE des
+décisions (plats, food cost, chantiers) — le meilleur pour former quelqu'un à
+décider. L'ouvrir demande une modification de code.
+
 ### Accueillir une manageuse — accès et parcours (28/08/2026)
 
 Ambre rejoint l'équipe comme manageuse. Deux gestes, `scripts/acces-ambre.mjs`

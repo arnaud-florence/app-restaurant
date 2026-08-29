@@ -66,6 +66,22 @@ const ECRITURE = [
 ]
 
 const LECTURE = [
+  // ⚠️ /admin/cat est le CENTRE DE CONTRÔLE : la carte des 49 modules avec
+  // leur état en direct, une recherche, un plan imprimable — déjà filtrée par
+  // rôle. C'est littéralement l'écran conçu pour comprendre ce que l'outil
+  // contient, et il était le SEUL fermé à quelqu'un qui doit l'apprendre.
+  // Sans lui, elle n'a pas la carte du territoire.
+  //
+  // ⚠️ NE JAMAIS mettre '/admin' seul ici : `pathMatchPrefix` matche par
+  // PRÉFIXE, donc '/admin' ouvrirait TOUT /admin/* d'un coup — sécurité,
+  // journal d'audit et assistant de configuration compris. Vécu le
+  // 28/08/2026 : les 23 écrans volontairement fermés sont passés à 0 en
+  // une ligne, sans le moindre message. On liste écran par écran.
+  '/admin/cat',
+  // Le métier de gérante, et ces quatre-là contiennent déjà des données :
+  // 9 lignes de charges fixes, 9 challenges, 6 chambres, l'équipe en direct.
+  // On ne dirige pas sans connaître sa structure de coûts.
+  '/admin/economie', '/admin/challenges', '/admin/chambres', '/admin/supervision',
   // L'argent, en entier. C'est le cœur de la décision.
   '/admin/ventes', '/admin/ventes-pdv', '/admin/finances', '/admin/patrimoine',
   '/admin/pilotage', '/admin/previsionnel', '/admin/commande-fournil',
