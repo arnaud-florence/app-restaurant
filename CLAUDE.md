@@ -1156,17 +1156,28 @@ par notre propre route.
 ⚠️ **Ne rien déclarer avant d'avoir le secret en place sur Vercel** : notre
 route refuse un corps non signé par 401, et Zelty réessaierait en boucle.
 
-⚠️ Le nom de l'en-tête de signature n'est pas documenté (la page ne se
-charge pas). On teste donc les en-têtes vraisemblables, en hexadécimal comme
-en base64, préfixe `sha256=` toléré, comparaison à **temps constant**. Un
-refus enregistre les **NOMS** d'en-têtes reçus — jamais leurs valeurs — pour
-identifier le bon au premier appel réel. `ZELTY_WEBHOOK_HEADER` le fige
-ensuite.
+✅ **L'en-tête de signature est `x-zelty-hmac-sha256`** — identifié le
+30/08/2026 sur le premier appel RÉEL de Zelty (28/08, 11:45). Il n'est pas
+documenté et ne figurait dans aucune de nos hypothèses : ce webhook réel a
+donc été **refusé en 401**. Rien n'a été perdu — le sondage horaire est le
+filet — mais le temps réel ne fonctionnait pas depuis le branchement.
+
+C'est le journal qui l'a résolu : chaque refus enregistre les **NOMS** des
+en-têtes reçus, jamais leurs valeurs. Ne pas retirer cette trace, c'est elle
+qui rend le prochain inconnu diagnosticable en une requête. Les autres noms
+restent dans la liste par prudence, et `ZELTY_WEBHOOK_HEADER` peut le figer.
+
+⚠️ `scripts/test-zelty-webhook.mjs` supprimait **TOUS** les événements webhook
+du journal à son cleanup — il a effacé cette trace réelle le 30/08 en
+s'exécutant. Il ne retire désormais que ce qu'il a créé après son propre
+démarrage. Un test ne doit jamais détruire des données de production.
+Une assertion couvre le vrai en-tête : sans elle, un « nettoyage » de la liste
+rouvrirait la panne en silence.
 
 ⚠️ Une erreur de traitement chez nous répond quand même **200** : sinon Zelty
 réessaie indéfiniment. Le journal garde le brut, on rejoue.
 
-Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 11 assertions, dont
+Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 13 assertions, dont
 l'essentiel porte sur ce qui est REFUSÉ (corps non signé, signature fausse,
 corps altéré après signature).
 

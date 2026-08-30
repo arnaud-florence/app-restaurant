@@ -33,7 +33,20 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 /** En-têtes plausibles, du plus au moins probable. */
+// ⚠️ `x-zelty-hmac-sha256` est le VRAI nom, constaté sur un appel réel de
+// Zelty le 28/08/2026 — il n'est pas documenté, et il ne figurait pas dans
+// nos hypothèses. Résultat : le premier webhook réel a été REFUSÉ (401).
+//
+// Rien n'a été perdu — le sondage horaire est le filet — mais le temps réel
+// ne fonctionnait pas. C'est le journal qui a permis de le trouver : chaque
+// refus enregistre les NOMS des en-têtes reçus, jamais leurs valeurs.
+// Ne pas retirer cette trace : c'est elle qui rend le prochain inconnu
+// diagnosticable en une requête.
+//
+// Les autres noms restent, par prudence : ils ne coûtent rien et couvrent un
+// éventuel changement de convention.
 const ENTETES = [
+  'x-zelty-hmac-sha256',
   'x-zelty-signature', 'zelty-signature', 'x-signature', 'x-hub-signature-256',
   'x-webhook-signature', 'signature',
 ]

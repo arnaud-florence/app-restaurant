@@ -22,6 +22,13 @@ for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
 const BASE = `http://localhost:${process.env.PORT ?? '3000'}`
 const SECRET = env.ZELTY_WEBHOOK_SECRET
 
+// ⚠️ Borne de nettoyage. Le cleanup supprimait TOUS les événements webhook du
+// journal — y compris les vrais. Le 30/08/2026 il a effacé la trace du premier
+// webhook réel de Zelty, celle-là même qui avait permis de découvrir le nom de
+// l'en-tête de signature. Un test ne doit jamais détruire des données de
+// production : on ne retire que ce qu'on a créé après cet instant.
+const DEBUT = new Date().toISOString()
+
 let ok = 0, ko = 0
 const t = (nom, cond, detail = '') => {
   if (cond) { ok++; console.log(`  ✓ ${nom}`) }
@@ -108,10 +115,21 @@ t("mais JAMAIS la valeur de la signature",
   !JSON.stringify(refus?.payload?.entetes_recus ?? []).match(/[0-9a-f]{64}/),
   JSON.stringify(refus?.payload).slice(0, 160))
 
+// ── Le VRAI en-tête de Zelty ────────────────────────────────────────
+// Constaté sur un appel réel le 28/08/2026 : `x-zelty-hmac-sha256`. Il n'est
+// pas documenté et ne figurait dans aucune de nos hypothèses — le premier
+// webhook réel a donc été refusé en 401. Sans cette assertion, quelqu'un qui
+// « nettoie » la liste des en-têtes rouvrirait la panne sans le savoir.
+r = await envoyer({ event_name: 'order.ended', order: { id: 1, total: 100 } },
+  { entete: 'x-zelty-hmac-sha256' })
+t('l\'en-tête RÉEL de Zelty (x-zelty-hmac-sha256) est accepté', r.status === 200,
+  `HTTP ${r.status} — c'est celui que Zelty envoie vraiment`)
+
 // ── Cleanup ─────────────────────────────────────────────────────────
-await fetch(`${U}/rest/v1/integration_evenements?type=eq.webhook`, { method: 'DELETE', headers: H })
-const reste = await get('integration_evenements?select=id&type=eq.webhook')
-t('cleanup complet', reste.length === 0, `${reste.length}`)
+await fetch(`${U}/rest/v1/integration_evenements?type=eq.webhook&created_at=gte.${DEBUT}`,
+  { method: 'DELETE', headers: H })
+const reste = await get(`integration_evenements?select=id&type=eq.webhook&created_at=gte.${DEBUT}`)
+t('cleanup complet (et seulement nos propres traces)', reste.length === 0, `${reste.length}`)
 
 console.log(`\n── ${ok} ✓   ${ko} ✗ ──\n`)
 process.exit(ko === 0 ? 0 : 1)
