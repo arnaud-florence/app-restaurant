@@ -44,6 +44,7 @@ import { calculerMetrique, METRIQUE_LABEL, periodeMoisCourant } from '@/lib/chal
 import { leaderboardsPourEmploye, type ChallengeLeaderboard } from '@/lib/challenges-leaderboards'
 import ChallengeSurplusViz from '@/components/ChallengeSurplusViz'
 import RelancerVisite from '@/components/RelancerVisite'
+import PaliersGerance from '@/components/PaliersGerance'
 
 export const metadata = { title: 'Mon espace — Tableau de bord' }
 export const dynamic = 'force-dynamic'
@@ -174,7 +175,7 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
   const lbByChallenge = new Map<string, ChallengeLeaderboard>()
   for (const lb of leaderboards) lbByChallenge.set(lb.challenge.id, lb)
 
-  const [pointagesRes, pointageJourRes, taches7Res, progressionsRes, guidesRes, etapesCountRes, quizCountRes] = await Promise.all([
+  const [pointagesRes, pointageJourRes, taches7Res, progressionsRes, guidesRes, etapesCountRes, quizCountRes, certifsRes] = await Promise.all([
     supabase.from('pointage')
       .select('date_pointage, heures_travaillees')
       .eq('employe_id', empId)
@@ -197,6 +198,11 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
       .order('ordre'),
     supabase.from('etapes_formation').select('guide_id'),
     supabase.from('quiz_questions').select('guide_id'),
+    // Paliers de gérance : la certification est le seul élément STOCKÉ — le
+    // reste (où elle en est) se recalcule depuis les progressions.
+    supabase.from('certifications')
+      .select('poste, obtenue_le')
+      .eq('employe_id', empId),
   ])
 
   const pointages    = (pointagesRes.data    ?? []) as Pointage[]
@@ -204,6 +210,12 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
   const taches7      = (taches7Res.data      ?? []) as TacheRow[]
   const progressions = (progressionsRes.data ?? []) as Progression[]
   const guides       = (guidesRes.data       ?? []) as GuideRow[]
+  // Titres des guides réussis : c'est là-dessus que les paliers se calculent.
+  const titresReussis = progressions
+    .filter(p => p.statut === 'reussi')
+    .map(p => guides.find(g => g.id === p.guide_id)?.titre ?? '')
+    .filter(Boolean)
+  const certifications = (certifsRes.data ?? []) as Array<{ poste: string; obtenue_le: string }>
 
   const nbEtapesParGuide = new Map<string, number>()
   for (const e of (etapesCountRes.data ?? []) as Array<{ guide_id: string }>) {
@@ -483,6 +495,13 @@ export default async function MonEspacePage({ searchParams }: { searchParams: { 
       {/* Reprise de la visite guidée. Sans ce bouton, un « Non merci » cliqué
           par réflexe le premier jour est définitif : le panneau ne se propose
           qu'une fois, et personne ne devine qu'il existe encore. */}
+      {/* La route vers la gérance : où elle en est, et ce que chaque palier
+          ouvre. Réservé aux postes d'encadrement — un plongeur n'a que faire
+          d'une trajectoire de gérance sur son tableau de bord. */}
+      {(emp.poste === 'manager' || profil.role === 'manager') && (
+        <PaliersGerance guidesReussis={titresReussis} certifications={certifications} />
+      )}
+
       <section className="px-4 sm:px-6 max-w-md">
         <RelancerVisite etat={profil.visite_guidee_etape ?? null} />
       </section>

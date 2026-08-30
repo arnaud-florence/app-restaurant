@@ -76,6 +76,7 @@ const CTA_CHANTIER: Record<string, string> = {
 
 export default function CoGerantClient({
   contexte, propositions, chantiers, platsAOptimiser, nbRecettes, brief, completude, findings,
+  readOnly = false,
 }: {
   contexte: ContexteResto
   propositions: Proposition[]
@@ -85,8 +86,15 @@ export default function CoGerantClient({
   brief: BriefDuJour | null
   completude: Completude
   findings: Finding[]
+  /** Lecture seule : on regarde comment une décision se construit, sans
+   *  l'exécuter. Les server actions refuseraient de toute façon — masquer
+   *  les boutons évite de proposer un geste qui finira en message d'erreur. */
+  readOnly?: boolean
 }) {
   const router = useRouter()
+  // `pending` désactive déjà chaque bouton pendant un appel : on réutilise le
+  // même levier plutôt que d'ajouter une condition sur chacun des quatorze.
+  const verrouille = readOnly
   const [ctx, setCtx] = useState<Record<string, string>>(
     Object.fromEntries(CHAMPS.map(c => [c.cle, contexte[c.cle] ?? ''])),
   )
@@ -302,14 +310,14 @@ export default function CoGerantClient({
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-black uppercase tracking-wide text-zinc-400">Prix</span>
           <div className="inline-flex items-center gap-2">
-            <button onClick={() => ajusterPrix(p.id, prix, -0.5)} disabled={pending}
+            <button onClick={() => ajusterPrix(p.id, prix, -0.5)} disabled={pending || verrouille}
               className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-zinc-100 text-zinc-700 active:scale-95 transition disabled:opacity-50">
               <Minus className="h-4 w-4" strokeWidth={3} />
             </button>
             <span className="min-w-[92px] text-center font-black tabular-nums text-zinc-900">
               {busy ? <Loader2 className="h-4 w-4 animate-spin inline" /> : <>{prix.toFixed(2)} €<span className="text-[11px] font-semibold text-zinc-400"> {isDrink ? '/verre' : 'HT'}</span></>}
             </span>
-            <button onClick={() => ajusterPrix(p.id, prix, +0.5)} disabled={pending}
+            <button onClick={() => ajusterPrix(p.id, prix, +0.5)} disabled={pending || verrouille}
               className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-zinc-100 text-zinc-700 active:scale-95 transition disabled:opacity-50">
               <Plus className="h-4 w-4" strokeWidth={3} />
             </button>
@@ -322,7 +330,7 @@ export default function CoGerantClient({
           <div className="mt-3">
             <div className="flex flex-wrap gap-1.5 mb-2">
               {['Moins cher', 'Plus copieux', 'Plus simple', 'Version végé'].map(chip => (
-                <button key={chip} onClick={() => affiner(p.id, chip)} disabled={pending}
+                <button key={chip} onClick={() => affiner(p.id, chip)} disabled={pending || verrouille}
                   className="h-8 px-2.5 rounded-full bg-zinc-100 text-zinc-600 text-xs font-semibold active:scale-95 transition disabled:opacity-50">
                   {chip}
                 </button>
@@ -336,7 +344,7 @@ export default function CoGerantClient({
                 placeholder="Dis à Arnaud quoi ajuster…"
                 className="flex-1 h-10 px-3 rounded-xl bg-zinc-50 ring-1 ring-zinc-200 focus:ring-2 focus:ring-zinc-900/15 outline-none text-sm"
               />
-              <button onClick={() => affiner(p.id, instr[p.id] ?? '')} disabled={pending}
+              <button onClick={() => affiner(p.id, instr[p.id] ?? '')} disabled={pending || verrouille}
                 className="h-10 px-3.5 rounded-xl bg-zinc-900 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ajuster'}
               </button>
@@ -346,11 +354,11 @@ export default function CoGerantClient({
 
         {/* Valider / Rejeter */}
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-100">
-          <button onClick={() => valider(p.id)} disabled={pending}
+          <button onClick={() => valider(p.id)} disabled={pending || verrouille}
             className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-emerald-600 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />} Valider
           </button>
-          <button onClick={() => rejeter(p.id)} disabled={pending}
+          <button onClick={() => rejeter(p.id)} disabled={pending || verrouille}
             className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-full bg-white ring-1 ring-zinc-200 text-zinc-600 text-sm font-bold active:scale-95 transition disabled:opacity-50">
             <X className="h-4 w-4" strokeWidth={2.5} /> Non
           </button>
@@ -362,6 +370,14 @@ export default function CoGerantClient({
   return (
     <div className="min-h-screen bg-zinc-50">
       <main className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-5">
+        {readOnly && (
+          <p className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <strong>Lecture seule.</strong> Tu vois comment chaque décision est construite —
+            le coût, la marge, le raisonnement — sans l&apos;exécuter. C&apos;est l&apos;écran
+            qui apprend à arbitrer&nbsp;: lis les propositions et demande-toi ce que tu ferais,
+            avant d&apos;en discuter.
+          </p>
+        )}
         {/* ☀️ Le mot d'Arnaud (pour toi) */}
         <section className="rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 text-white p-5">
           <div className="flex items-center justify-between gap-2">
@@ -369,7 +385,7 @@ export default function CoGerantClient({
               <Sun className="h-5 w-5" />
               <h2 className="font-black">Le mot d'Arnaud</h2>
             </div>
-            <button onClick={genererBrief} disabled={pending}
+            <button onClick={genererBrief} disabled={pending || verrouille}
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-white/20 text-white text-xs font-bold active:scale-95 transition disabled:opacity-50">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {brief ? 'Rafraîchir' : 'Mon brief'}
@@ -475,7 +491,7 @@ export default function CoGerantClient({
               <ClipboardList className="h-5 w-5 text-zinc-700" />
               <h2 className="font-black text-zinc-900">Les chantiers d'Arnaud</h2>
             </div>
-            <button onClick={auditerResto} disabled={pending}
+            <button onClick={auditerResto} disabled={pending || verrouille}
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-zinc-900 text-white text-xs font-bold active:scale-95 transition disabled:opacity-50">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Fais le tour du resto
@@ -514,7 +530,7 @@ export default function CoGerantClient({
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mt-3">
                             {cta && (
-                              <button onClick={() => lancerChantier(c.id)} disabled={pending}
+                              <button onClick={() => lancerChantier(c.id)} disabled={pending || verrouille}
                                 className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-emerald-600 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
                                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" strokeWidth={2.5} />} {cta}
                               </button>
@@ -525,7 +541,7 @@ export default function CoGerantClient({
                                 Ouvrir <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
                               </Link>
                             )}
-                            <button onClick={() => rejeter(c.id)} disabled={pending}
+                            <button onClick={() => rejeter(c.id)} disabled={pending || verrouille}
                               className="inline-flex items-center gap-1 h-10 px-3.5 rounded-full text-zinc-500 text-sm font-bold active:scale-95 transition disabled:opacity-50">
                               <X className="h-4 w-4" strokeWidth={2.5} /> Plus tard
                             </button>
@@ -568,17 +584,17 @@ export default function CoGerantClient({
                     </p>
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <div className="inline-flex items-center gap-2">
-                        <button onClick={() => setPrix(p.id, choisi - 0.5)} disabled={pending}
+                        <button onClick={() => setPrix(p.id, choisi - 0.5)} disabled={pending || verrouille}
                           className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-white ring-1 ring-zinc-200 text-zinc-700 active:scale-95 transition disabled:opacity-50">
                           <Minus className="h-4 w-4" strokeWidth={3} />
                         </button>
                         <span className="min-w-[84px] text-center font-black tabular-nums text-zinc-900">{choisi.toFixed(2)} €</span>
-                        <button onClick={() => setPrix(p.id, choisi + 0.5)} disabled={pending}
+                        <button onClick={() => setPrix(p.id, choisi + 0.5)} disabled={pending || verrouille}
                           className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-white ring-1 ring-zinc-200 text-zinc-700 active:scale-95 transition disabled:opacity-50">
                           <Plus className="h-4 w-4" strokeWidth={3} />
                         </button>
                       </div>
-                      <button onClick={() => appliquerPrix(p.id)} disabled={pending}
+                      <button onClick={() => appliquerPrix(p.id)} disabled={pending || verrouille}
                         className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-emerald-600 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
                         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.5} />} Appliquer {choisi.toFixed(2)} €
                       </button>
@@ -674,7 +690,7 @@ export default function CoGerantClient({
                       <option value="salle">Salle</option>
                       <option value="admin">Direction</option>
                     </select>
-                    <button onClick={envoyerEquipe} disabled={pending}
+                    <button onClick={envoyerEquipe} disabled={pending || verrouille}
                       className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-emerald-600 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
                       <Send className="h-4 w-4" strokeWidth={2.5} /> Envoyer à l'équipe
                     </button>
@@ -712,7 +728,7 @@ export default function CoGerantClient({
                   />
                 </label>
               ))}
-              <button onClick={sauverContexte} disabled={pending}
+              <button onClick={sauverContexte} disabled={pending || verrouille}
                 className="inline-flex items-center gap-2 h-11 px-4 rounded-full bg-zinc-900 text-white text-sm font-bold active:scale-95 transition disabled:opacity-50">
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />} Enregistrer
               </button>

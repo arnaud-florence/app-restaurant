@@ -1490,6 +1490,61 @@ visite : elle apprend que l'outil est cassé.
 Test : `PORT=3000 node scripts/test-visite-guidee.mjs` — 20 assertions, il
 restaure l'état initial du profil qu'il modifie.
 
+### La route vers la gérance — trois paliers (28/08/2026)
+
+Il manquait une **trajectoire**. Les cinq guides « Manageuse » sont un parcours
+de prise en main : ils s'arrêtent là où commence le métier. Résultat, la
+personne formée n'avait aucun moyen de voir ce qui lui restait, ni le gérant de
+constater qu'elle était prête — la promotion se serait décidée au feeling.
+
+`src/lib/paliers-gerance.ts` (client-safe) définit trois paliers, chacun avec
+ce qu'on sait faire, les guides qui le prouvent, et **ce qui s'ouvre en
+écriture**. La progression des accès devient une conséquence lisible, pas une
+décision dont personne ne connaît les critères.
+
+| Palier | Guides | Ouvre |
+|---|---|---|
+| 1 · Prise en main | Manageuse 1 + 2 | comptoir, inventaire, invendus, ruptures, journal |
+| 2 · Lecture | Manageuse 3 + 4 + 5 | allergènes, fournisseurs, fiches produits |
+| 3 · Décision | *aucun, volontairement* | co-gérant, économie, chantiers de croissance |
+
+⚠️ **L'état d'un palier se CALCULE à la lecture**, depuis les progressions de
+formation. Rien n'est entretenu à la main : un compteur dériverait au premier
+quiz repassé. Seule la **certification** — le fait qu'un palier a été atteint,
+et à quelle date — est enregistrée, parce qu'une date ne se recalcule pas.
+
+⚠️ **Un palier SANS guide n'est jamais atteint automatiquement.** Le troisième
+se constate et s'accorde ; le marquer atteint parce qu'il n'a rien à valider
+serait exactement le contraire de son intention. Ses guides restent à écrire —
+rédigés avant qu'elle ait rencontré les vraies situations, ils seraient
+théoriques.
+
+⚠️ L'enregistrement se fait dans `soumettreQuiz`, au moment où le fait devient
+vrai, et il est **best-effort** : un échec d'écriture ne doit jamais faire
+échouer un quiz réussi. L'idempotence vient de la contrainte
+`unique (employe_id, poste)` — repasser un quiz ne réécrit pas une date acquise.
+
+Le score enregistré est la **moyenne des quiz du palier** : un palier obtenu de
+justesse et un palier obtenu haut la main ne racontent pas la même chose au
+moment de décider d'une promotion.
+
+**`/admin/co-gerant` est passé aux permissions.** Il appelait `requireManager()`
+en dur, donc aucune permission ne pouvait l'ouvrir — alors que c'est l'écran qui
+PROPOSE des décisions (un plat avec son food cost, un chantier audité), donc le
+meilleur pour apprendre à arbitrer.
+
+⚠️ **Ses server actions restent `requireManager()`**, et c'est délibéré : elles
+CRÉENT des recettes et poussent des prix. On regarde comment une décision se
+construit avant d'en prendre une. Le client reçoit `readOnly` et masque les
+quinze boutons — proposer un geste qui finira en message d'erreur serait pire
+que de ne pas le proposer.
+
+Test : `node scripts/test-paliers-gerance.mjs` — 16 assertions.
+⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble. Et il lit les
+titres de guides en guillemets **simples ET doubles** — « Manageuse 2 » en porte
+des doubles parce qu'il contient une apostrophe, et ne lire que les simples
+faisait passer le test au vert sur une règle fausse.
+
 ### L'aide contextuelle — l'outil doit dire POURQUOI (28/08/2026)
 
 `src/lib/help-content.ts` + `<ContextualHelp />` (bouton « ? » flottant, monté
@@ -2200,6 +2255,7 @@ node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloqu
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
 PORT=3000 node scripts/test-visite-guidee.mjs  # visite guidée (contrat d'accompagnement)
+node scripts/test-paliers-gerance.mjs          # paliers de gérance + co-gérant en lecture
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)

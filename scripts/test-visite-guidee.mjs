@@ -30,9 +30,20 @@ const profils = await sb('profils?select=id,email,visite_guidee_etape')
 T(profils.length > 0, `${profils.length} profils lus`)
 T(profils.every(p => p.visite_guidee_etape === null || Number.isInteger(p.visite_guidee_etape)),
   'la colonne existe et n\'accepte que null ou un entier')
-T(profils.every(p => p.visite_guidee_etape === null),
-  'aucun profil n\'a de visite en cours pour l\'instant',
-  'l\'état null est bien le défaut : personne n\'est marqué « déjà vu » par erreur')
+// ⚠️ Ne PAS vérifier qu'aucun profil n'a de visite en cours : quelqu'un qui
+// commence la visite est exactement le comportement attendu, et l'assertion
+// rougirait pour un succès. Un test rouge en permanence finit par être
+// ignoré, et ce jour-là il ne protège plus rien.
+//
+// Ce qui compte est que le DÉFAUT soit `null` — personne ne doit être marqué
+// « déjà vu » par erreur à la création d'un profil.
+const parEtat = profils.reduce((a, p) => {
+  const k = p.visite_guidee_etape === null ? 'jamais' : p.visite_guidee_etape === -1 ? 'terminee' : 'en_cours'
+  a[k] = (a[k] ?? 0) + 1; return a
+}, {})
+console.log(`    (${parEtat.jamais ?? 0} jamais commencée · ${parEtat.en_cours ?? 0} en cours · ${parEtat.terminee ?? 0} terminée)`)
+T((parEtat.jamais ?? 0) > 0 || profils.length === 0,
+  'le défaut reste null : personne n\'est marqué « déjà vu » par erreur')
 
 // ── 2. Le contenu ───────────────────────────────────────────────────
 console.log('\n── les étapes ──')

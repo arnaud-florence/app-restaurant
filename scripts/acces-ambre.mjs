@@ -82,6 +82,11 @@ const LECTURE = [
   // 9 lignes de charges fixes, 9 challenges, 6 chambres, l'équipe en direct.
   // On ne dirige pas sans connaître sa structure de coûts.
   '/admin/economie', '/admin/challenges', '/admin/chambres', '/admin/supervision',
+  // Le co-gérant : l'écran qui PROPOSE des décisions — un plat avec son food
+  // cost calculé, un chantier audité. C'est le meilleur écran pour apprendre
+  // à arbitrer, et il est en lecture : on regarde comment une décision se
+  // construit avant d'en prendre une. Ses actions restent manager-only.
+  '/admin/co-gerant',
   // L'argent, en entier. C'est le cœur de la décision.
   '/admin/ventes', '/admin/ventes-pdv', '/admin/finances', '/admin/patrimoine',
   '/admin/pilotage', '/admin/previsionnel', '/admin/commande-fournil',

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getProfile } from '@/lib/auth'
 import { getMainRoute } from '@/lib/permissions'
 import { calculerScoreQuiz, peutRetenter, statutApresQuiz, type Question, type Progression } from '@/lib/formation'
+import { etatPaliers } from '@/lib/paliers-gerance'
 
 /**
  * Vérifie qu'un employé a le droit d'agir au nom d'un employe_id donné.
@@ -137,9 +138,62 @@ export async function soumettreQuiz(input: unknown): Promise<{
   }).eq('id', prog.id)
   if (error) throw new Error(error.message)
 
+  // ── Palier de gérance atteint ? ─────────────────────────────────
+  // Le moment où le fait devient vrai est CELUI-CI : un quiz vient d'être
+  // réussi. On l'enregistre ici plutôt qu'à l'affichage, parce qu'une date
+  // de certification ne se recalcule pas — l'état d'avancement, lui, se
+  // recalcule très bien et n'est donc stocké nulle part.
+  //
+  // ⚠️ Best-effort : un échec d'écriture ne doit JAMAIS faire échouer un quiz
+  // réussi. La personne a répondu juste ; lui rendre une erreur parce qu'une
+  // ligne annexe n'a pas pu s'écrire serait absurde.
+  if (statut === 'reussi') {
+    try { await enregistrerPaliersAtteints(prog.employe_id as string) } catch { /* ignore */ }
+  }
+
   revalidatePath('/formation')
   revalidatePath(`/formation/${p.guide_id}`)
+  revalidatePath('/mon-espace')
   return { score_pct, bonnes, total, statut, seuil }
+}
+
+/**
+ * Enregistre les certifications des paliers désormais complets.
+ *
+ * Idempotent par construction : la contrainte `unique (employe_id, poste)`
+ * refuse un doublon, et on n'insère que ce qui manque. Repasser un quiz ne
+ * réécrit donc jamais une date de certification déjà acquise — c'est le
+ * premier passage qui compte.
+ */
+async function enregistrerPaliersAtteints(employeId: string) {
+  const supabase = await createClient()
+  const [progRes, guidesRes, certifsRes] = await Promise.all([
+    supabase.from('progressions_formation')
+      .select('guide_id, statut, dernier_score_pct').eq('employe_id', employeId),
+    supabase.from('guides_formation').select('id, titre'),
+    supabase.from('certifications').select('poste').eq('employe_id', employeId),
+  ])
+  const titres = new Map((guidesRes.data ?? []).map(g => [g.id as string, String(g.titre)]))
+  const reussis = (progRes.data ?? []).filter(p => p.statut === 'reussi')
+  const titresReussis = reussis.map(p => titres.get(p.guide_id as string) ?? '').filter(Boolean)
+  const deja = new Set((certifsRes.data ?? []).map(c => String(c.poste)))
+
+  const aCreer = etatPaliers(titresReussis)
+    .filter(e => e.atteint && !deja.has(e.palier.cle))
+    .map(e => {
+      // Score du palier = moyenne des quiz qui le composent. Un palier
+      // obtenu de justesse et un palier obtenu haut la main ne racontent
+      // pas la même chose au moment de décider d'une promotion.
+      const scores = reussis
+        .filter(p => e.palier.guides.includes(titres.get(p.guide_id as string) ?? ''))
+        .map(p => Number(p.dernier_score_pct ?? 0))
+      const moyenne = scores.length
+        ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100
+        : 0
+      return { employe_id: employeId, poste: e.palier.cle, score_pct: moyenne }
+    })
+
+  if (aCreer.length > 0) await supabase.from('certifications').insert(aCreer)
 }
 
 // ─── Terminer l'onboarding ────────────────────────────────────────
