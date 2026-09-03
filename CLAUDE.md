@@ -1550,6 +1550,26 @@ fiche technique, il a un prix d'achat. Ces colonnes servent aux **19 produits
 assemblés** (sandwichs, paninis, salades, pizzas) et à la carte du restaurant
 et de la pizzeria. Ne pas relancer la saisie des 90 compositions du Fournil.
 
+**La saisie se fait dans la fiche produit** (`/admin/recettes` → Modifier).
+L'éditeur de composition existait déjà — on ajoute un ingrédient, sa quantité
+et son unité, et le food cost se recalcule sous les yeux. Les deux champs de
+la 0150 s'y ajoutent : le **grammage servi** à côté du nombre de portions, et
+la **méthode** en dessous de la description. On remplit au fur et à mesure ;
+une fiche à moitié faite reste utile et le dit.
+
+⚠️ `procedure` est un `Textarea` multi-lignes et le retour à la ligne est
+conservé jusqu'à l'impression — une méthode en un seul paragraphe ne se suit
+pas au poste.
+
+⚠️ Ne pas passer `poids_portion_g` en `z.coerce.number().nullable()` : le type
+d'entrée devient `unknown` et le resolver de react-hook-form ne compile plus.
+`z.number().nullable()` + `setValueAs` sur le champ, comme `cout_achat_ht`.
+
+⚠️ `scripts/test-recettes.mjs` signale « food cost : valeur aberrante 0.0 % »
+sur les produits sans coût — **266 occurrences, antérieures à la 0150**. Le
+test avait raison depuis toujours ; c'est l'écran qui mentait. Ces lignes
+disparaîtront à mesure que les coûts seront saisis.
+
 Test : `PORT=3000 node scripts/test-fiches-techniques.mjs` — 18 assertions.
 ⚠️ Il RECOPIE les seuils de `foodCost.ts` ; modifier les deux ensemble.
 

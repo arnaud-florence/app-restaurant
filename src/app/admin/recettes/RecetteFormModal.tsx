@@ -34,6 +34,10 @@ const formSchema = z.object({
   categorie: z.string().trim().min(1, 'Catégorie obligatoire').max(60),
   tag_destination: z.enum(TAGS_DESTINATION),
   description: z.string().max(2000),
+  // Fiche technique (0150) : la méthode se saisit ici, le grammage servi juste
+  // à côté du nombre de portions.
+  procedure: z.string().max(8000).nullable(),
+  poids_portion_g: z.number().min(0).max(100000).nullable(),
   temps_preparation: z.number().int().min(0).max(720),
   nb_portions: z.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.number().min(0).max(99999),
@@ -77,6 +81,8 @@ export default function RecetteFormModal({
         categorie: recette.categorie,
         tag_destination: recette.tag_destination,
         description: recette.description ?? '',
+        procedure: recette.procedure ?? '',
+        poids_portion_g: recette.poids_portion_g ?? null,
         temps_preparation: recette.temps_preparation,
         nb_portions: recette.nb_portions,
         prix_vente_ht: recette.prix_vente_ht,
@@ -94,7 +100,7 @@ export default function RecetteFormModal({
         vendable_online: recette.vendable_online ?? false,
         image_url: recette.image_url ?? '',
       }
-    : { ...defaultRecette(), description: '', photo_url: '', contient_alcool: false, vendable_online: false, image_url: '' } as FormData
+    : { ...defaultRecette(), description: '', procedure: '', poids_portion_g: null, photo_url: '', contient_alcool: false, vendable_online: false, image_url: '' } as FormData
 
   const {
     register, handleSubmit, control, watch, setValue, setError,
@@ -284,14 +290,32 @@ export default function RecetteFormModal({
                 <Field label="Description (visible client)">
                   <Textarea {...register('description')} placeholder="Description courte présentée au client…" rows={3} />
                 </Field>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Field label="Temps de préparation (min)" error={errors.temps_preparation?.message}>
                     <Input type="number" step={1} min={0} {...register('temps_preparation', { valueAsNumber: true })} />
                   </Field>
                   <Field label="Nb portions par recette *" error={errors.nb_portions?.message}>
                     <Input type="number" step={1} min={1} {...register('nb_portions', { valueAsNumber: true })} />
                   </Field>
+                  {/* Le grammage SERVI, distinct des quantités mises dedans :
+                      deux assiettes faites des mêmes ingrédients peuvent
+                      coûter du simple au double, et ça ne se voit nulle part
+                      ailleurs. */}
+                  <Field label="Poids servi (g)" hint="Le grammage à respecter en salle.">
+                    <Input type="number" step={1} min={0} placeholder="—"
+                      {...register('poids_portion_g', { setValueAs: v => v === '' ? null : Number(v) })} />
+                  </Field>
                 </div>
+
+                {/* ── La méthode ───────────────────────────────────────
+                    Séparée de la description, et pas par goût du rangement :
+                    l'une se vend au client, l'autre se suit en production.
+                    Les mélanger obligerait à choisir entre les deux. */}
+                <Field label="Méthode — la fiche technique à respecter"
+                  hint="Étape par étape. C'est ce qui fait que deux personnes produisent le même plat.">
+                  <Textarea {...register('procedure')} rows={6}
+                    placeholder={'1. Trancher le pain en deux dans la longueur.\n2. Beurrer 8 g sur la base.\n3. Disposer 60 g de jambon, 30 g d\'emmental.\n4. Passer 3 min au four à 180 °C.'} />
+                </Field>
                 <Field label="URL de la photo" hint="L'upload Cloudinary sera activé quand on aura les credentials.">
                   <Input type="url" {...register('photo_url')} placeholder="https://exemple.com/photo.jpg" />
                 </Field>

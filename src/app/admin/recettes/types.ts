@@ -25,6 +25,12 @@ export type Recette = {
   categorie: string
   tag_destination: TagDestination
   description: string | null
+  /** Fiche technique (0150) : la méthode à RESPECTER, distincte de
+   *  `description` qui est le texte commercial lu par le client. */
+  procedure: string | null
+  /** Grammage SERVI. Sans lui, la fiche dit ce qu'on met dedans, pas ce
+   *  qu'on sert — et c'est là que les marges se perdent. */
+  poids_portion_g: number | null
   temps_preparation: number
   nb_portions: number
   prix_vente_ht: number
@@ -76,6 +82,8 @@ export function defaultRecette(): Omit<Recette, 'id' | 'created_at' | 'updated_a
     categorie: 'Plats',
     tag_destination: 'CUISINE',
     description: '',
+    procedure: '',
+    poids_portion_g: null,
     temps_preparation: 15,
     nb_portions: 1,
     prix_vente_ht: 0,

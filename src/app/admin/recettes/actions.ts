@@ -18,6 +18,10 @@ const recetteSchema = z.object({
   categorie: z.string().trim().min(1, 'Catégorie obligatoire').max(60),
   tag_destination: z.enum(TAGS_DESTINATION),
   description: z.string().max(2000).optional().nullable(),
+  // Fiche technique (0150). `procedure` peut être long : c'est une méthode
+  // complète, pas une phrase d'accroche.
+  procedure: z.string().max(8000).optional().nullable(),
+  poids_portion_g: z.coerce.number().min(0).max(100000).nullable().optional(),
   temps_preparation: z.coerce.number().int().min(0).max(720),
   nb_portions: z.coerce.number().int().min(1, 'Au moins 1 portion').max(200),
   prix_vente_ht: z.coerce.number().min(0).max(99999),
@@ -61,6 +65,8 @@ function mapRecette(r: Record<string, unknown>): Recette {
     categorie: r.categorie as string,
     tag_destination: r.tag_destination as Recette['tag_destination'],
     description: (r.description as string) ?? null,
+    procedure: (r.procedure as string) ?? null,
+    poids_portion_g: r.poids_portion_g == null ? null : Number(r.poids_portion_g),
     temps_preparation: Number(r.temps_preparation ?? 0),
     nb_portions: Number(r.nb_portions ?? 1),
     prix_vente_ht: Number(r.prix_vente_ht ?? 0),
