@@ -13,8 +13,7 @@ import {
   type Boisson, TYPE_LABEL, COULEUR_LABEL,
   margeBouteille, margeVerre, margePinte, rendementFut,
   statutStockBouteilles, statutStockFuts,
-  fmtPrix, fmtPct,
-} from '@/lib/boissons'
+  fmtPrix, fmtPct, type MargeFormat } from '@/lib/boissons'
 import { toggleBoissonActif, deleteBoisson } from './actions'
 import BoissonFormModal from './BoissonFormModal'
 
@@ -322,7 +321,7 @@ function BoissonCard({
   )
 }
 
-function FormatBadge({ label, data, unit }: { label: string; data: { marge_pct: number; food_cost_pct: number; prix_vente_ht: number; statut: 'vert' | 'orange' | 'rouge' }; unit: string }) {
+function FormatBadge({ label, data, unit }: { label: string; data: MargeFormat; unit: string }) {
   const tone = data.statut === 'vert' ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
     : data.statut === 'orange' ? 'bg-amber-50 border-amber-200 text-amber-900'
     : 'bg-red-50 border-red-200 text-red-900'

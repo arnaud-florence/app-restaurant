@@ -20,8 +20,7 @@ import {
   type Boisson, TYPE_LABEL, COULEUR_LABEL,
   margeBouteille, margeVerre, margePinte, rendementFut,
   suggererAccordsPour, type RecetteShort,
-  fmtPrix, fmtPct,
-} from '@/lib/boissons'
+  fmtPrix, fmtPct, type MargeFormat } from '@/lib/boissons'
 import { createBoisson, updateBoisson, ajouterAccord, retirerAccord } from './actions'
 
 // ─── Schéma ──────────────────────────────────────────────────────────
@@ -512,7 +511,7 @@ function Field({ label, error, hint, className, children }: {
 
 function MargeRow({ label, m }: {
   label: string
-  m: { applicable: boolean; prix_vente_ht: number; marge_eur: number; marge_pct: number; food_cost_pct: number; statut: 'vert' | 'orange' | 'rouge' }
+  m: MargeFormat
 }) {
   if (!m.applicable) return (
     <div className="flex items-center justify-between text-xs text-muted-foreground italic">

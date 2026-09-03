@@ -416,6 +416,17 @@ function RecetteCard({
           </div>
         )}
 
+        {/* La fiche technique reste accessible en LECTURE SEULE : c'est
+            justement le document qu'on consulte sans rien modifier — au
+            poste, pour respecter un grammage. */}
+        <div className={cn('flex gap-1 pt-2', readOnly && 'mt-auto')}>
+          <Link href={`/print/fiche-technique/${r.id}`} target="_blank" rel="noopener"
+            className="flex-1 inline-flex items-center justify-center gap-1 h-8 rounded-md
+                       border border-input text-xs font-medium hover:bg-accent">
+            📄 Fiche technique
+          </Link>
+        </div>
+
         {/* Actions — masquées en lecture seule */}
         {!readOnly && (
           <div className="flex gap-1 mt-auto pt-2">

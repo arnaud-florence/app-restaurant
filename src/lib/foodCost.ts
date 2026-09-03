@@ -5,7 +5,17 @@
 //   ROUGE : food cost > 32%
 //   ALERTE automatique si food cost > 30%
 
-export type StatutFoodCost = 'vert' | 'orange' | 'rouge'
+// ⚠️ `inconnu` n'est pas une couleur de plus, c'est une correction.
+// `statutFoodCost(0)` rendait 'vert' : un produit sans composition NI coût
+// d'achat s'affichait à 0 % de food cost, en vert — le produit dont on sait
+// le MOINS paraissait le meilleur de la carte. C'est la même faute que
+// « rien déclaré » lu comme « aucun allergène » : une absence rendue comme
+// un bon résultat.
+//
+// Un coût nul n'existe pas en restauration. Zéro veut dire « on ne sait pas »,
+// et il faut que ça se voie — sinon on pilote des marges en croyant les
+// maîtriser.
+export type StatutFoodCost = 'vert' | 'orange' | 'rouge' | 'inconnu'
 
 export const SEUIL_VERT_MAX     = 28   // < 28 = vert
 export const SEUIL_ORANGE_MAX   = 32   // ≤ 32 = orange, > 32 = rouge
@@ -60,7 +70,8 @@ export function prixSuggerePourMarge(coutPortion: number, margeCiblePct: number)
 
 // ─── Statut & alerte ─────────────────────────────────────────────────
 export function statutFoodCost(pct: number): StatutFoodCost {
-  if (!Number.isFinite(pct) || pct <= 0) return 'vert'
+  // Coût nul ou non calculable = coût INCONNU, jamais « sain ».
+  if (!Number.isFinite(pct) || pct <= 0) return 'inconnu'
   if (pct < SEUIL_VERT_MAX)   return 'vert'
   if (pct <= SEUIL_ORANGE_MAX) return 'orange'
   return 'rouge'
@@ -77,6 +88,9 @@ export const STATUT_FOOD_COST_STYLE: Record<StatutFoodCost, {
   vert:   { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', bgSolid: 'bg-emerald-600', label: 'Sain' },
   orange: { bg: 'bg-amber-50',   text: 'text-amber-800',   border: 'border-amber-300',   bgSolid: 'bg-amber-500',   label: 'À surveiller' },
   rouge:  { bg: 'bg-red-50',     text: 'text-red-800',     border: 'border-red-300',     bgSolid: 'bg-red-600',     label: 'Trop élevé' },
+  // Gris, et surtout PAS vert : le produit dont on ignore le coût ne doit
+  // jamais ressembler au meilleur de la carte.
+  inconnu:{ bg: 'bg-zinc-100',   text: 'text-zinc-700',    border: 'border-zinc-300',    bgSolid: 'bg-zinc-400',    label: 'Coût inconnu' },
 }
 
 // ─── Synthèse compacte pour les cartes de la liste ───────────────────

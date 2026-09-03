@@ -144,6 +144,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Pont caisse ↔ outil | journal des échanges + correspondance des catalogues | 0137 |
 | Lecture patrimoniale | EBE récurrent, valeur du fonds, plus-value latente | 0143 |
 | Registre légal d'ouverture | 24 obligations, drapeau `bloquant` sans date | 0147 |
+| Fiches techniques | `procedure`, `poids_portion_g`, statut « coût inconnu » | 0150 |
 | Heures de contrat décimales | un mi-temps fait 17,5 h, pas 17 ni 18 | 0148 |
 | Visite guidée | accompagnement écran par écran, reprenable | 0149 |
 | Bar : vendu ↔ acheté | `nom_matiere` + rendements, inventaire par poste | — |
@@ -1501,6 +1502,57 @@ visite : elle apprend que l'outil est cassé.
 Test : `PORT=3000 node scripts/test-visite-guidee.mjs` — 20 assertions, il
 restaure l'état initial du profil qu'il modifie.
 
+### Fiches techniques — maîtriser portions et marges (0150)
+
+Le modèle avait déjà tout pour CALCULER une marge : `recette_ingredients`
+(quantité + unité), `recettes.nb_portions`, `temps_preparation`, et
+`synthese()` qui additionne composition et coût d'achat. Il manquait la
+discipline de production et, surtout, un garde-fou.
+
+⚠️ **Le défaut de fond : `statutFoodCost(0)` rendait `'vert'`.** Un produit
+sans composition NI coût d'achat s'affichait à **0 % de food cost, en vert** —
+le produit dont on savait le moins passait pour le meilleur de la carte. C'est
+la même faute que « rien déclaré » lu comme « aucun allergène » : une absence
+rendue comme un bon résultat. Un coût nul n'existe pas en restauration ; zéro
+veut dire « on ne sait pas », et il faut que ça se voie.
+
+`StatutFoodCost` gagne donc **`'inconnu'`**, affiché en gris. 39 produits du
+Fournil sont dans ce cas au 28/08/2026.
+
+**Deux colonnes** (0150), et la distinction compte :
+
+- `recettes.procedure` — la méthode à RESPECTER, étape par étape.
+  `description` existait déjà mais c'est le texte **commercial**, celui que lit
+  le client sur le site. Les mélanger obligerait à choisir entre vendre et
+  produire.
+- `recettes.poids_portion_g` — le grammage **servi**. Sans lui, une fiche dit
+  ce qu'on MET DEDANS mais pas ce qu'on SERT : deux assiettes faites des mêmes
+  ingrédients peuvent coûter du simple au double. C'est précisément là que les
+  marges se perdent, et c'est invisible dans une recette.
+
+**`/print/fiche-technique/[id]`** — A4 noir sur blanc, lisible à un mètre,
+avec un lien depuis chaque fiche produit. Une fiche qui vit dans un écran
+d'admin n'est pas respectée : personne ne déverrouille une tablette entre deux
+services pour vérifier un grammage. Elle est respectée punaisée au-dessus du
+plan de travail.
+
+⚠️ Elle porte les DEUX moitiés du sujet — les quantités et le coût. Les
+séparer, c'est laisser le cuisinier ignorer l'effet de sa main et le gérant
+ignorer pourquoi sa marge glisse.
+
+⚠️ Elle **dit ce qui manque** plutôt que de paraître complète : « aucune
+composition saisie », « méthode non renseignée », « allergènes non vérifiés ».
+Le lien reste ouvert en lecture seule — c'est justement le document qu'on
+consulte sans rien modifier.
+
+⚠️ **Le Fournil reste en achat-revente** : un croissant surgelé n'a pas de
+fiche technique, il a un prix d'achat. Ces colonnes servent aux **19 produits
+assemblés** (sandwichs, paninis, salades, pizzas) et à la carte du restaurant
+et de la pizzeria. Ne pas relancer la saisie des 90 compositions du Fournil.
+
+Test : `PORT=3000 node scripts/test-fiches-techniques.mjs` — 18 assertions.
+⚠️ Il RECOPIE les seuils de `foodCost.ts` ; modifier les deux ensemble.
+
 ### La route vers la gérance — trois paliers (28/08/2026)
 
 Il manquait une **trajectoire**. Les cinq guides « Manageuse » sont un parcours
@@ -2267,6 +2319,7 @@ node scripts/acces-ambre.mjs                   # accès manageuse (essai à blan
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
 PORT=3000 node scripts/test-visite-guidee.mjs  # visite guidée (contrat d'accompagnement)
 node scripts/test-paliers-gerance.mjs          # paliers de gérance + co-gérant en lecture
+PORT=3000 node scripts/test-fiches-techniques.mjs # fiches techniques + « coût inconnu »
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
