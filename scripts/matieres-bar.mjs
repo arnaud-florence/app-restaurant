@@ -98,6 +98,12 @@ const COMPOSITES = {
   'Picon bière':  'bière pression + Picon',
   'Diabolo':      'sirop + limonade',
   'Alcool + soft':'spiritueux + soda',
+  // Pastis de couleur et rosé pamplemousse (21/09/2026)
+  'Mauresque':    'pastis + sirop d\'orgeat',
+  'Tomate':       'pastis + sirop de grenadine',
+  'Perroquet':    'pastis + sirop de menthe',
+  'Rosé pamplemousse': 'vin rosé + sirop de pamplemousse',
+  'Planteur':     'rhum ambré + jus d\'ananas + nectar d\'orange + grenadine',
 }
 
 // Ambigu tant que le gérant n'a pas tranché : un pichet ne dit pas sa couleur.

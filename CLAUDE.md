@@ -2081,6 +2081,16 @@ Rivesaltes 1 L (Lunel en rupture), **vin au verre en BIB 10 L** (3 €/L, moins
 de la moitié de la bouteille la moins chère), sirops Teisseire, limonade
 Phénix, Perrier VC. Ce sont des choix de départ, **à confirmer par le gérant**.
 
+**Audit du 21/09/2026** (55 alternatives mesurées, données locales
+`data/france-boissons-audit-2026-09-21.json`, gitignoré) : prosecco **Scalini
+DOC** au lieu de Perlino (coût du spritz en baisse d'environ 20 %), crème de cassis
+**Giffard** au lieu de Marie Brizard (même prix), **Grant's Triple Wood** et
+**Havana 3 ans** au même coût que William Lawson's et Bacardi. Le reste de la
+sélection est déjà le meilleur rapport qualité-prix. À retenir : le **Heineken
+et le Moretti 30 L n'ont PAS de remise**, le 20 L si — le 20 L est moins cher
+au litre. `couts-france-boissons.mjs` ne repose plus de référence FB sur le vin
+tranquille (`VIN_HORS_FB`).
+
 Le fût passe de 30 L à 20 L : **80 demis, 40 pintes**. Le BIB rend **83,33
 verres** de 12 cl — ⚠️ une première version écrivait 8,33 (coût juste,
 rendement faux ×10), attrapé par `test-matieres-bar.mjs`.
@@ -2131,6 +2141,12 @@ toucher sans revoir le reste déséquilibre le bar. Repère à suivre dès
 l'ouverture : **consommations par heure de présence** (rentable au-dessus de
 15, perdant sous 10, quel que soit le prix).
 
+**Softs en salle à 2,80 €** (21/09/2026) : servis en verre consigné France
+Boissons (taxe soda comprise), ils rapportaient moins que
+le demi à 2,50 €. Seul `prix_sur_place_ttc` change ; les canettes à emporter du
+Fournil restent à 1,80 € et s'achètent chez Eurocash, pas chez France Boissons
+(la canette France Boissons coûte nettement plus cher qu'en cash & carry).
+
 Repère externe mesuré : l'Insee donne le demi à **3,67 €** en moyenne nationale
 (août 2026). Aucun bar des villages voisins ne publie ses prix en ligne ; le
 relevé terrain se fait avec la page « Tournée des comptoirs » (affichage
@@ -2148,15 +2164,89 @@ Page 2 : l'**affichage extérieur obligatoire** (arrêté du 27 mars 1987, art. 
 — café, demi, bière bouteille, jus, soda, eau, apéritif anisé, sandwich, plat
 du jour — en 64 pt, soit des capitales au-delà du minimum légal de 1,5 cm.
 
-⚠️ **Le vin ne vient PAS de France Boissons** (vignoble ou caviste, décision du
-21/09/2026). Les références FB ont été retirées des produits vin ; leurs coûts
-restent un repère (prix FB) jusqu'à la première facture du vrai fournisseur.
-Idem pour la part vin du Kir et du Kir royal, et pour le prosecco du spritz.
+⚠️ **Le vin TRANQUILLE ne vient PAS de France Boissons** — rouge, rosé et blanc
+passent par un vignoble ou un caviste (précisé par le gérant le 21/09/2026).
+Les références FB ont été retirées des verres, pichets et de la bouteille de
+Coteaux Varois ; leurs coûts restent un repère jusqu'à la première facture du
+vrai fournisseur, comme la part vin blanc du Kir. **Le crémant et le prosecco,
+eux, viennent bien de France Boissons** : le crémant garde sa référence et son
+coût réel, le Kir royal et le spritz sont chiffrés juste.
+
+**Bières artisanales en bouteille** (21/09/2026) : deux références de La Rade
+(Toulon) — **Girelle 5°** et **Naïade 6,5°**, 33 cl à **5,00 €** (verre perdu), marge au-dessus
+du demi.
+Pas de blanche (on entre dans l'automne) ; les Esterel étaient en rupture et la
+Bulles de Provence blonde refusée au panier. `node scripts/bieres-artisanales.mjs`.
+
+⚠️ **Les coûts unitaires France Boissons vivent dans
+`data/france-boissons-couts-unitaires-2026-09-21.json`** (gitignoré) : les scripts
+`complements-bar`, `bieres-artisanales` et `fiches-brasserie` le lisent et
+refusent d'écrire sans lui. Aucun prix remisé en clair dans le dépôt, qui est
+public.
+
+**Compléments du bar** (21/09/2026, `node scripts/complements-bar.mjs`) :
+Pastis 51, mauresque / tomate / perroquet (2,80 €), rosé pamplemousse (3,00 €),
+Martini rouge, rhum ambré Negrita, tequila (4 cl et shot 2 cl), jus de tomate,
+et les digestifs du restaurant — limoncello, cognac, amaretto, Baileys, marc de
+Provence, Cointreau. Droits mesurés un par un : le **rhum des DOM** paie des
+droits réduits, le **Martini Rosso** est sous CRD. Un insert groupé PostgREST
+exige les MÊMES clés sur chaque ligne (PGRST102) : écrire `null` plutôt
+qu'omettre. Les pastis de couleur sont des composites déclarés dans
+`matieres-bar.mjs` et `test-matieres-bar.mjs`.
+
+⚠️ **Eazle retire parfois des lignes du panier sans prévenir** (muscat Valauria
+deux fois, Minute Maid pomme une fois, au rechargement de la page). Relire le
+panier ligne par ligne juste avant « Passer ma commande ».
 
 **Ouverture : samedi 3 octobre 2026, inauguration le soir même.** Livraison
 France Boissons **chaque jeudi** (seuls jours proposés par Eazle) : la
 première commande est livrée le jeudi 1er octobre et couvre l'inauguration et
 la semaine jusqu'au jeudi 8.
+
+### Carte de la pizzeria et de la brasserie (21/09/2026)
+
+`node scripts/carte-restaurant.mjs [--ecrire]` — 12 pizzas (PIZZA, famille
+**Pizzeria**) et 19 fiches brasserie (CUISINE : Burger, Plat, Grande salade,
+Planche, Menu), point de vente Restauration (`le-relais-des-saveurs`), TVA 10 %,
+aux prix des affiches. Créées actives : l'activation les tient hors du site
+jusqu'à « Ouvrir le restaurant ». Pizzas vendables en ligne (l'affiche dit
+emporter + livraison), brasserie sur place — le menu public l'affiche « sur
+place uniquement ».
+
+⚠️ **Aucun coût** : ce sont des produits assemblés, le coût viendra de la fiche
+technique. Ils sont en « coût inconnu », et c'est voulu.
+
+⚠️ Familles distinctes de celles du Fournil (« Pizza », « Salade », « Formule »
+y désignent la part à 2,90 € et les formules du matin) : mélanger les deux
+mettrait une pizza à 14,90 € à côté d'une part à emporter sur le même écran de
+caisse.
+
+**Visuels** : `scripts/visuels-carte-restaurant.mjs` découpe les pizzas et le
+menu enfant dans l'affiche (bande nette sur fond flou, 900×675). Les cases de
+la brasserie ne font que 82 px de haut — agrandies elles sont méconnaissables :
+les plats gardent une plaque typographique. Il faut les fichiers HD de
+l'affiche ou de vraies photos.
+
+⚠️ `generer-visuels-sans-photo.mjs` **réécrit `vendable_online`** selon sa règle
+de famille : lancé après une création, il a remis la brasserie en ligne. Le
+relancer impose de revérifier ce drapeau. Il écrivait aussi « b-uf » pour
+« bœuf » (le `œ` ne se décompose pas en NFD) — corrigé.
+
+**Fiches techniques des pizzas** (`node scripts/fiches-pizzas.mjs`) : 12 fiches
+remplies — composition au gramme sur le pâton Gineys, méthode pas à pas (ce
+qui passe au four et ce qui se pose APRÈS : roquette, jambon cru, burrata),
+poids assemblé. 25 ingrédients créés (famille « Pizzeria », `stocke = false`) :
+prix Gineys quand l'unité colle, sinon **estimation** marquée dans
+`fournisseur_principal`. Leur nom porte l'unité (« Roquette (kg) ») pour que le
+rapprochement des factures — qui cherche le nom de l'ingrédient DANS la ligne —
+n'y écrive jamais un prix à la barquette. Food cost 18 à 26 %, 32 % pour la
+signature (burrata).
+
+**Fiches techniques de la brasserie** (`node scripts/fiches-brasserie.mjs`) :
+18 plats remplis, même contrat que les pizzas (27 ingrédients de plus, famille
+« Restaurant »). La **formule n'a pas de composition**, et c'est voulu : elle
+sert le plat choisi avec SA fiche ; la chiffrer sur un plat fixe mentirait pour
+les trois autres. Au-dessus de 32 % : les planches (32-33 %). La salade burrata est passée de 37 à 31 % en retirant la coppa (un seul jambon).
 
 ### La carte du bar (0144, 28 août 2026)
 

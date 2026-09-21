@@ -64,8 +64,8 @@ const L = {
   blanc:   litre('vin blanc BIB 10L', 10),
   rouge:   litre('vin rouge BIB 10L', 10),
   cremant: litre('Crémant Loire 75', 4.5),        // carton de 6 × 75 cl
-  prosecco:litre('Prosecco Perlino 75', 4.5),
-  cassis:  litre('Crème cassis MB 1L', 1),
+  prosecco:litre('Prosecco Scalini 75', 4.5),      // audit 21/09 : Scalini DOC plutôt que Perlino
+  cassis:  litre('Crème cassis Giffard 1L', 1),   // audit 21/09 : même prix, meilleure crème
   aperol:  litre('Aperol 1L', 1),
   picon:   litre('Picon bière 1L', 1),
   sirop:   litre('sirop grenadine Teiss', 1),
@@ -92,11 +92,13 @@ const PLAN = [
   ['Crémant 75 cl',           achat('Crémant Loire 75') / 6, 'Crémant Monmousseau 75 cl', 1, 'Crémant Loire 75'],
 
   // ── Spiritueux, dose de 4 cl ─────────────────────────────────────────
-  ['Whisky 4 cl',          achat('whisky WL 70cl') / 17.5, "William Lawson's 70 cl", 17.5, 'whisky WL 70cl'],
+  // Audit du 21/09 : Grant's Triple Wood et Havana 3 ans au même coût que
+  // William Lawson's et Bacardi, pour une meilleure image au comptoir.
+  ['Whisky 4 cl',          achat('whisky Grants TW 70cl') / 17.5, "Grant's Triple Wood 70 cl", 17.5, 'whisky Grants TW 70cl'],
   ['Whisky premium 4 cl',  achat('whisky JD 70cl') / 17.5, "Jack Daniel's 70 cl", 17.5, 'whisky JD 70cl'],
   ['Vodka 4 cl',           achat('vodka Smirnoff 70') / 17.5, 'Smirnoff 70 cl', 17.5, 'vodka Smirnoff 70'],
   ['Gin 4 cl',             achat('gin Gordons 70') / 17.5, "Gordon's 70 cl", 17.5, 'gin Gordons 70'],
-  ['Rhum 4 cl',            achat('rhum Bacardi 70') / 17.5, 'Bacardi 70 cl', 17.5, 'rhum Bacardi 70'],
+  ['Rhum 4 cl',            achat('rhum Havana 3 70') / 17.5, 'Havana Club 3 ans 70 cl', 17.5, 'rhum Havana 3 70'],
   ['Digestif 4 cl',        achat('digestif Get27 70') / 17.5, 'Get 27 70 cl', 17.5, 'digestif Get27 70'],
 
   // ── Apéritifs ────────────────────────────────────────────────────────
@@ -136,6 +138,8 @@ const PLAN = [
   ['Diabolo',     L.limonade * 0.23 + L.sirop * 0.02, null, null, null, '23 cl limonade + 2 cl sirop'],
 ]
 
+const VIN_HORS_FB = new Set(['vin rosé BIB 10L', 'vin blanc BIB 10L', 'vin rouge BIB 10L', 'Coteaux Varois rosé 75'])
+
 const bar = await sb('recettes?select=id,nom,prix_vente_ht,tva,cout_achat_ht,nom_matiere,unites_par_achat,reference_fournisseur&tag_destination=eq.BAR&actif=eq.true')
 const parNom = new Map(bar.map(r => [r.nom, r]))
 
@@ -162,7 +166,11 @@ for (const [nom, cout, matiere, parAchat, source, remarque] of PLAN) {
   // factures (0142) : la première facture scannée se rattachera toute seule.
   // Plusieurs produits peuvent la porter — le demi ET la pinte sortent du
   // même fût, chacun avec son `unites_par_achat`.
-  if (source && matiere) maj.reference_fournisseur = ref(source)
+  // ⚠️ Le vin TRANQUILLE ne vient pas de France Boissons (vignoble ou caviste,
+  // 21/09/2026) : son coût FB reste un repère, mais sa référence ne doit pas
+  // être reposée — la première facture du vrai fournisseur ne s'y rattacherait
+  // jamais.
+  if (source && matiere && !VIN_HORS_FB.has(source)) maj.reference_fournisseur = ref(source)
   await sb('recettes?id=eq.' + r.id, { method: 'PATCH', body: JSON.stringify(maj) })
   ecrits++
 }

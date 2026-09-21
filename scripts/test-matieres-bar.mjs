@@ -30,7 +30,8 @@ const bar = await q('recettes?select=nom,categorie,nom_matiere,unites_par_achat,
 
 // Ces produits mélangent deux matières : les rattacher à une seule en
 // oublierait l'autre, qui sortirait du stock sans que rien ne le signale.
-const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière', 'Diabolo', 'Alcool + soft']
+const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière', 'Diabolo', 'Alcool + soft',
+  'Mauresque', 'Tomate', 'Perroquet', 'Rosé pamplemousse', 'Planteur']
 const A_TRANCHER = ['Pichet 25 cl', 'Pichet 50 cl']
 
 console.log('\n── couverture ──')
@@ -52,7 +53,7 @@ const par = Object.fromEntries(bar.map(r => [r.nom, r]))
 const attendus = [
   ['Demi pression',       'Fût Moretti 20 L',   80,    '20 L / 25 cl'],
   ['Pinte pression',      'Fût Moretti 20 L',   40,    '20 L / 50 cl'],
-  ['Whisky 4 cl',         "William Lawson's 70 cl", 17.5, '70 cl / 4 cl'],
+  ['Whisky 4 cl',         "Grant's Triple Wood 70 cl", 17.5, '70 cl / 4 cl'],
   // ⚠️ 83,33 et pas 8,33 : 10 L = 1000 cl. Une première version écrivait
   // 8,33 — coût juste, rendement faux ×10. C'est cette ligne qui l'a vu.
   ['Verre de rosé 12 cl', 'Vin rosé BIB 10 L',  83.33, '10 L / 12 cl'],

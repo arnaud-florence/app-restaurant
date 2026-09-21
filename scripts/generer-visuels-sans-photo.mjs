@@ -64,7 +64,7 @@ const OR = '#e8b86d', OR_PALE = '#c9a15c'
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const taille = nom => (nom.length <= 9 ? 78 : nom.length <= 14 ? 62 : nom.length <= 20 ? 50 : 42)
 
-const slug = nom => nom.toLowerCase().normalize('NFD')
+const slug = nom => nom.toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD')
   .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 /** Sépare « Pago pomme 33 cl » en titre et format. */

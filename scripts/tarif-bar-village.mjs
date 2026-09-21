@@ -53,6 +53,22 @@ const GRILLE = {
   'Bouteille Coteaux Varois': 20.00,
 }
 
+// Softs servis EN SALLE, en verre consigné France Boissons (21/09/2026), taxe
+// soda comprise. À 2,50 € la plupart rapportaient MOINS que le demi. À 2,80 € : même prix que le
+// demi, le Perrier et le diabolo — rien de plus cher que lui. Le prix à
+// emporter (canette du Fournil, 1,80 €) ne bouge pas : seul le sur place change.
+const SUR_PLACE = Object.fromEntries([
+  'Coca-Cola 33 cl', 'Coca-Cola Zéro 33 cl', 'Coca-Cola Cherry 33 cl', 'Orangina 33 cl',
+  'Fanta 33 cl', 'Oasis 33 cl', 'Ice Tea 33 cl', 'Ciao 33 cl', "Jus d'orange 33 cl",
+  'Jus de pomme 33 cl', 'Pago pomme 33 cl', 'Pago orange 33 cl',
+].map(n => [n, 2.80]))
+// Eaux en salle (21/09/2026) : Cristaline 50 cl (bouteille plastique) en
+// attendant l'ouverture de la San Benedetto au compte ; San Pellegrino 50 cl en
+// verre consigné. À 2,00 / 2,20 € elles rapportaient moins
+// que le demi. La plate reste la boisson fraîche la moins chère de la carte.
+SUR_PLACE['Eau plate 50 cl'] = 2.50
+SUR_PLACE['Eau gazeuse 50 cl'] = 2.80
+
 const bar = await (await fetch(U + '/rest/v1/recettes?select=id,nom,tva,prix_vente_ht,prix_sur_place_ttc,cout_achat_ht&tag_destination=eq.BAR&actif=eq.true', { headers: H })).json()
 const parNom = new Map(bar.map(r => [r.nom, r]))
 const f2 = n => n.toFixed(2).replace('.', ',')
@@ -73,6 +89,19 @@ for (const [nom, ttc] of Object.entries(GRILLE)) {
 if (ECRIRE) for (const x of aEcrire)
   await fetch(U + '/rest/v1/recettes?id=eq.' + x.id, { method: 'PATCH', headers: H, body: JSON.stringify({ prix_vente_ht: x.ht }) })
 
+const softs = await (await fetch(U + '/rest/v1/recettes?select=id,nom,tva,prix_vente_ht,prix_sur_place_ttc&actif=eq.true&prix_sur_place_ttc=not.is.null', { headers: H })).json()
+const parNomSP = new Map(softs.map(r => [r.nom, r]))
+const spEcrire = []
+for (const [nom, ttc] of Object.entries(SUR_PLACE)) {
+  const r = parNomSP.get(nom)
+  if (!r) { console.log('  ⚠️ introuvable (sur place) : ' + nom); continue }
+  if (Math.abs(Number(r.prix_sur_place_ttc) - ttc) < 0.005) { console.log(`  = ${nom.padEnd(26)} sur place ${f2(ttc)} € (inchangé)`); continue }
+  console.log(`  ${nom.padEnd(28)} sur place ${f2(Number(r.prix_sur_place_ttc)).padStart(6)} → ${f2(ttc).padStart(6)} €`)
+  spEcrire.push({ id: r.id, nom, ttc })
+}
+if (ECRIRE) for (const x of spEcrire)
+  await fetch(U + '/rest/v1/recettes?id=eq.' + x.id, { method: 'PATCH', headers: H, body: JSON.stringify({ prix_sur_place_ttc: x.ttc }) })
+
 // ── Caisse Zelty ──────────────────────────────────────────────────────
 console.log(`\n── ${ECRIRE ? 'ÉCRITURE' : 'ESSAI À BLANC'} — caisse Zelty ──\n`)
 const plats = (await (await fetch('https://api.zelty.fr/2.11/catalog/dishes?show_all=true&lang=fr&limit=0', { headers: { Authorization: `Bearer ${Z}` } })).json()).dishes ?? []
@@ -90,8 +119,19 @@ for (const [nom, ttc] of Object.entries(GRILLE)) {
   corps.push({ id: p.id, name: p.name, price: salle, price_togo: comptoir, tax: p.tax, tax_takeaway: p.tax_takeaway })
   console.log(`  ${nom.padEnd(28)} ${f2((p.price ?? 0) / 100).padStart(6)} → ${f2(salle / 100).padStart(6)} €`)
 }
+// Sur place : seul `price` (salle) change ; `price_togo` est recopié tel quel.
+for (const [nom, ttc] of Object.entries(SUR_PLACE)) {
+  const r = parNomSP.get(nom); if (!r) continue
+  const p = parRemote.get(String(r.id))
+  if (!p) { refus.push(`${nom} : absent de la caisse`); continue }
+  if (p.name == null || p.price == null || p.tax == null) { refus.push(`${nom} : champ obligatoire manquant — refus`); continue }
+  const salle = Math.round(ttc * 100)
+  if (p.price === salle) continue
+  corps.push({ id: p.id, name: p.name, price: salle, price_togo: p.price_togo, tax: p.tax, tax_takeaway: p.tax_takeaway })
+  console.log(`  ${nom.padEnd(28)} salle ${f2((p.price ?? 0) / 100).padStart(6)} → ${f2(salle / 100).padStart(6)} € · emporter ${f2((p.price_togo ?? 0) / 100)} € inchangé`)
+}
 if (refus.length) { console.log('\n  refusés :'); refus.forEach(l => console.log('   ' + l)) }
-console.log(`\n  outil : ${aEcrire.length} prix · caisse : ${corps.length} plats`)
+console.log(`\n  outil : ${aEcrire.length + spEcrire.length} prix · caisse : ${corps.length} plats`)
 if (!ECRIRE) { console.log('  (rien écrit — relancer avec --ecrire)\n'); process.exit(0) }
 if (corps.length) {
   // Un seul appel groupé : Zelty limite le débit et renvoie des 429 dès la
