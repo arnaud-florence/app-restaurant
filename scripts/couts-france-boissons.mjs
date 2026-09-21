@@ -83,8 +83,8 @@ const PLAN = [
 
   // ── Bouteilles, à l'unité (le colisage viendra de la facture, C=N) ─────
   ['Bière bouteille 33 cl',   achat('bière Heineken VC33') / 24, 'Heineken VC 33 cl', 1, 'bière Heineken VC33'],
-  ['Bière sans alcool 25 cl', achat('sans alcool Hnk 0.0 33') / 24, 'Heineken 0.0 33 cl', 1, 'sans alcool Hnk 0.0 33',
-    'le produit s\'appelle 25 cl mais seul le 33 cl est disponible pour votre compte'],
+  ['Bière sans alcool 33 cl', achat('sans alcool Hnk 0.0 33') / 24, 'Heineken 0.0 33 cl', 1, 'sans alcool Hnk 0.0 33',
+    'renommé 33 cl le 21/09 — seul format disponible chez France Boissons'],
   ['Desperados 33 cl',        achat('Desperados VC33') / 24, 'Desperados VC 33 cl', 1, 'Desperados VC33'],
   ['Perrier 33 cl',           achat('Perrier VC 33') / 24, 'Perrier VC 33 cl', 1, 'Perrier VC 33'],
   ['Limonade 25 cl',          achat('limonade Phénix FB VC25') / 24, 'Limonade Phénix VC 25 cl', 1, 'limonade Phénix FB VC25'],

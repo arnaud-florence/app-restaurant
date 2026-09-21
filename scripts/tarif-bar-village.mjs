@@ -45,7 +45,7 @@ const GRILLE = {
   'Bière bouteille 33 cl': 4.00,
   'Desperados 33 cl': 4.50,
   // Payer une bière SANS alcool plus cher qu'un demi choque le client.
-  'Bière sans alcool 25 cl': 3.20,
+  'Bière sans alcool 33 cl': 3.20,
   'Perrier 33 cl': 2.80,
   'Limonade 25 cl': 2.50,
   'Diabolo': 2.80,

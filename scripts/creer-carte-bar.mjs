@@ -31,7 +31,7 @@ const BAR = [
   ['Picon bière',              'Bière',   3.20, 20, A, 0.70],
   ['Bière bouteille 33 cl',    'Bière',   3.00, 20, A, 1.00],
   ['Desperados 33 cl',         'Bière',   4.00, 20, A, 1.40],
-  ['Bière sans alcool 25 cl',  'Bière',   2.80, 10, S, 0.80],
+  ['Bière sans alcool 33 cl',  'Bière',   2.80, 10, S, 0.80],
 
   ['Pastis 2 cl',              'Apéritif',2.50, 20, A, 0.45],
   ['Martini 4 cl',             'Apéritif',3.00, 20, A, 0.70],
