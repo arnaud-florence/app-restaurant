@@ -2136,6 +2136,28 @@ Repère externe mesuré : l'Insee donne le demi à **3,67 €** en moyenne natio
 relevé terrain se fait avec la page « Tournée des comptoirs » (affichage
 extérieur obligatoire, arrêté du 27 mars 1987, art. 2).
 
+### Carte des boissons imprimable — `/print/carte-bar`
+
+Tirée de la base à chaque ouverture : un prix changé dans l'outil (donc dans la
+caisse) change la carte. Une carte tapée à la main finit toujours par afficher
+un autre prix que le ticket — et c'est le prix AFFICHÉ que le client est en
+droit de payer. Prix = `prix_sur_place_ttc` s'il existe (verre consigné), sinon
+le prix de vente : c'est ce que paie le client assis.
+
+Page 2 : l'**affichage extérieur obligatoire** (arrêté du 27 mars 1987, art. 2)
+— café, demi, bière bouteille, jus, soda, eau, apéritif anisé, sandwich, plat
+du jour — en 64 pt, soit des capitales au-delà du minimum légal de 1,5 cm.
+
+⚠️ **Le vin ne vient PAS de France Boissons** (vignoble ou caviste, décision du
+21/09/2026). Les références FB ont été retirées des produits vin ; leurs coûts
+restent un repère (prix FB) jusqu'à la première facture du vrai fournisseur.
+Idem pour la part vin du Kir et du Kir royal, et pour le prosecco du spritz.
+
+**Ouverture : samedi 3 octobre 2026, inauguration le soir même.** Livraison
+France Boissons **chaque jeudi** (seuls jours proposés par Eazle) : la
+première commande est livrée le jeudi 1er octobre et couvre l'inauguration et
+la semaine jusqu'au jeudi 8.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
