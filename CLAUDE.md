@@ -2029,6 +2029,86 @@ facture scannée se rattache au lieu de produire 25 lignes orphelines.
 
 Test : `PORT=3000 node scripts/test-matieres-bar.mjs` — 24 assertions.
 
+### Coûts réels du bar — relevé France Boissons (21/09/2026)
+
+Les coûts du bar étaient les estimations qui avaient servi à bâtir la carte.
+Ils sont remplacés par ce que France Boissons facture vraiment à CASATASIA,
+relevé sur l'espace pro **Eazle** (`eazle.france-boissons.fr`) en simulant la
+commande. Données brutes : `data/france-boissons-releve-2026-09-21.json`
+(34 références) — ⚠️ **hors dépôt, gitignoré** : ce sont des conditions
+NÉGOCIÉES, et le dépôt est public. Le script les lit sur le poste.
+Écriture : `node scripts/couts-france-boissons.mjs [--ecrire]`.
+
+⚠️ **Prix REMISÉ, jamais le tarif.** Le tarif de la fiche produit est le prix
+public pro ; la remise du contrat n'apparaît qu'à la **simulation** du panier,
+à côté de la quantité. Elle est importante et **inégale selon la marque** —
+certaines références n'en ont aucune. Calculer sur le tarif aurait faussé tout
+le bar. (Taux par marque : dans le relevé local, pas ici.)
+
+⚠️ **Les droits d'accises sont un COÛT**, non récupérable comme la TVA. Sur un
+spiritueux ils pèsent **autant ou plus que le prix remisé de la bouteille**.
+Le site ne les détaille pas par ligne, seulement
+le total : ils ont été isolés en ajoutant les produits **un par un** et en
+lisant l'écart du total à chaque simulation. La cohérence valide la méthode —
+6,70 € pour toute 70 cl à 37,5°, 7,15 € à 40°, 10,22 € pour 1 L à 40°.
+
+⚠️ Sous **capsule CRD** (Martini, Suze), les droits sont DÉJÀ dans le prix :
+0 € de droits est correct. La **consigne** (fûts, verre consigné) n'est pas un
+coût. La limonade porte une taxe soda (2,14 € la caisse) : c'est un coût.
+
+**Mécanique d'Eazle**, pour le prochain relevé : la recherche
+(`/recherche?query=`) embarque un bloc `.algolia-output` en JSON — nom ERP
+exact avec contenance et degré, et **allergènes** du fournisseur. Ajout
+`POST /cart/add` (`colisage=c<ref 18 chiffres><unité>`), simulation
+`POST /profil/cart/details` (`simulate=1`), retrait `POST /cart/remove`. Tout
+changement de panier **annule** la simulation.
+
+⚠️ Après simulation, le bouton devient **« Passer ma commande »**. Ne jamais y
+toucher lors d'un relevé.
+
+⚠️ **Un produit refusé (rupture, référence non ouverte au compte) reste
+accroché au panier sans s'afficher**, visible seulement dans `/cart/preview`.
+Les retirer un par un. Et vérifier le panier du gérant avant ET après : un
+relevé ne doit rien laisser derrière lui — le fût Moretti qu'il y avait mis a
+dû être remis à la main.
+
+**Choix de références** (une par matière) : fût **Moretti 20 L** (celui que
+le gérant avait au panier — Pelforth 30 L revient au même prix au litre,
+Heineken 30 L coûte nettement plus faute de remise), Affligem ambrée 20 L,
+Heineken VC 33 cl, William Lawson's, Jack Daniel's, Smirnoff, Gordon's,
+Bacardi, Get 27, Ricard, Martini Bianco, Picon, Suze, porto tawny, muscat de
+Rivesaltes 1 L (Lunel en rupture), **vin au verre en BIB 10 L** (3 €/L, moins
+de la moitié de la bouteille la moins chère), sirops Teisseire, limonade
+Phénix, Perrier VC. Ce sont des choix de départ, **à confirmer par le gérant**.
+
+Le fût passe de 30 L à 20 L : **80 demis, 40 pintes**. Le BIB rend **83,33
+verres** de 12 cl — ⚠️ une première version écrivait 8,33 (coût juste,
+rendement faux ×10), attrapé par `test-matieres-bar.mjs`.
+
+Les **composites** sont chiffrés sur des doses standard écrites dans le script
+(Kir 12 + 2 cl, Spritz 6 + 9 + 3 cl…) : c'est une recette, pas une estimation ;
+l'écart de service se lit dans la démarque. Les pichets ont un coût (les trois
+BIB coûtent 2,99 à 3,04 €/L, juste au centime) mais pas de matière — la
+couleur n'est pas tranchée. « Alcool + soft » reste hors calcul.
+
+`reference_fournisseur` porte la référence France Boissons sur 26 produits :
+elle passe AVANT le libellé au rapprochement des factures (0142), et plusieurs
+produits peuvent la partager (le demi et la pinte sortent du même fût).
+
+⚠️ **CE QUE LE RELEVÉ A MONTRÉ : la bière et les softs sont vendus trop bas.**
+Demi 44 %, pinte 49 %, bière bouteille 60 %, Coteaux Varois en bouteille 60 %,
+Perrier 41 %, limonade 38 %. Les spiritueux (17-23 %), les apéritifs
+(14-22 %) et le vin au verre (15 %) sont, eux, très rentables. La carte de la
+0144 avait été posée sur des coûts estimés deux fois trop bas pour la pression.
+
+⚠️ **POINT DE VIGILANCE — la première facture France Boissons.** La
+propagation des prix facture → produits divise le prix de LIGNE par le
+conditionnement. Si la facture porte les droits sur une ligne séparée (ce qui
+est probable), la propagation écrira un coût **sans les droits** et écrasera
+les coûts justes posés ici — le coût du pastis serait divisé par plus de deux,
+sans erreur. Au premier scan : relire les coûts du bar, et traiter les droits
+dans la propagation si besoin.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
@@ -2334,6 +2414,7 @@ PORT=3000 node scripts/test-zelty-import.mjs   # import initial de la carte (san
 PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test local)
 PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
 PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
+node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse

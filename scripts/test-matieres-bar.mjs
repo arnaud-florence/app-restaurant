@@ -46,12 +46,17 @@ T(orphelins.length === 0,
 
 console.log('\n── les rendements sont arithmétiques ──')
 const par = Object.fromEntries(bar.map(r => [r.nom, r]))
+// Matières RÉELLES depuis le relevé France Boissons du 21/09/2026
+// (scripts/couts-france-boissons.mjs) : le fût est un Moretti de 20 L, le vin
+// au verre sort d'un bag-in-box de 10 L.
 const attendus = [
-  ['Demi pression',       'Fût de blonde 30 L', 120, '30 L / 25 cl'],
-  ['Pinte pression',      'Fût de blonde 30 L',  60, '30 L / 50 cl'],
-  ['Whisky 4 cl',         'Whisky 70 cl',      17.5, '70 cl / 4 cl'],
-  ['Verre de rosé 12 cl', 'Vin rosé 75 cl',       6, '75 cl / 12 cl'],
-  ['Pastis 2 cl',         'Pastis 1 L',          50, '1 L / 2 cl'],
+  ['Demi pression',       'Fût Moretti 20 L',   80,    '20 L / 25 cl'],
+  ['Pinte pression',      'Fût Moretti 20 L',   40,    '20 L / 50 cl'],
+  ['Whisky 4 cl',         "William Lawson's 70 cl", 17.5, '70 cl / 4 cl'],
+  // ⚠️ 83,33 et pas 8,33 : 10 L = 1000 cl. Une première version écrivait
+  // 8,33 — coût juste, rendement faux ×10. C'est cette ligne qui l'a vu.
+  ['Verre de rosé 12 cl', 'Vin rosé BIB 10 L',  83.33, '10 L / 12 cl'],
+  ['Pastis 2 cl',         'Ricard 1 L',         50,    '1 L / 2 cl'],
 ]
 for (const [nom, mat, n, calcul] of attendus) {
   const r = par[nom]
@@ -61,7 +66,7 @@ for (const [nom, mat, n, calcul] of attendus) {
 }
 
 console.log('\n── un fût nourrit DEUX contenances ──')
-const surFut = rattaches.filter(r => r.nom_matiere === 'Fût de blonde 30 L')
+const surFut = rattaches.filter(r => r.nom_matiere === 'Fût Moretti 20 L')
 T(surFut.length >= 2,
   `${surFut.length} produits tirent du même fût — c'est le cas du filter, pas du find`,
   'n\'en rattacher qu\'un laisserait l\'autre sans savoir d\'où vient son coût')
@@ -95,7 +100,7 @@ if (PORT) {
   const champs = h => (h.match(/type="number"/g) ?? []).length
   T(champs(barPage) >= 25, `${champs(barPage)} lignes à compter au bar`)
   T(champs(fournil) > champs(barPage), `le Fournil garde ses ${champs(fournil)} lignes`)
-  T(barPage.includes('Fût de blonde') && !fournil.includes('Fût de blonde'),
+  T(barPage.includes('Fût Moretti') && !fournil.includes('Fût Moretti'),
     'le fût est au bar et NULLE PART ailleurs',
     'mélanger les deux postes rallongerait le comptage du matin pour rien')
   T(!barPage.includes('Kir</') , 'aucun cocktail dans les lignes de stock',
