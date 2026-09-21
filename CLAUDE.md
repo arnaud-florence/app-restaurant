@@ -2223,9 +2223,14 @@ caisse.
 
 **Visuels** : `scripts/visuels-carte-restaurant.mjs` découpe les pizzas et le
 menu enfant dans l'affiche (bande nette sur fond flou, 900×675). Les cases de
-la brasserie ne font que 82 px de haut — agrandies elles sont méconnaissables :
-les plats gardent une plaque typographique. Il faut les fichiers HD de
-l'affiche ou de vraies photos.
+la brasserie ne font que 82 px de haut — agrandies elles sont méconnaissables.
+Les 18 plats ont donc des photos **générées** (image.pollinations.ai, sans
+compte : modèle simple, filigrane retiré au recadrage) —
+`scripts/photos-brasserie.mjs` les met au format 900×675 sous le nom des
+plaques qu'elles remplacent. Ce sont des illustrations : les vraies photos des
+assiettes les remplaceront, sans changer les URL. Contrôler chaque image à
+l'œil : 4 sur 18 étaient hors sujet au premier tirage (camembert rendu en pain,
+carpaccio sans bœuf…) et ont été régénérées.
 
 ⚠️ `generer-visuels-sans-photo.mjs` **réécrit `vendable_online`** selon sa règle
 de famille : lancé après une création, il a remis la brasserie en ligne. Le
