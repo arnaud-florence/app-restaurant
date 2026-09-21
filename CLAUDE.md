@@ -2248,6 +2248,28 @@ signature (burrata).
 sert le plat choisi avec SA fiche ; la chiffrer sur un plat fixe mentirait pour
 les trois autres. Au-dessus de 32 % : les planches (32-33 %). La salade burrata est passée de 37 à 31 % en retirant la coppa (un seul jambon).
 
+### Services du restaurant et aperçu des cartes (22/09/2026)
+
+**`src/lib/services-restaurant.ts`** — la règle du gérant, source unique :
+brasserie le MIDI 7j/7, pizzeria le SOIR 7j/7, les DEUX le vendredi et le
+samedi soir. Heures de départ midi 12h-14h30, soir 19h-22h, à ajuster dans ce
+seul fichier. Servie au site par `/api/public/activation` (`services`) ; la
+page Contact du site l'affiche au lieu de son ancien texte en dur (« pizzas en
+continu »).
+
+**Aperçu** : un module éteint, en `teaser`, AVEC `date_ouverture_prevue`, voit
+sa carte publiée par `/api/public/menu` — photos, prix, descriptions — mais
+**jamais commandable** (`vendable_online` forcé à false, `bientot` = date).
+Une commande en ligne sur une cuisine fermée serait une vraie commande que
+personne ne préparerait. Brasserie et pizzeria sont en aperçu jusqu'au
+3 octobre ; « Ouvrir le restaurant » les bascule en carte normale.
+
+⚠️ **`PDV_PAR_MODULE` ne connaissait pas `restaurant_salle` ni `pizzeria`** :
+le bouton d'ouverture allumait les modules sans jamais allumer l'établissement
+« Restauration », et la carte publique (qui filtre sur `etablissements.actif`)
+serait restée VIDE le jour de l'ouverture. Corrigé ; et éteindre l'un des deux
+ne ferme plus l'établissement si l'autre tourne encore.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,

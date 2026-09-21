@@ -109,6 +109,13 @@ export const TAGS_PAR_MODULE: Partial<Record<ModuleCle, string[]>> = {
 
 /** Slugs `etablissements` couverts par chaque module. */
 export const PDV_PAR_MODULE: Partial<Record<ModuleCle, string[]>> = {
+  // ⚠️ La brasserie ET la pizzeria vendent sous le même point de vente
+  // « Restauration ». Absentes de cette table jusqu'au 22/09/2026 : « Ouvrir le
+  // restaurant » allumait les modules sans jamais allumer l'établissement, et
+  // /api/public/menu — qui filtre sur `etablissements.actif` — aurait servi une
+  // carte VIDE le jour de l'ouverture.
+  restaurant_salle: ['le-relais-des-saveurs'],
+  pizzeria: ['le-relais-des-saveurs'],
   fournil: ['fournil'],
   relais_colis: ['relais-colis'],
   fdj: ['fdj'],
@@ -139,6 +146,30 @@ export function tagsActifs(etat: EtatActivation): string[] {
     if (etat[cle as ModuleCle]) list.forEach(t => tags.add(t))
   }
   return [...tags]
+}
+
+/** Tags en APERÇU : modules éteints, en teaser, avec une date d'ouverture
+ *  posée. Leur carte se montre sur le site — pour donner envie avant
+ *  l'ouverture — mais n'est JAMAIS commandable : une commande en ligne sur une
+ *  cuisine fermée serait une vraie commande, que personne ne préparerait.
+ *  Sans date, un teaser reste un simple bandeau « ouverture prochainement ». */
+export function tagsApercu(modules: ModuleActivation[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const m of modules) {
+    if (m.actif || !m.teaser || !m.date_ouverture_prevue) continue
+    for (const t of TAGS_PAR_MODULE[m.cle as ModuleCle] ?? []) out[t] = m.date_ouverture_prevue
+  }
+  return out
+}
+
+/** Points de vente des modules en aperçu (même règle que tagsApercu). */
+export function pdvApercu(modules: ModuleActivation[]): string[] {
+  const out = new Set<string>()
+  for (const m of modules) {
+    if (m.actif || !m.teaser || !m.date_ouverture_prevue) continue
+    for (const s of PDV_PAR_MODULE[m.cle as ModuleCle] ?? []) out.add(s)
+  }
+  return [...out]
 }
 
 /** true si la route est éteinte par un module inactif. */

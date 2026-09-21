@@ -60,8 +60,17 @@ async function syncPointsDeVente(
   cle: ModuleCle,
   actif: boolean,
 ) {
-  const slugs = PDV_PAR_MODULE[cle]
-  if (!slugs || slugs.length === 0) return
+  let slugs = PDV_PAR_MODULE[cle] ?? []
+  if (slugs.length === 0) return
+  // Un point de vente peut servir plusieurs modules (Restauration = brasserie
+  // + pizzeria). En éteindre un ne doit pas fermer l'établissement si l'autre
+  // tourne encore — sinon couper la pizzeria viderait aussi la brasserie.
+  if (!actif) {
+    const { data: allumes } = await sb.from('activites_modules').select('cle').eq('actif', true).neq('cle', cle)
+    const encoreUtiles = new Set((allumes ?? []).flatMap(m => PDV_PAR_MODULE[m.cle as ModuleCle] ?? []))
+    slugs = slugs.filter(s => !encoreUtiles.has(s))
+    if (slugs.length === 0) return
+  }
   await sb.from('etablissements').update({ actif }).in('slug', slugs)
 }
 

@@ -9,7 +9,8 @@
 //     etat:     { fournil: true, chambres: false, ... },   // un booléen par module
 //     teasers:  [ { cle, libelle, emoji, teaser_texte, date_ouverture_prevue } ],
 //     tags:     ['FOURNIL'],                               // tags de carte visibles
-//     livraison:{ communes, heureLimite, heureTournee, minimumTtc, fraisTtc }
+//     livraison:{ communes, heureLimite, heureTournee, minimumTtc, fraisTtc },
+//     services: { horaires, par_tag, phrases }            // qui sert quoi, quand
 //   }
 //
 // ⚠️ En cas d'erreur base, on répond 200 avec le repli « Fournil seul » plutôt
@@ -24,6 +25,7 @@ import {
   etatDepuisModules,
   tagsActifs,
 } from '@/lib/activation/config'
+import { servicesPublics } from '@/lib/services-restaurant'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,6 +56,7 @@ export async function GET(req: Request) {
           fermeture: LIVRAISON_FOURNIL_DEFAUT.fermeture,
         },
         livraison: LIVRAISON_FOURNIL_DEFAUT,
+        services: servicesPublics(),
         repli: true,
       }, { headers: { ...cors, ...cache } })
     }
@@ -77,6 +80,7 @@ export async function GET(req: Request) {
         })),
       tags: tagsActifs(etat),
       livraison,
+      services: servicesPublics(),
       repli: false,
     }, { headers: { ...cors, ...cache } })
   } catch (e) {
@@ -90,6 +94,7 @@ export async function GET(req: Request) {
         fermeture: LIVRAISON_FOURNIL_DEFAUT.fermeture,
       },
       livraison: LIVRAISON_FOURNIL_DEFAUT,
+      services: servicesPublics(),
       repli: true,
     }, { headers: { ...cors, ...cache } })
   }

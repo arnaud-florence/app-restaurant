@@ -13,8 +13,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { tauxTvaVente } from '@/lib/tva'
-import { getActivation } from '@/lib/activation/server'
-import { tagsActifs } from '@/lib/activation/config'
+import { getActivation, getModules } from '@/lib/activation/server'
+import { tagsActifs, tagsApercu, pdvApercu } from '@/lib/activation/config'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,7 +30,14 @@ export async function GET(req: Request) {
   // Tags autorisés = ceux des modules allumés. Si tout est éteint, on renvoie
   // une carte vide plutôt que la carte complète — le repli doit fermer, pas ouvrir.
   const etat = await getActivation()
-  const tags = tagsActifs(etat)
+  const modules = await getModules()
+  const actifs = tagsActifs(etat)
+  // Cartes en aperçu (module éteint, teaser + date d'ouverture) : montrées,
+  // jamais commandables. Un tag déjà actif n'est jamais en aperçu.
+  const apercu = Object.fromEntries(
+    Object.entries(tagsApercu(modules)).filter(([t]) => !actifs.includes(t)),
+  )
+  const tags = [...actifs, ...Object.keys(apercu)]
   if (tags.length === 0) {
     return Response.json({ items: [], count: 0 }, {
       headers: {
@@ -49,7 +56,13 @@ export async function GET(req: Request) {
     .select('id')
     .eq('inclus_ca_principal', true)
     .eq('actif', true)
-  const etabIds = (etabs ?? []).map(e => e.id as string)
+  // Le point de vente d'une carte en aperçu est encore fermé (actif = false) :
+  // on l'ajoute explicitement, sinon l'aperçu sortirait vide.
+  const slugsApercu = pdvApercu(modules)
+  const { data: etabsApercu } = slugsApercu.length
+    ? await sb.from('etablissements').select('id').in('slug', slugsApercu)
+    : { data: [] as Array<{ id: string }> }
+  const etabIds = [...(etabs ?? []), ...(etabsApercu ?? [])].map(e => e.id as string)
 
   let query = sb.from('recettes')
     .select(`
@@ -108,14 +121,17 @@ export async function GET(req: Request) {
       // prix affiché = prix payé, et le site est aligné sur le comptoir.
       prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + tauxTvaVente(r, 'emporter') / 100) * 100) / 100,
       contient_alcool: r.contient_alcool,
-      vendable_online: r.vendable_online,
+      // ⚠️ En aperçu, rien n'est commandable, quel que soit le drapeau du
+      // produit : la cuisine n'est pas ouverte.
+      vendable_online: apercu[r.tag_destination] ? false : r.vendable_online,
+      bientot: apercu[r.tag_destination] ?? null,
       image_url: r.image_url,
       allergenes: Array.from(allergenes).sort(),
     }
   })
 
   return Response.json(
-    { items, count: items.length },
+    { items, count: items.length, apercu },
     {
       headers: {
         ...Object.fromEntries(corsHeaders(req.headers.get('origin'))),
