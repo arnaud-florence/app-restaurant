@@ -1,4 +1,7 @@
 // Tarif du bar — grille « village » validée par le gérant le 21/09/2026.
+// Ajustée le même jour : rien ne doit rapporter moins que le demi (1,42 € HT),
+// et rien ne doit paraître cher À CÔTÉ du demi — c'est lui que le client
+// compare, pas le centilitre.
 //
 // Logique : trois prix font la réputation d'un bar de village — le café,
 // le demi, le pastis. Ils restent bas. La marge se fait sur ce qu'on ne
@@ -34,12 +37,15 @@ const GRILLE = {
   'Demi pression': 2.80,          // « le demi à moins de 3 € » — prix phare
   'Panaché': 2.80,                // aligné sur le demi
   'Monaco': 3.00,
-  'Pinte pression': 5.50,
-  'Demi ambrée': 3.50,
-  'Picon bière': 3.50,
+  // Pinte ≈ 1,86 × le demi : à 5,50 € elle ne valait que 0,10 € de moins que
+  // deux demis, et perdait tout intérêt au comptoir.
+  'Pinte pression': 5.20,
+  'Demi ambrée': 3.30,            // +0,50 € sur la blonde, l'usage
+  'Picon bière': 3.30,
   'Bière bouteille 33 cl': 4.00,
   'Desperados 33 cl': 4.50,
-  'Bière sans alcool 25 cl': 3.50,
+  // Payer une bière SANS alcool plus cher qu'un demi choque le client.
+  'Bière sans alcool 25 cl': 3.20,
   'Perrier 33 cl': 2.80,
   'Limonade 25 cl': 2.50,
   'Diabolo': 2.80,

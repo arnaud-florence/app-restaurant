@@ -2119,7 +2119,9 @@ pas un catalogue vide).
 La logique, validée par le gérant : **trois prix font la réputation d'un bar de
 village — le café (1,40 €), le demi (2,80 €), le pastis (2,50 €).** Ils restent
 bas. La marge se fait sur ce qu'on ne compare pas : bière en bouteille,
-spritz, bouteille de vin à table. Plancher : environ 1,40 € de marge HT par
+spritz, bouteille de vin à table. Plancher : rien ne rapporte moins que le demi (1,42 € HT), et rien ne paraît
+cher À CÔTÉ de lui — pinte 5,20 €, ambrée et Picon bière 3,30 €, sans alcool
+3,20 €. Au-delà, environ 1,40 € de marge HT par
 consommation — en dessous le bar paie pour servir (17,23 €/h chargés ÷ 15
 consos/h = 1,15 € par verre).
 
