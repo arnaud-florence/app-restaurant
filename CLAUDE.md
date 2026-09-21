@@ -2109,6 +2109,31 @@ les coûts justes posés ici — le coût du pastis serait divisé par plus de d
 sans erreur. Au premier scan : relire les coûts du bar, et traiter les droits
 dans la propagation si besoin.
 
+### Le tarif « village » du bar (21/09/2026)
+
+`node scripts/tarif-bar-village.mjs [--ecrire]` — écrit la grille dans l'outil
+ET dans la caisse Zelty (relecture avant écriture, un seul POST groupé,
+arrêt net si la caisse rend moins de 100 plats : c'est une lecture ratée,
+pas un catalogue vide).
+
+La logique, validée par le gérant : **trois prix font la réputation d'un bar de
+village — le café (1,40 €), le demi (2,80 €), le pastis (2,50 €).** Ils restent
+bas. La marge se fait sur ce qu'on ne compare pas : bière en bouteille,
+spritz, bouteille de vin à table. Plancher : environ 1,40 € de marge HT par
+consommation — en dessous le bar paie pour servir (17,23 €/h chargés ÷ 15
+consos/h = 1,15 € par verre).
+
+⚠️ Le demi à 2,80 € laisse 1,42 € HT : il ne paie presque que le service. Il
+tient parce que la pinte, la bouteille et le spritz portent la marge — y
+toucher sans revoir le reste déséquilibre le bar. Repère à suivre dès
+l'ouverture : **consommations par heure de présence** (rentable au-dessus de
+15, perdant sous 10, quel que soit le prix).
+
+Repère externe mesuré : l'Insee donne le demi à **3,67 €** en moyenne nationale
+(août 2026). Aucun bar des villages voisins ne publie ses prix en ligne ; le
+relevé terrain se fait avec la page « Tournée des comptoirs » (affichage
+extérieur obligatoire, arrêté du 27 mars 1987, art. 2).
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
