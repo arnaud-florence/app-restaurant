@@ -2203,6 +2203,28 @@ France Boissons **chaque jeudi** (seuls jours proposés par Eazle) : la
 première commande est livrée le jeudi 1er octobre et couvre l'inauguration et
 la semaine jusqu'au jeudi 8.
 
+### Le café passe en grains (22/09/2026)
+
+France Boissons met **machine et moulin à disposition** ; le café se paie au
+kilo. `node scripts/cafe-grains.mjs [--ecrire]`.
+
+C'était le pire poste de la maison : la **dosette Lavazza revenait à 0,53 €**
+la tasse pour un café vendu 1,40 € — 41 % de food cost sur le produit le plus
+vendu d'un village. En grains (Lavazza Super Crema, 8 g par tasse), la tasse
+tombe à **0,22 € sucre compris, 17 % de food cost**. Le prix du panneau ne
+bouge pas : c'est la marge qui monte, d'environ 0,31 € par café.
+
+⚠️ Le **lait** du cappuccino, de la noisette et du chocolat chaud ne vient pas
+de France Boissons : son coût est une ESTIMATION (1,10 €/L), à corriger à la
+première facture du crémier. Le café et le chocolat en poudre, eux, sont des
+prix relevés.
+
+⚠️ Une machine « mise à disposition » se paie dans le prix du café (25 €/kg
+ici, contre 15 à 20 € en gros) et s'accompagne en général d'un **engagement de
+volume** : à lire avant de signer, et à comparer avec l'achat d'un moulin et
+d'une machine d'occasion. La dose de 8 g est un réglage de départ — c'est elle
+qui fixe le coût, donc elle se vérifie à la balance au premier service.
+
 ### Carte de la pizzeria et de la brasserie (21/09/2026)
 
 `node scripts/carte-restaurant.mjs [--ecrire]` — 12 pizzas (PIZZA, famille
