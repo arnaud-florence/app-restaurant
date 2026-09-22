@@ -5,8 +5,11 @@
 // revenait à 0,53 € la tasse pour un café vendu 1,40 € — 41 % de food cost, le
 // pire de la carte, sur le produit le plus vendu d'un village.
 //
-// En grains, une tasse de 8 g coûte le cinquième. Le prix du panneau ne bouge
+// En grains, une tasse de 8 g coûte le quart. Le prix du panneau ne bouge
 // pas : c'est la marge qui monte.
+//
+// Mélange retenu par le gérant : **Lavazza Gold Selection** (la machine et le
+// moulin sont prêtés par Lavazza, donc le café vient de chez eux).
 //
 // ⚠️ Coûts lus dans data/france-boissons-couts-unitaires-*.json (hors dépôt,
 // conditions négociées). Sans le fichier, le script refuse d'écrire.
@@ -29,7 +32,7 @@ const FICHIER = 'data/france-boissons-couts-unitaires-2026-09-21.json'
 if (!fs.existsSync(FICHIER)) { console.log(`✗ ${FICHIER} absent — rien n'est écrit.`); process.exit(1) }
 const C = JSON.parse(fs.readFileSync(FICHIER, 'utf8'))
 
-const GRAINS_KG = C['_ingredient:Café grains Lavazza Super Crema (kg)']
+const GRAINS_KG = C['_ingredient:Café grains Lavazza Gold Selection (kg)']
 const SUCRE = C['_ingredient:Sucre bûchette (pièce)']
 const CHOCO_KG = C['_ingredient:Chocolat poudre espresso (kg)']
 const DOSE_G = 8          // dose d'espresso au moulin, réglage de départ

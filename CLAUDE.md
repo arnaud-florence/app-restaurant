@@ -2210,9 +2210,12 @@ kilo. `node scripts/cafe-grains.mjs [--ecrire]`.
 
 C'était le pire poste de la maison : la **dosette Lavazza revenait à 0,53 €**
 la tasse pour un café vendu 1,40 € — 41 % de food cost sur le produit le plus
-vendu d'un village. En grains (Lavazza Super Crema, 8 g par tasse), la tasse
-tombe à **0,22 € sucre compris, 17 % de food cost**. Le prix du panneau ne
-bouge pas : c'est la marge qui monte, d'environ 0,31 € par café.
+vendu d'un village. En grains (**Lavazza Gold Selection**, choix du gérant, 8 g par
+tasse), la tasse tombe à **0,24 € sucre compris, 19 % de food cost**. Le prix
+du panneau ne bouge pas : c'est la marge qui monte, d'environ 0,29 € par café.
+La machine et le moulin sont prêtés par **Lavazza** : le café vient donc de
+chez eux. Prix relevés au kilo : Aroma Sublime et Super Crema 25,14 €, Grand
+Espresso 28,21 €, Gold Selection 28,35 €, Tierra Selection 37,35 €, bio 40,24 €.
 
 ⚠️ Le **lait** du cappuccino, de la noisette et du chocolat chaud ne vient pas
 de France Boissons : son coût est une ESTIMATION (1,10 €/L), à corriger à la
