@@ -38,7 +38,7 @@ const ORDRE = ['Pain', 'Viennoiserie', 'Boisson chaude', 'Formule petit-déjeune
   'Bière', 'Apéritif', 'Vin', 'Alcool',
   // ── Pizzeria et brasserie (octobre 2026) — en fin de liste : ajoutées
   //    après coup, elles ne décalent pas l'ordre des familles existantes.
-  'Pizzeria', 'Burger', 'Plat', 'Grande salade', 'Planche', 'Menu']
+  'Pizzeria', 'Burger', 'Plat', 'Grande salade', 'Planche', 'Menu', 'Dessert']
 
 const tags = (await zl('catalog/tags')).body.tags ?? []
 const manquantes = ORDRE.filter(n => !tags.some(t => t.name === n))

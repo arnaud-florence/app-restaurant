@@ -2228,6 +2228,19 @@ volume** : à lire avant de signer, et à comparer avec l'achat d'un moulin et
 d'une machine d'occasion. La dose de 8 g est un réglage de départ — c'est elle
 qui fixe le coût, donc elle se vérifie à la balance au premier service.
 
+**Deux tarifs de café** (22/09/2026, `node scripts/cafe-restaurant.mjs`) :
+1,40 € au comptoir et le midi, **1,80 € servi à table au service du soir**
+(fiche « Café servi à table », CUISINE). ⚠️ Ce n'est pas l'HEURE qui change le
+prix, c'est le SERVICE : un client au comptoir à 21 h paie 1,40 €. Deux prix
+imposent **deux boutons en caisse** — un seul et l'équipe tape au jugé — et
+les DEUX doivent être affichés, chacun à sa place (ardoise du bar et affichage
+extérieur pour 1,40 €, carte du restaurant pour 1,80 €).
+
+**Café gourmand 5,50 €** (café + 3 mignardises du Fournil) : coût 1,97 €,
+marge 3,03 €, food cost 39 %. Le taux est élevé sur le papier, mais c'est le
+dessert qui écoule la vitrine du soir — les mignardises concernées seraient
+jetées le lendemain, et sa marge en euros vaut trois cafés.
+
 ### Carte de la pizzeria et de la brasserie (21/09/2026)
 
 `node scripts/carte-restaurant.mjs [--ecrire]` — 12 pizzas (PIZZA, famille
