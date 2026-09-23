@@ -58,3 +58,5 @@ sql/setup-pgcron-agents.sql
 # Relevés de prix fournisseur : conditions NÉGOCIÉES, confidentielles.
 # Le dépôt est public — ces fichiers restent sur le poste.
 data/france-boissons-*.json
+data/devis-*.pdf
+data/felix-potin-*.json

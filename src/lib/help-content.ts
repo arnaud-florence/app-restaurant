@@ -686,6 +686,43 @@ Les produits qui partagent une même matière sont donc repliés en une seule li
     ],
   },
 
+  '/admin/tarifs-fournisseurs': {
+    title: 'Aide — Tarifs fournisseurs',
+    intro: "Ce que les fournisseurs proposent, face à ce qu'on paie déjà.",
+    shortcuts: [
+      { emoji: '🧾', label: 'Factures', href: '/admin/fournisseurs' },
+      { emoji: '🔗', label: 'Correspondances', href: '/admin/correspondances' },
+    ],
+    sections: [
+      {
+        heading: 'Un devis n\'est pas une facture',
+        emoji: '⚠️',
+        markdown: `Rien sur cet écran ne modifie un prix d'achat. Le prix payé vient des **factures scannées**, et lui seul entre dans le food cost. Un tarif est une proposition : le faire entrer dans les coûts ferait dériver toutes les marges sur de la marchandise jamais reçue.`,
+      },
+      {
+        heading: 'On compare à l\'unité, jamais au colis',
+        emoji: '⚖️',
+        markdown: `Un bidon d'huile de 5 L à 24,66 € et un litre à 4,93 € sont le **même prix**. Côte à côte en prix de colis, le premier paraît cinq fois plus cher.
+
+Et le format doit concorder : une poche de thon de 600 g contre une poche d'un kilo, c'est le prix au kilo qui tranche, pas le prix de la poche.`,
+      },
+      {
+        heading: 'Le rapprochement est un geste humain',
+        emoji: '🤝',
+        markdown: `« JAMBON CUIT SUP AC 8K » et « Jambon blanc tranché » partagent presque tous leurs mots et ne sont pas le même produit : l'un est une pièce entière à trancher. Un faux rapprochement désigne un moins-disant qui n'existe pas.
+
+Les suggestions ne sont **jamais pré-cochées**.`,
+      },
+      {
+        heading: 'Quand l\'écran dit « non comparable »',
+        emoji: '🚫',
+        markdown: `Il manque une contenance — souvent la nôtre : une matière enregistrée en « barquette » sans poids ne se compare à rien. Corrige son unité dans **Ingrédients** (« barquette 500 g »), ou précise la contenance de la ligne du fournisseur d'un clic.
+
+Mieux vaut pas de chiffre qu'un classement inventé.`,
+      },
+    ],
+  },
+
   '/inventaire': {
     title: 'Aide — Inventaire',
     intro: "Compter ce qu'il y a vraiment. C'est le seul moyen de voir ce qui part sans être vendu.",

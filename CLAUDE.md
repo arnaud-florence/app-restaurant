@@ -68,6 +68,7 @@ Chaque écran (ops) affiche en haut un `<BriefingPoste />` personnalisé (`src/l
 /admin/affichage               → Module 26 (TV salle, QR tables)
 /admin/formation               → Module 27 (guides, fiches poste, quiz)
 /admin/securite                → Module 28 (RBAC, 2FA, journal d'audit, sauvegardes)
+/admin/tarifs-fournisseurs     → comparaison des tarifs (0151)
 ```
 
 Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en service). Les routes `/print/*` sont en dehors et héritent uniquement du root layout (fond blanc pour impression). Les routes `/admin/*` sont en thème clair par défaut. `/equipes` (Module 10) sera neutre — accessible aux postes de service comme à l'admin.
@@ -151,8 +152,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
+| Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151 |
 
-**Migrations actuelles : 0001 → 0149.**
+**Migrations actuelles : 0001 → 0151.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2029,6 +2031,112 @@ facture scannée se rattache au lieu de produire 25 lignes orphelines.
 
 Test : `PORT=3000 node scripts/test-matieres-bar.mjs` — 24 assertions.
 
+### Tarifs fournisseurs — qui est le moins cher, et sur quoi (0151)
+
+`/admin/tarifs-fournisseurs`. L'outil savait ce qu'on **paie** — les factures
+scannées alimentent `ingredients.prix_achat_ht`. Il ne savait pas ce que les
+autres **proposent** : un devis reçu par mail se lisait une fois et se
+rangeait, et six mois plus tard personne ne savait si le jambon était moins
+cher ailleurs.
+
+`catalogue_fournisseur` porte les tarifs proposés ; `cle_comparaison` et
+`ingredient_id` les relient à nos matières.
+
+⚠️ **UN DEVIS N'EST PAS UNE FACTURE.** Rien de cet écran n'écrit dans
+`ingredients.prix_achat_ht` : un tarif est une proposition, une facture est
+une preuve. Faire entrer un tarif dans le prix payé ferait dériver tout le
+food cost sur de la marchandise jamais reçue. Une assertion du test le
+vérifie — si elle saute, toutes les marges bougent sans qu'une seule facture
+soit arrivée.
+
+⚠️ **ON COMPARE À L'UNITÉ, JAMAIS AU COLIS.** Un bidon d'huile de 5 L à
+24,66 € et un litre à 4,93 € sont le même prix ; en prix de colis le premier
+paraît cinq fois plus cher. `prix_ht` est donc TOUJOURS le prix de l'unité de
+facturation, et le prix du colis se recalcule — l'inverse ne marche pas.
+
+⚠️ **LE FORMAT DOIT CONCORDER**, et le prix de référence se CALCULE à la
+lecture (une meilleure extraction profite à tout le catalogue sans réimport).
+Quand la désignation est ambiguë, on n'affiche **aucun** prix de référence :
+« RACLETTE TR 22G 400G » porte le poids de la tranche ET celui de la
+barquette, et choisir au hasard donne un €/kg faux d'un facteur vingt, affiché
+comme les autres. `contenance_valeur` / `contenance_unite` sont là pour qu'un
+humain tranche depuis l'écran.
+
+⚠️ **L'UNITÉ DE FACTURATION change le sens d'un multiplicateur.**
+« FEUILLETE COMTE 110GX40 » facturé à la PIÈCE : chaque feuilleté fait 110 g.
+« PAIN BURGER BRIOCHE 90GX9 » facturé au SACHET : le sachet contient les neuf
+pains, donc 810 g. Prendre 90 g dans le second cas donnait **64 €/kg pour du
+pain à burger**, neuf fois trop. Quand le contenant porte un multiplicateur,
+on se tait — « ROSETTE LYON 2X25TR 500G X8 » est une barquette de 500 g
+vendue par 8, même forme, sens opposé.
+
+⚠️ **Une boîte de conserve ne se compare qu'au MÊME format.** Le poids net
+d'une 5/1 de tomates et d'une 5/1 de champignons diffère : on ne déduit aucun
+€/kg, mais deux 5/1 se comparent parfaitement au prix de la boîte. `PrixRef`
+porte donc un `format`, et `memeBase()` exige qu'il concorde — sans ça une
+4/4 gagnerait contre une 5/1 à tous les coups.
+
+⚠️ **Nos propres unités portent souvent leur contenance** — « barquette 1 kg »,
+« poche 1 kg », « flacon 1 kg », « sac 750 g », « colis 36 ». Sans les lire,
+le thon en poche de 600 g du fournisseur se retrouvait face à notre « poche
+1 kg » marqué « unités différentes » : deux prix justes, aucune comparaison
+possible, alors que tout était là. `prixReferenceMatiere()` les lit. Une
+matière enregistrée en « barquette » **sans poids** reste non comparable —
+c'est son unité qu'il faut corriger dans `/admin/ingredients`.
+
+⚠️ **RIEN N'EST RAPPROCHÉ AUTOMATIQUEMENT.** « JAMBON CUIT SUP AC 8K » (pièce
+entière à trancher) et « Jambon blanc tranché » partagent presque tous leurs
+mots sans être le même produit — le prix au kilo est plus bas parce que le
+travail reste à faire. La suggestion se calcule (couverture des mots, comme
+`/admin/correspondances`), la décision s'enregistre. Rien n'est pré-coché.
+Le risque n'est pas d'écrire un faux prix — un rapprochement n'en déplace
+aucun — mais d'afficher un « moins cher » qui compare deux produits.
+
+**Devis Félix Potin Provence du 28/09/2026** (proposition EX212546, compte
+47163472, Sandra Iannetti, Brignoles) : **184 références**, 3 548,58 € HT —
+crémerie 32, frais 33, surgelés 56, épicerie 62, boissons 1.
+`node scripts/import-devis-felix-potin.mjs [--ecrire]` relit le PDF lui-même,
+donc il resservira au prochain devis. `node
+scripts/rapprocher-tarifs-felix-potin.mjs [--ecrire]` pose les **20**
+rapprochements sûrs.
+
+⚠️ Le PDF vit dans `data/devis-*.pdf`, **gitignoré** : conditions négociées,
+dépôt public — même règle que le relevé France Boissons.
+
+⚠️ **L'extraction d'un PDF se CONTRÔLE.** Un décalage d'une colonne ne lève
+aucune erreur, il rend des nombres plausibles. L'import refuse d'écrire tant
+que, sur CHAQUE ligne, quantité × prix unitaire ne retombe pas sur le total
+imprimé. Le tableau est reconstruit par coordonnées ; les deux quantités
+(nombre de colis et quantité facturée) partagent la même colonne et ne se
+distinguent que par la LIGNE — les séparer par leur abscisse laissait 65
+articles sans quantité, tous ceux facturés à la pièce.
+
+⚠️ `on_conflict` de PostgREST ne sait pas viser un index **PARTIEL** — piège
+déjà payé sur `inventaires` (0134). D'où `reference text not null default ''`
+et un index unique TOTAL sur (fournisseur, référence, date).
+
+⚠️ **La clé porte la DATE du tarif** : réimporter le même devis corrige, un
+devis d'une autre date s'ajoute et l'ancien survit. C'est lui qui rendra une
+hausse lisible.
+
+**Premier verdict, au 23/09/2026** : sur 20 matières rapprochées, **11 sont
+moins chères** chez Félix Potin — sauce barbecue −35 %, beurre doux −30 %,
+jambon blanc −28 %, olives noires −25 %, sauce pizza −20 %. L'huile d'olive
+et l'emmental Valma y sont plus chers. ⚠️ Un écart en pourcentage ne décide
+de rien : il se multiplie par les quantités réelles avant de changer de
+fournisseur.
+
+⚠️ Trois rapprochements ont été **écartés volontairement** et doivent le
+rester sans décision explicite : la coppa n'est pas du jambon serrano, les
+herbes de Provence ne sont pas de l'origan, le beurre allégé à 40 % n'est pas
+du beurre à 82 %. Le test le vérifie.
+
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 22 assertions.
+⚠️ Il RECOPIE les règles d'extraction depuis le TS ; modifier les deux
+ensemble. Et il vérifie que la page est **fermée aux appels anonymes** : elle
+expose des conditions négociées, la laisser répondre reviendrait à les
+publier (même correction que `test-rh.mjs`).
+
 ### Coûts réels du bar — relevé France Boissons (21/09/2026)
 
 Les coûts du bar étaient les estimations qui avaient servi à bâtir la carte.
@@ -2645,6 +2753,9 @@ PORT=3000 node scripts/test-zelty-webhook.mjs  # webhook signé (secret de test 
 PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans Claude Vision)
 PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
 node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
+PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
+node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
+node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
