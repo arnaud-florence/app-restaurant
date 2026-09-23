@@ -153,8 +153,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 | Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151, 0152 |
+| Capacité en articles | `max_articles` — 4 pizzas par quart d'heure, pas 4 commandes | 0153 |
 
-**Migrations actuelles : 0001 → 0152.**
+**Migrations actuelles : 0001 → 0153.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2670,12 +2671,31 @@ PIZZA **le midi** 11h30-14h plus un lundi jusqu'à 23h59 ; elles disent
 maintenant 19h-22h, 7 jours sur 7, et les 13 plages SNACKING (aucun produit en
 face) sont désactivées.
 
-⚠️ **`max_commandes` n'est PAS appliqué.** `/creneaux-retrait` n'accepte
-qu'UNE commande par créneau (`count === 0`), alors que l'en-tête du fichier
-annonce `count < max_commandes` et que la capacité se règle en base. Régler 10
-et n'en servir qu'une est un réglage mort : le gérant croit ouvrir des places
-qui n'existent pas. On ne l'élargit pas sans décision — dix commandes dans le
-même quart d'heure, c'est une décision de four, pas de code.
+⚠️ **LA CAPACITÉ SE COMPTE EN ARTICLES, PAR POSTE** (0153). Le gérant tient
+**4 pizzas par quart d'heure**. Le champ s'appelait `max_commandes` : écrit
+« 4 » dedans, le chiffre se relit « 4 commandes », et quatre clients de trois
+pizzas font douze pizzas dans le même créneau — avec un réglage qui affiche
+pourtant 4. Renommé `max_articles` plutôt que commenté : un nom de colonne est
+lu par tout le monde, un commentaire par personne. Six lecteurs à jour dans le
+même commit — une colonne renommée à moitié casse à la lecture suivante.
+
+⚠️ **Le filtre par TAG est indispensable.** L'ancien contrôle comptait les
+commandes toutes destinations confondues : une baguette à retirer à 19 h
+bloquait le créneau pizza de 19 h. Les heures rondes du fournil et les quarts
+d'heure de la pizzeria se croisent tous les soirs.
+
+⚠️ **Et la capacité n'était pas lue du tout** : `/creneaux-retrait` s'en
+tenait à une commande par créneau (`count === 0`), donc un client commandant
+six pizzas passait sans rien déclencher, et le réglage de l'écran d'admin
+n'avait aucun effet. Elle est désormais appliquée des deux côtés — à
+l'affichage des créneaux ET dans le contrôle anti-race de
+`/api/public/commande`, qui refuse en 409 avec le nombre de places restantes.
+
+Le créneau rend `restant` et `max` : le site barre les créneaux trop justes
+POUR LE PANIER en cours, plutôt que de laisser choisir un horaire que le
+serveur refusera à la dernière étape, après la saisie de l'adresse.
+Test : `PORT=3000 node scripts/test-creneaux-capacite.mjs` — 12 assertions ;
+il CRÉE des commandes de contrôle, les compte, et vérifie qu'aucune ne survit.
 
 ⚠️⚠️ **TOUT ANCÊTRE AVEC UN `filter` CAPTURE LES `position: fixed`** — et
 `blur(0px)` suffit. `PageTransition` anime `filter` sur un nœud qui enveloppe
@@ -3063,6 +3083,9 @@ PORT=3000 node scripts/test-visite-guidee.mjs  # visite guidée (contrat d'accom
 node scripts/test-paliers-gerance.mjs          # paliers de gérance + co-gérant en lecture
 PORT=3000 node scripts/test-fiches-techniques.mjs # fiches techniques + « coût inconnu »
 node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
+PORT=3000 node scripts/test-creneaux-capacite.mjs  # 4 pizzas / 15 min, par poste
+PORT=3000 node scripts/test-commande-livraison.mjs # la tournée ne porte que du pain
+PORT=3000 node scripts/creneaux-services.mjs       # créneaux dérivés des services
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
