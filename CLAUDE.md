@@ -2854,6 +2854,32 @@ fmtPct(n)   // 12,3 %
 
 - **Domaine public : `casatasia.fr`** (OVH, titulaire CASATASIA, compte `xj9701-ovh`, renouvellement auto en août 2027). Il sert le **site vitrine**, projet Vercel `site-restaurant` — *pas* cette app. Zone DNS chez OVH : `A @ → 216.198.79.1` et `CNAME www → f0ab09f3a0e2f92c.vercel-dns-017.com.` ; `www` redirige en 308 vers l'apex, qui reste l'adresse canonique (c'est elle qu'on imprime). Les 3 MX `mx{1,2,3}.mail.ovh.net` sont ceux de la boîte incluse avec le domaine : **ne pas les supprimer**, sinon la messagerie tombe. Le back-office n'a pas encore de sous-domaine ; s'il en reçoit un (`app.casatasia.fr`), penser à mettre à jour `NEXT_PUBLIC_SITE_URL` et la base des `image_url` en base. Toutes les env vars critiques (Supabase, Anthropic, CRON_SECRET, VAPID, Resend) sont configurées côté Vercel. Manque : `OPENWEATHER_API_KEY` (agent Météo + Module 22 ne tourneront pas sans).
 
+- **Site vitrine — le repli de `SITE_URL` doit être le domaine CANONIQUE.**
+  Constaté en production le 23/09/2026 : `NEXT_PUBLIC_SITE_URL` n'a jamais été
+  posée sur Vercel après la mise en place de `casatasia.fr`, et le repli du
+  code était resté l'URL de préversion. Conséquence : le `robots.txt` de
+  casatasia.fr renvoyait Google vers le sitemap de la **préversion**, le
+  `sitemap.xml` listait dix URL de ce domaine, et l'image OpenGraph, l'image
+  Twitter et le Schema.org (`image`, `menu`) pointaient tous ailleurs. Le site
+  disait au moteur que le vrai site est un autre domaine. ⚠️ **Rien ne cassait
+  visuellement** — un référencement qui se dilue ne lève aucune erreur et se
+  constate des mois plus tard, sur une courbe de visites qui ne décolle pas.
+  Le repli est désormais `https://casatasia.fr` ; la variable reste
+  prioritaire pour les préversions. À vérifier après tout changement de
+  domaine : `curl https://casatasia.fr/robots.txt` et les trois premières
+  `<loc>` du sitemap.
+
+- **Site vitrine — le titre a TROIS états, pas deux** (23/09/2026). Les
+  métadonnées suivaient `restaurant_salle || pizzeria || bar`, donc le titre
+  restait « CASATASIA — Le Fournil, boulangerie » jusqu'à la minute de
+  l'ouverture — alors que l'accueil annonçait déjà la pizzeria et que les
+  pizzas se précommandaient. Le site se contredisait, et les dix jours qui
+  précèdent une ouverture sont justement ceux où l'on cherche « restaurant
+  Sainte-Anastasie ». L'état intermédiaire s'appuie sur les mêmes **teasers
+  datés** que l'aperçu des cartes. ⚠️ Annoncer n'est pas servir : le titre
+  NOMME les activités à venir, la description les DATE, et le hero répète la
+  même date que les sections juste en dessous.
+
 - **Auth Supabase : `getUser()` doit OBLIGATOIREMENT être en try/catch côté serveur**. Quand le refresh token est expiré (cookies stales, ce qui arrive après un déploiement, un reset, ou plusieurs heures), `supabase.auth.getUser()` throw `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` (code `refresh_token_not_found`). Sans try/catch, l'erreur remonte dans le RSC qui crash → page d'erreur Next générique. **Fix appliqué dans `src/lib/auth.ts:getProfile()` et `src/lib/supabase/middleware.ts:updateSession()`** (commit 8f281ec). Si tu ajoutes un nouveau wrapper auth, applique le même pattern.
 
 - **Supabase Realtime : nom de channel UNIQUE par instance de hook**. Si 2 Client Components instancient le même hook (genre `useLiveFindings()`) avec les mêmes filtres, ils créent deux channels avec le même nom (ex: `agent_findings_live__`). Le 2ᵉ `subscribe()` throw "cannot add `postgres_changes` callbacks after `subscribe()`". **Fix** : utiliser `useId()` React pour générer un ID stable SSR/CSR unique par instance et l'inclure dans le nom du channel (cf. `src/hooks/useLiveFindings.ts` et `useLiveAgentRuns.ts`, commit df789fb).
