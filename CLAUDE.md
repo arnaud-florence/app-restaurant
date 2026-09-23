@@ -2622,6 +2622,62 @@ signature (burrata).
 sert le plat choisi avec SA fiche ; la chiffrer sur un plat fixe mentirait pour
 les trois autres. Au-dessus de 32 % : les planches (32-33 %). La salade burrata est passée de 37 à 31 % en retirant la coppa (un seul jambon).
 
+### Les horaires ont TROIS régimes, pas un (23/09/2026)
+
+Le site annonçait **« 6h30 – 19h30 » à sept endroits**, description Google
+comprise, alors que l'affiche du gérant dit « de 6h30 jusqu'à la fin du
+service de restauration ». Quelqu'un qui lisait l'affiche puis vérifiait sur
+le site croyait la brasserie fermée à 19h30.
+
+| Activité | Fermeture |
+|---|---|
+| Fournil et relais colis | **20h**, 7j/7 |
+| Comptoir et restauration | fin du service du soir (22h) |
+| **Soirée organisée, une par mois** | **1 h du matin** |
+
+`fournil_fermeture` (table `parametres`) passe de 19:30 à **20:00** : la
+correction se propage seule partout où elle s'affiche — c'est tout l'intérêt
+de ne pas l'avoir écrite en dur. Les deux autres régimes vivent dans
+`FERMETURES` / `PHRASE_FERMETURE` de `src/lib/services-restaurant.ts`, déjà la
+source unique des services, et partent au site par `/api/public/activation`.
+
+⚠️ **N'afficher que les horaires du fournil laissait croire que tout ferme en
+même temps.** `SectionHoraires` et la page Contact montrent désormais les
+trois lignes. Un site qui contredit l'affiche de la vitrine fait douter des
+deux.
+
+### Le site face aux affiches (23/09/2026)
+
+Confrontation ligne à ligne des trois affiches réseaux au site. Onze éléments
+manquaient, et **trois contradictions franches** :
+
+1. les horaires (ci-dessus) ;
+2. **les réseaux sociaux pointaient sur l'ANCIENNE enseigne** —
+   `facebook.com/relaisdessaveurs` et `instagram.com/relaisdessaveurs`, alors
+   que les affiches annoncent **@casatasia**. Corrigé ;
+3. **le lien TripAdvisor menait à la fiche du Relais des Saveurs** : retiré.
+   Envoyer un visiteur sur l'avis d'un autre établissement est pire que de ne
+   rien afficher. À remettre quand la fiche CASATASIA existe.
+
+Le bloc « Bientôt » annonce maintenant ce que les affiches promettent et que
+le site taisait : **relais colis & dépôt d'ordonnances**, **snacking &
+desserts**, **événements, baptêmes et anniversaires** — chacun daté, via
+`activites_modules.teaser_texte`.
+
+⚠️ Le tag `SNACKING` n'a **aucun produit** : son aperçu ne publie donc aucune
+carte. On annonce le service, pas un menu vide.
+
+⚠️ **Le logo n'est pas à jour.** L'en-tête affiche `logo-small.png` en
+**128×128** — une vignette — tandis que `logo-casatasia.png` (1693×929) dort
+dans `public/` sans être référencé nulle part. Le nouveau logo est attendu en
+PNG transparent ou en SVG ; il faudra le poser en en-tête, en favicon, en
+icône PWA (192 et 512) et dans `og-image.jpg`.
+
+**Pas encore fait, volontairement** — c'est de l'écriture de marque, pas de la
+correction : l'histoire « De l'auberge provençale à CasaTasia », les slogans
+(« Ici, la vie a bon goût ! », « Authentique • Convivial • Gourmand », « Tout
+simplement CasaTasia ») et la bascule du titre vers « Maison Méditerranéenne ».
+
 ### Services du restaurant et aperçu des cartes (22/09/2026)
 
 **`src/lib/services-restaurant.ts`** — la règle du gérant, source unique :
