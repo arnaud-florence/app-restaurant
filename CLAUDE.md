@@ -3016,6 +3016,80 @@ n'a été enregistrée : une réservation d'essai notifie le manager, qui
 rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
 modifier les deux ensemble.
 
+#### Les réservations de la caisse — contrat RELEVÉ, pas deviné (24/09/2026)
+
+Le gérant a ouvert le back-office ; trois réservations d'essai ont été créées
+puis annulées sur le compte Casatasia (mode école) pour observer la forme
+réelle. Tout ce qui suit a été VU, aucune ligne ne vient d'une documentation.
+Traduction pure : `src/lib/integrations/zelty/reservations.ts`.
+
+⚠️⚠️ **`GET /bookings` SANS `?date=` RÉPOND `{"bookings": []}`, PAS UNE
+ERREUR.** Ni `from`/`to`, ni `start`/`end`, ni `day`, ni `limit` ne filtrent
+quoi que ce soit : **seul `?date=AAAA-MM-JJ` rend les réservations, un jour à
+la fois.** C'est le piège central, et c'est le frère de `expand[]=items` sur
+les commandes — on interroge, on reçoit 200, on conclut « carnet vide », et on
+rate tout. Vécu le jour même : la réservation venait d'être créée sous nos
+yeux et l'API la disait inexistante. Un miroir d'une semaine fait sept appels.
+
+⚠️ **`POST /bookings` exige `booking_for`, `places` et `customer`** — et
+`customer` doit être un **OBJET** (« Should be an object ») : un identifiant
+est refusé. Bonne nouvelle, Zelty **crée la fiche client tout seul**, il n'y a
+pas à la créer d'abord.
+
+⚠️ **`remote_id` est accepté et conservé** : notre identifiant vit chez eux,
+donc la correspondance est exacte dès le premier envoi et un renvoi après
+timeout ne crée pas de doublon. Même acquis que sur le catalogue.
+
+⚠️ **`src` est posé par Zelty** : `bo` pour une saisie au back-office, `web`
+pour une création par l'API. C'est notre `canal`, offert.
+
+⚠️ **ON NE PEUT NI MODIFIER NI ANNULER PAR L'API.** `GET /bookings/{id}`,
+`PATCH` et `DELETE` répondent 404 sous toutes les formes essayées — par `id`,
+par `uid`, sur la collection avec l'identifiant dans le corps — alors même que
+`OPTIONS /bookings` annonce `GET, POST, PATCH, DELETE, PUT`. **Une annulation
+faite chez nous ne peut donc pas être poussée vers la caisse.** Ne pas
+promettre ce sens-là ; l'annulation se fait à la main dans le back-office
+jusqu'à ce que Zelty l'ouvre.
+
+⚠️ **« Confirmation automatique des réservations » est COCHÉE** dans les
+paramètres du restaurant. Une réservation envoyée sans `status` explicite
+ressortirait **confirmée**, avec un mail de confirmation au client, alors que
+notre modèle est « demande à valider ». On envoie donc toujours `status`.
+
+**Les cinq états**, relevés sur les onglets du back-office (`data-value`) :
+
+| Code | Zelty | Chez nous |
+|---|---|---|
+| 0 | En attente de confirmation | `demande` |
+| 80 | Confirmée | `confirmee` |
+| 96 | Installée | `arrivee` |
+| 192 | Annulée | `annulee` |
+| 255 | Terminée | `terminee` |
+
+⚠️ Un code **inconnu** devient `demande`, jamais `confirmee` : on ne réserve
+pas une table sur un état qu'on ne comprend pas. Et `no_show` n'existe pas
+dans `status` — Zelty le range dans `cancel_reason` (32 = annulée par le
+restaurant ; le code du no-show reste à relever).
+
+⚠️ **`booking_for` est une chaîne ISO AVEC fuseau** (`2027-01-04T20:30:00+01:00`)
+et se lit par expression régulière, **jamais par `new Date()`** : Vercel tourne
+en UTC, et une réservation à 00h30 heure française y deviendrait la veille à
+22h30 — le carnet du soir daté du jour d'avant. À l'envoi, le décalage est
+calculé pour la date concernée : **le 3 octobre 2026 est encore en heure
+d'été**, donc `+02:00`.
+
+⚠️ **Zelty fait déjà ce que notre guichet ne fait pas** : couverts maximum par
+horaire (vide aujourd'hui), couverts maximum par réservation (10, quand nous
+sommes à 12 — à aligner), blocage N minutes avant l'heure (15), heures de
+réservation par jour de la semaine, et **emails de confirmation et d'annulation
+au client**. À décider : qui porte la capacité, et qui écrit au client. Les
+deux le faisant, le client recevrait deux messages.
+
+Test : `node scripts/test-zelty-reservations.mjs` — 23 assertions, sans compte
+ni clé, sur la charge utile réelle. ⚠️ Il RECOPIE la règle depuis le TS ;
+modifier les deux ensemble.
+Lecture : `node scripts/zelty-bookings.mjs --du AAAA-MM-JJ`.
+
 #### Les deux registres de réservation (0155, 24/09/2026)
 
 ⚠️ **LA CAISSE A SON PROPRE REGISTRE, ET IL N'EST PAS RELIÉ AU NÔTRE.**
@@ -3421,7 +3495,8 @@ PORT=3000 node scripts/test-creneaux-capacite.mjs  # 4 pizzas / 15 min, par post
 PORT=3000 node scripts/test-commande-livraison.mjs # la tournée ne porte que du pain
 PORT=3000 node scripts/creneaux-services.mjs       # créneaux dérivés des services
 PORT=3000 node scripts/test-reservation-table.mjs  # guichet de réservation (n'envoie que des refus)
-node scripts/zelty-bookings.mjs                # forme réelle des réservations de la caisse (lecture)
+node scripts/zelty-bookings.mjs                # réservations de la caisse (lecture, un jour)
+node scripts/test-zelty-reservations.mjs       # traduction des réservations (sans compte)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
