@@ -154,8 +154,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
 | Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151, 0152 |
 | Capacité en articles | `max_articles` — 4 pizzas par quart d'heure, pas 4 commandes | 0153 |
+| Réservation de table en ligne | guichet ouvert avant la salle, créneaux réels, `canal` | 0154 |
 
-**Migrations actuelles : 0001 → 0153.**
+**Migrations actuelles : 0001 → 0154.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2928,6 +2929,92 @@ le bouton d'ouverture allumait les modules sans jamais allumer l'établissement
 serait restée VIDE le jour de l'ouverture. Corrigé ; et éteindre l'un des deux
 ne ferme plus l'établissement si l'autre tourne encore.
 
+### La réservation de table en ligne (0154, 24/09/2026)
+
+Le gérant a constaté qu'on ne pouvait pas réserver une table sur le site.
+Trois choses manquaient, et la troisième était la plus grave.
+
+**1. Le module était éteint, et muet.** `reservation_table` était le SEUL
+module du groupe restaurant sans `teaser` ni `date_ouverture_prevue` : la page
+`/reserver` affichait « bientôt » sans dire quand, le lien disparaissait de la
+navigation, et le bouton d'appel principal proposait de commander du pain.
+
+**2. Le raisonnement du code était à l'envers.** `ctaPrincipal()` portait en
+commentaire : « tant que la salle n'a pas ouvert, *Réserver une table*
+n'aurait aucun sens ». C'est faux pour une OUVERTURE. Une salle ne se remplit
+pas le jour où elle ouvre, elle se remplit les jours d'avant — et pour
+l'inauguration du samedi 3 octobre, le seul moment utile pour prendre les
+réservations, c'est maintenant. Le guichet ouvre donc AVANT la salle ; ce qui
+ne s'avance pas, c'est la date du repas.
+
+**3. ⚠️ LA ROUTE PUBLIQUE N'AVAIT JAMAIS PU FONCTIONNER.**
+`/api/public/reservation-table` écrivait `nom`, `prenom`, `email`,
+`telephone`, `nombre_personnes`, `date_heure`, `canal` et `service` : **huit
+colonnes sur onze qui n'existent pas** dans `reservations_tables`. Le vrai
+schéma (migration 0035) dit `client_nom`, `client_email`, `client_telephone`,
+`nb_personnes`, `date_resa`, `heure_arrivee`. Chaque demande serait repartie
+en 500. Personne ne l'a vu parce que le module était éteint et le formulaire
+inatteignable : **du code jamais exécuté une seule fois**, livré et compté
+comme fait.
+
+**La règle vit dans `src/lib/reservation-table.ts`** (pur, client-safe) et
+DÉRIVE de `services-restaurant.ts` — rien n'y est recopié :
+
+| | |
+|---|---|
+| Jours servis | tous : brasserie le midi, pizzeria le soir |
+| Dernière arrivée, soir | **22h30** = l'heure de dernière commande du gérant |
+| Dernière arrivée, midi | **14h00** = fin du service − 30 min |
+| Pas entre deux horaires | 15 min |
+| Couverts | 1 à 12 ; au-delà, c'est un groupe |
+
+⚠️ **La dernière arrivée se DÉDUIT, elle ne se saisit pas.** Quand le gérant a
+fixé une heure de dernière commande, c'est elle : faire asseoir quelqu'un
+après, c'est l'installer devant une cuisine qui ferme. Sinon, fin du service
+moins une demi-heure.
+
+⚠️ **DEUX INTERRUPTEURS, ET ILS NE DISENT PAS LA MÊME CHOSE.**
+`reservation_table` ouvre ou ferme LE GUICHET — c'est l'arrêt d'urgence du
+gérant, et la route refuse TOUT quand il est éteint. `restaurant_salle` porte
+la DATE : c'est la salle qui ouvre. Lire la date sur le mauvais module
+laisserait réserver pour demain dans un restaurant fermé.
+
+⚠️ **Le repli est le REFUS.** Ni salle ouverte ni date annoncée → aucune
+réservation. Inventer une date ferait venir quelqu'un devant une porte close,
+et c'est le genre d'erreur qu'un client raconte. Le proxy du site applique la
+même règle quand l'outil ne répond pas.
+
+⚠️ **Le contrôle qui compte est dans la ROUTE**, pas dans le formulaire — même
+leçon que la précommande de pizza. Le champ `<input type="time">` laissait
+demander une table à 4 h du matin ; il est remplacé par la liste des horaires
+réellement servis, mais un onglet resté ouvert enverra toujours les anciennes
+valeurs.
+
+⚠️ **`canal` (0154) a un défaut à `'autre'`, pas à `'site_web'`.** Une ligne
+dont on ignore l'origine ne doit pas être comptée au crédit du site — c'est
+le seul moyen de répondre un jour à « est-ce que le site sert à quelque
+chose ? ».
+
+⚠️ **Aucune colonne `service`.** Elle se déduit de l'heure : ce qui se calcule
+ne se stocke pas, sinon elle deviendrait fausse au premier décalage de plage
+horaire, sans que rien ne le signale.
+
+⚠️ L'onglet « Une chambre » de `/reserver` ne s'affiche **que si les chambres
+ont ouvert**. Les deux réservations partagent la page mais pas le calendrier :
+laisser l'onglet visible proposait de réserver une chambre qui n'existe pas et
+rendait une liste vide sans rien expliquer.
+
+Une demande arrive en statut **`demande`** dans `/admin/reservations` et
+notifie les managers — ce n'est pas une table réservée tant que personne n'a
+validé. Aucune capacité n'est appliquée : c'est l'humain qui arbitre, et une
+limite fausse vaut moins qu'un coup d'œil au plan de salle.
+
+Test : `PORT=3000 node scripts/test-reservation-table.mjs` — 39 assertions.
+⛔ Il n'envoie QUE des demandes destinées à être REFUSÉES, et vérifie qu'aucune
+n'a été enregistrée : une réservation d'essai notifie le manager, qui
+rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
+modifier les deux ensemble.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
@@ -3276,6 +3363,7 @@ node scripts/test-planning-rythme.mjs          # semaine type (pur, sans base)
 PORT=3000 node scripts/test-creneaux-capacite.mjs  # 4 pizzas / 15 min, par poste
 PORT=3000 node scripts/test-commande-livraison.mjs # la tournée ne porte que du pain
 PORT=3000 node scripts/creneaux-services.mjs       # créneaux dérivés des services
+PORT=3000 node scripts/test-reservation-table.mjs  # guichet de réservation (n'envoie que des refus)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
