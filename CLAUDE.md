@@ -2244,14 +2244,22 @@ fût de 20 L donne 20 (des litres), une caisse de 24 bouteilles donne 24 (des
 bouteilles). Diviser par lui rend le prix de l'unité vendue — vrai dans les
 deux cas, à condition de ne pas le prendre pour un volume.
 
-**Euro-Cash — la liste à faire chiffrer (23/09/2026).** Le catalogue général
-été 2026 fait 221 pages et ~2 280 références ; on n'en a besoin que d'une
-fraction. `node scripts/selection-eurocash.mjs` en tire **151 références**,
-rangées par BESOIN et non par rayon — un client qui entre acheter un paquet de
-cigarettes n'achète pas « du rayon briquets », il achète ce qui va avec.
-Sortie : `data/selection-eurocash-2026-09-23.csv`, trois colonnes vides pour
-le tarif. Le fournisseur **Euro-Cash** est créé, prêt à recevoir le devis via
+**Euro-Cash — la demande de tarif (23/09/2026).** Le catalogue général été
+2026 fait 221 pages et ~2 280 références. Le gérant a retenu **20 rayons** :
+pochettes cadeau enfants, tartinables, boissons, jus, eaux, bières, vins,
+cidres, champagnes, proseccos, produits pipiers, briquets/allumettes,
+emballages, accessoires de cuisine, accessoires divers, hygiène, vaisselle
+jetable. `node scripts/selection-eurocash.mjs` en sort **1 280 références**
+dans `data/selection-eurocash-2026-09-23.csv`, trois colonnes vides pour le
+tarif. Le fournisseur **Euro-Cash** est créé, prêt à recevoir le devis via
 `catalogue_fournisseur`.
+
+⚠️ **On demande le tarif de rayons ENTIERS, pas une sélection dedans** : un
+représentant ne chiffre pas mille lignes à la main, il sort son tarif — autant
+lui donner le périmètre complet d'un coup. La colonne **PRIORITÉ** (120
+lignes) marque ce sur quoi il doit se battre : ce qu'on achète DÉJÀ ailleurs
+(prix payé connu au centime) et ce sans quoi le rayon tabac ne peut pas
+ouvrir.
 
 ⚠️ **Les codes sont TIRÉS du PDF, jamais recopiés.** Recopier un code à la
 main, c'est faire chiffrer un autre produit et s'en apercevoir à la livraison.
@@ -2268,19 +2276,35 @@ référence qu'on achète déjà.
 porte plus que « 18cl ». Ils sont rétablis dans `LIBELLES`, à la vue du
 catalogue — envoyer « cl » à chiffrer ne veut rien dire.
 
-**Les rubriques 11 à 13 sont la priorité** : sacs à croissants, sacs
+⚠️ **Le lecteur de tableaux ne tourne QUE sur les pages d'emballage** (204-215).
+Lancé sur tout le catalogue, il inventait des produits : la page des
+e-liquides aligne des taux de nicotine (« 3 mg- 63002 ») que le motif
+« NNNNN suivi d'un chiffre » prend pour une ligne de tableau. Vingt-trois
+références fantômes, désignation « mg- », qu'un représentant aurait dû nous
+renvoyer une par une.
+
+**Les emballages sont la priorité absolue** : sacs à croissants, sacs
 baguette, sacs sandwich, boîtes pâtissières, bols à salade, gobelets,
 serviettes, kits couverts. On achète déjà ces références chez Gineys et
 Promocash, donc leur prix payé est dans `catalogue_fournisseur` — la
 comparaison sera immédiate.
 
-⚠️ **Ce qui est écarté l'est SCIEMMENT**, et le script le dit : CBD /
-e-liquides / cigarettes électroniques (décision du gérant, pas une case à
-cocher), poppers, pétards (F2/F3 : stockage, âge, responsabilité), displays de
-briquets à visuel (50 pièces d'une série qui se démode), vins et bières
-(France Boissons + vignoble), cafés et thés (la mise à disposition de la
-machine tient au canal). Une liste de courses ne dit rien de ce qu'on a
-écarté ; six mois plus tard on ne sait plus si c'était un oubli.
+⚠️ **Bières, vins, proseccos sont demandés SCIEMMENT en second canal** face à
+France Boissons, dont la remise est inégale selon la marque (Heineken et
+Moretti 30 L n'en ont aucune). Pour le vin tranquille, qui devait passer par
+un vignoble, ce tarif est un repère de négociation — pas une décision.
+
+⚠️ **Ce qui reste écarté l'est SCIEMMENT**, et le script le dit : CBD,
+e-liquides et cigarettes électroniques partent AVEC le rayon pipier mais
+restent à trancher avant vitrine ; poppers ; pétards (F2/F3 : stockage, âge,
+responsabilité) ; cafés et thés (la mise à disposition de la machine tient au
+canal France Boissons). Une liste de courses ne dit rien de ce qu'on a écarté ;
+six mois plus tard on ne sait plus si c'était un oubli.
+
+⚠️ **La confiserie n'est PAS dans la liste du gérant** — ni bonbons, ni
+biscuits, ni chocolats, soit 94 pages du catalogue. C'est pourtant là que se
+joue le panier moyen d'un tabac, dont le prix des cigarettes est imposé. Le
+script le signale à chaque exécution : à confirmer, oubli ou décision.
 
 ⚠️ Le catalogue et la sélection vivent dans `data/`, **gitignorés** : document
 commercial d'un tiers, dépôt public.
