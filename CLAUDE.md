@@ -2250,7 +2250,7 @@ pochettes cadeau enfants, tartinables, boissons, jus, eaux, bières, vins,
 cidres, champagnes, proseccos, produits pipiers, briquets/allumettes,
 emballages, accessoires de cuisine, accessoires divers, hygiène, vaisselle
 jetable. `node scripts/selection-eurocash.mjs` en sort **1 280 références**
-dans `data/selection-eurocash-2026-09-23.csv`, trois colonnes vides pour le
+dans `data/tarif-eurocash-2026-09-23.csv`, trois colonnes vides pour le
 tarif. Le fournisseur **Euro-Cash** est créé, prêt à recevoir le devis via
 `catalogue_fournisseur`.
 
@@ -2260,6 +2260,36 @@ lui donner le périmètre complet d'un coup. La colonne **PRIORITÉ** (120
 lignes) marque ce sur quoi il doit se battre : ce qu'on achète DÉJÀ ailleurs
 (prix payé connu au centime) et ce sans quoi le rayon tabac ne peut pas
 ouvrir.
+
+**NOTRE PRIX EN FACE (23/09/2026).** Le fichier porte trois colonnes de plus :
+`Notre prix actuel HT`, `Base de notre prix` et surtout **`Prix colis à
+battre`** — notre prix unitaire × le nombre d'unités de LEUR colis. Un
+fournisseur qui ne sait pas ce qu'il doit battre propose son tarif public, et
+on perd des deux côtés : lui l'affaire, nous le temps de comparer. **15 lignes
+renseignées** sur 1 280 ; partout ailleurs la case reste vide, comme demandé.
+
+⚠️ **Chaque paire est une DÉCISION, jamais un rapprochement automatique.** Un
+prix faux en face d'une de leurs références, c'est demander une remise sur un
+produit qui n'est pas le nôtre : elle est refusée, ou pire accordée, et
+l'écart se découvre à la livraison. Le format doit concorder **au
+centimètre** — un sac à baguette 19+7x42 n'est pas un 9+6,5x58.
+
+⚠️ **`unitesColis()` ignore le facteur qui porte une CONTENANCE.**
+« c-24x33cl » vaut 24 canettes, pas 792 : multiplier le 33 donnerait un prix
+de colis à battre absurde, et le tableau perdrait toute crédibilité à la
+première lecture.
+
+**Ce qui ne concorde pas devient une QUESTION**, pas un blanc : le tableau se
+termine par `A_PROPOSER` — 9 références qu'on achète ailleurs et qui n'ont pas
+d'équivalent au catalogue (sacs à baguette, boîte pâtissière 22x8, film
+alimentaire 45 cm…). C'est la moitié la plus utile pour un commercial : sans
+cette liste, il ignore que le besoin existe.
+
+⚠️ Deux lignes (Perrier, Desperados) portent des prix **France Boissons,
+droits d'accises compris et verre consigné**. La base est écrite en toutes
+lettres — sans elle le prix paraît élevé et la remise demandée n'a pas de
+sens. Elles divulguent en revanche le niveau négocié chez France Boissons :
+c'est une décision de négociation, pas un automatisme.
 
 ⚠️ **Les codes sont TIRÉS du PDF, jamais recopiés.** Recopier un code à la
 main, c'est faire chiffrer un autre produit et s'en apercevoir à la livraison.

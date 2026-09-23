@@ -139,6 +139,65 @@ const RAYONS_TABLEAU = [
    "PRIORITÉ ABSOLUE : sacs à croissants, sacs baguette, sacs sandwich, boîtes pâtissières, bols à salade, gobelets, serviettes, kits couverts — on achète déjà ces références chez Gineys et Promocash, donc leur prix payé est connu au centime. C'est la comparaison la plus immédiatement rentable du catalogue."],
 ]
 
+// ─── Ce qu'on paie DÉJÀ, chez quelqu'un d'autre ──────────────────
+//
+// C'est le cœur du tableau : un fournisseur qui ne sait pas ce qu'il doit
+// battre propose son tarif public, et on perd les deux côtés — lui l'affaire,
+// nous le temps de comparer.
+//
+// ⚠️ CHAQUE PAIRE EST UNE DÉCISION, pas un rapprochement automatique. Un prix
+// faux en face d'une de SES références, c'est lui demander une remise sur un
+// produit qui n'est pas le nôtre : il la refuse, ou pire il l'accorde et on
+// découvre l'écart à la livraison. Le FORMAT doit concorder exactement — un
+// sac à baguette 19+7x42 n'est pas un sac 9+6,5x58, et on ne le fait pas
+// semblant. Ce qui ne concorde pas part dans `A_PROPOSER`, où il devient une
+// question : « avez-vous l'équivalent ? »
+//
+// prix = ce qu'on paie pour UNE unité vendable (un sac, une canette, un kilo).
+const PRIX_CONNUS = {
+  // ── Emballages : formats identiques au centimètre près ──
+  '67996': { prix: 0.01373, base: 'le sac (colis de 1000)' },              // Sacs croissants N°104
+  '68043': { prix: 0.026294, base: 'le sac (colis de 1000)' },             // Sandwich kraft blanc 12+6x34
+  '68089': { prix: 0.1568,  base: 'la boîte (sachet de 50)' },             // Boîte pâtissière 16x8
+  '68406': { prix: 0.246,   base: 'le bol + couvercle (sachet de 25)' },   // Bol salade 750 ml
+  '68436': { prix: 0.1184,  base: 'le kit (colis de 250)' },               // Kit couvert 3 pièces bois
+  '68465': { prix: 0.0127,  base: 'la serviette 30x30 1 pli' },            // Serviette snack
+
+  // ── Canettes et jus : nos prix cash & carry ──
+  '53850': { prix: 0.66, base: 'la canette 33 cl' },
+  '53860': { prix: 0.56, base: 'la canette 33 cl' },
+  '52501': { prix: 0.58, base: 'la canette 33 cl' },
+  '52397': { prix: 1.19, base: 'la bouteille 33 cl' },
+  '52456': { prix: 0.85, base: 'la bouteille 20 cl' },
+  '52406': { prix: 0.95, base: 'la bouteille 20 cl' },
+
+  // ── Épicerie ──
+  '28500': { prix: 26.458, base: 'le pot de 3 kg' },                       // Nutella
+
+  // ⚠️ Les deux suivantes sont des prix France Boissons, DROITS D'ACCISES
+  // COMPRIS et en verre CONSIGNÉ. Le dire est indispensable : sans cette
+  // précision, le prix paraît élevé et la remise demandée n'a pas de sens.
+  '57003': { prix: 0.9392, base: 'la bouteille 33 cl, verre consigné' },   // Perrier
+  '54822': { prix: 1.504,  base: 'la bouteille 33 cl, verre consigné, droits compris' }, // Desperados
+}
+
+// ─── Ce qu'on achète ailleurs et qu'on ne trouve pas chez eux ────
+//
+// La moitié la plus utile du tableau pour un commercial : chaque ligne est
+// une affaire qu'il peut prendre en proposant un équivalent. Sans cette
+// liste, il ne sait même pas que le besoin existe.
+const A_PROPOSER = [
+  ['Sac à baguette kraft 19+7x42 cm',        1000, 35.804, 'Aucun format équivalent au catalogue (vous avez 9+3,5x41 et 9+6,5x58)'],
+  ['Sachet à baguette blanc 9,3+5x55 cm',    1000, 39.354, 'Proche de votre 68022 (9+6,5x58) sans être identique'],
+  ['Sac kraft brun à poignée, fond 12/6',     250, 31.850, 'Vos cabas lisses 68582 / 68585 ont un autre fond'],
+  ['Boîte pâtissière blanche 22x8 cm',         50, 10.450, 'Vous passez de 20x20 à 23x23 — rien en 22'],
+  ['Touillette bois',                         300,  1.594, 'Vos touillettes Genovese sont emballées, pas les nôtres'],
+  ['Paille carton kraft 46 mm',               500,  7.304, 'À rapprocher de vos 68433 / 68434'],
+  ['Film alimentaire, boîte distributrice 45 cm x 300 m', 1, 11.522, 'Vos distributeurs sont en 30 cm'],
+  ['Aluminium, boîte distributrice 45 cm x 200 m',        1, 23.584, 'Vos rouleaux sont en 20 cm'],
+  ['Sac à croissants — autres tailles que le N°104',    1000, null, 'Nous ne prenons que le N°104 aujourd\'hui ; un tarif dégressif sur la gamme nous intéresse'],
+]
+
 // ─── Ce sur quoi il faut qu'il se batte ──────────────────────────
 //
 // Deux raisons d'être prioritaire, et une seule suffit :
@@ -212,12 +271,45 @@ const cat = await lire(PDF)
 for (const [code, nom] of Object.entries(LIBELLES)) {
   const p = cat.get(code); if (p) p.nom = nom
 }
+/**
+ * Combien d'unités VENDABLES dans un colis.
+ *
+ * « c-24x33cl » = 24 canettes ; « c-1x50 » = 50 pièces ; « c-4x6x33cl » = 24 ;
+ * « c-10x4 » = 40 piles ; « 1000 » (emballages) = 1000.
+ *
+ * ⚠️ Le facteur qui porte une CONTENANCE (33cl, 3kg) n'est pas un nombre
+ * d'unités : le multiplier donnerait 792 canettes au lieu de 24, et le prix
+ * de colis équivalent demandé serait absurde.
+ */
+function unitesColis(colisage) {
+  if (!colisage) return null
+  const c = String(colisage).trim()
+  if (/^\d+$/.test(c)) return Number(c)
+  const facteurs = [...c.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml|pcs?)?/gi)]
+    .filter(m => !/^(kg|g|l|cl|ml)$/i.test(m[2] ?? ''))
+    .map(m => Number(m[1].replace(',', '.')))
+  if (!facteurs.length) return null
+  const n = facteurs.reduce((a, b) => a * b, 1)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 const lignes = []
 const tous = [...cat.values()]
 for (const [rayon, a, b, pourquoi] of [...RAYONS, ...RAYONS_TABLEAU]) {
   const refs = tous.filter(p => p.page >= a && p.page <= b)
     .sort((x, y) => x.page - y.page || x.code.localeCompare(y.code))
-  for (const r of refs) lignes.push({ rayon, pourquoi, ...r, prioritaire: PRIORITAIRES.has(r.code) })
+  for (const r of refs) {
+    const connu = PRIX_CONNUS[r.code] ?? null
+    const u = unitesColis(r.colisage)
+    lignes.push({ rayon, pourquoi, ...r,
+      prioritaire: PRIORITAIRES.has(r.code),
+      notrePrix: connu?.prix ?? null,
+      base: connu?.base ?? null,
+      // Le chiffre qu'elle doit battre sur SON colis. Rendu seulement quand
+      // on sait combien d'unités il contient — sinon on demanderait une
+      // remise sur un nombre inventé.
+      colisEquivalent: connu && u ? Number((connu.prix * u).toFixed(2)) : null })
+  }
 }
 
 // ⚠️ Un code prioritaire qui ne tombe dans AUCUN rayon retenu serait perdu en
@@ -226,8 +318,14 @@ for (const [rayon, a, b, pourquoi] of [...RAYONS, ...RAYONS_TABLEAU]) {
 const vus = new Set(lignes.map(l => l.code))
 const orphelins = [...PRIORITAIRES].filter(c => !vus.has(c))
 
+const avecPrix = lignes.filter(l => l.notrePrix !== null)
 console.log(`\n── DEMANDE DE TARIF EURO-CASH ──  ${lignes.length} références`)
-console.log(`   dont ${lignes.filter(l => l.prioritaire).length} prioritaires\n`)
+console.log(`   dont ${lignes.filter(l => l.prioritaire).length} prioritaires`)
+console.log(`   dont ${avecPrix.length} avec notre prix actuel en face\n`)
+for (const l of avecPrix)
+  console.log(`   ${l.code}  ${l.nom.slice(0, 40).padEnd(42)}${String(l.notrePrix).padStart(8)} € ${l.base.padEnd(42)}→ colis à battre : ${l.colisEquivalent ?? '?'} €`)
+const inconnus = Object.keys(PRIX_CONNUS).filter(c => !cat.has(c))
+if (inconnus.length) console.log(`\n  ⚠️ prix posés sur des codes ABSENTS du catalogue : ${inconnus.join(', ')}`)
 let r = null
 for (const l of lignes) {
   if (l.rayon !== r) {
@@ -244,10 +342,22 @@ for (const [quoi, pourquoi] of ECARTES) console.log(`    · ${quoi}\n      ${pou
 
 // ─── Le fichier à envoyer ────────────────────────────────────────
 const esc = s => `"${String(s).replace(/"/g, '""')}"`
-const csv = ['Rayon;Priorité;Code;Désignation;Colisage;Page catalogue;Prix HT unité;Prix HT colis;Remise']
-for (const l of lignes) csv.push(
-  [l.rayon, l.prioritaire ? 'PRIORITAIRE' : '', l.code, l.nom, l.colisage, l.page, '', '', '']
-    .map(esc).join(';'))
-const sortie = 'data/selection-eurocash-2026-09-23.csv'
+const csv = ['Rayon;Priorité;Code;Désignation;Colisage;Page catalogue;Notre prix actuel HT;Base de notre prix;Prix colis à battre;VOTRE PRIX HT;VOTRE REMISE']
+for (const l of lignes) csv.push([
+  l.rayon, l.prioritaire ? 'PRIORITAIRE' : '', l.code, l.nom, l.colisage, l.page,
+  l.notrePrix === null ? '' : String(l.notrePrix).replace('.', ','),
+  l.base ?? '',
+  l.colisEquivalent === null ? '' : String(l.colisEquivalent).replace('.', ','),
+  '', '',
+].map(esc).join(';'))
+
+// Les besoins sans équivalent au catalogue : une affaire à prendre pour qui
+// sait proposer le produit. Elles ferment le tableau plutôt que de disparaître.
+csv.push('')
+csv.push(esc('CE QUE NOUS ACHETONS AILLEURS ET QUE NOUS N’AVONS PAS TROUVÉ À VOTRE CATALOGUE — avez-vous un équivalent ?'))
+csv.push('Désignation;Par;Notre prix HT du colis;Remarque;;;;;;VOTRE PRIX HT;VOTRE REMISE')
+for (const [nom, par, prix, remarque] of A_PROPOSER)
+  csv.push([nom, par, prix === null ? '' : String(prix).replace('.', ','), remarque, '', '', '', '', '', '', ''].map(esc).join(';'))
+const sortie = 'data/tarif-eurocash-2026-09-23.csv'
 fs.writeFileSync(sortie, '﻿' + csv.join('\r\n'), 'utf8')
 console.log(`\n  → ${sortie} — ${lignes.length} lignes, 3 colonnes vides à remplir par Euro-Cash\n`)
