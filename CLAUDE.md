@@ -152,9 +152,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Allergènes vérifiés | `allergenes_valides_le` — « rien déclaré » ≠ « aucun allergène » | 0138 |
 | Rapprochement caisse | contrôle quotidien reçu vs compris, page `/admin/integrations` | 0139 |
 | Adaptateur Zelty | mapper pur + banc d'essai, prêt à brancher | — |
-| Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151 |
+| Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151, 0152 |
 
-**Migrations actuelles : 0001 → 0151.**
+**Migrations actuelles : 0001 → 0152.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2156,7 +2156,66 @@ rester sans décision explicite : la coppa n'est pas du jambon serrano, les
 herbes de Provence ne sont pas de l'origan, le beurre allégé à 40 % n'est pas
 du beurre à 82 %. Le test le vérifie.
 
-Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 25 assertions.
+**Gineys, Promocash et Lavazza entrent par les FACTURES (0152).** Ils n'ont
+jamais envoyé de devis : ce qu'on sait de leurs prix vient des factures
+scannées. C'est même mieux qu'un devis — ce sont des prix RÉELLEMENT PAYÉS.
+`node scripts/catalogue-depuis-factures.mjs [--ecrire]` : **106 articles**
+(Gineys 82, Promocash 18, Lavazza 6), une ligne par article et par
+fournisseur, la plus RÉCENTE.
+
+⚠️ **`nature` ('devis' | 'facture') est affiché partout.** Un devis est une
+PROPOSITION : il peut être un tarif d'appel consenti pour emporter un client,
+et ne jamais se revoir. Une facture est une PREUVE. Les comparer est
+exactement le but, mais arbitrer un fournisseur sur le premier en croyant
+lire le second se paie pendant des mois.
+
+⚠️ Seuls les **devis** sont mis « face à nos prix » : une ligne de nature
+facture EST ce qu'on paie, la comparer à elle-même remplirait la page
+d'écarts à zéro.
+
+⚠️ **Un groupe d'UNE ligne n'est pas une comparaison.** Les laisser noyait les
+quinze vrais face-à-face sous quatre-vingt-dix entrées de catalogue — et un
+écran illisible n'est pas consulté.
+
+⚠️ **Le prix d'une ligne facturée AU KILO est déjà le prix de référence.**
+« HUILE GIDOLIVE BID=5L, q=5 L, pu=4,133 » coûte 4,133 €/L ; le rediviser par
+les 5 L lus dans le libellé donnait 0,827 €/L, et l'écran annonçait **496 %
+d'écart** avec le devis — sur un prix qu'on paie nous-mêmes. Même faute sur le
+saumon (42 € au lieu de 21) et les olives (4,12 au lieu de 10,30). La
+contenance ne se cherche QUE pour un contenant.
+
+⚠️ **Un poids au milieu d'un libellé ne dit rien de la contenance.**
+« BAGUETTE PRECUITE SUR FOUR A SOLE 280G ARTIPAT C=32 » : le 280 g est le
+poids d'UNE baguette, le prix celui du CARTON — les relier donne 49,71 €/kg,
+trente-deux fois trop. Deux formes seulement sont lues : un **marqueur**
+(`BQT=500G`, `SEAU=1L`, `BID=5L`, `SAC=25`) et un **préfixe**, la convention
+cash & carry de Promocash où le format ouvre le libellé (`1KG SCE BARBECUE`,
+`BTE 33CL ORANGINA`). Tout le reste reste sans contenance.
+
+⚠️ **`PR`, `TR`, `OF`, `G` ne sont PAS des pièces** — ce sont des codes
+internes du grossiste. Les traduire en « pièce » sortait la mozzarella cerise
+(« BQT=1KG », facturée `PR`) de toute comparaison, et faisait passer un sac de
+250 sacs kraft pour une unité. Seuls `Kg`, `L`, `Pce` et `Col` sont sûrs ; tout
+le reste, **unité absente comprise**, est traité comme un contenant. Une unité
+manquante n'est pas une pièce : « PQ 200 SERV BLC » à 1,15 € est un paquet de
+deux cents serviettes, et lu comme une pièce il faisait dire à l'écran que
+Promocash vendait la serviette **quatre-vingt-huit fois** le prix de Gineys,
+alors qu'elle est moins chère.
+
+⚠️ Les **avoirs** sont exclus : montants négatifs, marchandise rendue, pas un
+tarif (même règle que la 0127).
+
+⚠️ Les factures déjà scannées n'ont **aucune référence** (elle n'était pas
+extraite à l'époque, cf. 0142) : le libellé normalisé sert de clé d'upsert,
+sinon rien ne saurait quoi remplacer.
+
+**Quinze face-à-face au 23/09/2026.** Les plus parlants : mayonnaise +139 %
+chez Gineys (squeeze 920 g contre seau de 4,65 kg), beurre doux +43 %, sauces
+burger et kebab +40 % et +37 %, jambon serrano +28 %. À l'inverse **l'huile
+d'olive est 19 % moins chère chez Gineys** et les olives noires 34 %. Aucun
+fournisseur ne gagne partout — c'est exactement ce que l'écran sert à voir.
+
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 33 assertions.
 ⚠️ Il RECOPIE les règles d'extraction depuis le TS ; modifier les deux
 ensemble. Et il vérifie que la page est **fermée aux appels anonymes** : elle
 expose des conditions négociées, la laisser répondre reviendrait à les
@@ -2782,6 +2841,7 @@ PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (01
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
+node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash/Lavazza depuis nos factures
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse

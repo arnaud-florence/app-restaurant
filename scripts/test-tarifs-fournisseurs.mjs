@@ -125,6 +125,44 @@ if (f) {
   T('le jambon en pièce entière reste non rapproché', !piece?.ingredient_id)
 }
 
+console.log('\n── Le catalogue tiré de nos factures ──')
+const tousF = await sb('catalogue_fournisseur?select=designation,unite,prix_ht,contenance_valeur,contenance_unite,nature,fournisseur_id,cle_comparaison')
+const factures = tousF.filter(t => t.nature === 'facture')
+T('des tarifs viennent de nos factures', factures.length >= 100, `${factures.length}`)
+T('ils sont tous marqués « facture »', factures.every(t => t.nature === 'facture'))
+
+// ⚠️ Le prix d'une ligne facturée AU KILO est déjà le prix de référence. Lui
+// coller la contenance lue dans le libellé (« BID=5L ») le redivisait par
+// cinq : l'huile Gineys tombait à 0,827 €/L et l'écran annonçait 496 %
+// d'écart avec le devis, sur un prix qu'on paie nous-mêmes.
+const auKilo = factures.filter(t => ['kg', 'L', 'piece'].includes(t.unite))
+T('aucune ligne au kilo/litre ne porte de contenance', auKilo.every(t => !t.contenance_valeur),
+  auKilo.filter(t => t.contenance_valeur).map(t => t.designation).join(' | '))
+const huile = factures.find(t => t.designation.includes('GIDOLIVE'))
+T('l’huile Gineys reste à son prix au litre', huile && Math.abs(Number(huile.prix_ht) - 4.133) < 0.001,
+  huile ? String(huile.prix_ht) : 'absente')
+const olives = factures.find(t => t.designation.includes('OLIVE NOIRE A LA GRECQUE'))
+T('les olives Gineys restent à 10,30 €/kg', olives && !olives.contenance_valeur && Math.abs(Number(olives.prix_ht) - 10.3) < 0.001)
+
+// ⚠️ « BAGUETTE … 280G ARTIPAT C=32 » : le 280 g est le poids d'UNE
+// baguette, le prix celui du CARTON. Les relier donnerait 49 €/kg.
+const bag = factures.filter(t => t.designation.toUpperCase().includes('BAGUETTE'))
+T('un poids au milieu d’un libellé ne fait pas une contenance',
+  bag.every(t => !t.contenance_valeur || t.contenance_unite === 'piece'),
+  bag.filter(t => t.contenance_unite && t.contenance_unite !== 'piece').map(t => t.designation).join(' | '))
+const croissant = factures.find(t => t.designation.includes('CROISSANT PREPOUSSE 70G'))
+T('un colis de 96 croissants donne bien 0,30 € la pièce',
+  croissant && Math.abs(Number(croissant.prix_ht) / Number(croissant.contenance_valeur) - 0.300) < 0.002)
+
+// La raison d'être de l'écran : des clés portées par DEUX fournisseurs.
+const parCle = new Map()
+for (const t of tousF.filter(t => t.cle_comparaison)) {
+  if (!parCle.has(t.cle_comparaison)) parCle.set(t.cle_comparaison, new Set())
+  parCle.get(t.cle_comparaison).add(t.fournisseur_id)
+}
+const duels = [...parCle.values()].filter(s => s.size > 1).length
+T('au moins dix face-à-face entre fournisseurs', duels >= 10, `${duels}`)
+
 if (PORT) {
   // ⚠️ On ne vérifie PAS le contenu de la page : depuis le module 28 le
   // middleware renvoie un 307 vers /login, et c'est ce qu'on veut. Cet écran

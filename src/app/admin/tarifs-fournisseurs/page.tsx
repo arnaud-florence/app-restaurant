@@ -19,7 +19,7 @@ export default async function TarifsFournisseursPage() {
 
   const [{ data: tarifs }, { data: fournisseurs }, { data: matieres }] = await Promise.all([
     sb.from('catalogue_fournisseur')
-      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, date_tarif, source')
+      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature')
       .eq('actif', true).order('famille').order('designation'),
     sb.from('fournisseurs').select('id, nom').order('nom'),
     // Nos matières réellement comptées : ce sont elles qu'on rachète, donc
@@ -48,8 +48,11 @@ export default async function TarifsFournisseursPage() {
   }))
   const parMatiere = new Map(nosMatieres.map(m => [m.id, m]))
 
+  // ⚠️ Seuls les DEVIS sont mis face à ce qu'on paie. Une ligne de nature
+  // « facture » EST ce qu'on paie : la comparer à elle-même afficherait une
+  // colonne d'écarts à zéro, qui noierait les vraies alternatives.
   const faceAFace = lignes
-    .filter(l => l.ingredient_id && parMatiere.has(l.ingredient_id))
+    .filter(l => l.nature === 'devis' && l.ingredient_id && parMatiere.has(l.ingredient_id))
     .map(l => {
       const nous = parMatiere.get(l.ingredient_id!)!
       const ref = prixReference(l)

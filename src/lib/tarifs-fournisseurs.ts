@@ -40,8 +40,15 @@ export type LigneTarif = {
   contenance_unite: UniteRef | null
   cle_comparaison: string | null
   ingredient_id: string | null
+  recette_id?: string | null
   date_tarif: string
   source: string | null
+  /**
+   * D'où vient ce prix. `devis` = PROPOSÉ, il peut ne jamais se réaliser et
+   * peut être un tarif d'appel. `facture` = PAYÉ, c'est une preuve. Les deux
+   * se comparent, mais le lecteur doit savoir lequel il regarde.
+   */
+  nature: 'devis' | 'facture'
 }
 
 /** Unités de facturation qui SONT déjà une unité de référence. */
@@ -244,10 +251,12 @@ export function score(libelle: string, cible: string): number {
 
 export type Groupe = {
   cle: string
-  lignes: (LigneTarif & { ref: ReturnType<typeof prixReference> })[]
+  lignes: (LigneTarif & { ref: PrixRef | null })[]
   meilleur: string | null       // id de la ligne la moins chère
   ecartPct: number | null       // écart entre la moins chère et la plus chère
-  comparable: boolean           // toutes les lignes ramenées à la MÊME unité ?
+  comparable: boolean           // toutes les lignes ramenées à la MÊME base ?
+  /** Nombre de fournisseurs distincts — 1 = on compare deux de ses propres références. */
+  fournisseurs: number
 }
 
 /**
@@ -284,8 +293,16 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
       const bas = tri[0].ref!.prix, haut = tri[tri.length - 1].ref!.prix
       ecartPct = bas > 0 ? ((haut - bas) / bas) * 100 : null
     }
-    groupes.push({ cle, lignes: avecRef, meilleur, ecartPct, comparable })
+    // ⚠️ Un groupe d'UNE SEULE ligne n'est pas une comparaison, c'est une
+    // entrée de catalogue. Les laisser noyait les quinze vrais face-à-face
+    // sous quatre-vingt-dix lignes sans rien en face — et un écran illisible
+    // n'est pas consulté.
+    if (avecRef.length < 2) continue
+    groupes.push({ cle, lignes: avecRef, meilleur, ecartPct, comparable,
+      fournisseurs: new Set(avecRef.map(l => l.fournisseur_id)).size })
   }
-  // Les plus gros écarts d'abord : c'est là qu'il y a de l'argent.
-  return groupes.sort((a, b) => (b.ecartPct ?? -1) - (a.ecartPct ?? -1))
+  // Les duels entre fournisseurs d'abord, puis le plus gros écart : c'est
+  // là qu'il y a de l'argent à aller chercher.
+  return groupes.sort((a, b) =>
+    (b.fournisseurs - a.fournisseurs) || ((b.ecartPct ?? -1) - (a.ecartPct ?? -1)))
 }

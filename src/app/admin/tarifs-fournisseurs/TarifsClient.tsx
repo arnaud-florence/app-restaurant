@@ -54,7 +54,7 @@ export default function TarifsClient({
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          ['Tarifs au catalogue', String(lignes.length)],
+          ['Tarifs au catalogue', `${lignes.filter(l => l.nature === 'devis').length} devis · ${lignes.filter(l => l.nature === 'facture').length} payés`],
           ['Rapprochés de nos matières', String(faceAFace.length)],
           ['Moins chers qu’aujourd’hui', String(moinsCher.length)],
           ['Contenance à préciser', String(sansReference)],
@@ -120,7 +120,10 @@ export default function TarifsClient({
                         </td>
                         <td className="px-3 py-2">
                           <p className="text-zinc-800">{f.ligne.designation}</p>
-                          <p className="text-[11px] text-zinc-500">{f.ligne.fournisseur_nom} · {f.ligne.date_tarif}</p>
+                          <p className="text-[11px] text-zinc-500">
+                            {f.ligne.fournisseur_nom} · {f.ligne.date_tarif}
+                            <Nature nature={f.ligne.nature} />
+                          </p>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {f.ref ? fmtRef(f.ref) : <span className="text-zinc-400">contenance inconnue</span>}
@@ -169,7 +172,14 @@ export default function TarifsClient({
           ) : groupes.map(g => (
             <div key={g.cle} className="rounded-xl border border-zinc-200 bg-white p-3">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="font-bold text-zinc-900">{g.cle}</p>
+                <p className="font-bold text-zinc-900">
+                  {g.cle}
+                  {g.fournisseurs === 1 && (
+                    <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-zinc-400">
+                      deux références du même fournisseur
+                    </span>
+                  )}
+                </p>
                 {g.comparable && g.ecartPct !== null
                   ? <p className="text-sm font-bold text-emerald-600">{fmtPct(g.ecartPct)} d’écart</p>
                   : <p className="text-xs text-amber-700">non comparable — unités ou contenances différentes</p>}
@@ -177,7 +187,11 @@ export default function TarifsClient({
               <ul className="mt-2 space-y-1 text-sm">
                 {g.lignes.map(l => (
                   <li key={l.id} className={`flex justify-between gap-3 rounded px-2 py-1 ${l.id === g.meilleur ? 'bg-emerald-50 font-semibold' : ''}`}>
-                    <span>{l.id === g.meilleur ? '✓ ' : ''}{l.fournisseur_nom} — {l.designation}</span>
+                    <span>
+                      {l.id === g.meilleur ? '✓ ' : ''}{l.fournisseur_nom} — {l.designation}
+                      <Nature nature={l.nature} />
+                      <span className="ml-1 text-[10px] text-zinc-400">{l.date_tarif}</span>
+                    </span>
                     <span className="tabular-nums">{l.ref ? fmtRef(l.ref) : 'contenance inconnue'}</span>
                   </li>
                 ))}
@@ -211,7 +225,10 @@ export default function TarifsClient({
                       <td className="px-3 py-2 font-mono text-[11px] text-zinc-500">{l.reference || '—'}</td>
                       <td className="px-3 py-2">
                         <p className="text-zinc-800">{l.designation}</p>
-                        <p className="text-[11px] text-zinc-400">{l.fournisseur_nom} · {l.famille}</p>
+                        <p className="text-[11px] text-zinc-400">
+                          {l.fournisseur_nom}{l.famille ? ` · ${l.famille}` : ''} · {l.date_tarif}
+                          <Nature nature={l.nature} />
+                        </p>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{fmtPrix(l.prix_ht)}<span className="text-zinc-400">/{l.unite}</span></td>
                       <td className="px-3 py-2 text-right tabular-nums">
@@ -232,6 +249,22 @@ export default function TarifsClient({
       )}
     </main>
   )
+}
+
+/**
+ * D'où vient ce prix — et c'est tout sauf décoratif.
+ *
+ * Un devis est une PROPOSITION : il peut être un tarif d'appel consenti pour
+ * emporter un client, et ne jamais se revoir. Une facture est une PREUVE.
+ * Arbitrer un fournisseur sur le premier en croyant lire le second se paie
+ * pendant des mois.
+ */
+function Nature({ nature }: { nature: 'devis' | 'facture' }) {
+  return nature === 'facture'
+    ? <span title="Prix réellement payé, relevé sur une facture"
+        className="ml-1 rounded bg-emerald-100 px-1 text-[9px] font-bold uppercase tracking-wide text-emerald-800">payé</span>
+    : <span title="Prix proposé sur un devis — il peut ne jamais se réaliser"
+        className="ml-1 rounded bg-amber-100 px-1 text-[9px] font-bold uppercase tracking-wide text-amber-800">devis</span>
 }
 
 function Vide({ texte }: { texte: string }) {
