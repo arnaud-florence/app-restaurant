@@ -312,40 +312,71 @@ export async function POST(req: Request) {
     adresseFinale = `${(p.adresse_livraison ?? '').trim()}, ${commune}`
   }
 
-  // ─── Anti-race : vérifie que le créneau choisi n'est pas déjà pris ───
-  // Le cache CDN peut faire afficher un slot dispo pendant max 30s alors qu'il
-  // vient d'être réservé. On revérifie au dernier moment, juste avant l'INSERT.
-  // Règle : 1 commande max par créneau (cohérent avec listerCreneauxDisponibles).
+  // ─── Anti-race : la place est-elle encore là, au dernier moment ? ───
+  //
+  // Le cache CDN peut montrer un créneau libre pendant 30 s alors qu'il vient
+  // d'être pris. On revérifie juste avant l'INSERT.
+  //
+  // ⚠️ ON COMPTE DES ARTICLES, PAR POSTE (0153). L'ancienne version comptait
+  // les COMMANDES, toutes destinations confondues, avec une limite de 1 :
+  //   · une baguette à retirer à 19 h bloquait le créneau pizza de 19 h — les
+  //     heures rondes du fournil et les quarts d'heure de la pizzeria se
+  //     croisent tous les soirs ;
+  //   · et la capacité réglée par le gérant n'était jamais lue, si bien qu'un
+  //     client commandant six pizzas passait sans problème.
   //
   // ⚠️ NE S'APPLIQUE PAS à la livraison : toutes les commandes d'une tournée
   // partagent le même `creneau_retrait`. Sans cette exclusion, la 2ᵉ livraison
   // de la journée serait refusée avec « ce créneau vient d'être réservé ».
   if (p.creneau_retrait && p.mode_retrait !== 'livraison') {
     const slotStart = new Date(p.creneau_retrait)
-    // Détermine la durée du créneau via la config (par défaut 15 min si introuvable)
     const jourSemaine = slotStart.getDay()
-    const { data: cfg } = await sb.from('capacite_cuisine_par_creneau')
-      .select('duree_creneau_min')
-      .eq('jour_semaine', jourSemaine)
-      .eq('tag_destination', 'SNACKING')  // TODO : adapter si pizza/bar online
-      .eq('actif', true)
-      .limit(1)
-      .maybeSingle()
-    const dureeMin = Number(cfg?.duree_creneau_min ?? 15)
-    const slotEnd = new Date(slotStart.getTime() + dureeMin * 60_000)
 
-    const { count: dejaPrises } = await sb.from('commandes')
-      .select('*', { count: 'exact', head: true })
-      .in('source', ['ONLINE', 'COMPTOIR'])
-      .not('statut', 'in', '(annule)')
-      .gte('creneau_retrait', slotStart.toISOString())
-      .lt('creneau_retrait', slotEnd.toISOString())
+    // Ce que CETTE commande demande, poste par poste.
+    const demande: Record<string, number> = {}
+    for (const a of articlesEnrichis) {
+      const t = a.tag_destination as string | null
+      if (t) demande[t] = (demande[t] ?? 0) + Number(a.quantite ?? 0)
+    }
 
-    if ((dejaPrises ?? 0) >= 1) {
-      return Response.json(
-        { error: 'Ce créneau vient d\'être réservé. Choisis un autre horaire.' },
-        { status: 409, headers: cors },
-      )
+    for (const [tag, veut] of Object.entries(demande)) {
+      const { data: cfg } = await sb.from('capacite_cuisine_par_creneau')
+        .select('duree_creneau_min, max_articles')
+        .eq('jour_semaine', jourSemaine)
+        .eq('tag_destination', tag)
+        .eq('actif', true)
+        .limit(1)
+        .maybeSingle()
+      // Pas de capacité déclarée pour ce poste : il ne se gère pas par
+      // créneaux (le fournil vend en continu). Rien à vérifier.
+      if (!cfg) continue
+
+      const dureeMin = Number(cfg.duree_creneau_min ?? 15)
+      const slotEnd = new Date(slotStart.getTime() + dureeMin * 60_000)
+      const max = Number(cfg.max_articles ?? 1)
+
+      const { data: dejaPrises } = await sb.from('commandes')
+        .select('creneau_retrait, commande_articles!inner(quantite, tag_destination)')
+        .eq('commande_articles.tag_destination', tag)
+        .in('source', ['ONLINE', 'COMPTOIR'])
+        .not('statut', 'in', '(annule)')
+        .gte('creneau_retrait', slotStart.toISOString())
+        .lt('creneau_retrait', slotEnd.toISOString())
+
+      const engages = (dejaPrises ?? []).reduce((n, c) => {
+        const lignes = (c.commande_articles ?? []) as Array<{ quantite: number }>
+        return n + lignes.reduce((q, l) => q + Number(l.quantite ?? 0), 0)
+      }, 0)
+
+      if (engages + veut > max) {
+        const restant = Math.max(0, max - engages)
+        return Response.json({
+          error: restant === 0
+            ? 'Ce créneau vient d\'être complet. Choisissez un autre horaire.'
+            : `Il ne reste que ${restant} place${restant > 1 ? 's' : ''} sur ce créneau, `
+              + `et votre commande en demande ${veut}. Choisissez un autre horaire.`,
+        }, { status: 409, headers: cors })
+      }
     }
   }
 

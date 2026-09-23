@@ -19,7 +19,7 @@ const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_P
 // 1. Charge toutes les configs SNACKING
 const { data: snacks, error: e1 } = await sb
   .from('capacite_cuisine_par_creneau')
-  .select('jour_semaine, heure_debut, heure_fin, duree_creneau_min, max_commandes, actif, etablissement_id')
+  .select('jour_semaine, heure_debut, heure_fin, duree_creneau_min, max_articles, actif, etablissement_id')
   .eq('tag_destination', 'SNACKING')
 if (e1) { console.error('Erreur lecture SNACKING :', e1.message); process.exit(1) }
 console.log(`${snacks.length} configs SNACKING chargées`)
@@ -43,7 +43,7 @@ const aInserer = snacks
     heure_debut: s.heure_debut,
     heure_fin: s.heure_fin,
     duree_creneau_min: s.duree_creneau_min,
-    max_commandes: s.max_commandes,
+    max_articles: s.max_articles,
     actif: s.actif,
     etablissement_id: s.etablissement_id,
     tag_destination: 'PIZZA',

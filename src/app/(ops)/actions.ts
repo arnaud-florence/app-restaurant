@@ -986,7 +986,7 @@ export async function listerCreneauxDisponibles(
   const jourSemaine = new Date(date + 'T12:00:00').getDay()
 
   const { data: configs, error: errCfg } = await supabase.from('capacite_cuisine_par_creneau')
-    .select('heure_debut, heure_fin, duree_creneau_min, max_commandes')
+    .select('heure_debut, heure_fin, duree_creneau_min, max_articles')
     .eq('jour_semaine', jourSemaine)
     .eq('tag_destination', tag)
     .eq('actif', true)
@@ -1017,7 +1017,7 @@ export async function listerCreneauxDisponibles(
     const debut = (cfg.heure_debut as string).slice(0, 5)
     const fin = (cfg.heure_fin as string).slice(0, 5)
     const duree = Number(cfg.duree_creneau_min ?? 15)
-    const max = Number(cfg.max_commandes ?? 5)
+    const max = Number(cfg.max_articles ?? 5)
     const [hd, md] = debut.split(':').map(Number)
     const [hf, mf] = fin.split(':').map(Number)
     let curMin = hd * 60 + md

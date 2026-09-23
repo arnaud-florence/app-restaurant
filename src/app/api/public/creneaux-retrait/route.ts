@@ -6,7 +6,16 @@
 //   2. Découpe en créneaux de duree_creneau_min minutes.
 //   3. Pour chaque créneau, compte les commandes ONLINE déjà créées avec
 //      creneau_retrait dans cette tranche.
-//   4. Renvoie disponible=true si count < max_commandes, sinon false.
+//   4. Renvoie disponible=true s'il reste de la place, sinon false.
+//
+// ⚠️ LA CAPACITÉ SE COMPTE EN ARTICLES, PAS EN COMMANDES (0153). Le gérant
+// tient 4 pizzas par quart d'heure : compter les commandes laisserait passer
+// quatre clients de trois pizzas, soit douze pizzas dans le même créneau. Le
+// four ne suit pas, et le réglage affiche pourtant bien « 4 ».
+//
+// Le champ `restant` est rendu au client pour qu'il puisse écarter les
+// créneaux trop justes POUR SON panier : un panier de 3 pizzas n'a rien à
+// faire sur un créneau où il reste une place.
 
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
@@ -51,7 +60,7 @@ export async function GET(req: Request) {
 
   const sb = await createClient()
   const { data: configs } = await sb.from('capacite_cuisine_par_creneau')
-    .select('heure_debut, heure_fin, duree_creneau_min, max_commandes')
+    .select('heure_debut, heure_fin, duree_creneau_min, max_articles')
     .eq('jour_semaine', jourSemaine)
     .eq('tag_destination', tag)
     .eq('actif', true)
@@ -65,26 +74,31 @@ export async function GET(req: Request) {
     })
   }
 
-  // Compte commandes ONLINE déjà existantes pour ce jour avec creneau_retrait
+  // Articles DE CE TAG déjà engagés sur la journée, avec l'heure de leur
+  // commande. On compte ONLINE *et* COMPTOIR — une commande prise au comptoir
+  // charge le même four.
+  //
+  // ⚠️ Le filtre par TAG est indispensable : sans lui, une baguette à retirer
+  // à 19 h occupait un créneau de pizza. Les heures rondes du fournil et les
+  // quarts d'heure de la pizzeria se croisent tous les soirs.
   const dayStart = new Date(dateStr + 'T00:00:00').toISOString()
   const dayEnd = new Date(dateStr + 'T23:59:59').toISOString()
-  // On compte ONLINE *et* COMPTOIR — les commandes prises en interne (poste Snack)
-  // chargent aussi la cuisine. Évite que le snack-man réserve un créneau déjà saturé par le web.
   const { data: cmds } = await sb.from('commandes')
-    .select('creneau_retrait')
+    .select('creneau_retrait, commande_articles!inner(quantite, tag_destination)')
+    .eq('commande_articles.tag_destination', tag)
     .in('source', ['ONLINE', 'COMPTOIR'])
     .not('statut', 'in', '(annule)')
     .gte('creneau_retrait', dayStart)
     .lte('creneau_retrait', dayEnd)
 
-  const slots: Array<{ heure: string; iso: string; disponible: boolean }> = []
+  const slots: Array<{ heure: string; iso: string; disponible: boolean; restant: number; max: number }> = []
   const now = new Date()
 
   for (const cfg of configs) {
     const debut = (cfg.heure_debut as string).slice(0, 5)  // HH:MM
     const fin = (cfg.heure_fin as string).slice(0, 5)
     const duree = Number(cfg.duree_creneau_min ?? 15)
-    const max = Number(cfg.max_commandes ?? 5)
+    const max = Number(cfg.max_articles ?? 5)
 
     const [hd, md] = debut.split(':').map(Number)
     const [hf, mf] = fin.split(':').map(Number)
@@ -105,27 +119,22 @@ export async function GET(req: Request) {
         continue
       }
 
-      // Compte commandes dans ce créneau
-      const count = (cmds ?? []).filter(c => {
-        if (!c.creneau_retrait) return false
+      // Somme des ARTICLES de ce tag déjà engagés sur ce créneau.
+      const engages = (cmds ?? []).reduce((n, c) => {
+        if (!c.creneau_retrait) return n
         const t = new Date(c.creneau_retrait as string).getTime()
-        return t >= slotStartMs && t < slotEndMs
-      }).length
+        if (t < slotStartMs || t >= slotEndMs) return n
+        const lignes = (c.commande_articles ?? []) as Array<{ quantite: number }>
+        return n + lignes.reduce((q, l) => q + Number(l.quantite ?? 0), 0)
+      }, 0)
 
-      // ⚠️ RÈGLE EFFECTIVE : UNE commande par créneau — `max_commandes` de
-      // `capacite_cuisine_par_creneau` n'est PAS appliqué ici, alors que
-      // l'en-tête de ce fichier annonce l'inverse et que l'écran d'admin le
-      // laisse régler. Régler 10 et n'en servir qu'une est un réglage mort :
-      // le gérant croit ouvrir des places qui n'existent pas.
-      //
-      // On ne change pas la règle sans décision : l'élargir, c'est accepter
-      // dix commandes dans le même quart d'heure au four. Le jour où la
-      // capacité est arbitrée avec le pizzaïolo, la ligne à écrire est
-      // `count < (cfg.max_commandes ?? 1)`.
+      const restant = Math.max(0, max - engages)
       slots.push({
         heure: heureStr,
         iso: slotIso,
-        disponible: count === 0,
+        disponible: restant > 0,
+        restant,
+        max,
       })
       curMin += duree
     }

@@ -11,7 +11,7 @@ const creneauSchema = z.object({
   heure_debut:       z.string().regex(/^\d{2}:\d{2}/, 'Format HH:MM'),
   heure_fin:         z.string().regex(/^\d{2}:\d{2}/, 'Format HH:MM'),
   duree_creneau_min: z.coerce.number().int().min(5).max(120).default(15),
-  max_commandes:     z.coerce.number().int().min(1).max(500),
+  max_articles:     z.coerce.number().int().min(1).max(500),
   actif:             z.boolean().default(true),
 })
 
@@ -37,7 +37,7 @@ export async function creerCreneauCapacite(input: unknown) {
     heure_debut: normalizeHeure(p.heure_debut),
     heure_fin: normalizeHeure(p.heure_fin),
     duree_creneau_min: p.duree_creneau_min,
-    max_commandes: p.max_commandes,
+    max_articles: p.max_articles,
     actif: p.actif,
   }).select('id').single()
   if (error || !data) throw new Error(error?.message ?? 'Erreur')
@@ -58,7 +58,7 @@ export async function modifierCreneauCapacite(input: unknown) {
     heure_debut: normalizeHeure(p.heure_debut),
     heure_fin: normalizeHeure(p.heure_fin),
     duree_creneau_min: p.duree_creneau_min,
-    max_commandes: p.max_commandes,
+    max_articles: p.max_articles,
     actif: p.actif,
   }).eq('id', p.id)
   if (error) throw new Error(error.message)
@@ -113,7 +113,7 @@ export async function appliquerPresetStandard() {
     heure_debut: `${p.debut}:00`,
     heure_fin: `${p.fin}:00`,
     duree_creneau_min: 15,
-    max_commandes: p.max,
+    max_articles: p.max,
     actif: true,
   }))
 

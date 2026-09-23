@@ -13,9 +13,10 @@
 // /api/public/activation plutôt que de la recopier ici — une constante
 // recopiée dans un script est une troisième source, pas une simplification.
 //
-// ⚠️ `max_commandes` n'est PAS déduit : c'est la capacité du four, et personne
-// ici ne la connaît. La valeur existante est conservée telle quelle, et le
-// script la RAPPELLE à chaque exécution pour qu'elle soit arbitrée un jour.
+// ⚠️ La capacité se compte en ARTICLES, pas en commandes (0153) : le gérant
+// tient **4 pizzas par quart d'heure**. Compter les commandes laisserait
+// passer quatre clients de trois pizzas — douze pizzas dans le même créneau,
+// avec un réglage qui affiche pourtant « 4 ».
 
 import fs from 'node:fs'
 const env = {}
@@ -47,6 +48,9 @@ if (!services?.par_tag) { console.error('\n  ✗ réponse sans services\n'); pro
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
 const DUREE = 15
 
+/** Articles produits par créneau, arrêté par le gérant le 23/09/2026. */
+const CAPACITE = { PIZZA: 4 }
+
 console.log(`\n── ${ECRIRE ? 'ÉCRITURE' : 'ESSAI À BLANC'} ──\n`)
 
 // Les tags réellement commandables en ligne : un créneau pour une carte que
@@ -65,19 +69,15 @@ for (const [tag, creneaux] of Object.entries(services.par_tag)) {
   for (const { service, jours } of creneaux) {
     const h = services.horaires[service]
     // ⚠️ La capacité est la MÊME tous les jours d'un service : un four ne
-    // change pas de taille le dimanche. Reprendre la valeur ligne à ligne
-    // donnait 8 le dimanche et 10 le reste de la semaine — un écart hérité
-    // d'un vieux jeu de données, que personne n'aurait pu expliquer.
-    const duService = existant.filter(x => x.tag_destination === tag
-      && (x.heure_debut.slice(0, 5) >= '15:00') === (service === 'soir'))
-    const votes = {}
-    for (const x of duService) votes[x.max_commandes] = (votes[x.max_commandes] ?? 0) + 1
-    const capacite = Number(Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 8)
+    // change pas de taille le dimanche. La reprendre ligne à ligne donnait 8
+    // le dimanche et 10 le reste de la semaine — un écart hérité d'un vieux
+    // jeu de données, que personne n'aurait pu expliquer.
+    const capacite = CAPACITE[tag] ?? 4
     for (const j of jours) {
       voulus.push({
         tag_destination: tag, jour_semaine: j,
         heure_debut: `${h.debut}:00`, heure_fin: `${h.fin}:00`,
-        duree_creneau_min: DUREE, max_commandes: capacite,
+        duree_creneau_min: DUREE, max_articles: capacite,
         etablissement_id: null, actif: true,
       })
     }
@@ -89,7 +89,7 @@ for (const v of voulus) (parTag[v.tag_destination] ??= []).push(v)
 for (const [tag, l] of Object.entries(parTag)) {
   console.log(`\n  ${tag} — ${l.length} plage(s), ${DUREE} min par créneau`)
   for (const v of l.sort((a, b) => a.jour_semaine - b.jour_semaine))
-    console.log(`     ${JOURS[v.jour_semaine].padEnd(10)} ${v.heure_debut.slice(0, 5)}–${v.heure_fin.slice(0, 5)}   max ${v.max_commandes} commandes / créneau`)
+    console.log(`     ${JOURS[v.jour_semaine].padEnd(10)} ${v.heure_debut.slice(0, 5)}–${v.heure_fin.slice(0, 5)}   max ${v.max_articles} articles / créneau`)
 }
 
 // Ce qui ne correspond à aucun service ni à aucun produit : on DÉSACTIVE, on
@@ -104,13 +104,9 @@ if (aEteindre.length) {
   for (const [k, n] of Object.entries(t)) console.log(`     ${k} : ${n} plage(s)`)
 }
 
-console.log(`\n  ⚠️ max_commandes est la capacité du FOUR, pas une déduction.`)
-console.log(`     Et il n'est PAS appliqué aujourd'hui : /creneaux-retrait n'accepte`)
-console.log(`     qu'UNE commande par créneau, quoi qu'on règle ici. Le dire plutôt`)
-console.log(`     que de laisser croire à un réglage qui n'a aucun effet.`)
-console.log(`     Valeur reprise de l'existant, à arbitrer avec le pizzaïolo :`)
+console.log(`\n  La capacité se compte en ARTICLES, pas en commandes :`)
 for (const [tag, l] of Object.entries(parTag))
-  console.log(`     ${tag} : ${l[0].max_commandes} commandes par créneau de ${DUREE} min = ${l[0].max_commandes * (60 / DUREE)} l'heure.`)
+  console.log(`     ${tag} : ${l[0].max_articles} articles par créneau de ${DUREE} min = ${l[0].max_articles * (60 / DUREE)} l'heure.`)
 
 if (!ECRIRE) { console.log('\n  (rien écrit — relancer avec --ecrire)\n'); process.exit(0) }
 

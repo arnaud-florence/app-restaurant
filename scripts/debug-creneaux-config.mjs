@@ -23,7 +23,7 @@ console.log(`\n== Date : ${dateStr} (jour_semaine = ${jourSemaine}) ==\n`)
 
 const { data: configs, error } = await sb
   .from('capacite_cuisine_par_creneau')
-  .select('id, jour_semaine, heure_debut, heure_fin, duree_creneau_min, max_commandes, tag_destination, actif')
+  .select('id, jour_semaine, heure_debut, heure_fin, duree_creneau_min, max_articles, tag_destination, actif')
   .order('tag_destination')
   .order('jour_semaine')
 
@@ -54,7 +54,7 @@ for (const [tag, list] of Object.entries(parTag)) {
   for (const c of list) {
     const dayName = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][c.jour_semaine] ?? '?'
     const isToday = c.jour_semaine === jourSemaine ? ' ← AUJOURD\'HUI' : ''
-    console.log(`   ${dayName} ${c.heure_debut}–${c.heure_fin} (${c.duree_creneau_min}min, max ${c.max_commandes}) actif=${c.actif}${isToday}`)
+    console.log(`   ${dayName} ${c.heure_debut}–${c.heure_fin} (${c.duree_creneau_min}min, max ${c.max_articles}) actif=${c.actif}${isToday}`)
   }
   console.log()
 }

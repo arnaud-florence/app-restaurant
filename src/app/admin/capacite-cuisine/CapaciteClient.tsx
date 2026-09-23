@@ -157,7 +157,7 @@ export default function CapaciteClient({ creneaux }: { creneaux: CreneauCapacite
                               {c.heure_debut} → {c.heure_fin}
                             </p>
                             <p className="text-[11px] text-zinc-500">
-                              <span className="font-medium text-zinc-700">{c.max_commandes}</span> cmd max / créneau de {c.duree_creneau_min}min
+                              <span className="font-medium text-zinc-700">{c.max_articles}</span> articles max / créneau de {c.duree_creneau_min}min
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -228,7 +228,7 @@ function CreneauModal({
   const [debut, setDebut] = useState(creneau?.heure_debut ?? '11:30')
   const [fin, setFin] = useState(creneau?.heure_fin ?? '14:00')
   const [duree, setDuree] = useState<number>(creneau?.duree_creneau_min ?? 15)
-  const [max, setMax] = useState<number>(creneau?.max_commandes ?? 8)
+  const [max, setMax] = useState<number>(creneau?.max_articles ?? 8)
   const [actif, setActif] = useState(creneau?.actif ?? true)
   const [erreur, setErreur] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -245,7 +245,7 @@ function CreneauModal({
           heure_debut: debut,
           heure_fin: fin,
           duree_creneau_min: duree,
-          max_commandes: max,
+          max_articles: max,
           actif,
         }
         if (isEdit) await modifierCreneauCapacite({ ...payload, id: creneau!.id })

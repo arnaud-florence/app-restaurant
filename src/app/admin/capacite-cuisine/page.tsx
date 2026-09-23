@@ -14,7 +14,7 @@ export type CreneauCapacite = {
   heure_debut: string              // HH:MM
   heure_fin: string
   duree_creneau_min: number
-  max_commandes: number
+  max_articles: number
   actif: boolean
   created_at: string
 }
@@ -30,7 +30,7 @@ export default async function CapacitePage() {
   type Row = {
     id: string; tag_destination: string; jour_semaine: number;
     heure_debut: string; heure_fin: string;
-    duree_creneau_min: number | string; max_commandes: number | string;
+    duree_creneau_min: number | string; max_articles: number | string;
     actif: boolean; created_at: string;
   }
   const creneaux: CreneauCapacite[] = ((data ?? []) as Row[]).map(r => ({
@@ -40,7 +40,7 @@ export default async function CapacitePage() {
     heure_debut: r.heure_debut.slice(0, 5),
     heure_fin: r.heure_fin.slice(0, 5),
     duree_creneau_min: Number(r.duree_creneau_min ?? 15),
-    max_commandes: Number(r.max_commandes ?? 5),
+    max_articles: Number(r.max_articles ?? 5),
     actif: r.actif,
     created_at: r.created_at,
   }))
