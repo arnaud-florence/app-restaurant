@@ -264,6 +264,25 @@ export async function POST(req: Request) {
   if (p.mode_retrait === 'livraison') {
     const [etat, cfgLiv] = await Promise.all([getActivation(), getConfigLivraisonFournil()])
 
+    // ⚠️ LA TOURNÉE NE TRANSPORTE QUE DU PAIN. C'est une tournée du MATIN, et
+    // le créneau est RECALCULÉ plus bas quoi qu'ait demandé le client : une
+    // pizza commandée en livraison se retrouvait donc programmée sur la
+    // fournée du lendemain matin — avant même que la pizzeria existe, puisque
+    // le contrôle de précommande porte sur le créneau DEMANDÉ et que celui-ci
+    // est ensuite écrasé. Deux protections qui s'annulent l'une l'autre.
+    //
+    // Le jour où la pizza se livrera le soir, ce sera une AUTRE tournée, avec
+    // ses horaires et sa zone : le refus ici est la place exacte où elle
+    // viendra se brancher.
+    const horsFournil = [...new Set(articlesEnrichis.map(a => a.tag_destination as string))]
+      .filter(t => t && t !== 'FOURNIL')
+    if (horsFournil.length > 0) {
+      return Response.json({
+        error: 'La livraison à domicile ne concerne que la boulangerie, le matin. '
+             + 'Les autres produits sont à retirer sur place.',
+      }, { status: 400, headers: cors })
+    }
+
     if (!etat.fournil_livraison) {
       return Response.json(
         { error: 'La livraison à domicile n’est pas disponible actuellement.' },

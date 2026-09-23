@@ -2646,6 +2646,22 @@ sélecteur (`des` porté par chaque ligne de panier) et l'explique, mais une
 interface ne protège de rien — une commande de pizza pour ce soir arriverait
 dans une cuisine qui n'existe pas encore.
 
+⚠️ **LA TOURNÉE DE LIVRAISON NE TRANSPORTE QUE DU PAIN** (23/09/2026). Elle
+part le MATIN, et `/api/public/commande` **recalcule** son créneau quoi qu'ait
+demandé le client. Une pizza commandée en livraison se retrouvait donc
+programmée sur la fournée du lendemain matin — avant même l'ouverture de la
+pizzeria, puisque le contrôle de précommande porte sur le créneau DEMANDÉ et
+que celui-ci est ensuite écrasé. **Deux protections qui s'annulaient l'une
+l'autre**, et aucune erreur pour le dire.
+
+Toute commande `mode_retrait = 'livraison'` contenant un article hors FOURNIL
+est désormais refusée, panier mixte compris — la tournée serait partie avec le
+pain en laissant la pizza derrière. Le jour où la pizza se livrera le soir, ce
+sera une AUTRE tournée (horaires, zone, capacité) : ce refus est la place
+exacte où elle viendra se brancher.
+Test : `PORT=3000 node scripts/test-commande-livraison.mjs` — 6 assertions,
+⚠️ il n'envoie QUE des commandes destinées à être REFUSÉES.
+
 ⚠️ Vérifier ce refus crée une VRAIE commande quand il passe : le contrôle du
 23/09 a produit WEB-260923-7902, supprimée immédiatement (articles + en-tête).
 Ne tester que le chemin REFUSÉ, ou supprimer aussitôt.
