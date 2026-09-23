@@ -2244,6 +2244,47 @@ fût de 20 L donne 20 (des litres), une caisse de 24 bouteilles donne 24 (des
 bouteilles). Diviser par lui rend le prix de l'unité vendue — vrai dans les
 deux cas, à condition de ne pas le prendre pour un volume.
 
+**Euro-Cash — la liste à faire chiffrer (23/09/2026).** Le catalogue général
+été 2026 fait 221 pages et ~2 280 références ; on n'en a besoin que d'une
+fraction. `node scripts/selection-eurocash.mjs` en tire **151 références**,
+rangées par BESOIN et non par rayon — un client qui entre acheter un paquet de
+cigarettes n'achète pas « du rayon briquets », il achète ce qui va avec.
+Sortie : `data/selection-eurocash-2026-09-23.csv`, trois colonnes vides pour
+le tarif. Le fournisseur **Euro-Cash** est créé, prêt à recevoir le devis via
+`catalogue_fournisseur`.
+
+⚠️ **Les codes sont TIRÉS du PDF, jamais recopiés.** Recopier un code à la
+main, c'est faire chiffrer un autre produit et s'en apercevoir à la livraison.
+
+⚠️ **Deux mises en page cohabitent** dans ce catalogue et il faut les deux :
+les rayons en grille (nom / colisage / « Code : NNNNN ») et les emballages en
+tableau. Et **deux produits partagent parfois la même ligne** de tableau
+(« 68420 50 Assiettes Ø22cm 68465 200 Serviettes Blanches ») : lire la ligne
+d'un bloc perdait le second en silence — les serviettes, justement, sont une
+référence qu'on achète déjà.
+
+⚠️ Une poignée de libellés sont **coupés par la mise en page** : le mot
+« Gobelets » est posé au-dessus d'une colonne de contenances, et la ligne ne
+porte plus que « 18cl ». Ils sont rétablis dans `LIBELLES`, à la vue du
+catalogue — envoyer « cl » à chiffrer ne veut rien dire.
+
+**Les rubriques 11 à 13 sont la priorité** : sacs à croissants, sacs
+baguette, sacs sandwich, boîtes pâtissières, bols à salade, gobelets,
+serviettes, kits couverts. On achète déjà ces références chez Gineys et
+Promocash, donc leur prix payé est dans `catalogue_fournisseur` — la
+comparaison sera immédiate.
+
+⚠️ **Ce qui est écarté l'est SCIEMMENT**, et le script le dit : CBD /
+e-liquides / cigarettes électroniques (décision du gérant, pas une case à
+cocher), poppers, pétards (F2/F3 : stockage, âge, responsabilité), displays de
+briquets à visuel (50 pièces d'une série qui se démode), vins et bières
+(France Boissons + vignoble), cafés et thés (la mise à disposition de la
+machine tient au canal). Une liste de courses ne dit rien de ce qu'on a
+écarté ; six mois plus tard on ne sait plus si c'était un oubli.
+
+⚠️ Le catalogue et la sélection vivent dans `data/`, **gitignorés** : document
+commercial d'un tiers, dépôt public.
+
 Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 40 assertions.
 ⚠️ Il RECOPIE les règles d'extraction depuis le TS ; modifier les deux
 ensemble. Et il vérifie que la page est **fermée aux appels anonymes** : elle

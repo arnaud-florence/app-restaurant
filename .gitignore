@@ -60,3 +60,5 @@ sql/setup-pgcron-agents.sql
 data/france-boissons-*.json
 data/devis-*.pdf
 data/felix-potin-*.json
+data/catalogue-*.pdf
+data/selection-*.csv
