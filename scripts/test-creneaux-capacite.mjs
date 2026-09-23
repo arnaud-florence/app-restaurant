@@ -38,7 +38,16 @@ console.log('\n═══ Capacité des créneaux ═══\n')
 const cfg = await sb('capacite_cuisine_par_creneau?select=tag_destination,jour_semaine,heure_debut,heure_fin,max_articles,duree_creneau_min&actif=eq.true')
 const pizza = cfg.filter(c => c.tag_destination === 'PIZZA')
 T('la pizzeria a 7 plages actives', pizza.length === 7, `${pizza.length}`)
-T('toutes le soir, 19h–22h', pizza.every(c => c.heure_debut.startsWith('19') && c.heure_fin.startsWith('22')))
+// ⚠️ Les heures ne sont PAS recopiées ici : elles vivent dans
+// services-restaurant.ts et changent (22h → 23h le 23/09/2026). Un test qui
+// répète une valeur de configuration se met au rouge à chaque décision du
+// gérant, et finit par être ignoré. On lit la même source que l'application.
+const svc = await (await fetch(`http://localhost:${PORT}/api/public/activation`,
+  { headers: { 'x-api-key': env.PUBLIC_API_KEY } })).json()
+const soir = svc.services?.horaires?.soir ?? { debut: '19:00', fin: '23:00' }
+T('toutes sur le service du soir déclaré', pizza.every(c =>
+  c.heure_debut.slice(0, 5) === soir.debut && c.heure_fin.slice(0, 5) === soir.fin),
+  `${soir.debut}–${soir.fin}`)
 T('capacité 8 articles par créneau', pizza.every(c => c.max_articles === 8),
   [...new Set(pizza.map(c => c.max_articles))].join(', '))
 T('créneaux de 15 minutes', pizza.every(c => c.duree_creneau_min === 15))
@@ -49,7 +58,10 @@ T('aucune plage pizzeria le midi', !pizza.some(c => c.heure_debut < '15:00'))
 // Un samedi bien après l'ouverture : aucune commande réelle ne s'y trouve.
 const jour = '2026-12-05'
 const c = await api(`creneaux-retrait?date=${jour}&tag=PIZZA`)
-T('12 créneaux de 19h à 21h45', c.count === 12, `${c.count}`)
+// Nombre de créneaux attendu = amplitude du service ÷ durée d'un créneau.
+const minutes = (h) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
+const attendus = (minutes(soir.fin) - minutes(soir.debut)) / 15
+T(`${attendus} créneaux sur le service du soir`, c.count === attendus, `${c.count}`)
 T('chaque créneau dit ce qu’il lui reste', (c.items ?? []).every(i => typeof i.restant === 'number'))
 T('un créneau vide a 8 places', (c.items ?? [])[0]?.restant === 8, JSON.stringify(c.items?.[0]))
 
@@ -66,9 +78,12 @@ for (const [q, attendu] of [[1, 1], [8, 1], [9, 2], [15, 2], [16, 3], [40, 3]]) 
 // ferme à 22 h, les créneaux nécessaires n'existent pas.
 const gros = await api(`creneaux-retrait?date=${jour}&tag=PIZZA&articles=16`)
 const ouverts = (gros.items ?? []).filter(i => i.disponible)
-T('une commande de 45 min ne démarre pas après 21h15', ouverts.at(-1)?.heure === '21:15',
-  ouverts.at(-1)?.heure)
-T('… et les deux derniers horaires sont barrés', ouverts.length === 10, `${ouverts.length}`)
+// Une commande de trois créneaux ne peut pas démarrer sur les deux derniers :
+// elle déborderait après la fermeture.
+const dernierPossible = (c.items ?? []).at(-3)?.heure
+T('une commande de 45 min ne démarre pas sur les 2 derniers créneaux',
+  ouverts.at(-1)?.heure === dernierPossible, `${ouverts.at(-1)?.heure} vs ${dernierPossible}`)
+T('… soit deux horaires barrés', ouverts.length === c.count - 2, `${ouverts.length}/${c.count}`)
 
 // ── La place se consomme en ARTICLES ─────────────────────────
 // C'est tout l'objet du correctif : compter les COMMANDES laissait passer

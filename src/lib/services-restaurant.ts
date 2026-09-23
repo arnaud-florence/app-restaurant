@@ -18,7 +18,10 @@ export type Service = 'midi' | 'soir'
 
 export const HORAIRES_SERVICE: Record<Service, { debut: string; fin: string }> = {
   midi: { debut: '12:00', fin: '14:30' },
-  soir: { debut: '19:00', fin: '22:00' },
+  // ⚠️ Le service du soir va jusqu'à 23 h (gérant, 23/09/2026). Le 22 h
+  // précédent était une valeur de départ que personne n'avait confirmée — et
+  // c'est elle qui fixait le dernier créneau de commande de pizza.
+  soir: { debut: '19:00', fin: '23:00' },
 }
 
 // ─── Jusqu'à quelle heure la maison est ouverte ──────────────────
@@ -29,9 +32,10 @@ export const HORAIRES_SERVICE: Record<Service, { debut: string; fin: string }> =
 // jusqu'à la fin du service de restauration ». Quelqu'un qui lisait l'affiche
 // puis vérifiait sur le site croyait la brasserie fermée à 19h30.
 export const FERMETURES = {
-  /** Fournil et relais colis : le pain et les colis s'arrêtent avant le reste. */
+  // ⚠️ 20 h, c'est le FOURNIL et le RELAIS COLIS — pas la maison. Confondre
+  // les deux faisait fermer la brasserie trois heures trop tôt sur le site.
   fournil: '20:00',
-  /** Comptoir et restauration : on ferme après le service du soir. */
+  /** Comptoir et restauration : jusqu'à la fin du service du soir. */
   restauration: HORAIRES_SERVICE.soir.fin,
   /** Soirée organisée : environ une par mois, annoncée à l'avance. */
   soireeSpeciale: '01:00',
@@ -40,7 +44,7 @@ export const FERMETURES = {
 /** Ce qu'on affiche au public, en toutes lettres. */
 export const PHRASE_FERMETURE = {
   fournil: 'Fournil et relais colis : 6h30 – 20h, 7 jours sur 7',
-  restauration: 'Comptoir et restauration : jusqu’à la fin du service du soir',
+  restauration: 'Comptoir et restauration : jusqu’à la fin du service du soir, vers 23h',
   soireeSpeciale: 'Soirées organisées, une fois par mois : jusqu’à 1 h du matin',
 } as const
 

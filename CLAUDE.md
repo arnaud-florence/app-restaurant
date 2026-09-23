@@ -2632,7 +2632,7 @@ le site croyait la brasserie fermée à 19h30.
 | Activité | Fermeture |
 |---|---|
 | Fournil et relais colis | **20h**, 7j/7 |
-| Comptoir et restauration | fin du service du soir (22h) |
+| Comptoir et restauration | fin du service du soir, **vers 23h** |
 | **Soirée organisée, une par mois** | **1 h du matin** |
 
 `fournil_fermeture` (table `parametres`) passe de 19:30 à **20:00** : la
@@ -2640,6 +2640,12 @@ correction se propage seule partout où elle s'affiche — c'est tout l'intérê
 de ne pas l'avoir écrite en dur. Les deux autres régimes vivent dans
 `FERMETURES` / `PHRASE_FERMETURE` de `src/lib/services-restaurant.ts`, déjà la
 source unique des services, et partent au site par `/api/public/activation`.
+
+⚠️ **20 h, c'est le FOURNIL et le RELAIS COLIS — pas la maison.** Les
+confondre fermait la brasserie trois heures trop tôt sur le site. Le service
+du soir va jusqu'à **23 h** : le 22 h précédent était une valeur de départ que
+personne n'avait confirmée, et c'est elle qui fixait le dernier créneau de
+commande de pizza (désormais 22h45).
 
 ⚠️ **N'afficher que les horaires du fournil laissait croire que tout ferme en
 même temps.** `SectionHoraires` et la page Contact montrent désormais les
@@ -2673,10 +2679,23 @@ dans `public/` sans être référencé nulle part. Le nouveau logo est attendu e
 PNG transparent ou en SVG ; il faudra le poser en en-tête, en favicon, en
 icône PWA (192 et 512) et dans `og-image.jpg`.
 
-**Pas encore fait, volontairement** — c'est de l'écriture de marque, pas de la
-correction : l'histoire « De l'auberge provençale à CasaTasia », les slogans
-(« Ici, la vie a bon goût ! », « Authentique • Convivial • Gourmand », « Tout
-simplement CasaTasia ») et la bascule du titre vers « Maison Méditerranéenne ».
+**Écrit le 23/09/2026** : le label du hero passe de « Le Fournil » à **Maison
+Méditerranéenne** (le titre disait déjà CASATASIA — c'est le label qui
+réduisait la maison à sa boulangerie, sur le PREMIER écran), une section
+**« De l'auberge provençale à CasaTasia »** raconte l'histoire des affiches,
+la signature **« Ici, la vie a bon goût ! »** est posée juste sous le hero, et
+le pied de page — le texte que Google lit en bas de CHAQUE page — nomme enfin
+la maison au lieu du seul fournil.
+
+⚠️ **Le texte ne DATE rien et ne compte aucune génération.** « Depuis 1923 »
+serait vérifiable, donc réfutable, et personne ici n'a la date. Une
+imprécision assumée vaut mieux qu'une précision inventée sur l'histoire d'un
+lieu que les clients connaissent mieux que nous.
+
+⚠️ `scripts/test-creneaux-capacite.mjs` ne RECOPIE plus les heures du service :
+il les lit par `/api/public/activation`. Un test qui répète une valeur de
+configuration passe au rouge à chaque décision du gérant, et finit par être
+ignoré — ce jour-là il ne protège plus rien.
 
 ### Services du restaurant et aperçu des cartes (22/09/2026)
 
