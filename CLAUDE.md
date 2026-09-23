@@ -2647,6 +2647,36 @@ sélecteur (`des` porté par chaque ligne de panier) et l'explique, mais une
 interface ne protège de rien — une commande de pizza pour ce soir arriverait
 dans une cuisine qui n'existe pas encore.
 
+### Le paiement en ligne attend le TPE du CIC (23/09/2026)
+
+**Décision du gérant** : le paiement en ligne se fera quand le **TPE du CIC**
+sera déclaré dans le logiciel de caisse, pour que l'encaissement web y soit
+raccordé. Tant que ce n'est pas fait, le tunnel reste « vous réglez au retrait
+ou à la livraison », espèces ou carte.
+
+C'est cohérent avec la frontière posée le 24/08 : **la caisse agréée est la
+source légale (NF525)**. Un paiement web encaissé à côté produirait un CA
+parallèle sans valeur fiscale, qu'il faudrait ensuite rapprocher à la main —
+exactement ce que le connecteur existe pour éviter.
+
+⚠️ **LE MÊME GESTE DÉBLOQUE L'ÉMISSION DES COMMANDES WEB.** Zelty n'a
+aujourd'hui **aucune méthode de paiement** (`/transaction-methods` est vide),
+donc `ZELTY_MODE_PAIEMENT_EN_LIGNE` n'a pas de valeur possible et
+`/api/cron/caisse/zelty/emission` échouerait en 400 — raison pour laquelle il
+n'est pas planifié dans pg_cron. Déclarer le TPE crée ce mode de paiement, et
+les commandes de casatasia.fr peuvent alors remonter dans la caisse **payées**,
+au lieu d'être ressaisies.
+
+**L'ordre qui en découle**, et il n'est pas interchangeable :
+1. déclarer le TPE du CIC dans Zelty (et sortir du mode école) ;
+2. relever le libellé EXACT du mode de paiement → `ZELTY_MODE_PAIEMENT_EN_LIGNE` ;
+3. planifier `emission` dans pg_cron ;
+4. seulement alors, brancher le paiement en ligne du site sur ce mode.
+
+⚠️ Brancher le paiement du site AVANT l'étape 1 obligerait à encaisser hors
+caisse puis à rapprocher à la main. Ne pas commencer par là parce que c'est la
+partie visible.
+
 **LA PIZZERIA A SES PROPRES CRÉNEAUX (23/09/2026).** Le tunnel du site ne
 connaissait qu'un modèle — celui du fournil : retrait à l'heure ronde entre
 7 h et 19 h, ou tournée du matin. Il proposait donc ces horaires pour une
