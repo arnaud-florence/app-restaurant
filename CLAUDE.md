@@ -2691,11 +2691,45 @@ desserts**, **événements, baptêmes et anniversaires** — chacun daté, via
 ⚠️ Le tag `SNACKING` n'a **aucun produit** : son aperçu ne publie donc aucune
 carte. On annonce le service, pas un menu vide.
 
-⚠️ **Le logo n'est pas à jour.** L'en-tête affiche `logo-small.png` en
-**128×128** — une vignette — tandis que `logo-casatasia.png` (1693×929) dort
-dans `public/` sans être référencé nulle part. Le nouveau logo est attendu en
-PNG transparent ou en SVG ; il faudra le poser en en-tête, en favicon, en
-icône PWA (192 et 512) et dans `og-image.jpg`.
+### Le logotype de l'affiche (24/09/2026)
+
+Le gérant a changé de logo : **rameau d'olivier, CASATASIA, « Maison
+Méditerranéenne »**, crème sur vert bouteille (`#0B2B22`, relevé sur
+l'affiche). Détouré de l'affiche elle-même — aucun fichier vectoriel n'existe.
+
+| Fichier | Où | Quoi |
+|---|---|---|
+| `logo-casatasia.png` | site + app | logotype CRÈME, transparent, 1400×508 |
+| `logo-casatasia-sombre.png` | site + app | le même en VERT, pour fonds clairs |
+| `icon-512` / `icon-192` / `apple-touch-icon` / `logo-small` | site + app | monogramme **CT** sur vert |
+| `src/app/favicon.ico` | site | le même CT en 32×32 |
+| `og-image.jpg` | site | 1200×630, logotype + activités + commune |
+
+⚠️ **Le logotype est MONOCHROME : seul l'alpha porte la forme.** Le crème posé
+sur un fond clair est invisible, et c'est exactement ce qui s'est produit en
+posant la version verte dans l'en-tête de l'admin — qui est sur `stone-900`,
+donc SOMBRE. L'ancien commentaire du code disait le contraire parce que
+l'ancien lettrage était découpé dans une photo d'enseigne et arrivait avec son
+fond crème opaque.
+
+⚠️ **L'icône ne porte QUE le monogramme CT, sans le rameau.** À 48 px — la
+taille réelle de la pastille de l'en-tête du site — le rameau devient une
+bouillie de pixels. Il reste sur le logotype, où il a la place de se lire.
+
+⚠️ **Les dimensions passées à `<Image>` doivent suivre le fichier** : gardées à
+celles de l'ancien (720×186 au lieu de 1400×508), la réservation d'espace est
+fausse d'un cinquième de hauteur et la page saute au chargement.
+
+**Deux pièges de l'extraction**, si elle est à refaire depuis une affiche :
+
+- **la feuille du décor passe DEVANT le C et lui est connectée.** Au seuil
+  normal, les deux ne forment qu'une seule tache — tout critère de taille ou de
+  position emporte alors la lettre avec le décor, et le logotype se lit
+  « ASATASIA ». On étiquette au seuil STRICT (alpha ≥ 150), où le filament
+  disparaît, puis on sépare par **pâleur** : le décor est imprimé en filigrane
+  (alpha moyen 182-209) là où les lettres sont pleines (240-254) ;
+- **les accents et les points des i font quelques dizaines de pixels.** Un
+  seuil de taille grossier rend « Maıson Medıterraneenne ».
 
 **Écrit le 23/09/2026** : le label du hero passe de « Le Fournil » à **Maison
 Méditerranéenne** (le titre disait déjà CASATASIA — c'est le label qui
