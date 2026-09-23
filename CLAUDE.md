@@ -155,8 +155,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Tarifs fournisseurs | `catalogue_fournisseur` — qui est le moins cher, à l'unité | 0151, 0152 |
 | Capacité en articles | `max_articles` — 4 pizzas par quart d'heure, pas 4 commandes | 0153 |
 | Réservation de table en ligne | guichet ouvert avant la salle, créneaux réels, `canal` | 0154 |
+| Liaison réservation ↔ caisse | socle de la synchro, en attente de la forme réelle | 0155 |
 
-**Migrations actuelles : 0001 → 0154.**
+**Migrations actuelles : 0001 → 0155.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -3015,6 +3016,62 @@ n'a été enregistrée : une réservation d'essai notifie le manager, qui
 rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
 modifier les deux ensemble.
 
+#### Les deux registres de réservation (0155, 24/09/2026)
+
+⚠️ **LA CAISSE A SON PROPRE REGISTRE, ET IL N'EST PAS RELIÉ AU NÔTRE.**
+`GET /bookings` existe sur l'API Zelty et répond 200 — aujourd'hui vide, parce
+que l'établissement est en mode école. Le 405 sur `OPTIONS /bookings` annonce
+`GET, POST, PATCH, DELETE, PUT` : la synchronisation dans les deux sens est
+donc techniquement ouverte.
+
+Décision du gérant (24/09/2026) : **les deux côtés doivent voir la même
+chose.** L'équipe travaille sur la caisse, où le téléphone sonne ; le gérant
+et le site travaillent dans l'outil. Un seul registre, deux vues.
+
+Le risque, tant que ce n'est pas fait, tombe le soir de l'inauguration : une
+table réservée par téléphone sur la caisse et une réservée sur le site, aucune
+des deux vues ne montrant les deux — deux familles à la même table, ou du
+monde refusé alors qu'il reste de la place. C'est le même raisonnement que la
+frontière posée le 24/08 pour les ventes, mais la conclusion diffère : une
+réservation n'a **aucun enjeu NF525**, donc rien n'impose que la caisse soit
+la source.
+
+**La 0155 pose le socle** — `caisse_externe_systeme` / `_id` / `_at` sur
+`reservations_tables`, avec un index unique partiel (entrée une seule fois,
+même si le miroir est rejoué) et un index de file d'attente (ce qui n'est pas
+encore parti). Noms GÉNÉRIQUES, comme la 0140 pour les commandes : SumUp a été
+remplacé par Zelty en quatre mois.
+
+⚠️ **LE CONNECTEUR N'EST PAS ÉCRIT, ET C'EST DÉLIBÉRÉ.** On ne connaît pas la
+forme des données : la documentation Zelty exige une connexion au back-office,
+et leur registre est vide. Écrire un mapper sur des noms de champs devinés,
+c'est refaire exactement la faute trouvée le matin même — une route de
+réservation livrée, comptée comme faite, qui écrivait huit colonnes
+inexistantes et n'avait jamais pu aboutir. Cette API a déjà coûté cher sur ce
+point précis : `expand[]=items` oublié (CA juste, stock aveugle, aucune
+erreur), la TVA en MILLIÈMES, les `null` refusés par zod (84 plats sur 84
+rejetés en silence). Aucun de ces pièges ne se devine ; tous se voient sur une
+charge utile réelle.
+
+**Le geste qui débloque** : créer UNE réservation à la main dans le
+back-office Zelty (mode école, rien n'entre dans le CA), puis
+`node scripts/zelty-bookings.mjs` — il imprime le JSON brut et signale les
+champs parfois `null`, qui devront être en `.nullish()`.
+
+**Ce qui restera à trancher une fois la forme connue**, et qui ne se déduit
+d'aucune documentation :
+
+- **qui est maître du STATUT** quand une annulation arrive des deux côtés. La
+  piste : chaque côté possède ce qu'il a créé, et la caisse fait foi le jour
+  même — c'est là que l'équipe travaille en service ;
+- **où l'on écrit notre identifiant** chez eux. Sur le catalogue, `remote_id`
+  est un champ libre et c'est ce qui a rendu la correspondance exacte dès le
+  premier jour (84/84 appariés, aucun rapprochement par le nom). À vérifier
+  sur les réservations ;
+- **le plan de salle**. La caisse attribue peut-être une table ; nous ne le
+  faisons pas. Pousser une réservation sans table pourrait la rendre
+  invisible du plan, donc inutile à l'équipe.
+
 ### La carte du bar (0144, 28 août 2026)
 
 36 produits créés pour l'ouverture de septembre : 9 bières, 9 apéritifs,
@@ -3364,6 +3421,7 @@ PORT=3000 node scripts/test-creneaux-capacite.mjs  # 4 pizzas / 15 min, par post
 PORT=3000 node scripts/test-commande-livraison.mjs # la tournée ne porte que du pain
 PORT=3000 node scripts/creneaux-services.mjs       # créneaux dérivés des services
 PORT=3000 node scripts/test-reservation-table.mjs  # guichet de réservation (n'envoie que des refus)
+node scripts/zelty-bookings.mjs                # forme réelle des réservations de la caisse (lecture)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
