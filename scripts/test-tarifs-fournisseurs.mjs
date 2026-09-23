@@ -163,6 +163,31 @@ for (const t of tousF.filter(t => t.cle_comparaison)) {
 const duels = [...parCle.values()].filter(s => s.size > 1).length
 T('au moins dix face-à-face entre fournisseurs', duels >= 10, `${duels}`)
 
+console.log('\n── Lavazza est une marque, pas un fournisseur ──')
+// Le café Lavazza se commande CHEZ France Boissons. Tant que « Lavazza »
+// figurait comme fournisseur, la comparaison désignait un interlocuteur qui
+// n'en est pas un — et une commande partie de là serait allée à la mauvaise
+// adresse.
+const [lavazza] = await sb('fournisseurs?select=id,actif&nom=eq.Lavazza')
+if (lavazza) {
+  T('la fiche Lavazza est désactivée, pas supprimée', lavazza.actif === false)
+  const resteC = await sb(`catalogue_fournisseur?select=id&fournisseur_id=eq.${lavazza.id}`)
+  const resteF = await sb(`factures_fournisseurs?select=id&fournisseur_id=eq.${lavazza.id}`)
+  T('plus aucun tarif ne lui est rattaché', resteC.length === 0, `${resteC.length}`)
+  T('plus aucune facture ne lui est rattachée', resteF.length === 0, `${resteF.length}`)
+}
+const [fboissons] = await sb('fournisseurs?select=id&nom=eq.' + encodeURIComponent('France Boissons'))
+const catFB = await sb(`catalogue_fournisseur?select=id,nature,famille,prix_ht,unite,contenance_valeur,designation&fournisseur_id=eq.${fboissons.id}`)
+T('France Boissons a un catalogue', catFB.length >= 40, `${catFB.length}`)
+T('les factures du café y sont reprises', catFB.some(t => t.nature === 'facture' && /LAVAZZA/i.test(t.designation)))
+const grains = catFB.find(t => t.designation.includes('grains Lavazza'))
+T('le café en grains y est chiffré au kilo', grains && grains.unite === 'kg' && Number(grains.prix_ht) > 20)
+// ⚠️ « 70cl », « 1L », « VC33 », « 75 » : quatre écritures pour la même idée.
+// En déduire une contenance donnerait un prix au litre faux, affiché comme
+// les autres.
+T('aucune contenance n’est déduite des libellés France Boissons',
+  catFB.filter(t => t.famille === 'Boissons').every(t => !t.contenance_valeur))
+
 if (PORT) {
   // ⚠️ On ne vérifie PAS le contenu de la page : depuis le module 28 le
   // middleware renvoie un 307 vers /login, et c'est ce qu'on veut. Cet écran

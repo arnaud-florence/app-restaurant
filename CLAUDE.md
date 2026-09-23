@@ -2215,7 +2215,36 @@ burger et kebab +40 % et +37 %, jambon serrano +28 %. À l'inverse **l'huile
 d'olive est 19 % moins chère chez Gineys** et les olives noires 34 %. Aucun
 fournisseur ne gagne partout — c'est exactement ce que l'écran sert à voir.
 
-Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 33 assertions.
+**Lavazza est une MARQUE, pas un fournisseur (23/09/2026).** Le café Lavazza
+se commande **chez France Boissons** — précision du gérant. Tant que
+« Lavazza » figurait comme fournisseur, la comparaison désignait un
+interlocuteur qui n'en est pas un, et une commande partie de là serait allée
+à la mauvaise adresse. `node scripts/catalogue-france-boissons.mjs [--ecrire]`
+rattache les 2 factures d'août et les 6 articles à France Boissons, et
+**désactive** la fiche Lavazza.
+
+⚠️ **On désactive, on ne supprime pas**, et on trace : les deux factures sont
+des pièces comptables, leur note porte désormais la raison du rattachement et
+le fournisseur d'origine. La fiche Lavazza reste en base — la supprimer
+emporterait l'historique.
+
+**Le tarif France Boissons entre dans le catalogue** : 38 références bar
+(prix **remisé + droits d'accises**, ramené à l'unité vendue — les droits sont
+un coût, la consigne non) et 5 matières café & épicerie, dont le café en
+grains à 28,35 €/kg. Source : le relevé Eazle du 21/09/2026, gitignoré.
+
+⚠️ **Aucune contenance n'est déduite des libellés France Boissons.** Une
+bouteille s'y écrit « 70cl », « 1L », « VC33 », « 75 » ou rien : quatre
+conventions pour la même idée. En inventer une donnerait un prix au litre
+faux, affiché comme les autres. Le prix stocké est celui de l'unité VENDUE ;
+l'écran demandera la contenance le jour où il faudra comparer.
+
+⚠️ `units` du relevé est le NOMBRE d'unités du colis, pas une contenance : un
+fût de 20 L donne 20 (des litres), une caisse de 24 bouteilles donne 24 (des
+bouteilles). Diviser par lui rend le prix de l'unité vendue — vrai dans les
+deux cas, à condition de ne pas le prendre pour un volume.
+
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 40 assertions.
 ⚠️ Il RECOPIE les règles d'extraction depuis le TS ; modifier les deux
 ensemble. Et il vérifie que la page est **fermée aux appels anonymes** : elle
 expose des conditions négociées, la laisser répondre reviendrait à les
@@ -2405,8 +2434,9 @@ la tasse pour un café vendu 1,40 € — 41 % de food cost sur le produit le pl
 vendu d'un village. En grains (**Lavazza Gold Selection**, choix du gérant, 8 g par
 tasse), la tasse tombe à **0,24 € sucre compris, 19 % de food cost**. Le prix
 du panneau ne bouge pas : c'est la marge qui monte, d'environ 0,29 € par café.
-La machine et le moulin sont prêtés par **Lavazza** : le café vient donc de
-chez eux. Prix relevés au kilo : Aroma Sublime et Super Crema 25,14 €, Grand
+La machine et le moulin sont prêtés par **Lavazza**, mais le café se
+**commande chez France Boissons** — Lavazza est la marque, France Boissons le
+canal (confirmé par le gérant le 23/09/2026). Prix relevés au kilo : Aroma Sublime et Super Crema 25,14 €, Grand
 Espresso 28,21 €, Gold Selection 28,35 €, Tierra Selection 37,35 €, bio 40,24 €.
 
 ⚠️ Le **lait** du cappuccino, de la noisette et du chocolat chaud ne vient pas
@@ -2841,7 +2871,8 @@ PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (01
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
-node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash/Lavazza depuis nos factures
+node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
+node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
