@@ -92,15 +92,23 @@ export async function GET(req: Request) {
   }, { headers: cors })
 }
 
+// ⚠️ Les messages sont écrits en français, et adressés au CLIENT. Laissés à
+// zod, ils sortaient tels quels sur le site : un visiteur qui oubliait son
+// téléphone lisait « Invalid input » sur une page française.
 const schema = z.object({
-  date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  heure:            z.string().regex(/^\d{2}:\d{2}/),
-  nombre_personnes: z.coerce.number().int().min(1).max(60),
-  nom:              z.string().trim().min(1).max(100),
+  date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date manquante ou mal formée.'),
+  heure:            z.string().regex(/^\d{2}:\d{2}/, 'Choisissez un horaire.'),
+  nombre_personnes: z.coerce.number({ error: 'Indiquez le nombre de personnes.' })
+                      .int('Indiquez un nombre entier de personnes.')
+                      .min(1, 'Indiquez au moins une personne.')
+                      .max(60, 'Indiquez un nombre de personnes réaliste.'),
+  nom:              z.string().trim().min(1, 'Votre nom est nécessaire pour vous accueillir.').max(100),
   prenom:           z.string().trim().max(100).nullable().optional(),
-  email:            z.string().email().nullable().optional(),
-  telephone:        z.string().trim().min(8).max(40),
-  message:          z.string().max(1000).nullable().optional(),
+  email:            z.string().email('Cette adresse email ne semble pas valide.').nullable().optional(),
+  telephone:        z.string().trim()
+                      .min(8, 'Un numéro de téléphone est nécessaire : c’est par là que nous confirmons.')
+                      .max(40, 'Ce numéro de téléphone est trop long.'),
+  message:          z.string().max(1000, 'Message trop long.').nullable().optional(),
   honeypot:         z.string().nullable().optional(),
   captcha_token:    z.string().nullable().optional(),
 })
