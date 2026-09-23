@@ -207,7 +207,7 @@ export const LIVRAISON_FOURNIL_DEFAUT: ConfigLivraisonFournil = {
   minimumTtc: 0,
   fraisTtc: 0,
   ouverture: '06:30',
-  fermeture: '19:30',
+  fermeture: '20:00',
 }
 
 /** '06:30' → '6h30' ; '19:00' → '19h'. Formatage court à la française. */
