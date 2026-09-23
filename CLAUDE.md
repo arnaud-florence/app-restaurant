@@ -3016,6 +3016,76 @@ n'a été enregistrée : une réservation d'essai notifie le manager, qui
 rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
 modifier les deux ensemble.
 
+#### Ce que la caisse expose VRAIMENT — cartographie (24/09/2026)
+
+Demande du gérant : relier les deux systèmes sur tout ce qui peut l'être —
+stocks, clients, commande en ligne. La réponse est bornée par ce que l'API
+laisse passer, et cette limite n'est écrite nulle part : la documentation
+Zelty exige une connexion au back-office. On a donc sondé l'API elle-même.
+`node scripts/zelty-cartographie.mjs [--json rapport.json]` — lecture seule,
+rejouable, 67 chemins testés.
+
+**Verdict : 11 endpoints disponibles sur 67.**
+
+| Endpoint | Contenu au 24/09 | Chez nous |
+|---|---|---|
+| `/catalog/dishes` | 181 plats | ✅ miroir, import, ruptures |
+| `/catalog/tags` | 24 familles | ✅ poussées |
+| `/orders` | commandes (exige `from`/`to`) | ✅ miroir + webhook |
+| `/bookings` | réservations (exige `?date=`) | contrat établi, à brancher |
+| `/customers` | fichier clients | ❌ **rien** |
+| `/webhooks` | abonnements temps réel | ✅ `order.ended` |
+| `/restaurants` | l'établissement | lecture |
+| `/transaction-methods` | vide — bloque l'émission | connu |
+| `/catalog/menus`, `/catalog/options`, `/coupons` | vides | — |
+| `/devices` | 2 appareils | — |
+
+⚠️ **CE QUE LE BACK-OFFICE PROPOSE MAIS QUE L'API NE DONNE PAS** — tous en
+404, sous une dizaine de noms chacun :
+
+- **toute la Gestion des stocks** : mercuriale, fiches techniques,
+  fournisseurs, commandes, inventaire ;
+- **Utilisateurs** : liste, rôles, livreurs, planning ;
+- **Banque** : fonds, clôtures, comptages — donc **pas de Z de caisse par
+  API** ;
+- **plan de salle** : tables, zones, salles ;
+- **statistiques et analyses** ;
+- **commande en ligne** : modules, historique.
+
+**C'est la conclusion la plus importante de ce chantier, et elle tranche une
+question de fond** : Zelty propose un module de gestion des stocks qui
+recouvre une grande partie de l'outil (mercuriale ≈ nos tarifs fournisseurs
+0151/0152, fiches techniques ≈ 0150, inventaire ≈ `(ops)/inventaire`,
+commandes fournisseurs ≈ `/admin/commande-fournil`). **Mais rien de tout cela
+ne ressort par l'API.** Des données saisies là-bas seraient prisonnières : ni
+lisibles par l'outil, ni exportables vers le comptable, ni utilisables pour le
+food cost, les marges par activité ou la valeur du fonds. Saisir les stocks
+dans la caisse serait donc un aller sans retour.
+
+→ **L'outil reste le dépositaire des stocks, des achats et des marges ; la
+caisse reste le point de vente.** Ce n'est pas un choix de confort, c'est ce
+que permet l'API.
+
+⚠️ **Un 200 avec une liste vide ne veut pas dire « vide ».** `/bookings`
+répondait `{"bookings": []}` alors que la réservation venait d'être créée : il
+manquait `?date=`. La cartographie signale donc chaque collection vide comme
+« à confirmer avec un paramètre », jamais comme « rien dedans ». Même
+prudence pour `/catalog/menus`, `/catalog/options` et `/coupons`.
+
+⚠️ **Le prochain chantier utile est `/customers`.** Il existe, il est lisible,
+et il n'est relié à rien : un client qui commande sur le site est dans l'outil
+(module 20 — fidélité, allergies mémorisées, segments), un client qui donne
+son nom au comptoir est chez Zelty. Deux fichiers clients, donc aucun des deux
+n'est le fichier client. ⚠️ Ce rapprochement touche des **données
+personnelles** : `accept_marketing`, `sms_optin` et `mail_optin` existent des
+deux côtés et ne doivent jamais être écrasés par un défaut — un consentement
+qu'on invente est une infraction, pas un bug.
+
+⚠️ **Zelty ne sait pas supprimer un client depuis sa fiche** : ni bouton, ni
+`DELETE /customers/{id}` (404). Le seul chemin est « Suppression groupée »,
+par export puis réimport d'un fichier Excel. À savoir avant toute demande
+d'effacement RGPD — et avant de créer des fiches d'essai.
+
 #### Les réservations de la caisse — contrat RELEVÉ, pas deviné (24/09/2026)
 
 Le gérant a ouvert le back-office ; trois réservations d'essai ont été créées
@@ -3497,6 +3567,7 @@ PORT=3000 node scripts/creneaux-services.mjs       # créneaux dérivés des ser
 PORT=3000 node scripts/test-reservation-table.mjs  # guichet de réservation (n'envoie que des refus)
 node scripts/zelty-bookings.mjs                # réservations de la caisse (lecture, un jour)
 node scripts/test-zelty-reservations.mjs       # traduction des réservations (sans compte)
+node scripts/zelty-cartographie.mjs            # ce que l'API expose vraiment (lecture seule)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
