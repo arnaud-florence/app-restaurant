@@ -185,17 +185,17 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">
-          {/* Le lettrage est découpé dans la photo d'enseigne : son fond est
-              crème, donc on l'assume en plaque claire plutôt que de le poser
-              à nu sur le stone-900 où il ferait un rectangle accidentel. */}
+          {/* Le logotype est détouré sur fond transparent, en crème : il se
+              pose donc à nu sur le stone-900. ⚠️ Pour un fond CLAIR, prendre
+              logo-casatasia-sombre.png — le crème y serait invisible. */}
           <Link href="/admin/cat" className="block" onClick={() => setOpen(false)}>
             <Image
               src="/logo-casatasia.png"
               alt="CASATASIA — Maison méditerranéenne"
-              width={720}
-              height={186}
+              width={1400}
+              height={508}
               priority
-              className="h-11 w-auto rounded-lg"
+              className="h-11 w-auto"
             />
           </Link>
           <button onClick={() => setOpen(false)} className="md:hidden p-1 -mr-1" aria-label="Fermer">

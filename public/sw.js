@@ -5,7 +5,7 @@
 //  - Pages HTML : network-first avec fallback offline.html (toujours frais si online)
 //  - API/POST/Supabase : pas de cache, network only (fail si offline → géré côté UI)
 
-const CACHE_VERSION = 'v199-2026-09-23-creneaux-duree'
+const CACHE_VERSION = 'v200-2026-09-24-logo-casatasia'
 const STATIC_CACHE  = `static-${CACHE_VERSION}`
 const PAGES_CACHE   = `pages-${CACHE_VERSION}`
 const OFFLINE_URL   = '/offline.html'
