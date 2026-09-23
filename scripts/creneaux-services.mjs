@@ -78,10 +78,22 @@ for (const [tag, creneaux] of Object.entries(services.par_tag)) {
     // le dimanche et 10 le reste de la semaine — un écart hérité d'un vieux
     // jeu de données, que personne n'aurait pu expliquer.
     const capacite = CAPACITE[tag] ?? 4
+    // ⚠️ `heure_fin` borne la GÉNÉRATION des créneaux, pas la fermeture. Le
+    // dernier créneau proposé est celui qui précède cette borne : pour une
+    // dernière commande à 22h30, il faut donc écrire 22h45. Écrire l'heure de
+    // fermeture (23h) proposerait un retrait à 22h45, au moment du nettoyage.
+    const derniere = services.derniere_commande?.[service]
+    const borne = derniere
+      ? (() => {
+          const [hh, mm] = derniere.split(':').map(Number)
+          const t = hh * 60 + mm + DUREE
+          return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
+        })()
+      : h.fin
     for (const j of jours) {
       voulus.push({
         tag_destination: tag, jour_semaine: j,
-        heure_debut: `${h.debut}:00`, heure_fin: `${h.fin}:00`,
+        heure_debut: `${h.debut}:00`, heure_fin: `${borne}:00`,
         duree_creneau_min: DUREE, max_articles: capacite,
         etablissement_id: null, actif: true,
       })

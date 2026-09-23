@@ -24,6 +24,20 @@ export const HORAIRES_SERVICE: Record<Service, { debut: string; fin: string }> =
   soir: { debut: '19:00', fin: '23:00' },
 }
 
+// ─── Dernière commande EN LIGNE ─────────────────────────────────
+//
+// ⚠️ CE N'EST PAS L'HEURE DE FERMETURE, et les confondre coûte cher dans les
+// deux sens. Le service va jusqu'à 23 h ; accepter une commande web à 22h45
+// enverrait une pizza au four au moment où l'on nettoie. À l'inverse, caler
+// la fermeture sur la dernière commande ferait croire au client que la salle
+// ferme à 22h30 alors qu'il peut encore s'asseoir.
+//
+// Le créneau ici est le DERNIER proposé : 22h30 est un horaire de retrait
+// possible, 22h45 ne l'est pas.
+export const DERNIERE_COMMANDE: Partial<Record<Service, string>> = {
+  soir: '22:30',
+}
+
 // ─── Jusqu'à quelle heure la maison est ouverte ──────────────────
 //
 // Trois régimes, et les confondre est exactement ce que faisait le site
@@ -82,6 +96,7 @@ export function servicesPublics() {
     horaires: HORAIRES_SERVICE,
     par_tag: SERVICES_PAR_TAG,
     phrases: PHRASE_SERVICE,
+    derniere_commande: DERNIERE_COMMANDE,
     fermetures: FERMETURES,
     phrases_fermeture: PHRASE_FERMETURE,
   }

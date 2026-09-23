@@ -45,9 +45,15 @@ T('la pizzeria a 7 plages actives', pizza.length === 7, `${pizza.length}`)
 const svc = await (await fetch(`http://localhost:${PORT}/api/public/activation`,
   { headers: { 'x-api-key': env.PUBLIC_API_KEY } })).json()
 const soir = svc.services?.horaires?.soir ?? { debut: '19:00', fin: '23:00' }
-T('toutes sur le service du soir déclaré', pizza.every(c =>
-  c.heure_debut.slice(0, 5) === soir.debut && c.heure_fin.slice(0, 5) === soir.fin),
-  `${soir.debut}–${soir.fin}`)
+// ⚠️ `heure_fin` borne la génération des créneaux, PAS la fermeture : le
+// dernier créneau proposé est celui qui la précède. Dernière commande à
+// 22h30 → borne à 22h45, alors que le service ferme à 23h.
+const derniereCmd = svc.services?.derniere_commande?.soir ?? soir.fin
+const minutes = (h) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
+const borne = derniereCmd === soir.fin ? soir.fin
+  : `${String(Math.floor((minutes(derniereCmd) + 15) / 60)).padStart(2, '0')}:${String((minutes(derniereCmd) + 15) % 60).padStart(2, '0')}`
+T('toutes commencent au début du service', pizza.every(c => c.heure_debut.slice(0, 5) === soir.debut), soir.debut)
+T('toutes s’arrêtent après la dernière commande', pizza.every(c => c.heure_fin.slice(0, 5) === borne), borne)
 T('capacité 8 articles par créneau', pizza.every(c => c.max_articles === 8),
   [...new Set(pizza.map(c => c.max_articles))].join(', '))
 T('créneaux de 15 minutes', pizza.every(c => c.duree_creneau_min === 15))
@@ -58,10 +64,10 @@ T('aucune plage pizzeria le midi', !pizza.some(c => c.heure_debut < '15:00'))
 // Un samedi bien après l'ouverture : aucune commande réelle ne s'y trouve.
 const jour = '2026-12-05'
 const c = await api(`creneaux-retrait?date=${jour}&tag=PIZZA`)
-// Nombre de créneaux attendu = amplitude du service ÷ durée d'un créneau.
-const minutes = (h) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
-const attendus = (minutes(soir.fin) - minutes(soir.debut)) / 15
-T(`${attendus} créneaux sur le service du soir`, c.count === attendus, `${c.count}`)
+const attendus = (minutes(borne) - minutes(soir.debut)) / 15
+T(`${attendus} créneaux, du ${soir.debut} au ${derniereCmd}`, c.count === attendus, `${c.count}`)
+T('le dernier créneau EST l’heure de dernière commande',
+  (c.items ?? []).at(-1)?.heure === derniereCmd, (c.items ?? []).at(-1)?.heure)
 T('chaque créneau dit ce qu’il lui reste', (c.items ?? []).every(i => typeof i.restant === 'number'))
 T('un créneau vide a 8 places', (c.items ?? [])[0]?.restant === 8, JSON.stringify(c.items?.[0]))
 

@@ -2633,6 +2633,7 @@ le site croyait la brasserie fermée à 19h30.
 |---|---|
 | Fournil et relais colis | **20h**, 7j/7 |
 | Comptoir et restauration | fin du service du soir, **vers 23h** |
+| **Dernière commande en ligne** | **22h30** — pas l'heure de fermeture |
 | **Soirée organisée, une par mois** | **1 h du matin** |
 
 `fournil_fermeture` (table `parametres`) passe de 19:30 à **20:00** : la
@@ -2640,6 +2641,23 @@ correction se propage seule partout où elle s'affiche — c'est tout l'intérê
 de ne pas l'avoir écrite en dur. Les deux autres régimes vivent dans
 `FERMETURES` / `PHRASE_FERMETURE` de `src/lib/services-restaurant.ts`, déjà la
 source unique des services, et partent au site par `/api/public/activation`.
+
+⚠️ **LA DERNIÈRE COMMANDE N'EST PAS LA FERMETURE**, et les confondre coûte
+dans les deux sens. Le service va jusqu'à 23 h ; accepter une commande web à
+22h45 enverrait une pizza au four au moment du nettoyage. À l'inverse, caler
+la fermeture sur la dernière commande ferait croire que la salle ferme à
+22h30 alors qu'on peut encore s'asseoir. `DERNIERE_COMMANDE` vit dans
+`services-restaurant.ts`, à côté des horaires.
+
+⚠️ `capacite_cuisine_par_creneau.heure_fin` borne la **génération** des
+créneaux, pas la fermeture : le dernier créneau proposé est celui qui la
+précède. Pour une dernière commande à 22h30, la borne vaut **22h45**. Y
+écrire l'heure de fermeture proposerait un retrait à 22h45.
+
+⚠️ Le site ne recopie aucune de ces heures : **le dernier créneau rendu EST
+l'heure de dernière commande**, il le lit. Deux sources pour la même heure
+finissent par se contredire, et c'est le client qui voit l'écart — d'autant
+que le gérant l'a déplacée deux fois dans la même journée.
 
 ⚠️ **20 h, c'est le FOURNIL et le RELAIS COLIS — pas la maison.** Les
 confondre fermait la brasserie trois heures trop tôt sur le site. Le service
