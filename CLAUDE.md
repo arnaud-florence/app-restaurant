@@ -2244,9 +2244,15 @@ jetées le lendemain, et sa marge en euros vaut trois cafés.
 **Accueil du site (23/09/2026)** : les sections **café du matin**, **pizzeria**
 et **brasserie** sont revenues. Elles s'affichent aussi en APERÇU (module
 éteint + date), avec « Ouverture le samedi 3 octobre » et le bouton
-« Précommander » quand les pizzas sont commandables. ⚠️ La numérotation des
-sections est **calculée** (`num()`) : écrite en dur, elle affichait « 01 » sous
-un bandeau « 04 » dès qu'on insérait une section.
+« Précommander » quand les pizzas sont commandables.
+
+⚠️ La numérotation des sections est **calculée** (`num()`) : écrite en dur,
+elle affichait « 01 » sous un bandeau « 04 » dès qu'on insérait une section.
+Deux composants la portaient encore en dur — `SectionLivraison` (« 02 ») et
+`SectionHoraires` (« 04 ») — et la prod a donc affiché **01, 02, 03, 04, 02,
+04** le 23/09. Une numérotation qui se contredit est pire que pas de
+numérotation : elle laisse croire qu'on a sauté une section. Les deux
+reçoivent désormais `numero` en prop, comme `SectionFournil`.
 
 ### Carte de la pizzeria et de la brasserie (21/09/2026)
 
