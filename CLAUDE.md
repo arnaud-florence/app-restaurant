@@ -2646,6 +2646,52 @@ sélecteur (`des` porté par chaque ligne de panier) et l'explique, mais une
 interface ne protège de rien — une commande de pizza pour ce soir arriverait
 dans une cuisine qui n'existe pas encore.
 
+**LA PIZZERIA A SES PROPRES CRÉNEAUX (23/09/2026).** Le tunnel du site ne
+connaissait qu'un modèle — celui du fournil : retrait à l'heure ronde entre
+7 h et 19 h, ou tournée du matin. Il proposait donc ces horaires pour une
+pizza, alors que le four ne s'allume qu'à 19 h : le client choisissait « 9h »
+pour une CasaTasia, et personne ne l'attendait.
+`/api/public/creneaux-retrait?tag=PIZZA` **existait et fonctionnait** ; aucun
+composant du site ne l'appelait, et son proxy était déjà écrit.
+
+`src/lib/services-commande.ts` (site) porte la règle : **un panier = un
+service**. Le pain se retire le matin au comptoir, la pizza le soir — ni le
+même horaire, ni la même personne, ni le même four. Le conflit est dit à
+l'AJOUT, avec le choix de vider ou de garder : le découvrir à l'étape du
+créneau, après avoir saisi son adresse, c'est abandonner. `LignePanier.tag`
+porte la carte d'origine.
+
+**Les créneaux DÉRIVENT des services** : `PORT=3000 node
+scripts/creneaux-services.mjs [--ecrire]` reconstruit
+`capacite_cuisine_par_creneau` depuis `services-restaurant.ts`, lu par
+`/api/public/activation` plutôt que recopié — une constante recopiée dans un
+script est une troisième source. Les lignes dataient du prototype et disaient
+PIZZA **le midi** 11h30-14h plus un lundi jusqu'à 23h59 ; elles disent
+maintenant 19h-22h, 7 jours sur 7, et les 13 plages SNACKING (aucun produit en
+face) sont désactivées.
+
+⚠️ **`max_commandes` n'est PAS appliqué.** `/creneaux-retrait` n'accepte
+qu'UNE commande par créneau (`count === 0`), alors que l'en-tête du fichier
+annonce `count < max_commandes` et que la capacité se règle en base. Régler 10
+et n'en servir qu'une est un réglage mort : le gérant croit ouvrir des places
+qui n'existent pas. On ne l'élargit pas sans décision — dix commandes dans le
+même quart d'heure, c'est une décision de four, pas de code.
+
+⚠️⚠️ **TOUT ANCÊTRE AVEC UN `filter` CAPTURE LES `position: fixed`** — et
+`blur(0px)` suffit. `PageTransition` anime `filter` sur un nœud qui enveloppe
+TOUTES les pages : mesuré le 23/09 sur `/commander`, page défilée à 3 000 px,
+la feuille du panier était à **y = 16 859 px**. Elle existe, elle est opaque,
+elle est simplement tout en bas de la page — le client clique sur son panier
+et il ne se passe rien.
+
+Le correctif en place (retrait du filtre résiduel dans `PageTransition`) est
+insuffisant : il agit **une fois**, à la fin de l'animation, et framer-motion
+repose le style au re-rendu suivant. Un correctif qui dépend du moment où on
+regarde n'en est pas un. Panier et fenêtres passent désormais par
+`<Portail />` (site) → `createPortal(children, document.body)`, hors de portée
+de n'importe quel filtre présent ou futur. **Tout nouveau panneau flottant du
+site doit passer par ce portail.**
+
 ⚠️ **LA TOURNÉE DE LIVRAISON NE TRANSPORTE QUE DU PAIN** (23/09/2026). Elle
 part le MATIN, et `/api/public/commande` **recalcule** son créneau quoi qu'ait
 demandé le client. Une pizza commandée en livraison se retrouvait donc

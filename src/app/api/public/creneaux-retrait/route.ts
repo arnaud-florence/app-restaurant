@@ -112,7 +112,16 @@ export async function GET(req: Request) {
         return t >= slotStartMs && t < slotEndMs
       }).length
 
-      // Règle métier : 1 commande max par créneau (cohérent avec listerCreneauxDisponibles).
+      // ⚠️ RÈGLE EFFECTIVE : UNE commande par créneau — `max_commandes` de
+      // `capacite_cuisine_par_creneau` n'est PAS appliqué ici, alors que
+      // l'en-tête de ce fichier annonce l'inverse et que l'écran d'admin le
+      // laisse régler. Régler 10 et n'en servir qu'une est un réglage mort :
+      // le gérant croit ouvrir des places qui n'existent pas.
+      //
+      // On ne change pas la règle sans décision : l'élargir, c'est accepter
+      // dix commandes dans le même quart d'heure au four. Le jour où la
+      // capacité est arbitrée avec le pizzaïolo, la ligne à écrire est
+      // `count < (cfg.max_commandes ?? 1)`.
       slots.push({
         heure: heureStr,
         iso: slotIso,
