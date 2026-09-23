@@ -77,6 +77,19 @@ T('un format de conserve est reconnu', formatConserve('SAUCE PIZZA AROMATISEE 5/
 T('… et n’est pas confondu avec un poids',
   extraireContenance('CAPRE FINE VINAIGRE 4/4 VITAL', 'BT') === null)
 
+console.log('\n── Nos unités disent leur contenance ──')
+// Une matière enregistrée en « barquette » tout court ne se compare à rien :
+// deux prix justes, et l'écran qui affiche « unités différentes ». Les
+// contenances sont relues sur NOS factures (« BQT=500G »), jamais devinées.
+const stockees = await sb('ingredients?select=nom,unite&stocke=eq.true&actif=eq.true')
+const flou = stockees.filter(i => !/\d/.test(i.unite) && !/^(kg|litre|l|pi[eè]ce|unit[eé])$/i.test(i.unite.trim()))
+T('aucune unité de stock sans contenance', flou.length === 0, flou.map(i => `${i.nom} (${i.unite})`).join(', '))
+// ⚠️ Préciser, ce n'est pas changer : « barquette » reste une barquette.
+// La passer en « kg » diviserait par cinq cents les quantités déjà saisies.
+const barq = stockees.find(i => i.nom === 'Rosette de Lyon')
+T('la rosette reste comptée en barquette', barq?.unite === 'barquette 500 g', barq?.unite)
+T('aucune unité n’a été doublée par une relance', stockees.every(i => !/(\b\d+ ?(g|kg|ml|l)\b).*\1/i.test(i.unite)))
+
 console.log('\n── Le devis lu en base ──')
 const [f] = await sb('fournisseurs?select=id,nom,email&nom=eq.' + encodeURIComponent('Félix Potin Provence'))
 T('le fournisseur existe', Boolean(f))

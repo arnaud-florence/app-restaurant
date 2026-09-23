@@ -2080,9 +2080,29 @@ porte donc un `format`, et `memeBase()` exige qu'il concorde — sans ça une
 « poche 1 kg », « flacon 1 kg », « sac 750 g », « colis 36 ». Sans les lire,
 le thon en poche de 600 g du fournisseur se retrouvait face à notre « poche
 1 kg » marqué « unités différentes » : deux prix justes, aucune comparaison
-possible, alors que tout était là. `prixReferenceMatiere()` les lit. Une
-matière enregistrée en « barquette » **sans poids** reste non comparable —
-c'est son unité qu'il faut corriger dans `/admin/ingredients`.
+possible, alors que tout était là. `prixReferenceMatiere()` les lit.
+
+**Dix unités précisées le 23/09/2026** (`node scripts/preciser-unites-matieres.mjs
+[--ecrire]`) : rosette, serrano, emmental et mozzarella en tranches passent en
+« barquette 500 g » / « 400 g », les quatre sauces Gyma en « bouteille 950 g »
+(920 g pour la mayonnaise), la vinaigrette en « bouteille 750 ml », les
+serviettes en « colis 3000 ». Les comparables passent de 13 à 20, et les moins
+chers de 11 à **17**.
+
+⚠️ **On PRÉCISE l'unité, on ne la CHANGE pas.** « barquette » devient
+« barquette 500 g » : c'est toujours une barquette, elle dit son poids. La
+passer en « kg » diviserait par cinq cents toutes les quantités déjà saisies
+ailleurs — stock et food cost faux, sans une seule erreur.
+
+⚠️ **Aucune contenance n'est devinée** : chacune est relue sur la ligne de
+facture qui a alimenté la matière (`BQT=500G`, `BTL=950G`, `C=6 X 500`), et le
+script refuse d'écrire sans cette preuve. Il ne lit QUE ces notations — un
+poids qui traîne ailleurs dans le libellé peut être celui d'une tranche
+(« TRANCHETTE D'EMMENTAL 29X17G ») et non celui du contenant.
+
+⚠️ Le script repart du **nom du contenant**, pas de l'unité complète : une
+première version écrivait « barquette 500 g 500 g » à la deuxième exécution.
+Un script qu'on ne peut pas rejouer n'est pas un script.
 
 ⚠️ **RIEN N'EST RAPPROCHÉ AUTOMATIQUEMENT.** « JAMBON CUIT SUP AC 8K » (pièce
 entière à trancher) et « Jambon blanc tranché » partagent presque tous leurs
@@ -2119,10 +2139,15 @@ et un index unique TOTAL sur (fournisseur, référence, date).
 devis d'une autre date s'ajoute et l'ancien survit. C'est lui qui rendra une
 hausse lisible.
 
-**Premier verdict, au 23/09/2026** : sur 20 matières rapprochées, **11 sont
-moins chères** chez Félix Potin — sauce barbecue −35 %, beurre doux −30 %,
-jambon blanc −28 %, olives noires −25 %, sauce pizza −20 %. L'huile d'olive
-et l'emmental Valma y sont plus chers. ⚠️ Un écart en pourcentage ne décide
+**Premier verdict, au 23/09/2026** : sur 20 matières rapprochées, **17 sont
+moins chères** chez Félix Potin — mayonnaise −58 %, sauce barbecue −35 %,
+beurre doux −30 %, sauce burger −29 %, jambon blanc −28 %, sauce kebab −27 %,
+olives noires −25 %, serrano −22 %, sauce pizza −20 %, rosette −9 %. Seuls
+l'huile d'olive (+19 %) et l'emmental Valma (+8 %) y sont plus chers.
+
+⚠️ Le −58 % de la mayonnaise compare un **seau de 4,65 kg** à notre bouteille
+souple de 920 g : l'économie est réelle mais elle suppose de reconditionner.
+Un écart au kilo ne dit pas le travail qu'il y a derrière. ⚠️ Un écart en pourcentage ne décide
 de rien : il se multiplie par les quantités réelles avant de changer de
 fournisseur.
 
@@ -2131,7 +2156,7 @@ rester sans décision explicite : la coppa n'est pas du jambon serrano, les
 herbes de Provence ne sont pas de l'origan, le beurre allégé à 40 % n'est pas
 du beurre à 82 %. Le test le vérifie.
 
-Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 22 assertions.
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 25 assertions.
 ⚠️ Il RECOPIE les règles d'extraction depuis le TS ; modifier les deux
 ensemble. Et il vérifie que la page est **fermée aux appels anonymes** : elle
 expose des conditions négociées, la laisser répondre reviendrait à les
@@ -2756,6 +2781,7 @@ node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé +
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
+node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
