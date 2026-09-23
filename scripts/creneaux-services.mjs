@@ -48,8 +48,13 @@ if (!services?.par_tag) { console.error('\n  ✗ réponse sans services\n'); pro
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
 const DUREE = 15
 
-/** Articles produits par créneau, arrêté par le gérant le 23/09/2026. */
-const CAPACITE = { PIZZA: 4 }
+// Articles qu'un créneau de 15 min peut sortir.
+//
+// ⚠️ DOIT RESTER ÉGAL à CAPACITE_CRENEAU de src/lib/creneaux-duree.ts : la
+// table des durées en découle (8 pizzas tiennent en 15 min, donc un créneau
+// vaut 8 places). Le « 4 » donné avant cette table la rendait impossible —
+// un panier de 6 n'aurait jamais trouvé d'horaire.
+const CAPACITE = { PIZZA: 8 }
 
 console.log(`\n── ${ECRIRE ? 'ÉCRITURE' : 'ESSAI À BLANC'} ──\n`)
 

@@ -2701,8 +2701,41 @@ PIZZA **le midi** 11h30-14h plus un lundi jusqu'à 23h59 ; elles disent
 maintenant 19h-22h, 7 jours sur 7, et les 13 plages SNACKING (aucun produit en
 face) sont désactivées.
 
-⚠️ **LA CAPACITÉ SE COMPTE EN ARTICLES, PAR POSTE** (0153). Le gérant tient
-**4 pizzas par quart d'heure**. Le champ s'appelait `max_commandes` : écrit
+**UNE GROSSE COMMANDE S'ÉTALE SUR PLUSIEURS CRÉNEAUX (23/09/2026).** Règle du
+gérant, dans `src/lib/creneaux-duree.ts` :
+
+| Commande | Four | Créneaux |
+|---|---|---|
+| jusqu'à 8 pizzas | 15 min | 1 |
+| de 9 à 15 | 30 min | 2 |
+| 16 et plus | 45 min | 3 |
+
+Sans elle, un panier plus gros que la capacité d'un créneau voyait **les douze
+horaires barrés, sans un mot** — et une commande de famille dépasse vite. Le
+client repartait, et on ne savait pas qu'il était venu.
+
+⚠️ **La borne de 8 est un CHOIX, documenté dans le fichier** : la consigne
+disait « entre 4 et 8 → 15 min » ET « à partir de 8 → 30 min », les deux se
+recouvrant sur 8. Retenu : 8 tient en un créneau. Une pizza d'écart, mais un
+seuil implicite se redécouvre au comptoir un samedi soir.
+
+⚠️ **La capacité DÉCOULE de cette table** : si 8 pizzas tiennent en 15 min, un
+créneau vaut 8 places. Le « 4 » donné avant la rendait impossible — un panier
+de 6 n'aurait jamais trouvé d'horaire. `CAPACITE_CRENEAU` et `max_articles`
+bougent ENSEMBLE.
+
+⚠️ **Une commande de 45 min ne peut pas commencer à 21h45** : le service ferme
+à 22 h, les créneaux nécessaires n'existent pas. `tientAPartirDe()` exige que
+les créneaux existent ET que leur place cumulée suffise. Le contrôle
+anti-race de `/api/public/commande` regarde la même fenêtre — vérifier le seul
+créneau de départ laissait passer une commande qui déborde sur la suivante,
+déjà pleine.
+
+⚠️ Le site ne recalcule PAS la disponibilité : `disponible` vient de l'API.
+Deux règles pour la même chose finissent par diverger, et c'est le client qui
+voit l'écart.
+
+⚠️ **LA CAPACITÉ SE COMPTE EN ARTICLES, PAR POSTE** (0153). Le champ s'appelait `max_commandes` : écrit
 « 4 » dedans, le chiffre se relit « 4 commandes », et quatre clients de trois
 pizzas font douze pizzas dans le même créneau — avec un réglage qui affiche
 pourtant 4. Renommé `max_articles` plutôt que commenté : un nom de colonne est
@@ -2724,7 +2757,7 @@ l'affichage des créneaux ET dans le contrôle anti-race de
 Le créneau rend `restant` et `max` : le site barre les créneaux trop justes
 POUR LE PANIER en cours, plutôt que de laisser choisir un horaire que le
 serveur refusera à la dernière étape, après la saisie de l'adresse.
-Test : `PORT=3000 node scripts/test-creneaux-capacite.mjs` — 12 assertions ;
+Test : `PORT=3000 node scripts/test-creneaux-capacite.mjs` — 20 assertions ;
 il CRÉE des commandes de contrôle, les compte, et vérifie qu'aucune ne survit.
 
 ⚠️⚠️ **TOUT ANCÊTRE AVEC UN `filter` CAPTURE LES `position: fixed`** — et

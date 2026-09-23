@@ -19,6 +19,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
+import { creneauxOccupes, tientAPartirDe } from '@/lib/creneaux-duree'
 
 // Helper : construit un ISO UTC qui, affiché en Europe/Paris, donne HH:MM le jour `dateStr`.
 // Évite le décalage de 2h (été) ou 1h (hiver) entre le serveur Vercel UTC et l'heure FR.
@@ -46,6 +47,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const dateStr = url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10)
   const tag = url.searchParams.get('tag') ?? 'SNACKING'
+  // Taille du panier : une grosse commande occupe plusieurs créneaux, et ne
+  // peut donc pas commencer n'importe où. Sans ce paramètre on rendrait des
+  // horaires que le serveur refuserait ensuite.
+  const articles = Math.max(1, Number(url.searchParams.get('articles') ?? '1') || 1)
 
   // Validation
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -129,18 +134,30 @@ export async function GET(req: Request) {
       }, 0)
 
       const restant = Math.max(0, max - engages)
-      slots.push({
-        heure: heureStr,
-        iso: slotIso,
-        disponible: restant > 0,
-        restant,
-        max,
-      })
+      slots.push({ heure: heureStr, iso: slotIso, disponible: restant > 0, restant, max })
       curMin += duree
     }
   }
 
-  return Response.json({ date: dateStr, tag, items: slots, count: slots.length }, {
+  // ─── La commande tient-elle À PARTIR d'ici ? ─────────────────────
+  //
+  // Un créneau libre ne suffit pas : une commande de 12 pizzas occupe une
+  // demi-heure, donc CE créneau et le suivant. Et elle ne peut pas commencer
+  // à 21h45 — le service ferme à 22h, les créneaux nécessaires n'existent
+  // pas. Le dire ici évite de proposer un horaire que la validation refusera,
+  // à la dernière étape, après la saisie des coordonnées.
+  const restants = slots.map(s => s.restant)
+  const items = slots.map((s, i) => ({
+    ...s,
+    disponible: tientAPartirDe(restants, i, articles),
+    creneauxOccupes: creneauxOccupes(articles),
+  }))
+
+  return Response.json({
+    date: dateStr, tag, articles,
+    creneauxOccupes: creneauxOccupes(articles),
+    items, count: items.length,
+  }, {
     headers: {
       ...Object.fromEntries(corsHeaders(req.headers.get('origin'))),
       'Cache-Control': 'public, s-maxage=30',   // cache court car capacités évoluent vite

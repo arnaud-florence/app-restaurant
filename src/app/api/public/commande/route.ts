@@ -26,6 +26,7 @@ import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
 import { getClientIp } from '@/lib/public-api/rate-limit'
 import { getActivation, getConfigLivraisonFournil, getModules } from '@/lib/activation/server'
 import { tagsApercu } from '@/lib/activation/config'
+import { creneauxOccupes } from '@/lib/creneaux-duree'
 import { tourneePour, communeLivrable } from '@/lib/activation/config'
 import { tauxTvaVente } from '@/lib/tva'
 import { sendPushToEmployeRateLimited } from '@/lib/push'
@@ -352,8 +353,13 @@ export async function POST(req: Request) {
       if (!cfg) continue
 
       const dureeMin = Number(cfg.duree_creneau_min ?? 15)
-      const slotEnd = new Date(slotStart.getTime() + dureeMin * 60_000)
       const max = Number(cfg.max_articles ?? 1)
+
+      // ⚠️ Une grosse commande OCCUPE PLUSIEURS CRÉNEAUX. 12 pizzas prennent
+      // une demi-heure de four : vérifier le seul créneau de départ laissait
+      // passer une commande qui déborde sur la suivante, déjà pleine.
+      const nbCreneaux = creneauxOccupes(veut)
+      const fenetreFin = new Date(slotStart.getTime() + nbCreneaux * dureeMin * 60_000)
 
       const { data: dejaPrises } = await sb.from('commandes')
         .select('creneau_retrait, commande_articles!inner(quantite, tag_destination)')
@@ -361,19 +367,20 @@ export async function POST(req: Request) {
         .in('source', ['ONLINE', 'COMPTOIR'])
         .not('statut', 'in', '(annule)')
         .gte('creneau_retrait', slotStart.toISOString())
-        .lt('creneau_retrait', slotEnd.toISOString())
+        .lt('creneau_retrait', fenetreFin.toISOString())
 
       const engages = (dejaPrises ?? []).reduce((n, c) => {
         const lignes = (c.commande_articles ?? []) as Array<{ quantite: number }>
         return n + lignes.reduce((q, l) => q + Number(l.quantite ?? 0), 0)
       }, 0)
 
-      if (engages + veut > max) {
-        const restant = Math.max(0, max - engages)
+      const placeTotale = max * nbCreneaux
+      if (engages + veut > placeTotale) {
+        const restant = Math.max(0, placeTotale - engages)
         return Response.json({
           error: restant === 0
             ? 'Ce créneau vient d\'être complet. Choisissez un autre horaire.'
-            : `Il ne reste que ${restant} place${restant > 1 ? 's' : ''} sur ce créneau, `
+            : `Il ne reste que ${restant} place${restant > 1 ? 's' : ''} à cet horaire, `
               + `et votre commande en demande ${veut}. Choisissez un autre horaire.`,
         }, { status: 409, headers: cors })
       }

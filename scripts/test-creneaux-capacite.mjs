@@ -39,7 +39,7 @@ const cfg = await sb('capacite_cuisine_par_creneau?select=tag_destination,jour_s
 const pizza = cfg.filter(c => c.tag_destination === 'PIZZA')
 T('la pizzeria a 7 plages actives', pizza.length === 7, `${pizza.length}`)
 T('toutes le soir, 19h–22h', pizza.every(c => c.heure_debut.startsWith('19') && c.heure_fin.startsWith('22')))
-T('capacité 4 articles par créneau', pizza.every(c => c.max_articles === 4),
+T('capacité 8 articles par créneau', pizza.every(c => c.max_articles === 8),
   [...new Set(pizza.map(c => c.max_articles))].join(', '))
 T('créneaux de 15 minutes', pizza.every(c => c.duree_creneau_min === 15))
 // Le midi appartient à la brasserie, qui ne se commande pas en ligne.
@@ -51,7 +51,24 @@ const jour = '2026-12-05'
 const c = await api(`creneaux-retrait?date=${jour}&tag=PIZZA`)
 T('12 créneaux de 19h à 21h45', c.count === 12, `${c.count}`)
 T('chaque créneau dit ce qu’il lui reste', (c.items ?? []).every(i => typeof i.restant === 'number'))
-T('un créneau vide a 4 places', (c.items ?? [])[0]?.restant === 4, JSON.stringify(c.items?.[0]))
+T('un créneau vide a 8 places', (c.items ?? [])[0]?.restant === 8, JSON.stringify(c.items?.[0]))
+
+// ── La durée occupée suit la taille de la commande ───────────
+//
+// ⚠️ Le seuil de 8 est un CHOIX documenté dans creneaux-duree.ts : la
+// consigne disait « entre 4 et 8 → 15 min » et « à partir de 8 → 30 min »,
+// les deux se recouvrant sur 8. Retenu : 8 tient en un créneau.
+for (const [q, attendu] of [[1, 1], [8, 1], [9, 2], [15, 2], [16, 3], [40, 3]]) {
+  const r = await api(`creneaux-retrait?date=${jour}&tag=PIZZA&articles=${q}`)
+  T(`${q} pizza(s) occupent ${attendu} créneau(x)`, r.creneauxOccupes === attendu, `${r.creneauxOccupes}`)
+}
+// Une commande de 45 minutes ne peut pas commencer à 21h45 : le service
+// ferme à 22 h, les créneaux nécessaires n'existent pas.
+const gros = await api(`creneaux-retrait?date=${jour}&tag=PIZZA&articles=16`)
+const ouverts = (gros.items ?? []).filter(i => i.disponible)
+T('une commande de 45 min ne démarre pas après 21h15', ouverts.at(-1)?.heure === '21:15',
+  ouverts.at(-1)?.heure)
+T('… et les deux derniers horaires sont barrés', ouverts.length === 10, `${ouverts.length}`)
 
 // ── La place se consomme en ARTICLES ─────────────────────────
 // C'est tout l'objet du correctif : compter les COMMANDES laissait passer
@@ -73,7 +90,7 @@ if (p && creneau) {
 
   const c2 = await api(`creneaux-retrait?date=${jour}&tag=PIZZA`)
   const slot = (c2.items ?? []).find(i => i.iso === creneau)
-  T('UNE commande de 3 pizzas consomme 3 places', slot?.restant === 1, JSON.stringify(slot))
+  T('UNE commande de 3 pizzas consomme 3 places', slot?.restant === 5, JSON.stringify(slot))
   T('… le créneau reste ouvert pour une pizza', slot?.disponible === true)
 
   // ⚠️ Le filtre par poste : une commande FOURNIL sur le même horaire ne doit
@@ -92,7 +109,7 @@ if (p && creneau) {
     }]) })
     const c3 = await api(`creneaux-retrait?date=${jour}&tag=PIZZA`)
     const slot3 = (c3.items ?? []).find(i => i.iso === creneau)
-    T('cinq baguettes ne prennent pas la place du four', slot3?.restant === 1, JSON.stringify(slot3))
+    T('cinq baguettes ne prennent pas la place du four', slot3?.restant === 5, JSON.stringify(slot3))
     await sb('commande_articles?commande_id=eq.' + cmd2.id, { method: 'DELETE' })
     await sb('commandes?id=eq.' + cmd2.id, { method: 'DELETE' })
   }
