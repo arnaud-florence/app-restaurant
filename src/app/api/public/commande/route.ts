@@ -24,7 +24,8 @@ import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
 import { getClientIp } from '@/lib/public-api/rate-limit'
-import { getActivation, getConfigLivraisonFournil } from '@/lib/activation/server'
+import { getActivation, getConfigLivraisonFournil, getModules } from '@/lib/activation/server'
+import { tagsApercu } from '@/lib/activation/config'
 import { tourneePour, communeLivrable } from '@/lib/activation/config'
 import { tauxTvaVente } from '@/lib/tva'
 import { sendPushToEmployeRateLimited } from '@/lib/push'
@@ -227,6 +228,29 @@ export async function POST(req: Request) {
     const slot = new Date(p.creneau_retrait)
     if (isNaN(slot.getTime()) || slot.getTime() < Date.now() - 60_000) {
       return Response.json({ error: 'Créneau de retrait invalide ou dans le passé.' }, { status: 400, headers: cors })
+    }
+  }
+
+  // ─── Une carte en APERÇU ne se retire pas avant son ouverture ───
+  // Les pizzas sont précommandables avant le 3 octobre, mais le retrait doit
+  // tomber APRÈS l'ouverture : la cuisine n'existe pas avant. Le site pose
+  // déjà la date minimale ; ce contrôle est celui qui compte, parce qu'il ne
+  // dépend pas du navigateur du client.
+  {
+    const apercu = tagsApercu(await getModules())
+    const enApercu = [...new Set(articlesEnrichis.map(a => a.tag_destination as string))]
+      .filter(t => apercu[t])
+    if (enApercu.length > 0) {
+      const ouverture = enApercu
+        .map(t => apercu[t])
+        .sort()
+        .at(-1) as string
+      const slot = p.creneau_retrait ? new Date(p.creneau_retrait) : null
+      if (!slot || isNaN(slot.getTime()) || slot.toISOString().slice(0, 10) < ouverture) {
+        return Response.json({
+          error: `Ces produits sont en précommande : le retrait ne peut pas avoir lieu avant le ${ouverture.split('-').reverse().join('/')}.`,
+        }, { status: 400, headers: cors })
+      }
     }
   }
 

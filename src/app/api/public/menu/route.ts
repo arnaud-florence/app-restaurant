@@ -121,9 +121,12 @@ export async function GET(req: Request) {
       // prix affiché = prix payé, et le site est aligné sur le comptoir.
       prix_ttc: Math.round(Number(r.prix_vente_ht) * (1 + tauxTvaVente(r, 'emporter') / 100) * 100) / 100,
       contient_alcool: r.contient_alcool,
-      // ⚠️ En aperçu, rien n'est commandable, quel que soit le drapeau du
-      // produit : la cuisine n'est pas ouverte.
-      vendable_online: apercu[r.tag_destination] ? false : r.vendable_online,
+      // En aperçu, le produit garde son propre drapeau : les pizzas se
+      // PRÉCOMMANDENT pour l'ouverture, la brasserie reste sur place.
+      // `bientot` porte la date : le site en fait la date de retrait minimale,
+      // et /api/public/commande REFUSE un retrait antérieur — c'est ce
+      // contrôle-là qui protège, pas l'interface.
+      vendable_online: r.vendable_online,
       bientot: apercu[r.tag_destination] ?? null,
       image_url: r.image_url,
       allergenes: Array.from(allergenes).sort(),

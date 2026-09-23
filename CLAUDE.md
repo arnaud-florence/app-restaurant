@@ -2241,6 +2241,13 @@ marge 3,03 €, food cost 39 %. Le taux est élevé sur le papier, mais c'est le
 dessert qui écoule la vitrine du soir — les mignardises concernées seraient
 jetées le lendemain, et sa marge en euros vaut trois cafés.
 
+**Accueil du site (23/09/2026)** : les sections **café du matin**, **pizzeria**
+et **brasserie** sont revenues. Elles s'affichent aussi en APERÇU (module
+éteint + date), avec « Ouverture le samedi 3 octobre » et le bouton
+« Précommander » quand les pizzas sont commandables. ⚠️ La numérotation des
+sections est **calculée** (`num()`) : écrite en dur, elle affichait « 01 » sous
+un bandeau « 04 » dès qu'on insérait une section.
+
 ### Carte de la pizzeria et de la brasserie (21/09/2026)
 
 `node scripts/carte-restaurant.mjs [--ecrire]` — 12 pizzas (PIZZA, famille
@@ -2301,11 +2308,24 @@ page Contact du site l'affiche au lieu de son ancien texte en dur (« pizzas en
 continu »).
 
 **Aperçu** : un module éteint, en `teaser`, AVEC `date_ouverture_prevue`, voit
-sa carte publiée par `/api/public/menu` — photos, prix, descriptions — mais
-**jamais commandable** (`vendable_online` forcé à false, `bientot` = date).
-Une commande en ligne sur une cuisine fermée serait une vraie commande que
-personne ne préparerait. Brasserie et pizzeria sont en aperçu jusqu'au
+sa carte publiée par `/api/public/menu` — photos, prix, descriptions — avec
+`bientot` = date d'ouverture. Brasserie et pizzeria sont en aperçu jusqu'au
 3 octobre ; « Ouvrir le restaurant » les bascule en carte normale.
+
+**PRÉCOMMANDE (23/09/2026)** : un produit en aperçu garde son propre
+`vendable_online` — les pizzas se précommandent, la brasserie reste sur place.
+Le retrait, lui, ne peut pas précéder l'ouverture :
+
+⚠️ **Le contrôle qui compte est dans `/api/public/commande`**, pas dans le
+site : il refuse (400) toute commande dont le créneau tombe avant la
+`date_ouverture_prevue` d'un tag en aperçu. Le site pose la date minimale du
+sélecteur (`des` porté par chaque ligne de panier) et l'explique, mais une
+interface ne protège de rien — une commande de pizza pour ce soir arriverait
+dans une cuisine qui n'existe pas encore.
+
+⚠️ Vérifier ce refus crée une VRAIE commande quand il passe : le contrôle du
+23/09 a produit WEB-260923-7902, supprimée immédiatement (articles + en-tête).
+Ne tester que le chemin REFUSÉ, ou supprimer aussitôt.
 
 ⚠️ **`PDV_PAR_MODULE` ne connaissait pas `restaurant_salle` ni `pizzeria`** :
 le bouton d'ouverture allumait les modules sans jamais allumer l'établissement
