@@ -2183,14 +2183,33 @@ lignes du même format. Le prendre pour 15 × 800 g donnerait 0,37 €/kg — un
 sauce dix fois moins chère que tout le reste, ce qui aurait dû alerter, mais
 c'est précisément le genre de chiffre qu'on finit par croire.
 
-⚠️⚠️ **LES TROIS PRIX DU MESSAGE N'ONT PAS D'UNITÉ, ET ELLE NE SE DEVINE
-PAS.** Oignons jaunes 2,00 €, oignons rouges 2,50 €, frites 12×12 avec peau
-1,50 € : au kilo, au sachet ou au colis, l'écart va de un à dix. Le kilo est
-plausible chez un fournisseur de friterie, mais « plausible » n'écrit pas un
-prix d'achat — c'est la règle qui a évité le pain à burger à 64 €/kg et le
-croissant à 40 €. Ces trois lignes portent donc l'unité **« à confirmer »** et
-aucune contenance : l'écran dit « pas de prix de référence » au lieu
-d'inventer un €/kg. **À préciser d'un mot auprès du fournisseur.**
+✅ **Les trois prix du message sont AU KILO** — confirmé par le gérant le
+24/09/2026. Ils portent donc une contenance de 1 kg et deviennent comparables.
+
+⚠️ L'unité n'était pas dans le message, et elle n'a PAS été devinée : au kilo,
+au sachet ou au colis, l'écart allait de un à dix. Les lignes ont d'abord été
+posées en « à confirmer », sans contenance, pour que l'écran dise « pas de
+prix de référence » plutôt qu'un €/kg inventé — la règle qui a évité le pain à
+burger à 64 €/kg et le croissant à 40 €. Une question a suffi.
+
+**Premier verdict, au 24/09/2026 :**
+
+| | nous | eux | |
+|---|---|---|---|
+| Mayonnaise (leur seau 10 L) | 5,83 €/kg | 2,99 €/kg | **−49 %** |
+| Ketchup (leur seau 10 L) | 3,14 €/kg | 2,75 €/kg | **−12 %** |
+
+⚠️ **Les frites et les oignons ne sont PAS comparables en l'état**, et l'écran
+ne doit pas laisser croire le contraire : nos « oignons jaunes ÉMINCÉS » à
+1,80 €/kg ne sont pas leurs « oignons ÉPLUCHÉS » à 2,00 €, et nos « frites
+SURGELÉES » à 1,80 € ne sont pas leurs « 12×12 AVEC PEAU » à 1,50 €. Le prix
+au kilo diffère parce que le TRAVAIL diffère — même cas que « JAMBON CUIT SUP
+AC 8K » face à « Jambon blanc tranché ». Rapprocher ces lignes afficherait un
+écart qui compare deux produits.
+
+⚠️ Le seau de 10 L divise la mayonnaise par deux, mais il suppose de
+reconditionner — comme le seau de 4,65 kg de Félix Potin. Un écart au kilo ne
+dit pas le travail qu'il y a derrière.
 
 ⚠️ **Quatre lignes n'ont pas de code article** (la graisse et les trois du
 message). L'index unique de `catalogue_fournisseur` étant TOTAL sur

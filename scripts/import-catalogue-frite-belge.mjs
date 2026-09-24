@@ -125,20 +125,18 @@ const GRAISSE = [interne('graisse-boeuf-fribel'), 10.000, 'Graisse de bœuf Frib
 
 // ─── Les trois prix du message du gérant ───────────────────────────────────
 //
-// ⚠️⚠️ L'UNITÉ N'EST PAS DONNÉE, ET ELLE NE SE DEVINE PAS. « 2,00 € » pour des
-// oignons épluchés peut être le kilo, le sachet de 5 kg ou le colis — et
-// l'écart entre les trois est d'un facteur cinq à dix. Chez un fournisseur de
-// friterie, le kilo est le plus probable, mais « probable » n'écrit pas un
-// prix d'achat : c'est la règle qui a évité le pain à burger à 64 €/kg et le
-// croissant à 40 €.
+// ⚠️ L'unité n'était PAS donnée dans le message. Elle n'a pas été devinée :
+// « 2,00 € » pour des oignons épluchés pouvait être le kilo, le sachet de 5 kg
+// ou le colis, et l'écart entre les trois va de un à dix. Les trois lignes ont
+// d'abord été enregistrées en « à confirmer », sans contenance, pour que
+// l'écran dise « pas de prix de référence » plutôt que d'inventer un €/kg.
 //
-// Ils sont donc enregistrés avec une unité MARQUÉE À CONFIRMER, et sans
-// contenance — l'écran affichera « pas de prix de référence » plutôt qu'un
-// €/kg inventé. Un mot du gérant, et on précise.
+// ✅ **AU KILO** — confirmé par le gérant le 24/09/2026. Le €/kg se calcule
+// donc, et ces trois produits deviennent comparables aux autres fournisseurs.
 const MESSAGE = [
-  [interne('oignons-jaunes-epluches'), 'Oignons jaunes épluchés', 2.00, 'à confirmer'],
-  [interne('oignons-rouges-epluches'), 'Oignons rouges épluchés', 2.50, 'à confirmer'],
-  [interne('frites-12x12-avec-peau'),  'Frites 12x12 avec peau',  1.50, 'à confirmer'],
+  [interne('oignons-jaunes-epluches'), 'Oignons jaunes épluchés', 2.00],
+  [interne('oignons-rouges-epluches'), 'Oignons rouges épluchés', 2.50],
+  [interne('frites-12x12-avec-peau'),  'Frites 12x12 avec peau',  1.50],
 ]
 
 // ─── Le fournisseur ────────────────────────────────────────────────────────
@@ -192,19 +190,22 @@ for (const [ref, kg, nom, prix, format] of [...TARIF, GRAISSE]) {
     actif: true,
   })
 }
-for (const [ref, nom, prix, unite] of MESSAGE) {
+for (const [ref, nom, prix] of MESSAGE) {
   lignes.push({
     fournisseur_id: fournisseurId,
     reference: ref,
     designation: nom,
     famille: nom.toLowerCase().includes('frite') ? 'Frites' : 'Légumes',
-    unite,
+    // Facturés au kilo, donc le prix EST déjà le prix de référence : la
+    // contenance vaut 1 kg, et le €/kg ne se recalcule pas. C'est la même
+    // règle que les lignes de facture au kilo (0152) — les rediviser par un
+    // poids lu ailleurs dans le libellé donnait des écarts de 496 %.
+    unite: 'kg',
     prix_ht: prix,
-    // ⚠️ Pas de contenance : l'unité elle-même est inconnue.
-    contenance_valeur: null,
-    contenance_unite: null,
+    contenance_valeur: 1,
+    contenance_unite: 'kg',
     date_tarif: DATE,
-    source: 'Message du fournisseur du 24/09/2026 — ⚠️ unité à confirmer',
+    source: 'Message du fournisseur du 24/09/2026 — au kilo, confirmé par le gérant',
     nature: 'devis',
     actif: true,
   })
