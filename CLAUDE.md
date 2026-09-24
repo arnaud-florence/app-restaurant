@@ -2161,6 +2161,54 @@ rester sans décision explicite : la coppa n'est pas du jambon serrano, les
 herbes de Provence ne sont pas de l'origan, le beurre allégé à 40 % n'est pas
 du beurre à 82 %. Le test le vérifie.
 
+**La Frite Belge — sauces Pauwels, frites et oignons (24/09/2026).**
+`node scripts/import-catalogue-frite-belge.mjs [--ecrire]` — 52 références :
+48 sauces Pauwels (tube 1 L, PET 3 L, BIB 5 L et 2×5 L, seau 10 L), la graisse
+de bœuf Fribel, et trois produits donnés par message.
+
+⚠️ **LE FOURNISSEUR EST « LA FRITE BELGE », PAS « PAUWELS ».** Pauwels est la
+MARQUE des sauces ; La Frite Belge (Var, 06 18 25 71 59) est le distributeur
+qu'on appelle. Exactement la situation de Lavazza, qui figurait comme
+fournisseur alors que le café se commande chez France Boissons : tant qu'une
+marque tient la place du fournisseur, la comparaison désigne un interlocuteur
+qui n'en est pas un, et une commande partie de là va à la mauvaise adresse.
+
+⚠️ **Le poids retenu est le POIDS NET imprimé au catalogue, pas la contenance
+nominale.** Un « tube 1 litre » de mayonnaise pèse 870 g : le lire comme 1 kg
+gonflerait son prix au kilo de 15 %.
+
+⚠️ **« 15 X 800 M » sur les sauces Remia est un COLISAGE, pas une
+contenance** : le prix affiché est celui d'UN tube, cohérent avec les autres
+lignes du même format. Le prendre pour 15 × 800 g donnerait 0,37 €/kg — une
+sauce dix fois moins chère que tout le reste, ce qui aurait dû alerter, mais
+c'est précisément le genre de chiffre qu'on finit par croire.
+
+⚠️⚠️ **LES TROIS PRIX DU MESSAGE N'ONT PAS D'UNITÉ, ET ELLE NE SE DEVINE
+PAS.** Oignons jaunes 2,00 €, oignons rouges 2,50 €, frites 12×12 avec peau
+1,50 € : au kilo, au sachet ou au colis, l'écart va de un à dix. Le kilo est
+plausible chez un fournisseur de friterie, mais « plausible » n'écrit pas un
+prix d'achat — c'est la règle qui a évité le pain à burger à 64 €/kg et le
+croissant à 40 €. Ces trois lignes portent donc l'unité **« à confirmer »** et
+aucune contenance : l'écran dit « pas de prix de référence » au lieu
+d'inventer un €/kg. **À préciser d'un mot auprès du fournisseur.**
+
+⚠️ **Quatre lignes n'ont pas de code article** (la graisse et les trois du
+message). L'index unique de `catalogue_fournisseur` étant TOTAL sur
+(fournisseur, référence, date) — il doit l'être, `on_conflict` ne sachant pas
+viser un index partiel — plusieurs références vides le même jour se heurtent
+en 23505 et font échouer l'insertion entière. Elles reçoivent une clé
+**`INT-…`**, dont le préfixe dit franchement que ce n'est pas un code
+fournisseur. Le jour où il en communique un, il la remplace ; l'ancienne ligne
+survit et se désactive à la main, ce qui vaut mieux qu'un écrasement muet.
+
+⚠️ `fournisseurs` n'a ni `site_web` ni `notes` : le site et la remarque sur la
+marque vont dans `conditions_tarifaires`, la seule colonne libre.
+
+Les moins chers au kilo : graisse de bœuf 2,40 €, ketchup en seau de 10 L
+2,75 €, mayonnaise chef en seau 2,99 €. Le rapprochement avec nos matières
+reste à faire à la main dans `/admin/tarifs-fournisseurs` — rien n'est
+rapproché automatiquement.
+
 **Gineys, Promocash et Lavazza entrent par les FACTURES (0152).** Ils n'ont
 jamais envoyé de devis : ce qu'on sait de leurs prix vient des factures
 scannées. C'est même mieux qu'un devis — ce sont des prix RÉELLEMENT PAYÉS.
@@ -3754,6 +3802,7 @@ node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, 
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal
+node scripts/import-catalogue-frite-belge.mjs  # sauces Pauwels, frites, oignons (essai à blanc)
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
