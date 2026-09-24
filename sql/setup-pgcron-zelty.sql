@@ -97,6 +97,36 @@ begin
   end if;
   perform cron.schedule('caisse-rapprochement', '30 5 * * *',
     $q$select call_zelty('/api/cron/caisse/rapprochement', '?jours=3')$q$);
+
+  -- ─── 5. Réservations, dans les deux sens ───────────────────────
+  -- Toutes les 15 minutes de 6 h à 22 h UTC : le carnet du comptoir descend
+  -- dans l'outil, et les demandes de casatasia.fr montent sur la caisse.
+  --
+  -- ⚠️ Chaque passage fait UN APPEL PAR JOUR de la fenêtre — GET /bookings
+  -- n'accepte aucun filtre par période. 14 jours = 14 appels, d'où le rythme
+  -- au quart d'heure et pas à la minute.
+  --
+  -- ⚠️ Sans ça, deux carnets coexistent et personne ne voit les deux : le
+  -- soir de l'inauguration, deux familles à la même table.
+  if exists (select 1 from cron.job where jobname = 'zelty-reservations') then
+    perform cron.unschedule('zelty-reservations');
+  end if;
+  perform cron.schedule('zelty-reservations', '*/15 6-22 * * *',
+    $q$select call_zelty('/api/cron/caisse/zelty/reservations', '?jours=14')$q$);
+
+  -- ─── 6. Fichier client, une fois par nuit ──────────────────────
+  -- 4 h 40 UTC. Un client n'a pas besoin d'être connu à la minute, et le
+  -- miroir relit tout le fichier à chaque passage : le faire tourner en
+  -- service coûterait pour rien.
+  --
+  -- ⚠️ Ce pont ne transporte AUCUN consentement marketing, dans aucun sens.
+  -- Voir src/lib/integrations/zelty/clients.ts — une erreur là-dessus ne
+  -- produit pas un message d'erreur, elle produit une plainte CNIL.
+  if exists (select 1 from cron.job where jobname = 'zelty-clients') then
+    perform cron.unschedule('zelty-clients');
+  end if;
+  perform cron.schedule('zelty-clients', '40 4 * * *',
+    $q$select call_zelty('/api/cron/caisse/zelty/clients')$q$);
 end $$;
 
 -- ─── Volontairement NON planifié ─────────────────────────────────────

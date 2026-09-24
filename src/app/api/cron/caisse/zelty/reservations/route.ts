@@ -108,6 +108,17 @@ async function traiter(req: Request) {
           miroir.majs++
         } else miroir.ignorees++
       } else {
+        // ⚠️ ON NE CRÉE PAS une ligne pour une réservation DÉJÀ annulée ou
+        // terminée. Personne n'ira accueillir ce client, et surtout : une
+        // annulée supprimée à la main pour nettoyer le carnet REVIENDRAIT au
+        // passage suivant, indéfiniment. Constaté le 24/09/2026 en rejouant
+        // la synchronisation après un essai.
+        //
+        // Une annulation reste bien répercutée sur une réservation qu'on
+        // connaît déjà — c'est la branche du dessus, et c'est tout l'intérêt
+        // du miroir. Ce qui est écarté ici, c'est la CRÉATION d'un mort-né.
+        if (r.statut === 'annulee' || r.statut === 'terminee') { miroir.ignorees++; continue }
+
         const { error } = await sb.from('reservations_tables').insert({
           client_nom: r.client_nom,
           client_telephone: r.client_telephone,

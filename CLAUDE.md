@@ -3082,11 +3082,31 @@ Tests : `node scripts/test-zelty-reservations.mjs` (23) et
 `node scripts/test-zelty-clients.mjs` (24), sans compte ni clé. ⚠️ Les deux
 RECOPIENT la règle depuis le TS ; modifier ensemble.
 
-⚠️ **À planifier dans `sql/setup-pgcron-zelty.sql`** (gitignoré) le jour de
-l'ouverture : les réservations toutes les 15 min pendant le service, les
-clients une fois par nuit. Sans planification, les deux routes existent et ne
-sont jamais appelées — c'était le cas des cinq routes du pont avant le
-28/08/2026.
+**Planifié dans `sql/setup-pgcron-zelty.sql`** (gitignoré, il porte le
+secret) : `zelty-reservations` toutes les 15 min de 6 h à 22 h UTC,
+`zelty-clients` à 4 h 40. ⚠️ **Le fichier est écrit, il reste à l'EXÉCUTER
+dans Supabase** — sans ça les routes existent et personne ne les appelle,
+exactement comme les cinq routes du pont avant le 28/08/2026.
+
+⚠️ **Le rythme au quart d'heure n'est pas de la prudence, c'est arithmétique** :
+chaque passage fait un appel par jour de la fenêtre, soit 14 appels pour 14
+jours. Les clients, eux, relisent tout le fichier à chaque fois — une fois par
+nuit suffit, un client n'a pas besoin d'être connu à la minute.
+
+**Vérifié de bout en bout le 24/09/2026**, sur le compte réel : une
+réservation créée dans l'outil est partie chez Zelty avec notre identifiant
+dans `remote_id` et le statut « en attente » ; une seconde exécution ne l'a
+pas dupliquée ; sa confirmation depuis la caisse est redescendue dans l'outil
+(`demande` → `confirmee`). Côté clients, les deux fiches de l'outil ont été
+créées chez Zelty et **le consentement de celle qui l'avait accordé est resté
+intact**. Tout a été nettoyé ensuite.
+
+⚠️ **Défaut trouvé à l'usage, et corrigé** : une réservation ANNULÉE chez
+Zelty était RECRÉÉE chez nous à chaque passage. Une annulée supprimée à la
+main pour nettoyer le carnet revenait donc indéfiniment. Le miroir ne CRÉE
+plus de ligne pour un statut `annulee` ou `terminee` — mais il répercute
+toujours l'annulation sur une réservation qu'il connaît déjà, ce qui est tout
+l'intérêt. Un mort-né n'a pas sa place dans un carnet.
 
 #### Ce que la caisse expose VRAIMENT — cartographie (24/09/2026)
 
