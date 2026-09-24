@@ -210,3 +210,49 @@ export function extraireListeCle(reponse: unknown, cle: string): unknown[] {
   }
   return extraireListe(reponse)
 }
+
+/**
+ * Appel générique — pour les endpoints qui n'ont pas besoin de la mécanique
+ * de pagination des commandes : réservations, clients, coupons.
+ *
+ * Ne lève jamais : rend `{ ok: false, erreur }`. Une synchronisation qui
+ * échoue sur un jour doit pouvoir continuer sur les autres, et le monitoring
+ * compte tout code ≠ 200 comme une panne.
+ *
+ * ⚠️ Le réessai ne couvre que le 429 et les 5xx, comme `appeler()`. Un 400
+ * répété ne se corrigera pas tout seul, et insister ferait tourner l'appel
+ * trois fois pour rien.
+ */
+export async function appelZelty(
+  chemin: string,
+  opts: { method?: 'GET' | 'POST'; body?: unknown } = {},
+): Promise<{ ok: true; data: unknown } | { ok: false; erreur: string }> {
+  const conf = lireConfig()
+  if (!conf.pret) return { ok: false, erreur: `configuration incomplète : ${conf.manquants.join(', ')}` }
+  const c = conf.config
+  const url = c.baseUrl + (chemin.startsWith('/') ? chemin : `/${chemin}`)
+  const method = opts.method ?? 'GET'
+
+  let derniere = ''
+  for (let essai = 1; essai <= 3; essai++) {
+    const r = await fetch(url, {
+      method,
+      headers: {
+        ...entetes(c),
+        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+      cache: 'no-store',
+    })
+    if (r.ok) return { ok: true, data: await r.json().catch(() => null) }
+    derniere = `HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 200)}`
+    if (r.status !== 429 && r.status < 500) break
+    await new Promise(res => setTimeout(res, essai * 1000))
+  }
+  return { ok: false, erreur: derniere }
+}
+
+/** La caisse est-elle branchée ? */
+export function zeltyConfigure(): boolean {
+  return lireConfig().pret
+}

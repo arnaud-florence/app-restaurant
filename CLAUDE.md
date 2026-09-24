@@ -156,8 +156,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Capacité en articles | `max_articles` — 4 pizzas par quart d'heure, pas 4 commandes | 0153 |
 | Réservation de table en ligne | guichet ouvert avant la salle, créneaux réels, `canal` | 0154 |
 | Liaison réservation ↔ caisse | socle de la synchro, en attente de la forme réelle | 0155 |
+| Liaison client ↔ caisse | un seul fichier client, deux vues | 0156 |
 
-**Migrations actuelles : 0001 → 0155.**
+**Migrations actuelles : 0001 → 0156.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -3016,6 +3017,77 @@ n'a été enregistrée : une réservation d'essai notifie le manager, qui
 rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
 modifier les deux ensemble.
 
+#### Les deux ponts branchés (24/09/2026)
+
+| Route | Sens | Ce qu'elle fait |
+|---|---|---|
+| `/api/cron/caisse/zelty/reservations[?dry=1][&jours=14]` | ↔ | carnet de la caisse → outil, demandes du site → caisse |
+| `/api/cron/caisse/zelty/clients[?dry=1]` | ↔ | fichier client des deux côtés |
+
+Bearer `CRON_SECRET`, `?dry=1` traduit et compte **sans rien écrire**, ni ici
+ni là-bas. Journalisées dans `integration_evenements`, comme le reste du pont.
+
+⚠️ **Le miroir des réservations fait UN APPEL PAR JOUR** — `GET /bookings`
+n'accepte aucun filtre par période. Quatorze jours, quatorze appels : c'est le
+prix, et la seule alternative (interroger sans `?date=`) rend une liste vide
+sans erreur, ce qui ferait croire le carnet à jour alors qu'il est vide.
+
+⚠️ **Le statut de la CAISSE fait foi sur une réservation déjà connue** : c'est
+là que l'équipe travaille pendant le service. Le reste n'est pas touché — une
+note prise chez nous ne doit pas disparaître au passage suivant.
+
+⚠️ **Sans identifiant rendu par la caisse, on ne marque RIEN comme envoyé.**
+Marquer « parti » sans preuve perdrait la réservation pour de bon : le
+prochain passage doit pouvoir réessayer.
+
+⚠️ **On n'émet que les réservations À VENIR.** Injecter une réservation passée
+ne sert personne et brouille le carnet du jour.
+
+**Le fichier client — la règle qui prime sur toutes les autres :**
+
+⚠️⚠️ **AUCUN CONSENTEMENT NE TRAVERSE CE PONT, DANS AUCUN SENS.** Un client
+qui a refusé les emails chez nous ne doit pas être réabonné parce que sa fiche
+caisse porte un `true` par défaut — et Zelty met bien `accept_marketing: true`
+sur toute fiche créée par l'API, y compris celles que NOUS créons. Ce n'est
+pas un consentement recueilli, c'est une valeur par défaut. Un client importé
+depuis la caisse arrive donc en `opt_in_marketing = false`, et celui d'un
+client existant n'est jamais modifié. Une erreur ici ne produit aucun message
+d'erreur : elle produit une plainte CNIL.
+
+⚠️ **Le rapprochement va de l'identifiant vers le téléphone, par ordre de
+fiabilité** : l'identifiant de caisse ne se trompe jamais, l'email presque
+jamais, le téléphone peut être celui du conjoint. `telephoneComparable()`
+ramène `+33767453444` et `0767453444` au même client — sans cette mise à
+plat, la moitié du fichier compterait double, précisément là où le pont doit
+servir.
+
+⚠️ **On COMPLÈTE une fiche, on ne la remplace pas.** Un prénom saisi au
+comptoir n'efface pas celui que le client a écrit lui-même, et un champ vide
+côté caisse ne vide jamais le nôtre. Les notes s'ajoutent — deux personnes
+peuvent avoir noté deux choses vraies — et repasser deux fois n'empile pas la
+même ligne.
+
+⚠️ **Un client sans email NI téléphone est IGNORÉ, et signalé.** Il n'est
+rapprochable de personne : l'importer remplirait le CRM de fiches muettes
+qu'on ne saurait jamais fusionner. C'est cette règle qui a écarté d'elle-même
+les trois fiches de sonde laissées chez Zelty, une fois leurs coordonnées
+retirées.
+
+⚠️ `appelZelty()` (dans `zelty/client.ts`) est l'appel générique des endpoints
+sans pagination. Il ne LÈVE jamais : une synchronisation qui échoue sur un
+jour doit continuer sur les autres. Comme `appeler()`, il ne réessaie que sur
+429 et 5xx — un 400 répété ne se corrigera pas tout seul.
+
+Tests : `node scripts/test-zelty-reservations.mjs` (23) et
+`node scripts/test-zelty-clients.mjs` (24), sans compte ni clé. ⚠️ Les deux
+RECOPIENT la règle depuis le TS ; modifier ensemble.
+
+⚠️ **À planifier dans `sql/setup-pgcron-zelty.sql`** (gitignoré) le jour de
+l'ouverture : les réservations toutes les 15 min pendant le service, les
+clients une fois par nuit. Sans planification, les deux routes existent et ne
+sont jamais appelées — c'était le cas des cinq routes du pont avant le
+28/08/2026.
+
 #### Ce que la caisse expose VRAIMENT — cartographie (24/09/2026)
 
 Demande du gérant : relier les deux systèmes sur tout ce qui peut l'être —
@@ -3568,6 +3640,7 @@ PORT=3000 node scripts/test-reservation-table.mjs  # guichet de réservation (n'
 node scripts/zelty-bookings.mjs                # réservations de la caisse (lecture, un jour)
 node scripts/test-zelty-reservations.mjs       # traduction des réservations (sans compte)
 node scripts/zelty-cartographie.mjs            # ce que l'API expose vraiment (lecture seule)
+node scripts/test-zelty-clients.mjs            # fichier client + garde-fous RGPD
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
