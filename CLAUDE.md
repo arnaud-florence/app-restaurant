@@ -2695,6 +2695,31 @@ desserts**, **événements, baptêmes et anniversaires** — chacun daté, via
 ⚠️ Le tag `SNACKING` n'a **aucun produit** : son aperçu ne publie donc aucune
 carte. On annonce le service, pas un menu vide.
 
+### L'affiche de l'Auberge Provençale en fond de l'histoire (24/09/2026)
+
+Le gérant a fourni **`CasaTasia_Auberge_Provencale.pdf`** : la terrasse sous
+les platanes, les tables dressées, la clientèle d'avant-guerre, et l'enseigne
+AUBERGE PROVENÇALE encore au mur. Elle dit en une image ce que la section
+« De l'auberge provençale à CasaTasia » mettait trois paragraphes à expliquer.
+
+Fond de `SectionHistoire` → `public/images/auberge-provencale.jpg`
+(1800×780, 320 Ko).
+
+⚠️ **L'image est RECADRÉE sur la scène.** L'affiche porte en haut le logotype
+et le titre « ICI, L'HISTOIRE CONTINUE » : les laisser en fond doublonnerait
+avec le titre de la section, en plus petit et en travers du texte.
+
+⚠️ **Le voile sombre n'est pas une coquetterie.** Sans lui, du texte blanc sur
+un sépia clair devient illisible dès que l'œil passe sur une nappe blanche ou
+un mur au soleil — et ce sont justement les zones les plus contrastées de
+l'image. Dégradé de 93 % en haut à 80 % au milieu.
+
+**La mention d'époque est reprise MOT POUR MOT de l'affiche** : « Cure d'air
+et de soleil · Lieux de pêche et de chasse · Pension de famille · Tél. n° 3 ».
+Rien n'est inventé, et ce « Tél. n° 3 » dit l'âge du lieu bien mieux qu'une
+date qu'on n'a pas — ce qui reste cohérent avec la règle de la section : ne
+rien dater, ne compter aucune génération.
+
 ### Le logotype officiel (24/09/2026)
 
 Le gérant a fourni **`Logo Casatasia.pdf`**, vectoriel pur — aucune image,
