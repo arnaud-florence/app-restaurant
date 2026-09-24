@@ -35,6 +35,14 @@ export type Rapprochement = {
     commandes_sans_ligne: string[]
     ecarts_tva: Array<{ taux: string; recu: number; commande: number }>
   }
+  /** Ce que la caisse déclare pour elle-même — le Z. NULL = journée non
+   *  clôturée, PAS zéro : un zéro afficherait un écart énorme sur une
+   *  journée simplement pas encore fermée. */
+  cloture_id_externe?: string | null
+  cloture_ca_ttc?: number | null
+  cloture_taxes?: number | null
+  ecart_cloture?: number | null
+
 }
 
 const arrondi = (n: number) => Math.round(n * 100) / 100

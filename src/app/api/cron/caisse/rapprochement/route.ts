@@ -10,6 +10,8 @@
 // Rejouable : un jour déjà rapproché est recalculé et réécrit.
 
 import { NextResponse } from 'next/server'
+import { appelZelty, zeltyConfigure } from '@/lib/integrations/zelty/client'
+import { reponseClotures, normaliser as normaliserCloture, agregerParJour } from '@/lib/integrations/zelty/clotures'
 import { calculerRapprochement, enregistrerRapprochement } from '@/lib/integrations/rapprochement'
 import { journaliser } from '@/lib/integrations/journal'
 import { createClient } from '@/lib/supabase/server'
@@ -53,6 +55,36 @@ async function traiter(req: Request) {
   const resultats: Array<Record<string, unknown>> = []
   const anomalies: string[] = []
 
+  // ─── Le Z de la caisse, troisième témoin ────────────────────────────────
+  // Les deux chiffres déjà comparés (reçu / compris) viennent du MÊME flux :
+  // un ticket que la caisse ne nous envoie jamais est invisible des deux
+  // côtés, et la journée s'affiche « ok » en étant amputée. Le Z est ce que
+  // la caisse déclare pour elle-même — un témoin indépendant.
+  const zParJour = new Map<string, { ids: string[]; ca_ttc: number; taxes: number; commentaires: string[] }>()
+  if (zeltyConfigure()) {
+    const depuis = jourParis(new Date(Date.now() - (jours + 1) * 86_400_000))
+    const jusqua = jourParis(new Date())
+    const rep = await appelZelty(`/closures?after=${depuis}&before=${jusqua}&limit=500`)
+    if (rep.ok) {
+      const parsed = reponseClotures.safeParse(rep.data)
+      if (parsed.success) {
+        const propres = []
+        for (const brut of parsed.data.closures) {
+          const n = normaliserCloture(brut)
+          if (n.ok) propres.push(n.cloture)
+          else anomalies.push(n.motif)
+        }
+        for (const [jour, agr] of agregerParJour(propres)) zParJour.set(jour, agr)
+      } else {
+        anomalies.push(`clôtures illisibles : ${parsed.error.issues[0].message}`)
+      }
+    } else {
+      // Pas de Z n'est pas une panne du rapprochement : les deux autres
+      // témoins restent valables, et on le dit plutôt que de se taire.
+      anomalies.push(`clôtures injoignables : ${rep.erreur}`)
+    }
+  }
+
   for (const source of sources) {
     // On repart d'hier : la journée en cours n'est pas finie, la rapprocher
     // produirait un faux écart à chaque exécution.
@@ -64,10 +96,28 @@ async function traiter(req: Request) {
         // fermée le lundi n'est pas une anomalie, et cent lignes vides
         // rendraient le tableau illisible.
         if (r.tickets_recus === 0) continue
+
+        // ⚠️ Le Z ne concerne QUE la caisse qui l'a produit. L'appliquer à
+        // l'historique SumUp comparerait le total Zelty d'un jour aux tickets
+        // d'une autre caisse — un écart inventé de toutes pièces.
+        const z = source === 'zelty' ? zParJour.get(jour) : undefined
+        if (z) {
+          r.cloture_id_externe = z.ids.join(',')
+          r.cloture_ca_ttc = z.ca_ttc
+          r.cloture_taxes = z.taxes
+          r.ecart_cloture = Math.round((z.ca_ttc - r.montant_recu) * 100) / 100
+          // Un Z qui ne tombe pas sur nos tickets veut dire qu'il en manque :
+          // c'est plus grave qu'un écart de traitement, donc ça prime.
+          if (Math.abs(r.ecart_cloture) >= 0.05) r.statut = 'ecart'
+        }
+
         await enregistrerRapprochement(r)
         resultats.push({ jour, source, statut: r.statut, ecart: r.ecart_montant })
         if (r.statut !== 'ok') {
-          anomalies.push(`${jour} ${source} : ${r.statut}, écart ${r.ecart_montant} €`)
+          const surZ = r.ecart_cloture && Math.abs(r.ecart_cloture) >= 0.05
+            ? `, Z de la caisse ${r.cloture_ca_ttc} € contre ${r.montant_recu} € reçus`
+            : ''
+          anomalies.push(`${jour} ${source} : ${r.statut}, écart ${r.ecart_montant} €${surZ}`)
         }
       } catch (e) {
         anomalies.push(`${jour} ${source} : ${e instanceof Error ? e.message : String(e)}`)

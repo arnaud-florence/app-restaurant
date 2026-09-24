@@ -157,8 +157,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Réservation de table en ligne | guichet ouvert avant la salle, créneaux réels, `canal` | 0154 |
 | Liaison réservation ↔ caisse | socle de la synchro, en attente de la forme réelle | 0155 |
 | Liaison client ↔ caisse | un seul fichier client, deux vues | 0156 |
+| Le Z dans le rapprochement | témoin indépendant de notre ingestion | 0157 |
 
-**Migrations actuelles : 0001 → 0156.**
+**Migrations actuelles : 0001 → 0157.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -3017,6 +3018,55 @@ n'a été enregistrée : une réservation d'essai notifie le manager, qui
 rappellerait un client qui n'existe pas. ⚠️ Il RECOPIE la règle depuis le TS ;
 modifier les deux ensemble.
 
+#### Le Z de la caisse, troisième témoin du rapprochement (0157)
+
+`GET /closures?after=&before=&limit=500` — le chiffre que la caisse déclare
+POUR ELLE-MÊME, jour par jour. Intégré à `/api/cron/caisse/rapprochement`.
+
+**Pourquoi il manquait.** Le rapprochement (0139) confronte ce que la caisse
+nous a POUSSÉ à ce qu'on en a COMPRIS. Ces deux chiffres viennent du **même
+flux** : si un ticket ne nous parvient jamais, aucun des deux ne le sait, et
+la journée s'affiche « ok » en étant amputée. Le Z est indépendant de notre
+ingestion — c'est le chiffre du comptable. Un Z supérieur à nos tickets reçus
+veut dire qu'il en manque, et rien d'autre ne pouvait le dire.
+
+⚠️ **`turnover` et `taxes` sont en CENTIMES**, comme partout chez Zelty. Le
+reste de `rapprochements_caisse` est en euros : les mélanger donnerait un
+écart faux d'un facteur cent — et un écart faux est pire qu'aucun écart,
+puisqu'on y croit.
+
+⚠️ **`cloture_ca_ttc` NULL ne veut pas dire zéro.** Une caisse non clôturée
+n'a pas de Z ; un zéro afficherait un écart énorme sur une journée simplement
+pas encore fermée.
+
+⚠️ **Plusieurs clôtures peuvent tomber le même jour** — une caisse fermée deux
+fois, ou deux caisses. On les ADDITIONNE et on garde tous les identifiants :
+présenter l'une d'elles comme « le » Z du jour inventerait un écart.
+
+⚠️ **Le Z ne s'applique qu'à la caisse qui l'a produit.** Le rattacher à
+l'historique SumUp comparerait un total Zelty aux tickets d'une autre caisse.
+
+⚠️ **`restaurant_ids` doit partir en TABLEAU RÉPÉTÉ**
+(`restaurant_ids[]=A&restaurant_ids[]=B`) : la documentation précise qu'une
+chaîne à virgules n'est pas découpée mais **silencieusement tronquée à sa
+première valeur** par `intval()`. Sur un compte multi-établissements, on
+croirait tout rapprocher et on n'en verrait qu'un. Notre clé ne couvrant qu'un
+restaurant, on ne l'envoie pas.
+
+Test : `node scripts/test-zelty-clotures.mjs` — 17 assertions, sans compte.
+⚠️ Il RECOPIE la règle depuis le TS.
+
+**Reste ouvert, par ordre d'intérêt :**
+
+| Ce qui existe dans l'API | État |
+|---|---|
+| `POST /customers/{id}/add_loyalty` | **fidélité pilotable** — le module 20 pourrait créditer les points gagnés en salle |
+| `GET`/`POST /coupons` | promotions, CRUD complet |
+| `POST /inventory` | stock par plat — **404 sur notre compte, à débloquer avec Zelty** |
+| `GET /restaurants/{id}/dishes_availability` | disponibilités lues, complément de `(ops)/ruptures` |
+| `GET /fabrication-places` | postes de production — l'équivalent de nos `tag_destination` |
+| `POST /orders` | émission des commandes web — **bloquée tant qu'aucun mode de paiement n'existe** |
+
 #### Les deux ponts branchés (24/09/2026)
 
 | Route | Sens | Ce qu'elle fait |
@@ -3702,6 +3752,7 @@ node scripts/zelty-bookings.mjs                # réservations de la caisse (lec
 node scripts/test-zelty-reservations.mjs       # traduction des réservations (sans compte)
 node scripts/zelty-cartographie.mjs            # ce que l'API expose vraiment (lecture seule)
 node scripts/test-zelty-clients.mjs            # fichier client + garde-fous RGPD
+node scripts/test-zelty-clotures.mjs           # le Z, troisième témoin du rapprochement
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
