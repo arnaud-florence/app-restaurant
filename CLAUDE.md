@@ -3108,6 +3108,48 @@ plus de ligne pour un statut `annulee` ou `terminee` — mais il répercute
 toujours l'annulation sur une réservation qu'il connaît déjà, ce qui est tout
 l'intérêt. Un mort-né n'a pas sa place dans un carnet.
 
+#### ⚠️ La cartographie s'est trompée, et voici pourquoi (24/09/2026)
+
+**La première version de cette section était fausse sur trois points**, et
+l'erreur est instructive : elle a été produite en DEVINANT des noms
+d'endpoints puis en concluant « n'existe pas » sur un 404. Or un 404 sur un
+nom deviné prouve qu'on n'a pas trouvé, pas que la chose n'existe pas.
+
+Ce qui a débloqué : **docs.zelty.fr s'ouvre une fois connecté au back-office**,
+et expose un export complet sur **`/llms.txt`** — la liste officielle de toutes
+les opérations. C'est la source, et elle prime sur tout sondage.
+
+| Affirmé à tort | En réalité |
+|---|---|
+| « pas de clôtures de caisse par API » | **`GET /closures`** existe — on cherchait `/closings` |
+| « on ne peut ni modifier ni annuler une réservation » | **`POST /bookings/{id}`** — on testait PATCH et PUT |
+| « aucune gestion de stock » | **`POST /inventory`** est documenté (« Update dish stock ») |
+
+⚠️ **Ce qui reste vrai, et c'est la nuance qui compte** : `POST /inventory`
+porte le stock d'un PLAT — combien de parts de tarte il reste, en mode `set`
+ou `adjust`. Ce n'est PAS la mercuriale, les fiches techniques, les
+fournisseurs ni l'inventaire complet que le back-office propose par ailleurs :
+**ceux-là n'ont aucun endpoint dans la référence officielle.** La gestion des
+achats reste donc dans l'outil, mais l'affirmation « rien ne sort » était trop
+tranchée.
+
+⚠️ **`POST /inventory` répond pourtant 404 sur notre compte**, tout comme
+`GET /rooms`. Ce n'est pas un défaut de portée de la clé : `GET /info` rend
+`brand_id 3811` et `restaurant_id 10445`, elle est bien liée au restaurant.
+Hypothèse à confirmer auprès de Zelty : une fonction à activer (la doc exige
+que le plat « support unit stock management »). **À demander à leur équipe
+d'intégration plutôt qu'à déduire d'un code de retour.**
+
+**La référence officielle, au complet** : Restaurants (4 opérations), Catalogs
+(20, dont `Upsert dishes` et `Update dish stock`), Orders (10, dont `Create`,
+`Update`, `Add transaction`, `Close order`, `Send to production`, `Get PDF`),
+Closures (2), Customers (6, dont `Add customer loyalty`), Bookings (4),
+Promotions (6), Transaction Methods (2), Devices (1), Rooms (2), Phone Calls
+(1), Misc (`GET /info`).
+
+⚠️ **Toujours absents de la référence** : employés et planning, statistiques,
+commande en ligne, mercuriale, fiches techniques, fournisseurs.
+
 #### Ce que la caisse expose VRAIMENT — cartographie (24/09/2026)
 
 Demande du gérant : relier les deux systèmes sur tout ce qui peut l'être —
@@ -3205,13 +3247,12 @@ timeout ne crée pas de doublon. Même acquis que sur le catalogue.
 ⚠️ **`src` est posé par Zelty** : `bo` pour une saisie au back-office, `web`
 pour une création par l'API. C'est notre `canal`, offert.
 
-⚠️ **ON NE PEUT NI MODIFIER NI ANNULER PAR L'API.** `GET /bookings/{id}`,
-`PATCH` et `DELETE` répondent 404 sous toutes les formes essayées — par `id`,
-par `uid`, sur la collection avec l'identifiant dans le corps — alors même que
-`OPTIONS /bookings` annonce `GET, POST, PATCH, DELETE, PUT`. **Une annulation
-faite chez nous ne peut donc pas être poussée vers la caisse.** Ne pas
-promettre ce sens-là ; l'annulation se fait à la main dans le back-office
-jusqu'à ce que Zelty l'ouvre.
+⚠️ **MODIFIER UNE RÉSERVATION SE FAIT EN `POST /bookings/{id}`, PAS EN PATCH.**
+Ce paragraphe a d'abord affirmé l'inverse — « on ne peut ni modifier ni
+annuler » — parce que `GET /bookings/{id}`, `PATCH` et `DELETE` répondent tous
+404, alors qu'`OPTIONS` les annonce. C'était faux, et c'est la documentation
+officielle qui l'a démenti. **Une annulation faite chez nous remonte donc bien
+vers la caisse**, et la route le fait (troisième temps de la synchronisation).
 
 ⚠️ **« Confirmation automatique des réservations » est COCHÉE** dans les
 paramètres du restaurant. Une réservation envoyée sans `status` explicite

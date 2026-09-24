@@ -28,12 +28,15 @@
 // par l'API. Zelty le pose LUI-MÊME : c'est exactement notre `canal`, et il
 // dit gratuitement d'où vient chaque réservation.
 //
-// ⚠️ ON NE PEUT NI MODIFIER NI ANNULER PAR L'API. `GET /bookings/{id}`,
-// `PATCH` et `DELETE` répondent 404 sous toutes les formes essayées (par id,
-// par uid, sur la collection avec l'id dans le corps), alors même que
-// `OPTIONS` annonce `GET, POST, PATCH, DELETE, PUT`. Conséquence directe : une
-// annulation faite chez nous ne peut PAS être poussée vers la caisse. Ne pas
-// promettre cette synchronisation-là tant que Zelty ne l'ouvre pas.
+// ⚠️ MODIFIER UNE RÉSERVATION SE FAIT EN `POST /bookings/{id}`, PAS EN PATCH.
+// Une première lecture de cette API avait conclu que la modification était
+// impossible : `GET /bookings/{id}`, `PATCH` et `DELETE` répondent tous 404,
+// alors même qu'`OPTIONS` annonce `GET, POST, PATCH, DELETE, PUT`. La
+// documentation officielle (docs.zelty.fr, lisible une fois connecté au
+// back-office) donne la bonne forme. La leçon vaut plus que le correctif :
+// un 404 sur un verbe deviné prouve qu'on n'a pas trouvé, pas que la chose
+// n'existe pas — et cette conclusion trop rapide avait été écrite dans la
+// documentation du projet comme un fait.
 //
 // ⚠️ « Confirmation automatique des réservations » est COCHÉE dans les
 // paramètres du restaurant. Une réservation créée sans `status` explicite

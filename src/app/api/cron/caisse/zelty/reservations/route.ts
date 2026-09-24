@@ -91,6 +91,13 @@ async function traiter(req: Request) {
         .or(`caisse_externe_id.eq.${r.caisse_externe_id}${notreId ? `,id.eq.${notreId}` : ''}`)
         .limit(1).maybeSingle()
 
+      // ⚠️ L'exclusion des annulées est évaluée AVANT le comptage à blanc.
+      // Placée après, elle faisait annoncer à `?dry=1` une création qui
+      // n'aurait jamais lieu — un essai à blanc qui ment est pire qu'inutile,
+      // puisqu'on s'en sert justement pour décider d'exécuter pour de vrai.
+      const mortNe = !deja && (r.statut === 'annulee' || r.statut === 'terminee')
+      if (mortNe) { miroir.ignorees++; continue }
+
       if (dry) { deja ? miroir.majs++ : miroir.creees++; continue }
 
       if (deja) {
@@ -108,17 +115,10 @@ async function traiter(req: Request) {
           miroir.majs++
         } else miroir.ignorees++
       } else {
-        // ⚠️ ON NE CRÉE PAS une ligne pour une réservation DÉJÀ annulée ou
-        // terminée. Personne n'ira accueillir ce client, et surtout : une
-        // annulée supprimée à la main pour nettoyer le carnet REVIENDRAIT au
-        // passage suivant, indéfiniment. Constaté le 24/09/2026 en rejouant
-        // la synchronisation après un essai.
-        //
-        // Une annulation reste bien répercutée sur une réservation qu'on
-        // connaît déjà — c'est la branche du dessus, et c'est tout l'intérêt
-        // du miroir. Ce qui est écarté ici, c'est la CRÉATION d'un mort-né.
-        if (r.statut === 'annulee' || r.statut === 'terminee') { miroir.ignorees++; continue }
-
+        // (le mort-né a été écarté plus haut : on ne CRÉE pas une ligne pour
+        // une réservation déjà annulée ou terminée — personne n'ira accueillir
+        // ce client, et une annulée supprimée à la main pour nettoyer le
+        // carnet reviendrait au passage suivant, indéfiniment.)
         const { error } = await sb.from('reservations_tables').insert({
           client_nom: r.client_nom,
           client_telephone: r.client_telephone,
@@ -186,7 +186,41 @@ async function traiter(req: Request) {
     emission.envoyees++
   }
 
-  const resultat = { dry, jours, miroir, emission, avertissements: avertissements.slice(0, 40) }
+  // ─── 3. Les changements de NOTRE côté remontent vers la caisse ──────────
+  // `POST /bookings/{id}` — et non PATCH, qui répond 404 sous toutes ses
+  // formes. Sans ce troisième temps, une réservation annulée chez nous restait
+  // « confirmée » sur la caisse : l'équipe aurait gardé une table pour
+  // quelqu'un qui a décommandé, un samedi soir complet.
+  const remontees = { candidates: 0, poussees: 0, refusees: 0 }
+  const { data: aRemonter } = await sb.from('reservations_tables')
+    .select('id, statut, caisse_externe_id, nb_personnes, client_nom')
+    .not('caisse_externe_id', 'is', null)
+    .in('statut', ['annulee', 'no_show'])
+    .gte('date_resa', aujourdhui)
+    .limit(50)
+
+  for (const r of aRemonter ?? []) {
+    // On ne repousse que ce qui DIVERGE : relire la caisse avant d'écrire
+    // évite de réémettre la même annulation à chaque quart d'heure.
+    const lu = await appelZelty(`/bookings/${r.caisse_externe_id}`)
+    const dejaAnnulee = lu.ok &&
+      (lu.data as { booking?: { status?: number } })?.booking?.status === 192
+    if (dejaAnnulee) continue
+
+    remontees.candidates++
+    if (dry) { remontees.poussees++; continue }
+
+    const rep = await appelZelty(`/bookings/${r.caisse_externe_id}`, {
+      method: 'POST',
+      // ⚠️ Le corps reprend les champs obligatoires : comme pour le catalogue,
+      // un objet incomplet risque d'écraser ce qu'on ne renvoie pas.
+      body: { places: r.nb_personnes, status: 192 },
+    })
+    if (!rep.ok) { avertissements.push(`annulation ${r.id} : ${rep.erreur}`); remontees.refusees++; continue }
+    remontees.poussees++
+  }
+
+  const resultat = { dry, jours, miroir, emission, remontees, avertissements: avertissements.slice(0, 40) }
   // Le journal ne lève jamais : perdre une synchronisation réussie parce que
   // sa trace n'a pas pu s'écrire serait absurde.
   await journaliser({

@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 // Ce que la caisse expose VRAIMENT — inventaire des endpoints.
 //
-// La documentation Zelty exige une connexion au back-office et ne se lit pas
-// depuis un script. On sonde donc l'API elle-même, en LECTURE SEULE, et on
-// note ce qui répond. C'est la méthode qui a permis d'établir le contrat des
-// réservations le 24/09/2026, après que trois hypothèses sur les paramètres
-// de filtrage se sont révélées fausses.
+// ⚠️⚠️ CE SCRIPT NE FAIT PAS AUTORITÉ, ET IL A DÉJÀ INDUIT EN ERREUR.
+// Sa première version devinait des noms d'endpoints et concluait « n'existe
+// pas » sur un 404. Deux conclusions fausses en sont sorties le 24/09/2026 :
+// les clôtures de caisse ont été déclarées absentes (elles sont sous
+// `/closures`, on cherchait `/closings`), et la modification d'une
+// réservation impossible (c'est `POST /bookings/{id}`, on testait PATCH et
+// PUT). Deviner un nom puis conclure de son absence, c'est prouver qu'on n'a
+// pas trouvé, pas que la chose n'existe pas.
+//
+// LA SOURCE FAIT FOI : https://docs.zelty.fr, accessible une fois connecté au
+// back-office, avec un export complet sur /llms.txt. La liste ci-dessous en
+// vient. Ce script sert à vérifier ce que NOTRE CLÉ peut réellement atteindre
+// — ce qui n'est pas la même question.
 //
 // ⚠️ UN 200 AVEC UNE LISTE VIDE NE VEUT PAS DIRE « VIDE ». C'est la leçon la
 // plus chère de cette API : `GET /bookings` répondait `{"bookings": []}` alors
@@ -46,13 +54,18 @@ const SUJETS = {
     'customers', 'loyalty', 'loyalty/cards', 'coupons', 'discounts',
     'gift-cards', 'vouchers', 'marketing',
   ],
-  'Stocks': [
-    'stocks', 'stock', 'inventory', 'inventories', 'ingredients', 'supplies',
-    'catalog/stocks', 'stock-movements', 'suppliers',
-  ],
+  // ⚠️ La référence officielle ne connaît QU'UN point d'entrée de stock :
+  // `POST /inventory` (« Update dish stock », modes `set` et `adjust`). Il
+  // porte le stock d'un PLAT — combien de parts il reste — et non la
+  // mercuriale, les fiches techniques, les fournisseurs et l'inventaire
+  // complets que le back-office propose par ailleurs. Ceux-là n'ont aucun
+  // endpoint. Le GET ci-dessous ne prouve donc rien sur l'écriture.
+  'Stocks': ['inventory'],
   'Encaissement & caisse': [
-    'transaction-methods', 'transactions', 'tills', 'till', 'payments',
-    'cash-movements', 'closings', 'z-reports',
+    'transaction-methods',
+    // ⚠️ `closures`, pas `closings` : les clôtures de caisse existent bel et
+    // bien, et une faute d'anglais les avait fait déclarer absentes.
+    'closures',
   ],
   'Équipe': ['employees', 'users', 'staff', 'roles', 'timeclock'],
   'Établissement & salle': [
@@ -66,7 +79,13 @@ const SUJETS = {
   'Comptabilité & analyse': [
     'stats', 'reports', 'analytics', 'revenues', 'taxes', 'accounting',
   ],
-  'Technique': ['webhooks', 'me', 'account'],
+  // Documenté mais 404 sur notre clé au 24/09/2026 : à éclaircir avec Zelty
+  // plutôt qu'à conclure. Notre clé est pourtant bien liée au restaurant
+  // (`/info` rend restaurant_id 10445), donc ce n'est pas un défaut de portée.
+  'Documentés, injoignables ici': ['rooms', 'inventory'],
+
+  // `/info` dit la portée de la clé : brand seule, ou liée à un restaurant.
+  'Technique': ['webhooks', 'info'],
 }
 
 /** Résume une réponse sans en imprimer le contenu : on veut savoir CE QUI
@@ -116,7 +135,9 @@ for (const [sujet, chemins] of Object.entries(SUJETS)) {
         note = `clés : ${(res.cles ?? []).slice(0, 12).join(', ')}`
       }
     } else if (r.status === 404) {
-      note = 'n’existe pas'
+      // ⚠️ « pas trouvé sous ce nom », JAMAIS « n'existe pas » : c'est
+      // exactement le raccourci qui avait fait déclarer les clôtures absentes.
+      note = 'pas trouvé sous ce nom (vérifier docs.zelty.fr)'
     } else {
       note = (json?.message ?? json?.errmsg ?? texte.slice(0, 60)).toString()
     }
