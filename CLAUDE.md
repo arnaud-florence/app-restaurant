@@ -2695,63 +2695,55 @@ desserts**, **événements, baptêmes et anniversaires** — chacun daté, via
 ⚠️ Le tag `SNACKING` n'a **aucun produit** : son aperçu ne publie donc aucune
 carte. On annonce le service, pas un menu vide.
 
-### Le logotype de l'affiche (24/09/2026)
+### Le logotype officiel (24/09/2026)
 
-Le gérant a changé de logo : **rameau d'olivier, CASATASIA, « Maison
-Méditerranéenne »**, crème sur vert bouteille (`#0B2B22`, relevé sur
-l'affiche). Détouré de l'affiche elle-même — aucun fichier vectoriel n'existe.
+Le gérant a fourni **`Logo Casatasia.pdf`**, vectoriel pur — aucune image,
+aucune police, rien que des tracés. Il remplace le détourage fait le matin
+même à partir d'une affiche : cette source se rend à n'importe quelle taille
+sans perte, et ses couleurs sont exactes plutôt que relevées à l'œil.
+
+**Couleurs OFFICIELLES**, relevées dans le fichier :
+
+| | |
+|---|---|
+| vert de marque | **`#253328`** (et non `#0B2B22`, qui venait de l'affiche) |
+| lettrage | blanc pur `#FFFFFE`, pas crème |
+
+⚠️ Le vert a changé : `theme_color` du manifeste et `themeColor` du layout ont
+suivi. Une couleur de marque relevée sur une photo d'affiche n'est jamais la
+bonne — l'impression et l'éclairage la déplacent.
 
 | Fichier | Où | Quoi |
 |---|---|---|
-| `logo-casatasia.png` | site + app | logotype CRÈME, transparent, 1400×508 |
-| `logo-casatasia-sombre.png` | site + app | le même en VERT, pour fonds clairs |
-| `icon-512` / `icon-192` / `apple-touch-icon` / `logo-small` | site + app | monogramme **CT** sur vert |
-| `src/app/favicon.ico` | site | le même CT en 32×32 |
-| `og-image.jpg` | site | 1200×630, logotype + activités + commune |
+| `logo-casatasia.png` | site + app | logotype BLANC détouré, 1600×639 |
+| `logo-casatasia-sombre.png` | site + app | le même en vert, pour fonds clairs |
+| `logo-casatasia-bloc.png` | site | le bloc officiel tel quel, vert plein |
+| `icon-512` / `icon-192` / `apple-touch-icon` / `logo-small` | site + app | le rameau sur le vert |
+| `src/app/favicon.ico` | site | le même rameau en 32×32 |
+| `og-image.jpg` | site | 1200×630, logotype + activités |
 
-⚠️ **Le logotype est MONOCHROME : seul l'alpha porte la forme.** Le crème posé
-sur un fond clair est invisible, et c'est exactement ce qui s'est produit en
-posant la version verte dans l'en-tête de l'admin — qui est sur `stone-900`,
-donc SOMBRE. L'ancien commentaire du code disait le contraire parce que
-l'ancien lettrage était découpé dans une photo d'enseigne et arrivait avec son
-fond crème opaque.
+⚠️ **Le détourage est ici TRIVIAL et exact** : le fond est un aplat uni et le
+lettrage un blanc pur, donc l'alpha se déduit de la luminance et
+l'antialiasing des courbes est préservé. Rien à voir avec le détourage de
+l'affiche, qui demandait des composantes connexes et un tri par pâleur.
 
-⚠️ **L'icône ne porte QUE le monogramme CT, sans le rameau.** À 48 px — la
-taille réelle de la pastille de l'en-tête du site — le rameau devient une
-bouillie de pixels. Il reste sur le logotype, où il a la place de se lire.
+⚠️ **L'ICÔNE PORTE LE RAMEAU, PAS UN MONOGRAMME.** Le logo officiel n'a pas de
+« CT » — l'ancien site en affichait un, inventé. Et le T de CASATASIA **ne
+peut pas être découpé** : dans ce lettrage, « ATA » se touchent, un rectangle
+emporterait des morceaux de A. Une première tentative a d'ailleurs produit
+« CS », les bornes de colonnes ayant décalé l'indexation des lettres. Plutôt
+que de fabriquer une lettre absente de l'identité, l'icône prend le signe qui
+y est. À 48 px — la taille réelle de la pastille de l'en-tête — le rameau
+reste lisible, ce qui n'était pas le cas depuis l'affiche : la source
+vectorielle y est pour tout.
 
-⚠️ **Les dimensions passées à `<Image>` doivent suivre le fichier** : gardées à
-celles de l'ancien (720×186 au lieu de 1400×508), la réservation d'espace est
-fausse d'un cinquième de hauteur et la page saute au chargement.
+⚠️ **`sharp.trim()` est inutilisable ici** : il se cale sur la couleur du coin
+haut-gauche, transparent après détourage, et veut donc tout rogner — il lève
+« bad extract area ». Le recadrage se fait sur l'alpha, à la main.
 
-**Deux pièges de l'extraction**, si elle est à refaire depuis une affiche :
-
-- **la feuille du décor passe DEVANT le C et lui est connectée.** Au seuil
-  normal, les deux ne forment qu'une seule tache — tout critère de taille ou de
-  position emporte alors la lettre avec le décor, et le logotype se lit
-  « ASATASIA ». On étiquette au seuil STRICT (alpha ≥ 150), où le filament
-  disparaît, puis on sépare par **pâleur** : le décor est imprimé en filigrane
-  (alpha moyen 182-209) là où les lettres sont pleines (240-254) ;
-- **les accents et les points des i font quelques dizaines de pixels.** Un
-  seuil de taille grossier rend « Maıson Medıterraneenne ».
-
-**Écrit le 23/09/2026** : le label du hero passe de « Le Fournil » à **Maison
-Méditerranéenne** (le titre disait déjà CASATASIA — c'est le label qui
-réduisait la maison à sa boulangerie, sur le PREMIER écran), une section
-**« De l'auberge provençale à CasaTasia »** raconte l'histoire des affiches,
-la signature **« Ici, la vie a bon goût ! »** est posée juste sous le hero, et
-le pied de page — le texte que Google lit en bas de CHAQUE page — nomme enfin
-la maison au lieu du seul fournil.
-
-⚠️ **Le texte ne DATE rien et ne compte aucune génération.** « Depuis 1923 »
-serait vérifiable, donc réfutable, et personne ici n'a la date. Une
-imprécision assumée vaut mieux qu'une précision inventée sur l'histoire d'un
-lieu que les clients connaissent mieux que nous.
-
-⚠️ `scripts/test-creneaux-capacite.mjs` ne RECOPIE plus les heures du service :
-il les lit par `/api/public/activation`. Un test qui répète une valeur de
-configuration passe au rouge à chaque décision du gérant, et finit par être
-ignoré — ce jour-là il ne protège plus rien.
+⚠️ Les dimensions passées à `<Image>` suivent le fichier (1600×639) : gardées
+à celles de la version précédente, la réservation d'espace serait fausse et la
+page sauterait au chargement.
 
 ### Services du restaurant et aperçu des cartes (22/09/2026)
 

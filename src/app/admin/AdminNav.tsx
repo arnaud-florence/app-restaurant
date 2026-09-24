@@ -185,15 +185,16 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
         'md:sticky md:top-0 md:translate-x-0 md:h-screen',
       )}>
         <div className="px-4 py-4 border-b border-stone-700 flex items-center justify-between">
-          {/* Le logotype est détouré sur fond transparent, en crème : il se
-              pose donc à nu sur le stone-900. ⚠️ Pour un fond CLAIR, prendre
-              logo-casatasia-sombre.png — le crème y serait invisible. */}
+          {/* Logotype officiel (PDF vectoriel du gérant), détouré sur fond
+              transparent, en BLANC : il se pose à nu sur le stone-900.
+              ⚠️ Pour un fond CLAIR, prendre
+              logo-casatasia-sombre.png — le blanc y serait invisible. */}
           <Link href="/admin/cat" className="block" onClick={() => setOpen(false)}>
             <Image
               src="/logo-casatasia.png"
               alt="CASATASIA — Maison méditerranéenne"
-              width={1400}
-              height={508}
+              width={1600}
+              height={639}
               priority
               className="h-11 w-auto"
             />
