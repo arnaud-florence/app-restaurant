@@ -2109,6 +2109,26 @@ poids qui traîne ailleurs dans le libellé peut être celui d'une tranche
 première version écrivait « barquette 500 g 500 g » à la deuxième exécution.
 Un script qu'on ne peut pas rejouer n'est pas un script.
 
+**Contrôle du 24/09/2026 : le croisement automatique confirme le tri manuel
+d'Euro-Cash.** La méthode mise au point pour Gel Var (racine de 5 lettres,
+minimum deux mots communs, couverture du besoin) a été passée sur les 1 280
+références Euro-Cash face à nos 93 matières réellement utilisées. Elle ne
+propose **aucune paire nouvelle qui tienne** : les sept candidates sont
+exactement celles que la sélection manuelle avait examinées puis écartées —
+sacs croissants **N°101** au lieu du N°104, sandwich **9+6** au lieu du 12+6,
+boîtes pâtissières **18×18** face à nos 16 et 22, cabas à fond plat face à nos
+sacs fond 12/6. Toutes figurent déjà dans « Avez-vous l'équivalent ? ».
+
+C'est la meilleure justification qu'on pouvait donner à la règle : la machine
+retrouve précisément les cas litigieux, et c'est l'œil humain qui a vu que le
+FORMAT ne concordait pas. Un rapprochement automatique les aurait écrits.
+
+⚠️ **Le catalogue Euro-Cash ne porte AUCUN prix** — 221 pages, 2 364 codes
+article, zéro tarif, comme Gel Var. Il ne peut donc pas alimenter
+`catalogue_fournisseur`, et le fournisseur reste en base avec 0 ligne jusqu'au
+devis. Ce n'est pas un oubli : une table de tarifs sans tarif ne compare rien,
+et y mettre des zéros ferait de ce fournisseur le moins cher partout.
+
 ⚠️ **RIEN N'EST RAPPROCHÉ AUTOMATIQUEMENT.** « JAMBON CUIT SUP AC 8K » (pièce
 entière à trancher) et « Jambon blanc tranché » partagent presque tous leurs
 mots sans être le même produit — le prix au kilo est plus bas parce que le
