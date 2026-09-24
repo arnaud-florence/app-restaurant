@@ -40,8 +40,19 @@ const restaurer = async () => {
 try {
   etape('avant l’ouverture')
   t(`les 14 interrupteurs sont en base`, initial.length === 14, `${initial.length} trouvé(s)`)
-  const avant = initial.filter(m => m.actif).length
-  t('seul le Fournil est allumé', avant === 3, `${avant} module(s) actif(s)`)
+  // ⚠️ Le GUICHET de réservation (`reservation_table`) est allumé depuis le
+  // 24/09/2026, alors que la SALLE ne l'est pas — et c'est voulu : une salle
+  // ne se remplit pas le jour où elle ouvre, elle se remplit les jours d'avant.
+  // L'API borne les dates réservables à l'ouverture de `restaurant_salle`.
+  // Ce test attendait « seul le Fournil » et tombait donc au rouge sur une
+  // décision commerciale ; il vérifie maintenant ce qui compte vraiment :
+  // qu'aucune activité de SERVICE n'est ouverte avant l'heure.
+  const allumes = initial.filter(m => m.actif).map(m => m.cle)
+  const service = allumes.filter(c => !c.startsWith('fournil') && c !== 'reservation_table')
+  t('aucune activité de service n’est ouverte avant l’heure',
+    service.length === 0, service.join(', ') || '—')
+  t('le guichet de réservation est ouvert, lui (il précède la salle)',
+    allumes.includes('reservation_table'))
 
   const cartes = await sb('recettes?select=tag_destination,actif&actif=eq.true')
   const parDest = {}
