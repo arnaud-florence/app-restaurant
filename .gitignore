@@ -68,3 +68,5 @@ data/*.xlsx
 # public. Les 16 PDF Gel Var pèsent 75 Mo à eux seuls — sans cette ligne ils
 # partaient dans l'historique, d'où on ne les retire plus vraiment.
 data/gelvar/
+data/demande-tarif-*.csv
+data/Demande de tarif*.xlsx

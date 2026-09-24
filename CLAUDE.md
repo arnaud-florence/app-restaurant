@@ -2207,6 +2207,56 @@ faudrait un OCR. Signalé à chaque exécution plutôt que compté pour vide.
 184, Gineys 82, La Frite Belge 52, France Boissons 49, Gel Var 26,
 Promocash 18.
 
+**Demande de tarif à Gel Var — ce qui nous sert, avec nos prix en face.**
+`node scripts/demande-tarif-gelvar.mjs` → `data/Demande de tarif CASATASIA -
+Gel Var.xlsx` (gitignoré). Deux parties, et la seconde est la plus utile :
+
+1. **13 références Gel Var** qui correspondent à un besoin identifié — il
+   chiffre exactement ce qu'il lit, avec sa propre désignation ;
+2. **110 produits que nous achetons et qu'on n'a pas trouvés à son
+   catalogue**, avec ce qu'on paie aujourd'hui : « avez-vous l'équivalent ? ».
+   Sans cette liste, le commercial ignore que le besoin existe — même leçon
+   que le tableau Euro-Cash.
+
+⚠️ **Un fournisseur qui ignore ce qu'il doit battre propose son tarif public**,
+et tout le monde y perd. Nos prix figurent donc en face, quand on les a — et
+la case reste VIDE sinon : un zéro dirait « gratuit ».
+
+⚠️ **ON DÉCOUPE SUR LA FIN D'ARTICLE (référence + état), pas sur un motif
+global.** Une première version cherchait « désignation + colisage + référence
++ état » d'un seul tenant : la désignation absorbait la fin de l'article
+PRÉCÉDENT, référence comprise, et produisait des lignes comme « Cheddar jeune
+rouge Bloc de 2,5kg 3105022 FRAIS Bacon rôti en tranches » portant la
+référence d'un troisième produit. Envoyé tel quel, le commercial aurait
+chiffré autre chose — et une référence fausse est pire qu'absente, parce qu'on
+la croit.
+
+⚠️ **Le pied de page de Gel Var est composé en lettres ESPACÉES**
+(« S I È G E  G E L V A R »), invisible pour un filtre par mot : il s'était
+retrouvé en désignation du premier article. Détecté par la proportion de
+lettres isolées.
+
+⚠️ **Les 100 lignes de DÉMO d'`ingredients` sont écartées** — « Tagliatelle /
+Metro France », « Œufs plein air / Ferme du Plateau », « Dioxyde de carbone ».
+Le critère de vérité n'est pas `actif` mais l'USAGE : une matière compte si
+elle entre dans une fiche technique (`recette_ingredients`) ou si on la compte
+à l'inventaire (`stocke`). 93 sur 200. Envoyer les autres ferait chiffrer des
+produits qu'on n'achète pas.
+
+⚠️ **Les alcools et les libellés de FACTURE sont exclus** : Gel Var n'est pas
+un caviste, et « BAGUETTE CAMPESTRE MULTICEREALE 51CM 295G ARTIPAT C=25 » est
+le texte de Gineys, pas un besoin exprimable.
+
+⚠️ **UN SEUL MOT COMMUN NE SUFFIT PAS À RAPPROCHER.** « Tomate » est couvert à
+100 % par « Tartinade de tomate olive », et « Bœuf pour carpaccio » par
+« Truffe été carpaccio PLANTIN » — deux rapprochements ridicules qui allaient
+partir. Minimum deux mots.
+
+⚠️ **Mais les mots se comparent sur une RACINE de 5 lettres**, sinon
+« Emmental en tranches » et « Emmental tranché » n'ont qu'un mot commun et le
+rapprochement saute — alors que c'est le même fromage. Le français décline
+trop pour une comparaison mot à mot.
+
 **La Frite Belge — sauces Pauwels, frites et oignons (24/09/2026).**
 `node scripts/import-catalogue-frite-belge.mjs [--ecrire]` — 52 références :
 48 sauces Pauwels (tube 1 L, PET 3 L, BIB 5 L et 2×5 L, seau 10 L), la graisse
@@ -3869,6 +3919,7 @@ node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos fac
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal
 node scripts/import-catalogue-frite-belge.mjs  # sauces Pauwels, frites, oignons (essai à blanc)
 node scripts/import-catalogue-gelvar.mjs       # Gel Var : 26 prix, 1619 références en attente
+node scripts/demande-tarif-gelvar.mjs          # la liste à envoyer au commercial (xlsx)
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
