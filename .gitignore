@@ -64,3 +64,7 @@ data/catalogue-*.pdf
 data/selection-*.csv
 data/tarif-*.csv
 data/*.xlsx
+# ⚠️ Catalogues fournisseurs : documents commerciaux de tiers, et le dépôt est
+# public. Les 16 PDF Gel Var pèsent 75 Mo à eux seuls — sans cette ligne ils
+# partaient dans l'historique, d'où on ne les retire plus vraiment.
+data/gelvar/

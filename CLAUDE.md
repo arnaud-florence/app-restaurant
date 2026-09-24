@@ -2161,6 +2161,52 @@ rester sans décision explicite : la coppa n'est pas du jambon serrano, les
 herbes de Provence ne sont pas de l'origan, le beurre allégé à 40 % n'est pas
 du beurre à 82 %. Le test le vérifie.
 
+**Gel Var — 16 catalogues, et presque aucun prix (24/09/2026).**
+`node scripts/import-catalogue-gelvar.mjs [--ecrire]` — les PDF vivent dans
+`data/gelvar/` (75 Mo, **gitignoré** : documents commerciaux d'un tiers, dépôt
+public).
+
+⚠️ **Le serveur de Gel Var refuse `curl` en 403.** Il faut les en-têtes d'un
+vrai navigateur — `User-Agent` et surtout `Referer` pointant la page des
+catalogues. Sans eux, on télécharge seize fichiers de zéro octet sans qu'une
+seule erreur ne soit levée par le script.
+
+⚠️ **UN SEUL DES SEIZE CATALOGUES PORTE DES PRIX** : « Nos bonnes affaires
+RESTAURATION », 26 articles. Les quinze autres sont des catalogues PRODUITS —
+référence, désignation, colisage, photo — soit **1 619 références sans
+tarif**. Elles n'entrent PAS dans `catalogue_fournisseur`, qui exige un prix.
+
+⚠️ **Et surtout : ne JAMAIS les y mettre à 0 pour « avoir le référentiel ».**
+Un zéro se lit « gratuit » et remonterait en tête du comparateur — exactement
+la faute de `statutFoodCost(0)`, qui affichait en vert le produit dont on
+savait le moins. Ces références attendent le devis ; elles serviront alors à
+le rapprocher.
+
+⚠️ **« Nos bonnes affaires BOULANGERIE PÂTISSERIE » n'a aucun prix malgré son
+titre** : ce sont des nouveautés et des idées de recettes (poke bowl, panini,
+bagel). D'où la règle du script : il CHERCHE les prix dans les seize fichiers
+au lieu de les présumer d'après le nom. Un intitulé n'est pas un contenu.
+
+⚠️ **Les 26 prix sont des PROMOTIONS de septembre 2026**, pas le tarif
+courant. Un prix d'appel oublié dans le comparateur ferait croire dans six
+mois que Gel Var est le moins cher sur des références dont la promo est
+passée. La date et la source le disent en toutes lettres.
+
+⚠️ **L'unité tarifée change d'une ligne à l'autre** — « Le kg », « Le sac »,
+« La boîte ». Une seiche à 6,45 € *le sac* de 800 g n'est pas à 6,45 €/kg : la
+confondre avec un prix au kilo sous-estimerait le produit de 20 %.
+
+⚠️ Dans le flux du PDF, « 6 € 45 » arrive en deux blocs (les centimes sont en
+exposant à l'impression). Les lire comme deux nombres donnerait des articles à
+6 € et des lignes fantômes à 45 €.
+
+⚠️ `glaces-antolin.pdf` est en **images pures** : zéro texte extractible, il
+faudrait un OCR. Signalé à chaque exécution plutôt que compté pour vide.
+
+**Le comparateur au 24/09/2026 : 411 tarifs sur 6 fournisseurs** — Félix Potin
+184, Gineys 82, La Frite Belge 52, France Boissons 49, Gel Var 26,
+Promocash 18.
+
 **La Frite Belge — sauces Pauwels, frites et oignons (24/09/2026).**
 `node scripts/import-catalogue-frite-belge.mjs [--ecrire]` — 52 références :
 48 sauces Pauwels (tube 1 L, PET 3 L, BIB 5 L et 2×5 L, seau 10 L), la graisse
@@ -3822,6 +3868,7 @@ node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire l
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal
 node scripts/import-catalogue-frite-belge.mjs  # sauces Pauwels, frites, oignons (essai à blanc)
+node scripts/import-catalogue-gelvar.mjs       # Gel Var : 26 prix, 1619 références en attente
 node scripts/test-obligations-ouverture.mjs    # registre légal + drapeau bloquant
 node scripts/acces-ambre.mjs                   # accès manageuse (essai à blanc par défaut)
 node scripts/parcours-manageuse.mjs            # parcours de formation manageuse
