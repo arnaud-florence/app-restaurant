@@ -2048,6 +2048,59 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
+
+Le gérant dispose de **trois iPad** (caisse, KDS cuisine, KDS pizza) et du
+**iPhone du livreur**. Objectif : une seule saisie qui alimente tout.
+
+**Ce que la caisse expose vraiment**, relevé sur le compte :
+
+| | |
+|---|---|
+| `fabrication-places` | **VIDE** — aucun poste de production configuré |
+| `id_fabrication_place` sur les 181 plats | **0 partout** |
+| Livraison native (frais, minimum, horaires, délai) | tout à **zéro** |
+| Appareils déclarés | iPhone (actif) et **iPad, vu le 2 septembre** |
+| Endpoint tournée / livreur | **aucun** |
+
+⚠️ **Allumer les KDS sans affecter les plats ne sert à rien** : les 181 sont à
+`id_fabrication_place: 0`, donc tout tomberait au même endroit — les pizzas
+chez le cuisinier, les croissants chez le pizzaiolo.
+
+⚠️ **`POST /fabrication-places` répond 404.** L'API sait LIRE les postes, pas
+les créer : ils se déclarent à la main dans le back-office. En revanche, une
+fois créés, l'affectation des 181 plats se fait par API —
+`node scripts/postes-production-zelty.mjs [--ecrire]`, un seul POST groupé.
+La correspondance se fait sur le NOM du poste, qui doit concorder
+EXACTEMENT : un « Pizzeria » chez eux face à un « Pizza » ici laisserait les
+douze pizzas sans écran, et personne ne le verrait avant le premier service.
+
+Répartition retenue : **Pizza** (12 plats), **Cuisine** (21). FOURNIL et BAR
+n'ont PAS de poste — ils se servent au comptoir, sur l'écran de caisse. Trois
+iPad, trois rôles.
+
+⚠️ **Le même upsert dangereux.** `POST /catalog/dishes` exige `name`, `price`
+et `tax` : le script RELIT le catalogue, recopie ces trois champs tels quels,
+ne touche QUE le poste, et REFUSE de construire s'il en manque un.
+
+⚠️⚠️ **Aujourd'hui le ticket d'une commande web pizza arrive UNIQUEMENT dans
+notre KDS** — la caisse n'en sait rien, l'émission étant bloquée faute de mode
+de paiement. Le 3 octobre en l'état, la cuisine aurait **deux écrans** : la
+caisse pour le comptoir et les tables, notre KDS pour le web. C'est exactement
+ce que la frontière d'août cherchait à éviter, et le levier est unique —
+déclarer le TPE du CIC.
+
+⚠️ **L'émission n'envoie PAS l'adresse de livraison.** `CommandeSortante`
+porte `mode: 'delivery'`, `due_date`, prénom et téléphone — pas de champ
+adresse. Une livraison poussée vers Zelty y arriverait sans destination. Le
+nom du champ n'est pas documenté dans la référence dont on dispose : à
+confirmer auprès de Zelty plutôt qu'à deviner — chaque hypothèse non vérifiée
+sur cette API a coûté. Repli sûr : le `comment`, qui existe.
+
+⚠️ **Aucun endpoint de tournée ni de livreur.** Même si Zelty a un écran
+livreur, on ne pourrait ni le lire ni l'alimenter — même limite que pour les
+stocks. La tournée du soir reste donc dans l'outil (`(ops)/livreur`).
+
 ### SumUp retiré, snacking éteint (25/09/2026)
 
 Décision du gérant : « on a Zelty », et « pas encore de vrai snacking dans
