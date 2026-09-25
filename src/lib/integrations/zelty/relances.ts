@@ -47,6 +47,16 @@ export const RELANCES: Record<string, Relance> = {
   'tag.delete':           { route: '/api/cron/caisse/zelty/catalogue', fenetreSecondes: 120, motif: 'famille supprimée' },
   'catalog.push':         { route: '/api/cron/caisse/zelty/catalogue', fenetreSecondes: 120, motif: 'catalogue publié' },
 
+  // ─── Les ruptures déclarées SUR LA CAISSE ────────────────────────────
+  // Le geste naturel quand on s'en aperçoit en servant. Sans ce retour,
+  // casatasia.fr continuait de vendre le produit.
+  //
+  // ⚠️ Fenêtre COURTE (30 s) : on vend en ligne pendant ce temps-là.
+  //
+  // ⚠️ Pas de boucle avec le sens sortant — ce sont DEUX drapeaux distincts.
+  // On écrit `disable_takeaway` / `disable_delivery` ; on lit `outofstock`.
+  'dish.availability_update': { route: '/api/cron/caisse/zelty/disponibilites/entrantes', fenetreSecondes: 30, motif: 'disponibilité plat' },
+
   // ─── Les réservations ────────────────────────────────────────────────
   // Le sondage passe au quart d'heure et coûte 14 appels (un par jour de la
   // fenêtre, `GET /bookings` n'acceptant aucune période). Le webhook rend la

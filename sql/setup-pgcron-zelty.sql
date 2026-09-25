@@ -114,6 +114,17 @@ begin
   perform cron.schedule('zelty-reservations', '*/15 6-22 * * *',
     $q$select call_zelty('/api/cron/caisse/zelty/reservations', '?jours=14')$q$);
 
+  -- ─── 5 bis. Ruptures déclarées SUR LA CAISSE, filet du webhook ──
+  -- `dish.availability_update` couvre le temps réel, mais un webhook n'a pas
+  -- de mémoire : une livraison ratée perd la rupture, et on continue de
+  -- vendre en ligne un produit qu'on n'a plus. Décalé de 5 min du sens
+  -- sortant pour ne pas croiser sa propre écriture.
+  if exists (select 1 from cron.job where jobname = 'zelty-ruptures-entrantes') then
+    perform cron.unschedule('zelty-ruptures-entrantes');
+  end if;
+  perform cron.schedule('zelty-ruptures-entrantes', '5,20,35,50 4-20 * * *',
+    $q$select call_zelty('/api/cron/caisse/zelty/disponibilites/entrantes')$q$);
+
   -- ─── 6. Fichier client, une fois par nuit ──────────────────────
   -- 4 h 40 UTC. Un client n'a pas besoin d'être connu à la minute, et le
   -- miroir relit tout le fichier à chaque passage : le faire tourner en

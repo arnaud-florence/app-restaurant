@@ -1240,13 +1240,52 @@ brancher au Z du soir rapprocherait la veille), `order.status.update`,
 `promotion.update`, `restaurant.*`, et les `menu.*` / `option*` — vides tant
 que la pizzeria n'a pas ouvert.
 
-⚠️ **`dish.availability_update` n'est pas encore branché, et c'est le dernier
-trou** : une rupture marquée sur la caisse ne redescend pas chez nous, donc
-casatasia.fr continue de vendre. Le sens inverse, lui, fonctionne
-(`(ops)/ruptures` → caisse). `GET /restaurants/{id}/dishes_availability` répond
-et porte `outofstock` par plat — la forme est observée, il reste à écrire la
-relecture. ⚠️ Attention à la boucle : notre propre poussée de rupture
-déclenchera cet événement.
+**Les ruptures redescendent de la caisse (25/09/2026).**
+`/api/cron/caisse/zelty/disponibilites/entrantes[?dry=1]` +
+`zelty/ruptures-entrantes.ts` (pur). On poussait nos ruptures depuis la 0141 ;
+l'inverse n'existait pas. Un plat marqué en rupture SUR LA CAISSE — le geste
+naturel quand on s'en aperçoit en servant — ne redescendait pas, et
+casatasia.fr continuait de le vendre. Rapprochement par `dish_remote_id`, qui
+porte NOTRE uuid depuis l'import : correspondance exacte, jamais par le nom.
+
+⚠️⚠️ **ON N'AJOUTE QUE DES RUPTURES, ON N'EN LÈVE JAMAIS.** Trois raisons, et
+chacune suffirait :
+
+1. **`outofstock: false` est la valeur PAR DÉFAUT** de tout plat que personne
+   n'a touché — les 181 du compte y sont aujourd'hui. Ça ne dit pas « quelqu'un
+   a vérifié qu'il y en a », ça dit « rien n'a été déclaré ». Même faute que le
+   tableau d'allergènes vide lu « aucun allergène » (0138), et que
+   `statutFoodCost(0)` affiché en vert (0150) : une absence n'est pas une
+   affirmation.
+2. **Lever effacerait le geste de l'équipe, en silence.** On marque « plus de
+   croissants » au comptoir ; personne ne touche la caisse, qui reste donc à
+   `false` ; trente secondes plus tard le site revend des croissants qui
+   n'existent pas.
+3. **Les deux erreurs ne coûtent pas pareil.** Une fausse rupture perd une
+   vente ; une fausse disponibilité fait venir un client pour rien — et ça, il
+   le raconte. La levée reste un geste humain dans `(ops)/ruptures`, et se fait
+   seule de toute façon : `rupture_le` est DATÉ, il se périme le lendemain.
+
+⚠️ **Pas de boucle avec le sens sortant, et ce n'est pas un hasard** : ce sont
+DEUX drapeaux distincts. On ÉCRIT `disable_takeaway` / `disable_delivery` (les
+canaux en ligne) ; on LIT `outofstock` (l'état du stock). Notre poussée ne
+modifie jamais ce qu'on relit.
+
+⚠️ **Une liste VIDE est une lecture ratée, pas « aucune rupture »** : sans ce
+garde-fou, une réponse tronquée passerait pour un catalogue sain.
+
+⚠️ `outofstock` absent ou `null` ne marque RIEN. Un `!= false` ferait passer
+les deux pour une rupture et retirerait toute la carte de la vente.
+
+⚠️ Un plat en rupture sans correspondance chez nous est SIGNALÉ, jamais créé :
+inventer une fiche depuis une rupture doublonnerait nos produits, sans nom,
+sans prix et sans photo.
+
+Filet de sondage `zelty-ruptures-entrantes` à `5,20,35,50 4-20` — décalé de
+5 min du sens sortant. Un webhook n'a pas de mémoire : une livraison ratée
+perdrait la rupture.
+Test : `PORT=3000 node scripts/test-zelty-ruptures-entrantes.mjs` — 18
+assertions. ⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble.
 
 Test : `PORT=3000 node scripts/test-zelty-relances.mjs` — 13 assertions.
 ⚠️ Il RECOPIE la table des relances depuis le TS ; modifier les deux ensemble.
@@ -4018,6 +4057,8 @@ node scripts/test-zelty-reservations.mjs       # traduction des réservations (s
 node scripts/zelty-cartographie.mjs            # ce que l'API expose vraiment (lecture seule)
 node scripts/test-zelty-clients.mjs            # fichier client + garde-fous RGPD
 node scripts/test-zelty-clotures.mjs           # le Z, troisième témoin du rapprochement
+PORT=3000 node scripts/test-zelty-relances.mjs # webhook = sonnette, GET = vérité (regroupement)
+PORT=3000 node scripts/test-zelty-ruptures-entrantes.mjs # ruptures caisse → outil (ne lève jamais)
 
 # tests à créer au fil des modules suivants (un fichier par module, même pattern)
 # node scripts/test-affichage.mjs                # Module 26
