@@ -140,9 +140,14 @@ if (aFaire.length === 0) { console.log('\nRien à faire.\n'); process.exit(0) }
 // ⚠️ UN SEUL APPEL avec un tableau. Zelty plafonne son débit et ne le
 // documente pas : treize créations de familles à la file avaient donné cinq
 // 429 à partir du cinquième appel.
+// ⚠️ LE CORPS EST UN TABLEAU NU, pas `{dishes: [...]}`. Enveloppé, l'API
+// répond 400 en réclamant `name`, `price` et `tax_id` — elle ne voit aucun
+// plat, et le message laisse croire à des champs manquants alors que c'est
+// la FORME qui est fausse. C'est ce que fait déjà l'émission des
+// disponibilités, et c'est pour ça qu'elle passe.
 const r = await zl('catalog/dishes', {
   method: 'POST',
-  body: JSON.stringify({ dishes: aFaire.map(({ _nom, _poste, ...d }) => d) }),
+  body: JSON.stringify(aFaire.map(({ _nom, _poste, ...d }) => d)),
 })
 console.log(`\n${r.status === 200 ? '✓' : '✗'} HTTP ${r.status}`)
 if (r.status !== 200) console.log('   ' + JSON.stringify(r.body).slice(0, 300))

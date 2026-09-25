@@ -2048,6 +2048,64 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### Le back-office configuré à la main (25/09/2026)
+
+⚠️ **CORRECTION D'UNE AFFIRMATION FAUSSE DE CE FICHIER.** Il disait que les
+lieux de fabrication « se créent à la main dans le back-office » sans dire où,
+après que `POST /fabrication-places` eut répondu 404. C'était exact sur l'API
+mais je n'avais pas trouvé l'écran, et j'en avais conclu qu'il fallait un KDS
+appairé d'abord. Faux : tout est dans **`bo.zelty.fr/configuration`**, une page
+que la navigation `app.zelty.fr` n'expose pas. Elle contient Méthodes de
+paiement, **Impressions → Lieux de production**, et même **Livraisons →
+Zones / Livreurs**.
+
+**Fait ce jour, dans le back-office :**
+
+| | |
+|---|---|
+| Méthodes de paiement | **3 créées** — il n'y en avait AUCUNE |
+| Lieux de fabrication | **Cuisine (#23175)** et **Pizza (#23176)** |
+| Plats affectés | 33 — 12 Pizza, 21 Cuisine, 148 au comptoir |
+
+⚠️ **Il n'existait aucune méthode de paiement, pas même les espèces.** La
+caisse ne pouvait donc solder aucun ticket. `Espèces` (type cash, rendu
+monnaie, tiroir, comptage), `Carte bancaire` (**type `ingenico`** — le TPE du
+CIC est un Ingenico, donc le montant part de la caisse vers le terminal et
+l'équipe ne le retape pas), et `Paiement en ligne` (icône web, **masquée de la
+caisse** : un règlement web n'a pas à être tapable au comptoir).
+
+→ **`ZELTY_MODE_PAIEMENT_EN_LIGNE=Paiement en ligne`.** L'émission des
+commandes du site n'est plus bloquée. ⚠️ À poser sur Vercel.
+
+⚠️⚠️ **`POST /catalog/dishes` prend un TABLEAU NU, pas `{dishes: [...]}`.**
+Enveloppé, l'API répond 400 en réclamant `name`, `price` et `tax_id` — elle ne
+voit aucun plat, et le message laisse croire à des champs manquants alors que
+c'est la FORME qui est fausse. Une heure perdue à chercher le mauvais problème.
+`zelty/disponibilite.ts` envoyait déjà un tableau nu, et c'est pour ça qu'il
+passait.
+
+⚠️ Contrôle systématique après tout upsert : `node
+scripts/verifier-carte-zelty.mjs` — **181/181 conformes, 0 écart, 0 prix nul**
+après l'affectation. Sur un endpoint qui peut écraser le prix imprimé sur les
+tickets, la vérification n'est pas optionnelle.
+
+⚠️ **Ce que je n'ai PAS touché, délibérément** : le moyen de paiement de
+l'abonnement (données bancaires) et le passage en **mode réel** — à partir de
+ce clic les tickets entrent dans le CA, c'est une décision liée à la date
+d'ouverture. Les deux bandeaux sont affichés en permanence dans le back-office.
+
+⚠️ **Les KDS restent à appairer depuis les iPad.** La page Appareils → KDS
+n'a aucun bouton d'ajout : un appareil se déclare en se connectant, et il
+atterrit dans la liste correspondant à l'APPLICATION qu'il fait tourner.
+L'iPad déjà déclaré (ref B, iPad 8ᵉ gén., vu le 2 septembre) est dans « La
+caisse » parce qu'il fait tourner l'app caisse ; il est en 4.55.0 alors que
+l'iPhone est en 4.55.2. Chaque lieu de fabrication s'associe ensuite « à une
+imprimante ou une application iPad de fabrication » (texte de Zelty).
+
+⚠️ **`/inventory` : la doc donne la réponse** — « a restaurant-scoped API
+credential is required ». Le 404 n'est pas une fonction absente, c'est une clé
+à recréer avec la portée RESTAURANT (Configuration → Accès API).
+
 ### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
 
 Le gérant dispose de **trois iPad** (caisse, KDS cuisine, KDS pizza) et du
