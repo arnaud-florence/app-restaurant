@@ -2102,9 +2102,27 @@ caisse » parce qu'il fait tourner l'app caisse ; il est en 4.55.0 alors que
 l'iPhone est en 4.55.2. Chaque lieu de fabrication s'associe ensuite « à une
 imprimante ou une application iPad de fabrication » (texte de Zelty).
 
-⚠️ **`/inventory` : la doc donne la réponse** — « a restaurant-scoped API
-credential is required ». Le 404 n'est pas une fonction absente, c'est une clé
-à recréer avec la portée RESTAURANT (Configuration → Accès API).
+⚠️ **`/inventory` : MON EXPLICATION ÉTAIT FAUSSE, deux fois.** J'avais d'abord
+dit « fonction à activer », puis, en lisant « a restaurant-scoped API
+credential is required », « clé à recréer avec la portée restaurant ». Les deux
+sont démentis :
+
+- l'écran **Accès API montre que la clé #23628 « Claude » est DÉJÀ rattachée au
+  restaurant Casatasia** — la colonne « Restaurant » le dit ;
+- testé proprement avec le chemin documenté (`POST /inventory`), la charge
+  documentée, et un `qty: 0` en mode `adjust` **volontairement invalide** — la
+  doc dit qu'il doit renvoyer 400 « Adjust quantity must not be zero », donc un
+  400 aurait prouvé que l'endpoint existe sans rien écrire. Résultat :
+  **404 en 2.11, 2.12 et 2.13** (seule la 2.11 répond sur `/info`).
+
+→ L'endpoint est documenté mais **n'est pas servi sur ce compte**. C'est une
+question pour Zelty, et elle est désormais étayée : chemin, charge utile,
+portée de clé et versions testées.
+
+⚠️ **On ne peut pas créer de clé API soi-même** : la page Accès API n'a aucun
+bouton d'ajout. « La gestion et l'activation des partenaires se fait maintenant
+depuis la marketplace Zelty. Les demandes d'ajout de clés API hors marketplace
+peuvent être faites via ce formulaire. »
 
 ### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
 
