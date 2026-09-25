@@ -2048,6 +2048,59 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### SumUp retiré, snacking éteint (25/09/2026)
+
+Décision du gérant : « on a Zelty », et « pas encore de vrai snacking dans
+notre concept ».
+
+**SumUp.** La route de sondage `/api/cron/caisse/sumup` est SUPPRIMÉE — le
+compte n'existe plus, l'appeler ne pouvait que échouer. Le texte de
+`/admin/caisse-agreee` qui donnait encore une consigne sur « l'API SumUp » est
+réécrit : un écran qui parle d'un système abandonné fait douter du reste de la
+page.
+
+⚠️⚠️ **LES DONNÉES RESTENT, ET C'EST NON NÉGOCIABLE.** 426 tickets, 2 357 €,
+du 17 au 24 août : c'est TOUT l'historique de vente réel de la maison. Il
+alimente `/admin/ventes`, `/admin/patrimoine`, le rapprochement et le food
+cost. Ne jamais purger `encaissements_externes` sur `source_caisse = 'sumup'`
+ni les commandes qui en découlent. Le connecteur reste source-agnostique :
+c'est lui qui permet à un historique SumUp et à un flux Zelty de cohabiter.
+Les mentions de SumUp qui subsistent dans le code sont des COMMENTAIRES —
+ils expliquent pourquoi le connecteur est construit ainsi.
+
+**Snacking.** `snack_emporter` passe en `actif=false, teaser=false`, date
+effacée. Le module ne pilotait plus que des choses mortes : **aucun produit**
+sous le tag SNACKING, 13 créneaux déjà désactivés, et CINQ routes qui
+n'existent plus (`/emporter`, `/borne`, `/admin/borne`, `/admin/borne-pin`
+retirés avec la frontière des caisses ; `/comptoir/snack-emporter` jamais
+écrit). `ROUTES_PAR_MODULE` est donc vidée pour cette clé.
+
+⚠️ La ligne RESTE en base. Le jour où le snacking entre au concept, on rallume
+au lieu de recréer — et `activites_modules` doit toujours compter **14**.
+
+⚠️ **Le snacking du FOURNIL n'est pas concerné** : les 6 sandwiches, 3 paninis
+et 4 salades sont taggés `FOURNIL`, vendus tous les jours, et restent en
+ligne. « Désactiver le snacking » visait l'ACTIVITÉ annoncée, pas les produits
+réels — confondre les deux aurait retiré de la vente des produits qui partent
+chaque midi.
+
+**Trois endroits du SITE l'annonçaient encore**, et c'est là que le gérant
+voyait « burger, tacos » :
+
+1. le **pied de page** — présent sur CHAQUE page, et c'est le texte que Google
+   lit : « brasserie, snacking, comptoir et chambres d'hôtes. Ouvert 7j/7 de
+   7h à minuit ». Trois erreurs : le snacking n'existe pas, les chambres n'ont
+   aucune réservation ouverte, et les horaires sont faux (6h30, pas 7h ; fin
+   du service du soir, pas minuit). ⚠️ C'est la branche qui s'allume le
+   **3 octobre** : elle serait devenue fausse le jour même de l'ouverture ;
+2. `UniversMagazine.tsx` — « Snacking gourmand · Burgers, tacos à ta façon ».
+   Composant **monté nulle part**, donc invisible, mais il portait littéralement
+   le concept abandonné. Supprimé ;
+3. l'onglet **SNACKING** du tunnel de commande, avec ses rubriques « Les
+   Burgers » et « Les Tacos ». Il ne s'affichait pas — la liste est filtrée sur
+   le nombre de produits — mais une configuration morte finit par être relue
+   comme une intention.
+
 ### Ce qui ne servait plus — revue complète (25/09/2026)
 
 Revue des 113 pages et 73 routes API contre la logique d'aujourd'hui. Quatre

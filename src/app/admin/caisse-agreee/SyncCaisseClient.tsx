@@ -50,11 +50,14 @@ export default function SyncCaisseClient() {
         </div>
       )}
 
+      {/* ⚠️ Ce paragraphe parlait encore de SumUp, abandonné le 28/08/2026.
+          Un écran qui donne une consigne sur un système qu'on n'utilise plus
+          fait douter de tout le reste de la page. */}
       <p className="mt-4 text-xs text-zinc-500 leading-relaxed">
-        <strong>À vérifier au premier lancement :</strong> l’API SumUp expose les paiements
-        qu’elle traite. Si vos ventes en espèces saisies sur SumUp Caisse n’apparaissent pas
-        dans le résultat ci-dessus, le chiffre d’affaires remonté ne sera que le CA carte —
-        et il faudra passer par l’export de SumUp Caisse plutôt que par cette API.
+        <strong>Bon à savoir :</strong> la synchronisation tourne déjà seule toutes
+        les heures. Ce bouton sert quand on veut le chiffre du jour tout de suite,
+        sans attendre le passage suivant. Les avertissements éventuels s’affichent
+        ci-dessus : ils signalent ce que la caisse n’a pas renvoyé.
       </p>
     </section>
   )

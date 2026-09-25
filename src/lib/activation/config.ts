@@ -130,7 +130,21 @@ export const ROUTES_PAR_MODULE: Partial<Record<ModuleCle, string[]>> = {
   restaurant_salle: ['/serveur', '/cuisine', '/admin/capacite-cuisine'],
   pizzeria: ['/pizza'],
   bar: ['/bar', '/comptoir/bar', '/admin/boissons'],
-  snack_emporter: ['/emporter', '/comptoir/snack-emporter', '/borne', '/admin/borne', '/admin/borne-pin'],
+  // ⚠️ Éteint le 25/09/2026 : « pas encore de vrai snacking dans notre
+  // concept » (décision du gérant). Le module ne pilotait plus que des choses
+  // mortes — aucun produit sous le tag SNACKING, 13 créneaux déjà désactivés,
+  // et CINQ routes qui n'existent plus : /emporter, /borne, /admin/borne et
+  // /admin/borne-pin ont été retirés avec la frontière des caisses, et
+  // /comptoir/snack-emporter n'a jamais été écrit.
+  //
+  // Son seul effet encore vivant était l'ANNONCE sur casatasia.fr — « Snacking
+  // & desserts, à emporter, ouverture le 3 octobre » — pour un service qui
+  // n'existe pas. Annoncer ce qu'on ne servira pas est pire que se taire : le
+  // client vient, et repart.
+  //
+  // La ligne reste en base (teaser retiré, date effacée) : le jour où le
+  // snacking entre au concept, on rallume au lieu de recréer.
+  snack_emporter: [],
   reservation_table: ['/admin/reservations'],
   chambres: ['/admin/chambres', '/reception'],
   evenementiel: ['/admin/groupes'],
