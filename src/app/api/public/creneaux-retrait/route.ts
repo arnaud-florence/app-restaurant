@@ -17,6 +17,7 @@
 // créneaux trop justes POUR SON panier : un panier de 3 pizzas n'a rien à
 // faire sur un créneau où il reste une place.
 
+import { getActivation } from '@/lib/activation/server'
 import { getConfigLivraisonSoir } from '@/lib/livraison-soir-server'
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
@@ -167,8 +168,23 @@ export async function GET(req: Request) {
   // ne peut porter, et c'est le client qui l'apprendrait, sur son pas de
   // porte. On compte donc les COMMANDES (un arrêt) et non les articles :
   // trois pizzas à une seule adresse, c'est un seul arrêt.
+  // ⚠️ La réponse dit TOUJOURS si la livraison du soir est ouverte, même quand
+  // on demande des créneaux de retrait. Sinon le site doit faire un second
+  // appel juste pour savoir s'il peut proposer le bouton — et deux sources
+  // pour la même information finissent par se contredire.
+  const etatAct = await getActivation()
+  const cfgSoirInfo = await getConfigLivraisonSoir()
+  const livraisonSoir = {
+    ouverte: tag === 'PIZZA' && etatAct.pizzeria === true,
+    debut: cfgSoirInfo.debut,
+    fin: cfgSoirInfo.fin,
+    communes: cfgSoirInfo.communes,
+    minimumTtc: cfgSoirInfo.minimumTtc,
+    fraisTtc: cfgSoirInfo.fraisTtc,
+  }
+
   if (livraison) {
-    const cfgSoir = await getConfigLivraisonSoir()
+    const cfgSoir = cfgSoirInfo
     const hhmm = (iso: string) => new Intl.DateTimeFormat('fr-FR', {
       timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
     }).format(new Date(iso)).replace('h', ':')
@@ -200,6 +216,7 @@ export async function GET(req: Request) {
 
   return Response.json({
     date: dateStr, tag, articles, mode: livraison ? 'livraison' : 'retrait',
+    livraison_soir: livraisonSoir,
     creneauxOccupes: creneauxOccupes(articles),
     items, count: items.length,
   }, {
