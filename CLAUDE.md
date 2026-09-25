@@ -2048,6 +2048,68 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### Le jeu de DÉMO sorti du catalogue (25/09/2026)
+
+Le gérant signalait « d'anciennes recettes qui apparaissent — burger relais,
+tacos ». Il n'y avait **aucun** produit de ce genre dans `recettes` : la purge
+d'août avait bien fait son travail. C'était `ingredients`, et la cause vivait
+dans le CODE.
+
+⚠️ **Un bouton « Pack démarrage » était toujours sur `/admin/recettes`**, en
+production, à huit jours de l'ouverture. Il installait 5 fournisseurs fictifs
+(Metro, Pomona, Sysco, Brake, Transgourmet), 50 ingrédients et 20 plats — Tacos
+Mexicain, Pizza Margherita, Mojito. Cliqué en mai-juin 2026, il avait laissé
+**108 ingrédients** dans le catalogue : taurine, glucuronolactone, inositol,
+dioxyde de carbone, colorant caramel, malt pils, houblon en pellets. Quelqu'un
+avait semé une boisson énergisante et un brassin de bière.
+
+⚠️⚠️ **Le second bouton était pire, et personne ne l'avait vu** : « Activer le
+catalogue ONLINE » posait `vendable_online` sur **TOUTES** les recettes
+SNACKING / PIZZA / BAR. Donc **l'alcool en vente sur le site, sans contrôle
+d'âge** — ce que la 0144 interdit explicitement — et la brasserie publiée avant
+son ouverture. Un clic, aucune confirmation par produit.
+
+Les deux sont retirés, avec `src/lib/catalogue-seed.ts` et
+`src/app/admin/setup/seed-actions.ts`. **Un bouton qui injecte des données de
+démonstration n'a rien à faire sur un écran de production** : il ne se
+distingue pas des autres, son libellé est engageant, et son effet ne se défait
+pas — les 20 plats seraient partis vers la caisse Zelty par l'import et vers
+casatasia.fr par le menu public. Un réamorçage futur passera par un script avec
+`--ecrire`, comme tous les autres amorçages du projet.
+
+**Tri : `node scripts/tri-ingredients-demo.mjs [--ecrire]`** — 102 désactivés,
+6 gardés, 98 ingrédients actifs restants.
+
+⚠️ **On DÉSACTIVE, on ne supprime pas.** `/admin/ingredients` filtre sur
+« actifs » par défaut : la désactivation suffit à les faire disparaître de
+l'écran et des sélecteurs, sans emporter `historique_prix_ingredients` ni
+`mouvements_stock`. Réversible par le filtre « Inactifs ».
+
+⚠️ **Le critère n'est pas la DATE, c'est l'USAGE.** Six des 108 ont été
+épargnés parce que de VRAIES lignes de facture et de VRAIS tarifs
+fournisseurs s'y sont rattachés depuis : **Beurre doux, Miel, Poivre noir
+moulu, Pommes, Saumon fumé, Sel fin**. Les désactiver ferait disparaître un
+prix réellement payé et la comparaison de tarifs qui va avec.
+
+⚠️ `historique_prix_ingredients` et `mouvements_stock` ne protègent PAS : le
+seed en a créé lui-même, et une ligne d'historique par ingrédient sert de point
+de départ (0146) — elle ne prouve aucun usage. Seuls `facture_lignes`,
+`catalogue_fournisseur`, `recette_ingredients`, `inventaires` et
+`lots_produits` comptent.
+
+⚠️ **À vérifier : ces six rapprochements sont-ils justes ?** « Pommes » et
+« Sel fin » ont pu attraper une ligne de facture par le NOM, avec le seuil de
+4 caractères que la 0142 dénonce déjà comme fragile. Un faux rapprochement
+écrit un faux prix d'achat.
+
+⚠️⚠️ **LE SERVICE WORKER EST LE PREMIER SUSPECT quand le gérant dit « je vois
+encore… ».** Mesuré le jour même : après suppression des boutons, le navigateur
+les affichait TOUJOURS — il servait les chunks depuis
+`static-v201-2026-09-24-logo-officiel`. Vidage du cache, et ils disparaissent.
+C'est le symptôme inverse de celui déjà documenté (des fonctions « absentes »
+qui sont en prod depuis des jours), et la même cause. **Bumper
+`CACHE_VERSION`** à chaque livraison qui touche l'interface.
+
 ### Produits arrivés par la caisse : classer, nommer, illustrer
 
 Les produits créés automatiquement depuis les tickets arrivent en catégorie
@@ -4038,6 +4100,7 @@ node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, 
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal
+node scripts/tri-ingredients-demo.mjs          # sortir le jeu de démo (essai à blanc par défaut)
 node scripts/import-catalogue-frite-belge.mjs  # sauces Pauwels, frites, oignons (essai à blanc)
 node scripts/import-catalogue-gelvar.mjs       # Gel Var : 26 prix, 1619 références en attente
 node scripts/demande-tarif-gelvar.mjs          # la liste à envoyer au commercial (xlsx)

@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { askConfirm } from '@/lib/confirm'
 import { getRecettePhoto } from '@/lib/recettePhoto'
 import AdminPageHeader from '@/components/admin/AdminPageHeader'
 import {
@@ -21,8 +20,6 @@ import {
 } from './types'
 import { toggleRecetteActif, deleteRecette } from './actions'
 import RecetteFormModal from './RecetteFormModal'
-import { installerCatalogueDemarrage, seedCatalogueOnline } from '../setup/seed-actions'
-import { Loader2, Sparkles } from 'lucide-react'
 import { PillTab, PillCount, PillDivider } from '@/components/ui/PillTab'
 
 export default function RecettesClient({
@@ -151,8 +148,9 @@ export default function RecettesClient({
               </Link>
               {!readOnly && (
                 <>
-                  <PackDemarrageButton />
-                  <SeedOnlineButton />
+                  {/* ⚠️ « Pack démarrage » et « Activer le catalogue ONLINE »
+                      ont été RETIRÉS le 25/09/2026, huit jours avant
+                      l'ouverture. Voir le commentaire en bas de ce fichier. */}
                   <Button size="lg" onClick={() => setCreating(true)}>
                     <span className="text-lg">+</span>
                     <span className="hidden sm:inline">Nouvelle recette</span>
@@ -472,170 +470,33 @@ function ConfirmDialog({
   )
 }
 
-// Bouton « Pack démarrage » : installe 5 fournisseurs + 50 ingrédients + 20 recettes en 1 click.
-function PackDemarrageButton() {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [result, setResult] = useState<{ f: number; i: number; r: number; details: string[] } | null>(null)
-
-  async function lancer() {
-    if (!(await askConfirm({
-      title: 'Installer le pack démarrage ?',
-      message:
-        'Cela créera :\n' +
-        '• 5 fournisseurs typiques (Metro, Pomona, Sysco...)\n' +
-        '• 50 ingrédients de base avec prix d\'achat\n' +
-        '• 20 recettes prêtes à l\'emploi (pizzas, burgers, salades, plats, desserts, boissons)\n\n' +
-        'Idempotent : ne crée pas de doublons.',
-      confirmLabel: 'Installer',
-      danger: false,
-    }))) return
-    startTransition(async () => {
-      try {
-        const r = await installerCatalogueDemarrage()
-        setResult({ f: r.fournisseurs.crees, i: r.ingredients.crees, r: r.recettes.crees, details: r.details })
-        router.refresh()
-      } catch (e) {
-        alert(e instanceof Error ? e.message : 'Erreur')
-      }
-    })
-  }
-
-  return (
-    <>
-      <Button
-        size="lg"
-        variant="outline"
-        onClick={lancer}
-        disabled={pending}
-        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 gap-1"
-        title="Installer 20 recettes + 50 ingrédients + 5 fournisseurs"
-      >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-        <span className="hidden sm:inline">Pack démarrage</span>
-        <span className="sm:hidden">Pack</span>
-      </Button>
-
-      {result && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setResult(null)}>
-          <div className="bg-white rounded-lg max-w-md w-full p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-emerald-600" />
-              Pack démarrage installé
-            </h3>
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="rounded-md bg-emerald-50 p-2 text-center">
-                <p className="text-2xl font-bold text-emerald-700">{result.f}</p>
-                <p className="text-[10px] text-zinc-500 uppercase">Fournisseurs</p>
-              </div>
-              <div className="rounded-md bg-emerald-50 p-2 text-center">
-                <p className="text-2xl font-bold text-emerald-700">{result.i}</p>
-                <p className="text-[10px] text-zinc-500 uppercase">Ingrédients</p>
-              </div>
-              <div className="rounded-md bg-emerald-50 p-2 text-center">
-                <p className="text-2xl font-bold text-emerald-700">{result.r}</p>
-                <p className="text-[10px] text-zinc-500 uppercase">Recettes</p>
-              </div>
-            </div>
-            <details className="text-xs">
-              <summary className="cursor-pointer text-zinc-600">Voir le détail ({result.details.length} lignes)</summary>
-              <ul className="mt-2 space-y-0.5 text-[11px] font-mono text-zinc-700 max-h-48 overflow-y-auto">
-                {result.details.map((d, i) => <li key={i}>{d}</li>)}
-              </ul>
-            </details>
-            <Button onClick={() => setResult(null)} className="w-full mt-3">Fermer</Button>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-// ─── Bouton « Activer site web » ─────────────────────────────
-// Active vendable_online sur toutes les recettes SNACKING/PIZZA/BAR existantes
-// + crée 16 recettes starter (5 snacking, 5 pizzas, 6 bar) avec photos
-// + ajoute photo placeholder sur toutes les recettes online sans image.
-function SeedOnlineButton() {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [result, setResult] = useState<{ activees: number; creees: number; photos: number; total: number; details: string[] } | null>(null)
-
-  async function lancer() {
-    if (!(await askConfirm({
-      title: 'Activer le catalogue ONLINE pour le site web ?',
-      message:
-        'Cela va :\n' +
-        '• Activer « vendable_online » sur toutes tes recettes SNACKING/PIZZA/BAR existantes\n' +
-        '• Créer 16 recettes starter manquantes (5 snacking + 5 pizzas + 6 bar) avec photos\n' +
-        '• Ajouter une photo placeholder sur les recettes online sans image\n\n' +
-        'Idempotent : ne crée pas de doublons.',
-      confirmLabel: 'Activer',
-      danger: false,
-    }))) return
-    startTransition(async () => {
-      try {
-        const r = await seedCatalogueOnline()
-        setResult({ activees: r.activees, creees: r.creees, photos: r.photos_ajoutees, total: r.total_online, details: r.details })
-        router.refresh()
-      } catch (e) {
-        alert(e instanceof Error ? e.message : 'Erreur')
-      }
-    })
-  }
-
-  return (
-    <>
-      <Button
-        size="lg"
-        variant="outline"
-        onClick={lancer}
-        disabled={pending}
-        className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1"
-        title="Active toutes les recettes pour le site web + crée des plats si manquants"
-      >
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>🌐</span>}
-        <span className="hidden sm:inline">Activer site web</span>
-        <span className="sm:hidden">Site web</span>
-      </Button>
-
-      {result && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setResult(null)}>
-          <div className="bg-white rounded-lg max-w-md w-full p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <span className="text-2xl">🌐</span>
-              Catalogue site web activé
-            </h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="rounded-md bg-blue-50 p-2 text-center">
-                <p className="text-2xl font-bold text-blue-700">{result.total}</p>
-                <p className="text-[10px] uppercase tracking-wider">Recettes online</p>
-              </div>
-              <div className="rounded-md bg-emerald-50 p-2 text-center">
-                <p className="text-2xl font-bold text-emerald-700">+{result.creees}</p>
-                <p className="text-[10px] uppercase tracking-wider">Créées</p>
-              </div>
-              <div className="rounded-md bg-amber-50 p-2 text-center">
-                <p className="text-2xl font-bold text-amber-700">{result.activees}</p>
-                <p className="text-[10px] uppercase tracking-wider">Activées</p>
-              </div>
-              <div className="rounded-md bg-pink-50 p-2 text-center">
-                <p className="text-2xl font-bold text-pink-700">{result.photos}</p>
-                <p className="text-[10px] uppercase tracking-wider">Photos ajoutées</p>
-              </div>
-            </div>
-            <p className="text-xs text-zinc-600 mb-2">
-              ✓ Va vérifier sur <a href="https://site-restaurant-beta.vercel.app/menu" target="_blank" rel="noopener" className="text-blue-600 underline">le site /menu</a> (hard reload Ctrl+Shift+R).
-            </p>
-            <details className="text-xs">
-              <summary className="cursor-pointer text-zinc-500 hover:text-zinc-700">Détails ({result.details.length})</summary>
-              <ul className="mt-2 space-y-0.5 max-h-48 overflow-y-auto">
-                {result.details.map((d, i) => <li key={i} className="text-[11px] text-zinc-600">{d}</li>)}
-              </ul>
-            </details>
-            <Button onClick={() => setResult(null)} className="w-full mt-3">Fermer</Button>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
+// ─── Deux boutons RETIRÉS le 25/09/2026 ──────────────────────────────────
+//
+// « Pack démarrage » et « Activer le catalogue ONLINE » vivaient ici, sur
+// l'écran des recettes, en production, à huit jours de l'ouverture.
+//
+// Le premier installait un jeu de DÉMO : 5 fournisseurs fictifs (Metro,
+// Pomona, Sysco, Brake, Transgourmet), 50 ingrédients et 20 plats — Tacos
+// Mexicain, Pizza Margherita, Mojito. Il a été cliqué en mai-juin 2026 et a
+// laissé 108 ingrédients dans le catalogue, taurine et houblon en pellets
+// compris. Le gérant les voyait encore quatre mois plus tard.
+// Sortis par `scripts/tri-ingredients-demo.mjs` (désactivés, pas supprimés).
+//
+// ⚠️ Le second était pire, et personne ne l'avait vu : il activait
+// `vendable_online` sur TOUTES les recettes SNACKING / PIZZA / BAR. Donc
+// l'alcool en vente sur le site — sans aucun contrôle d'âge, ce que la carte
+// du bar (0144) interdit explicitement — et la brasserie publiée avant son
+// ouverture. Un seul clic, aucune confirmation par produit, et il créait en
+// prime 16 « recettes starter » avec des photos d'attente.
+//
+// ⚠️ Un bouton qui INJECTE des données de démonstration n'a rien à faire sur
+// un écran de production. Il ne se distingue en rien des autres, son libellé
+// est engageant, et son effet ne se défait pas : les 20 plats auraient été
+// poussés vers la caisse Zelty par l'import, et vers casatasia.fr par le menu
+// public. Le catalogue est la source de vérité de ce que le client achète.
+//
+// Le code est dans l'historique git, avec `src/lib/catalogue-seed.ts` et
+// `src/app/admin/setup/seed-actions.ts`, supprimés au même commit. Si un jour
+// il faut réamorcer un catalogue, ce sera par un script en ligne de commande
+// avec `--ecrire`, comme tous les autres amorçages du projet — pas par un
+// bouton à portée de clic.
