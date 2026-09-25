@@ -2048,6 +2048,59 @@ Test : `node scripts/test-commission-tva.mjs` — ⚠️ il RECOPIE les formules
 `src/lib/tva.ts` et `src/lib/ventes-stats.ts`, modifier les trois ensemble.
 Aucune commande n'y est créée : le circuit de vente est réel.
 
+### Ce qui ne servait plus — revue complète (25/09/2026)
+
+Revue des 113 pages et 73 routes API contre la logique d'aujourd'hui. Quatre
+défauts réels, tous du même genre : du code resté en place après une décision
+qui l'avait rendu faux, et que rien ne signalait.
+
+**1. ⚠️⚠️ LA BORNE DE COMMANDE ÉTAIT PUBLIQUE ET ENCAISSAIT.**
+`/borne` répondait **200 en production, sans authentification** — le middleware
+ne protège que `/admin/*`. C'était l'écran de vente le plus complet de l'outil
+(1 788 lignes : catalogue, panier, paiement, PIN manager), et il créait des
+`commandes` ET écrivait dans `paiements_caisse`.
+
+Elle aurait dû partir le 24 août avec `/serveur`, `/caisse` et `/emporter` ;
+elle est passée entre les mailles. N'importe qui connaissant l'adresse pouvait
+donc créer des ventes et des paiements dans le CA — **un chiffre d'affaires
+parallèle sans valeur fiscale, exactement ce que la frontière existe pour
+empêcher**. Retirée, remplacée par la page d'explication habituelle (pas un
+404 : une tablette a pu rester dessus, un favori a pu être posé). Le code est
+dans l'historique git, avec `/admin/borne`, `/admin/borne-pin` et
+`PinManagerModal` qui ne servait qu'à elle.
+
+**2. Neuf raccourcis envoyaient l'équipe sur des écrans retirés.**
+`mon-espace` (postes serveur et salle), la grille « accès rapide » de `/login`,
+les chips de `TopActionBar`, `AdminNav`, `search-actions`, et la tuile
+« Tables » du Centre de contrôle pointaient tous sur `/serveur`, `/caisse` ou
+`/emporter`. Depuis un mois, un serveur qui ouvrait son espace tombait sur une
+page d'explication. ⚠️ Deux **notifications push** y renvoyaient aussi — dont
+celle d'une VRAIE commande web (`url_action: '/emporter'`), désormais dirigée
+vers le KDS.
+
+**3. ⚠️ Le poste `snack` était envoyé sur un écran qu'il n'avait pas le droit
+d'ouvrir.** `main: '/comptoir/fournil/kds'` alors que `allowed` ne contenait
+pas `/comptoir` — mais contenait `/emporter`, `/caisse` et le bar, trois écrans
+supprimés. Trouvé par le test, pas à l'œil : `getMainRoute()` et `canAccess()`
+se contredisaient. **Tout poste dont le `main` n'est pas dans son `allowed` est
+un poste qui ne peut pas travailler.**
+
+**4. Un test rouge depuis un mois.** `test-rbac-snack-livreur.mjs` affirmait
+`snack → /emporter`. Il échouait déjà avant cette revue — même symptôme que
+`test-rh.mjs` : un test rouge en permanence finit par être ignoré, et ce
+jour-là il ne protège plus rien.
+
+**Ce qui est VIDE mais qu'on garde, délibérément** : cartes cadeaux, codes
+promo, menu du jour, promos d'affichage, plats du jour, événements, groupes,
+campagnes, commissions tiers, réservations de chambres. Ces modules ne servent
+pas *encore* — ils servent à partir du 3 octobre. Les retirer serait à refaire
+dans huit jours. ⚠️ Mais un module livré et jamais nourri ne protège de rien
+(leçon d'`obligations_legales`, 0147) : c'est à suivre, pas à oublier.
+
+⚠️ **SumUp** : le cron est bien déplanifié (0 tâche). Les références dans le
+code restent VOLONTAIREMENT — 426 tickets d'août en dépendent, et le connecteur
+est source-agnostique.
+
 ### Le jeu de DÉMO sorti du catalogue (25/09/2026)
 
 Le gérant signalait « d'anciennes recettes qui apparaissent — burger relais,

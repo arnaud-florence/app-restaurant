@@ -56,7 +56,6 @@ const MODULES: Array<{ href: string; label: string; emoji: string; aliases?: str
   { href: '/admin/energie',      label: 'Énergie',            emoji: '⚡' },
   { href: '/admin/setup',        label: 'Configuration',      emoji: '⚙️' },
   { href: '/admin/securite',     label: 'Sécurité / 2FA',     emoji: '🔐' },
-  { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
   { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   { href: '/bar',                label: 'Service bar',        emoji: '🍷' },
   { href: '/caisse',             label: 'Caisse',             emoji: '💳' },

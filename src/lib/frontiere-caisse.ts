@@ -59,6 +59,22 @@ export const ECRANS_REMPLACES: Record<string, { titre: string; remplacePar: stri
     remplacePar: 'Les commandes du site web sont sur l\'écran Préparation. '
       + 'Les ventes à emporter au comptoir passent par la caisse.',
   },
+  // ⚠️ Ajoutée le 25/09/2026, et elle aurait dû l'être le 24 août avec les
+  // trois autres. La borne de commande est passée entre les mailles : c'est
+  // pourtant l'écran de vente le plus complet de l'outil — 1 788 lignes, un
+  // catalogue, un panier, un paiement. Elle créait des `commandes` ET écrivait
+  // dans `paiements_caisse`, donc elle ENCAISSAIT.
+  //
+  // ⚠️⚠️ Et elle était PUBLIQUE : `/borne` répondait 200 en production, sans
+  // authentification. N'importe qui avec l'adresse pouvait créer une commande
+  // et un paiement dans le chiffre d'affaires — un CA parallèle sans valeur
+  // fiscale, exactement ce que cette frontière existe pour empêcher.
+  '/borne': {
+    titre: 'Borne de commande',
+    remplacePar: 'La commande en self-service se fait sur la caisse, ou en '
+      + 'ligne sur casatasia.fr. Une borne qui encaisse à côté de la caisse '
+      + 'agréée produirait un chiffre d\'affaires sans valeur fiscale (NF525).',
+  },
 }
 
 /** Un écran de vente a-t-il été retiré au profit des caisses ? */

@@ -126,7 +126,7 @@ export default async function CatIndexPage() {
     tiles.push({ label: 'CA du jour', value: caJour.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €', sub: 'encaissé', tone: 'emerald', href: '/admin/finances' })
   }
   tiles.push({ label: 'En cours', value: String(nbEnCours), sub: nbEnCours > 1 ? 'commandes' : 'commande', tone: 'amber', href: '/admin/cat/service' })
-  tiles.push({ label: 'Tables', value: nbTables > 0 ? `${nbOccupees}/${nbTables}` : '—', sub: 'occupées', tone: 'blue', href: '/serveur' })
+  tiles.push({ label: 'Tables', value: nbTables > 0 ? `${nbOccupees}/${nbTables}` : '—', sub: 'occupées', tone: 'blue', href: '/admin/affichage' })  // le plan de salle a disparu avec /serveur ; les tables servent encore aux QR codes
   if (isManager) {
     tiles.push({ label: 'À traiter', value: String(nbATraiter), sub: nbRouges > 0 ? `${nbRouges} urgent${nbRouges > 1 ? 's' : ''}` : 'signalements', tone: nbRouges > 0 ? 'red' : nbATraiter > 0 ? 'amber' : 'emerald', href: '/admin/pilotage' })
     tiles.push({ label: 'Stock', value: nbRuptures > 0 ? `${nbRuptures}` : nbStockBas > 0 ? `${nbStockBas}` : 'OK', sub: nbRuptures > 0 ? 'rupture' + (nbRuptures > 1 ? 's' : '') : nbStockBas > 0 ? 'bas' : 'tout est là', tone: nbRuptures > 0 ? 'red' : nbStockBas > 0 ? 'amber' : 'emerald', href: '/admin/stock' })

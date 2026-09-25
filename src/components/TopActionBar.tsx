@@ -421,12 +421,9 @@ export default function TopActionBar({
 
   // Chips OPS pour le mode service intensif (sous-modules directs de cat 'service')
   const opsChipsBruts: Array<{ href: string; emoji: string; label: string; tone: Tone }> = [
-    { href: '/serveur',   emoji: '🍽',   label: 'Salle',     tone: 'blue' },
-    { href: '/caisse',    emoji: '💰',   label: 'Caisse',    tone: 'amber' },
     { href: '/cuisine',   emoji: '👨‍🍳', label: 'Cuisine',   tone: 'amber' },
     { href: '/pizza',     emoji: '🍕',   label: 'Pizza',     tone: 'red' },
     { href: '/bar',       emoji: '🍷',   label: 'Bar',       tone: 'violet' },
-    { href: '/emporter',  emoji: '🛒',   label: 'Snack',     tone: 'emerald' },
     { href: '/livreur',   emoji: '🛵',   label: 'Livreur',   tone: 'emerald' },
     { href: '/reception', emoji: '🛎',   label: 'Réception', tone: 'blue' },
   ]

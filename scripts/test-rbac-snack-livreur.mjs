@@ -14,12 +14,18 @@ function check(name, expected, actual) {
 }
 
 // ── SNACK ──
-check('snack → main route', '/emporter', getMainRoute('snack'))
-check('snack accès /emporter', true, canAccess('snack', '/emporter'))
-check('snack accès /caisse', true, canAccess('snack', '/caisse'))
+// ⚠️ Ces trois assertions datent d'AVANT la frontière avec les caisses
+// (24/08/2026). Le poste snack n'a plus d'écran de vente : il prépare.
+// La première échouait déjà depuis un mois — un test rouge en permanence
+// finit par être ignoré, et ce jour-là il ne protège plus rien (même
+// correction que test-rh.mjs).
+check('snack → main route', '/comptoir/fournil/kds', getMainRoute('snack'))
+check('snack accès la préparation', true, canAccess('snack', '/comptoir/fournil/kds'))
 check('snack accès /bar', true, canAccess('snack', '/bar'))
 check('snack accès /cuisine', true, canAccess('snack', '/cuisine'))
-check('snack accès /admin/borne', true, canAccess('snack', '/admin/borne'))
+// La borne a été retirée le 25/09/2026 : elle créait des commandes et
+// écrivait dans paiements_caisse, et elle était publiquement accessible.
+check('snack REFUSÉ /admin/borne (écran supprimé)', false, canAccess('snack', '/admin/borne'))
 check('snack accès /admin/clients', true, canAccess('snack', '/admin/clients'))
 check('snack accès /admin/hygiene', true, canAccess('snack', '/admin/hygiene'))
 check('snack accès /admin/dechets', true, canAccess('snack', '/admin/dechets'))
@@ -44,7 +50,10 @@ check('livreur REFUSÉ /admin/recettes', false, canAccess('livreur', '/admin/rec
 
 // ── Vérifications collatérales (pas de régression) ──
 check('manager accès tout', true, canAccess('manager', '/admin/finances'))
-check('serveur accès /serveur', true, canAccess('serveur', '/serveur'))
+// Le poste serveur n'a plus d'écran de vente : la salle se prend sur le pad
+// de la caisse. Ce qui lui reste dans l'outil, c'est la préparation.
+check('serveur REFUSÉ /serveur (écran retiré)', false, canAccess('serveur', '/serveur'))
+check('serveur accès la préparation', true, canAccess('serveur', '/comptoir/fournil/kds'))
 check('cuisinier accès /cuisine', true, canAccess('cuisinier', '/cuisine'))
 check('plonge REFUSÉ /cuisine', false, canAccess('plonge', '/cuisine'))
 

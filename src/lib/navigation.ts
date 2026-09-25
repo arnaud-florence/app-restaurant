@@ -184,7 +184,6 @@ export const CATEGORIES: Category[] = [
       { href: '/admin/caisse-agreee', emoji: '🔌', label: 'Connecteur caisse agréée', description: 'Synchro des encaissements de la caisse agréée (NF525) + contrat d\'intégration.', imageUrl: u('1556742502-ec7c0e9f34b1') },
       { href: '/admin/setup',    emoji: '⚙️', label: 'Configuration', description: 'Setup wizard, info établissement, intégrations.', imageUrl: u('1581090464777-f3220bbe1b8b') },
       { href: '/admin/securite', emoji: '🔐', label: 'Sécurité',      description: 'RBAC, 2FA, audit, connexions, sauvegardes.',     imageUrl: u('1563013544-824ae1b704d3') },
-      { href: '/admin/borne',    emoji: '🛍', label: 'Borne kiosk',   description: 'Configuration des bornes self-service en salle.', imageUrl: u('1556909114-f6e7ad7d3136') },
     ],
   },
 ]

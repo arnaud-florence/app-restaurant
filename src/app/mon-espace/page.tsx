@@ -72,8 +72,13 @@ const POSTE_TO_ACTION: Record<string, { href: string; label: string; emoji: stri
   cuisinier:      { href: '/cuisine',            label: 'Service cuisine',    emoji: '🍳' },
   cuisinier_snacking: { href: '/cuisine',        label: 'Préparation snack',  emoji: '🍔' },
   pizzaiolo:      { href: '/pizza',               label: 'Service pizza',      emoji: '🍕' },
-  serveur:        { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
-  salle:          { href: '/serveur',            label: 'Service salle',      emoji: '🍽️' },
+  // ⚠️ Les postes de salle pointaient sur `/serveur`, retiré le 24/08 au
+  // profit des caisses : ils envoyaient donc leur titulaire sur une page
+  // d'explication, depuis un mois. La prise de commande se fait sur le pad de
+  // la caisse ; ce qui reste utile dans l'outil pour la salle, c'est le
+  // carnet de réservations.
+  serveur:        { href: '/admin/reservations', label: 'Réservations',       emoji: '📅' },
+  salle:          { href: '/admin/reservations', label: 'Réservations',       emoji: '📅' },
   bar:            { href: '/bar',                label: 'Service bar',        emoji: '🍷' },
   barman:         { href: '/bar',                label: 'Service bar',        emoji: '🍷' },
   snack:          { href: '/comptoir/fournil/kds', label: 'Préparation',      emoji: '🛒' },

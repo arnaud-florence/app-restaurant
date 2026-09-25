@@ -45,7 +45,9 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Second / Chef de cuisine',
     main: '/mon-espace',
     allowed: [
-      '/cuisine', '/pizza', '/emporter',
+      // ⚠️ /serveur, /caisse et /emporter ont été retirés le 24/08/2026
+      // (src/lib/frontiere-caisse.ts) : les laisser ici n'ouvre rien.
+      '/cuisine', '/pizza',
       '/admin/recettes', '/admin/recettes/engineering',
       '/admin/ingredients', '/admin/stock', '/admin/fournisseurs',
       '/admin/boissons', '/admin/hygiene', '/admin/allergenes',
@@ -81,7 +83,6 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/mon-espace',
     allowed: [
       '/cuisine',                       // KDS (filtré SNACKING via getPosteFilter)
-      '/emporter',                      // snacking souvent à emporter / online
       '/admin/recettes',
       '/admin/ingredients',
       '/admin/stock',
@@ -103,7 +104,6 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/mon-espace',
     allowed: [
       '/pizza',                         // poste pizza dédié
-      '/emporter',                      // commandes ONLINE incluent les pizzas à emporter
       '/admin/recettes',                // pizza uniquement (v2 filtre contenu)
       '/admin/ingredients',             // pizza uniquement (v2 filtre contenu)
       '/admin/stock',                   // déduction pizza (v2 filtre contenu)
@@ -125,7 +125,9 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Serveur',
     main: '/mon-espace',
     allowed: [
-      '/serveur', '/caisse',
+      // ⚠️ /serveur, /caisse et /emporter ont été retirés le 24/08/2026
+      // (src/lib/frontiere-caisse.ts) : les laisser ici n'ouvre rien.
+      '/comptoir',
       '/admin/clients',
       '/admin/allergenes',
       '/admin/boissons',
@@ -147,7 +149,9 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Barman',
     main: '/mon-espace',
     allowed: [
-      '/bar', '/caisse', '/emporter',
+      // ⚠️ /serveur, /caisse et /emporter ont été retirés le 24/08/2026
+      // (src/lib/frontiere-caisse.ts) : les laisser ici n'ouvre rien.
+      '/bar',
       '/admin/boissons',
       '/admin/stock',                   // boissons uniquement (v2)
       '/admin/ingredients',             // boissons uniquement (v2)
@@ -191,18 +195,21 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     label: 'Snack / Comptoir',
     main: '/comptoir/fournil/kds',
     allowed: [
-      '/emporter',                      // page principale — gère ONLINE/BORNE/COMPTOIR
-      '/caisse',                        // Z-report
-      '/bar',                           // peut créer commandes COMPTOIR
-      '/cuisine',                       // voir items snacking (filtre tag possible)
-      '/admin/borne',                   // monitoring kiosque (lecture)
+      // ⚠️ Corrigé le 25/09/2026 : `main` pointait sur la préparation, qui ne
+      // figurait PAS dans `allowed`. Le titulaire du poste était donc envoyé,
+      // à chaque connexion, sur un écran qu'il n'avait pas le droit d'ouvrir.
+      // La liste, elle, donnait accès à trois écrans supprimés depuis le
+      // 24/08 : /emporter, /caisse, et la prise de commande au bar.
+      '/comptoir',                      // page principale — préparation du Fournil
+      '/inventaire', '/invendus', '/ruptures',
+      '/bar',                           // consultation du poste bar
+      '/cuisine',                       // voir les items snacking
       '/admin/clients',                 // fiches + fidélité
       '/admin/hygiene',                 // checklists comptoir + vitrines snack
       '/admin/dechets',                 // pesées emballages
       ...COMMUN_EMPLOYE,
     ],
     readonly: [
-      '/admin/borne',                   // dashboard kiosque en lecture seule
     ],
   },
 
@@ -225,18 +232,19 @@ export const PERMISSIONS_PAR_POSTE: Record<Poste, Permissions> = {
     main: '/mon-espace',
     allowed: [
       // Tous les écrans de service
-      '/cuisine', '/pizza', '/bar', '/serveur', '/caisse', '/emporter', '/livreur', '/reception',
+      // ⚠️ /serveur, /caisse et /emporter ont été retirés le 24/08/2026
+      // (src/lib/frontiere-caisse.ts) : les laisser ici n'ouvre rien.
+      '/cuisine', '/pizza', '/bar', '/comptoir', '/livreur', '/reception',
       // Back-office opérationnel (union des postes employés, hors gérant-only)
       '/admin/recettes', '/admin/ingredients', '/admin/stock', '/admin/fournisseurs',
       '/admin/boissons', '/admin/hygiene', '/admin/allergenes', '/admin/dechets',
       '/admin/clients', '/admin/reservations', '/admin/evenements', '/admin/chambres',
-      '/admin/groupes', '/admin/borne',
+      '/admin/groupes',
       ...COMMUN_EMPLOYE,
     ],
     readonly: [
       // Consultation seule : édition recettes/prix/allergènes réservée au gérant
       '/admin/recettes', '/admin/ingredients', '/admin/allergenes', '/admin/boissons',
-      '/admin/borne',
     ],
   },
 

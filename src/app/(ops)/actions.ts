@@ -213,7 +213,10 @@ export async function changerStatutArticle(input: unknown) {
             title: '🍽 Plat prêt',
             body: `T${cmd.numero_table} · ×${qty} ${nom}`,
             tag: `art-${p.article_id}`,
-            url:  '/serveur',
+            // ⚠️ Même correction : `/serveur` n'existe plus comme écran de
+            // travail. On renvoie sur l'écran de préparation, le seul endroit
+            // où l'état d'un plat se lit encore dans l'outil.
+            url:  '/comptoir/fournil/kds',
           })
         }
       }
@@ -567,7 +570,10 @@ export async function creerCommande(input: unknown): Promise<{ id: string; numer
             type: 'commande_online_recue',
             titre: '📦 Nouvelle commande ONLINE',
             message: `Commande #${cmd.numero ?? cmd.id.slice(-6)} reçue depuis le site web`,
-            url_action: '/emporter',
+            // ⚠️ Pointait sur `/emporter`, retiré le 24/08 : la notification
+            // d'une VRAIE commande web envoyait sur une page d'explication.
+            // Les commandes du site se préparent sur le KDS du Fournil.
+            url_action: '/comptoir/fournil/kds',
           }))
         )
       }

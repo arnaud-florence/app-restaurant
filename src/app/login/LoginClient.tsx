@@ -17,7 +17,6 @@ const POSTES_RAPIDES = [
   { href: '/cuisine',  emoji: '👨‍🍳', label: 'Cuisine' },
   { href: '/pizza',    emoji: '🍕',   label: 'Pizza' },
   { href: '/bar',      emoji: '🍷',   label: 'Bar' },
-  { href: '/serveur',  emoji: '🍽️',   label: 'Salle' },
   { href: '/comptoir/fournil/kds', emoji: '🥖', label: 'Préparation' },
   { href: '/livreur',  emoji: '🛵',   label: 'Livreur' },
   { href: '/reception', emoji: '🛎️',  label: 'Réception' },

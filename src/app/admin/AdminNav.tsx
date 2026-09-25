@@ -11,7 +11,6 @@ import {
   Calendar, Building2, Truck, Sparkles, Settings, Tv, GraduationCap,
   AlertTriangle, FileText, Trash2, Zap, NotebookPen, CloudSun, Wrench,
   Store, BookOpen, Trophy, Calculator, ChevronDown, ChevronRight, Home, Star,
-  ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
@@ -97,7 +96,6 @@ const GROUPES: Group[] = [
     items: [
       { href: '/admin/setup',        label: 'Configuration',       icon: Settings },
       { href: '/admin/securite',     label: 'Sécurité',            icon: ShieldCheck },
-      { href: '/admin/borne',        label: 'Borne kiosk',         icon: ShoppingBag },
     ],
   },
 ]
@@ -105,8 +103,6 @@ const GROUPES: Group[] = [
 const STORAGE_KEY = 'admin_nav_collapsed'
 
 const SHORTCUTS_OPS = [
-  { href: '/caisse',    label: 'Caisse',    icon: Wallet },
-  { href: '/serveur',   label: 'Serveur',   icon: BookOpen },
   { href: '/cuisine',   label: 'Cuisine',   icon: ChefHat },
   { href: '/bar',       label: 'Bar',       icon: Wine },
   { href: '/livreur',   label: 'Livreur',   icon: Truck },
@@ -165,10 +161,8 @@ export default function AdminNav({ profil }: { profil: AdminNavProfil }) {
 
   // Raccourcis bottom-nav mobile : 4 postes ops + bouton menu (5 zones tactiles).
   const BOTTOM_NAV_ALL: Array<{ href: string; label: string; emoji: string }> = [
-    { href: '/serveur', label: 'Serveur', emoji: '🍽️' },
     { href: '/bar',     label: 'Bar',     emoji: '🍺' },
     { href: '/cuisine', label: 'Cuisine', emoji: '👨‍🍳' },
-    { href: '/caisse',  label: 'Caisse',  emoji: '💰' },
   ]
   const BOTTOM_NAV = BOTTOM_NAV_ALL.filter(it => peutVoir(it.href))
 
