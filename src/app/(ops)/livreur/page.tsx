@@ -46,7 +46,18 @@ export default async function LivreurPage() {
 
   const { data: cmds } = await supabase
     .from('commandes')
-    .select('id, numero, statut, client_nom, client_telephone, client_email, montant_total_ttc, creneau_retrait, created_at, notes, consommation, mode_retrait, adresse_livraison, livraison_depart_at, email_retard_envoye_at, mode_paiement')
+    // ⚠️ Le CONTENU de la commande manquait. Le livreur voyait l'adresse et le
+    // montant, jamais ce qu'il transportait : impossible de vérifier son sac
+    // avant de partir, ni de répondre au client qui dit « il manque une
+    // pizza ». Sur une tournée de pain, ça passait ; le soir, avec des pizzas
+    // qui se ressemblent dans leurs boîtes, non.
+    .select(`
+      id, numero, statut, client_nom, client_telephone, client_email,
+      montant_total_ttc, creneau_retrait, created_at, notes, consommation,
+      mode_retrait, adresse_livraison, livraison_depart_at,
+      email_retard_envoye_at, mode_paiement,
+      commande_articles(quantite, commentaire, recette:recettes(nom))
+    `)
     .eq('source', 'ONLINE')
     .eq('mode_retrait', 'livraison')
     .or(
@@ -74,7 +85,7 @@ export default async function LivreurPage() {
     <>
       <BriefingPoste briefing={briefing} />
       <LivreurClient
-        commandes={(cmds ?? []) as CommandeLivreur[]}
+        commandes={(cmds ?? []) as unknown as CommandeLivreur[]}
         caJour={caJour}
         navProfil={navProfil}
       />
@@ -99,4 +110,10 @@ export type CommandeLivreur = {
   livraison_depart_at: string | null
   email_retard_envoye_at: string | null
   mode_paiement: string | null
+  /** Ce qu'il y a dans le sac. */
+  commande_articles?: Array<{
+    quantite: number
+    commentaire: string | null
+    recette: { nom: string } | null
+  }> | null
 }

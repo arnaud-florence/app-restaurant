@@ -20,6 +20,8 @@
 //
 // Renvoie : { id, numero, total_ttc, statut: 'en_attente' }
 
+import { verifierLivraisonSoir } from '@/lib/livraison-soir'
+import { getConfigLivraisonSoir } from '@/lib/livraison-soir-server'
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { isHoneypotFilled, verifyHcaptcha } from '@/lib/public-api/anti-spam'
@@ -275,22 +277,88 @@ export async function POST(req: Request) {
     // Le jour où la pizza se livrera le soir, ce sera une AUTRE tournée, avec
     // ses horaires et sa zone : le refus ici est la place exacte où elle
     // viendra se brancher.
-    const horsFournil = [...new Set(articlesEnrichis.map(a => a.tag_destination as string))]
-      .filter(t => t && t !== 'FOURNIL')
-    if (horsFournil.length > 0) {
+    const tags = [...new Set(articlesEnrichis.map(a => a.tag_destination as string))].filter(Boolean)
+    const horsFournil = tags.filter(t => t !== 'FOURNIL')
+
+    // ═══ DEUX TOURNÉES, ET ELLES NE SE MÉLANGENT PAS ═══════════════════
+    //
+    // Le pain part le MATIN, en une seule fournée pour tout le village. Les
+    // pizzas partent le SOIR, chaude par chaude, chacune à son quart d'heure.
+    // Ce ne sont ni les mêmes horaires, ni le même véhicule, ni la même
+    // personne.
+    //
+    // ⚠️ UN PANIER MIXTE EST REFUSÉ, et ce n'est pas une limitation technique :
+    // une commande ne peut pas partir deux fois. Acceptée, elle partirait avec
+    // le pain le matin — et la pizza serait livrée froide, douze heures avant
+    // que le four ne s'allume.
+    const soirPur = horsFournil.length > 0 && horsFournil.every(t => t === 'PIZZA')
+    const matinPur = horsFournil.length === 0
+
+    if (!soirPur && !matinPur) {
       return Response.json({
-        error: 'La livraison à domicile ne concerne que la boulangerie, le matin. '
-             + 'Les autres produits sont à retirer sur place.',
+        error: 'Un panier livré ne peut pas mélanger la boulangerie (tournée du matin) '
+             + 'et la pizzeria (livraison du soir). Passez deux commandes, ou retirez sur place.',
       }, { status: 400, headers: cors })
     }
 
-    if (!etat.fournil_livraison) {
+    // ─── La tournée du SOIR ────────────────────────────────────────────
+    if (soirPur) {
+      const cfgSoir = await getConfigLivraisonSoir()
+      const heure = p.creneau_retrait
+        ? new Intl.DateTimeFormat('fr-FR', {
+            timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
+          }).format(new Date(p.creneau_retrait)).replace('h', ':')
+        : ''
+
+      // Combien de livraisons sont déjà prises sur ce créneau ?
+      // ⚠️ On compte les COMMANDES et non les articles : la contrainte du soir
+      // est la ROUTE, pas le four. Trois pizzas à une seule adresse, c'est un
+      // seul arrêt ; trois adresses, c'est trois.
+      let dejaPrises = 0
+      if (p.creneau_retrait) {
+        const { count } = await sb.from('commandes')
+          .select('id', { count: 'exact', head: true })
+          .eq('mode_retrait', 'livraison')
+          .eq('creneau_retrait', p.creneau_retrait)
+          .not('statut', 'in', '(annule)')
+        dejaPrises = count ?? 0
+      }
+
+      const minutesAvant = p.creneau_retrait
+        ? Math.round((new Date(p.creneau_retrait).getTime() - Date.now()) / 60_000)
+        : -1
+
+      const v = verifierLivraisonSoir({
+        ouvert: etat.pizzeria === true,
+        heureLivraison: heure,
+        commune: (p.commune_livraison ?? '').trim(),
+        totalTtc: totalTTC,
+        minutesAvant,
+        dejaPrises,
+        cfg: cfgSoir,
+      })
+      if (!v.ok) {
+        return Response.json({ error: v.message, raison: v.raison },
+          { status: v.raison === 'complet' ? 409 : 400, headers: cors })
+      }
+
+      // ⚠️ Le créneau du SOIR n'est PAS recalculé, contrairement à celui du
+      // matin : c'est le client qui choisit son heure, et elle vient d'être
+      // validée. L'écraser ici annulerait ce contrôle — la faute des deux
+      // protections qui s'annulent, déjà payée le 23/09.
+      creneauFinal = p.creneau_retrait ?? null
+      adresseFinale = `${(p.adresse_livraison ?? '').trim()}, ${(p.commune_livraison ?? '').trim()}`
+    }
+
+    // ─── La tournée du MATIN ───────────────────────────────────────────
+    else if (!etat.fournil_livraison) {
       return Response.json(
         { error: 'La livraison à domicile n’est pas disponible actuellement.' },
         { status: 400, headers: cors },
       )
     }
 
+    else {
     const commune = (p.commune_livraison ?? '').trim()
     if (!commune || !communeLivrable(commune, cfgLiv)) {
       return Response.json({
@@ -311,6 +379,7 @@ export async function POST(req: Request) {
     const tournee = tourneePour(new Date(), cfgLiv)
     creneauFinal = tournee.creneau
     adresseFinale = `${(p.adresse_livraison ?? '').trim()}, ${commune}`
+    }
   }
 
   // ─── Anti-race : la place est-elle encore là, au dernier moment ? ───

@@ -105,10 +105,12 @@ export default function LivreurClient({
     })
   }
 
-  async function handleLivree(commande_id: string) {
-    if (!(await askConfirm('Confirmer la livraison ?'))) return
+  async function handleLivree(commande_id: string, paiement?: 'especes' | 'carte') {
+    const quoi = paiement === 'especes' ? ' — réglée en ESPÈCES'
+      : paiement === 'carte' ? ' — réglée par CARTE' : ''
+    if (!(await askConfirm(`Confirmer la livraison${quoi} ?`))) return
     startTransition(async () => {
-      const r = await marquerLivree(commande_id)
+      const r = await marquerLivree(commande_id, paiement)
       if (!r.ok) toast.error('Erreur : ' + r.error)
       else router.refresh()
     })
@@ -308,13 +310,42 @@ export default function LivreurClient({
                     )}
 
                     <div className="flex flex-col gap-1.5 pt-1">
-                      <button
-                        onClick={() => handleLivree(c.id)}
-                        disabled={pending}
-                        className="w-full h-11 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wide transition-colors"
-                      >
-                        ✓ Livrée
-                      </button>
+                      {/* ⚠️ DEUX BOUTONS, PAS UN. Le règlement se prend sur le
+                          pas de la porte : sans le dire, la commande restait
+                          en « remise au client » et n'entrait dans AUCUN
+                          chiffre — ni ventes, ni marges, ni patrimoine.
+                          Demander COMMENT le client a payé est le seul moment
+                          où l'information existe : trois heures plus tard,
+                          personne ne s'en souvient.
+                          Une commande déjà réglée en ligne n'affiche qu'un
+                          bouton — proposer un choix qui sera ignoré est pire
+                          que ne rien proposer. */}
+                      {c.mode_paiement ? (
+                        <button
+                          onClick={() => handleLivree(c.id)}
+                          disabled={pending}
+                          className="w-full h-11 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wide transition-colors"
+                        >
+                          ✓ Livrée · déjà réglée
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => handleLivree(c.id, 'especes')}
+                            disabled={pending}
+                            className="h-12 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wide transition-colors"
+                          >
+                            💶 Espèces
+                          </button>
+                          <button
+                            onClick={() => handleLivree(c.id, 'carte')}
+                            disabled={pending}
+                            className="h-12 rounded-md bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wide transition-colors"
+                          >
+                            💳 Carte
+                          </button>
+                        </div>
+                      )}
                       {enRetard && c.client_email && !c.email_retard_envoye_at && (
                         <button
                           onClick={() => handleEmailRetard(c.id)}
@@ -409,6 +440,28 @@ function CartelivrAgenda({
           <p className="text-[9px] uppercase tracking-wider font-black opacity-70 text-emerald-300">📍 Maps</p>
           <p className="text-xs font-medium leading-tight text-emerald-100 line-clamp-2">{c.adresse_livraison}</p>
         </a>
+      )}
+
+      {/* ⚠️ LE CONTENU DU SAC. Il manquait : le livreur voyait l'adresse et le
+          montant, jamais ce qu'il transportait. Sur du pain ça passait ; le
+          soir, avec des pizzas qui se ressemblent dans leurs boîtes, c'est la
+          seule façon de vérifier avant de partir — et de répondre au client
+          qui dit « il en manque une ». Pas de troncature : une ligne coupée
+          sur un écran de livreur est une ligne qu'on ne lit pas. */}
+      {(c.commande_articles?.length ?? 0) > 0 && (
+        <ul className="rounded-lg bg-zinc-950/60 border border-zinc-800 px-2 py-1.5 space-y-0.5">
+          {c.commande_articles!.map((a, i) => (
+            <li key={i} className="text-[11px] leading-snug text-zinc-200 flex gap-1.5">
+              <span className="font-black tabular-nums text-violet-300 shrink-0">{a.quantite}×</span>
+              <span className="min-w-0">
+                {a.recette?.nom ?? 'Article'}
+                {a.commentaire && (
+                  <span className="block text-amber-300 italic">↳ {a.commentaire}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="space-y-0.5 text-[10px]">

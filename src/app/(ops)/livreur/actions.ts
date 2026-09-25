@@ -26,9 +26,30 @@ export async function marquerEnLivraison(commande_id: string) {
   return { ok: true }
 }
 
-export async function marquerLivree(commande_id: string) {
+/** Modes de règlement possibles sur le pas de la porte. */
+export type PaiementPorte = 'especes' | 'carte'
+
+/**
+ * Le client a reçu sa commande.
+ *
+ * ⚠️⚠️ CORRIGÉ LE 25/09/2026 — UN TROU DE CHIFFRE D'AFFAIRES.
+ * Cette action laissait la commande en `retire_par_client` dès qu'elle
+ * n'était pas prépayée. Or TOUT le calcul du CA filtre sur
+ * `statut = 'encaisse'` : une livraison payée en espèces sur le pas de la
+ * porte n'entrait donc dans AUCUN chiffre — ni les ventes, ni les marges, ni
+ * le patrimoine. Exactement la faute déjà corrigée sur les ventes au
+ * comptoir, qui restaient à `servi` et affichaient 0 € toute la journée.
+ *
+ * Aucune livraison n'avait encore eu lieu quand ça a été trouvé : le trou
+ * était latent, il aurait mordu à la première pizza du soir.
+ *
+ * ⚠️ Ce n'est PAS un encaissement fiscal. Aucune ligne n'est écrite dans
+ * `paiements_caisse` : la caisse agréée reste la source légale (NF525), et
+ * l'argent rapporté par le livreur doit y être déclaré. `mode_paiement`
+ * sert au rapprochement, pas au Z.
+ */
+export async function marquerLivree(commande_id: string, paiement?: PaiementPorte) {
   const sb = await createClient()
-  // Récupère statut courant pour savoir si déjà payée (CB online) ou non
   const { data: c } = await sb.from('commandes')
     .select('statut, mode_paiement')
     .eq('id', commande_id)
@@ -39,17 +60,22 @@ export async function marquerLivree(commande_id: string) {
     return { ok: false, error: `Statut actuel '${c.statut}' — impossible de marquer livrée` }
   }
 
-  // Si déjà payée en CB (mode_paiement non null), on passe direct à 'encaisse'.
-  // Sinon, 'retire_par_client' = client a reçu mais paiement à la livraison.
-  const nouveauStatut = c.mode_paiement ? 'encaisse' : 'retire_par_client'
+  // ⚠️ On n'ÉCRASE jamais un règlement déjà enregistré : une commande payée
+  // en ligne l'a été pour de bon, et la repasser en « espèces » parce que le
+  // livreur a tapé trop vite fausserait le rapprochement dans les deux sens.
+  const modeFinal = c.mode_paiement ?? paiement ?? null
+
+  if (!modeFinal) {
+    return { ok: false, error: 'Indiquez comment le client a réglé : espèces ou carte.' }
+  }
 
   const { error } = await sb.from('commandes')
-    .update({ statut: nouveauStatut, updated_at: new Date().toISOString() })
+    .update({ statut: 'encaisse', mode_paiement: modeFinal, updated_at: new Date().toISOString() })
     .eq('id', commande_id)
 
   if (error) return { ok: false, error: error.message }
   revalidatePath('/livreur')
-  return { ok: true, statut: nouveauStatut }
+  return { ok: true, statut: 'encaisse', mode_paiement: modeFinal }
 }
 
 export async function envoyerEmailRetard(commande_id: string) {

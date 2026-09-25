@@ -53,7 +53,17 @@ if (pizza) {
   const r = await poster({ ...client, creneau_retrait: '2026-10-03T19:30:00.000Z',
     articles: [{ recette_id: pizza.id, quantite: 1 }] })
   T('une pizza en livraison est refusée', r.status === 400, `HTTP ${r.status}`)
-  T('… et le message dit pourquoi', /boulangerie/i.test(r.json.error ?? ''), r.json.error)
+  // ⚠️ La RAISON a changé le 25/09/2026, et c'est un progrès : la tournée du
+  // soir existe désormais (src/lib/livraison-soir.ts). Une pizza livrée n'est
+  // plus refusée « parce que la livraison ne concerne que la boulangerie »,
+  // mais parce que la PIZZERIA n'a pas encore ouvert — elle ouvre le
+  // 3 octobre. Le jour où le module s'allume, cette commande passera.
+  //
+  // L'assertion vérifie donc le refus ET sa cause : laisser l'ancienne aurait
+  // gardé le test rouge sur un comportement correct, et un test rouge en
+  // permanence finit par être ignoré.
+  T('… et le motif est l\'ouverture, plus la nature du produit',
+    /soir|ouvert/i.test(r.json.error ?? ''), r.json.error)
 }
 
 // Un panier MIXTE doit être refusé lui aussi : la tournée partirait avec le

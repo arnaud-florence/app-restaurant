@@ -1,5 +1,6 @@
 'use client'
 
+import { instantPreparation } from '@/lib/livraison-soir'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -524,7 +525,20 @@ function PizzaAgenda({
         </span>
       </header>
       <AgendaCreneauxColonnes
-        items={articles.map(a => ({ creneauISO: a.commande.creneau_retrait, data: a }))}
+        // ⚠️ UNE LIVRAISON SE PRÉPARE AVANT L'HEURE ANNONCÉE.
+        // `creneau_retrait` porte l'heure à laquelle le client est livré —
+        // c'est ce qu'il a choisi et ce qu'il lit dans son mail. Rangée telle
+        // quelle dans l'agenda, elle ferait enfourner au moment où la pizza
+        // devrait déjà être à sa porte : elle partirait en retard et
+        // arriverait froide, sans qu'aucune erreur ne se produise.
+        // `instantPreparation()` recule du temps de trajet — et c'est la SEULE
+        // fonction qui a le droit de le faire (cf. src/lib/livraison-soir.ts).
+        items={articles.map(a => ({
+          creneauISO: a.commande.mode_retrait === 'livraison'
+            ? instantPreparation(a.commande.creneau_retrait ?? null)
+            : a.commande.creneau_retrait,
+          data: a,
+        }))}
         renderItem={({ commande, articles: arts }) => (
           <Ticket
             commande={commande}

@@ -17,6 +17,7 @@
 // créneaux trop justes POUR SON panier : un panier de 3 pizzas n'a rien à
 // faire sur un créneau où il reste une place.
 
+import { getConfigLivraisonSoir } from '@/lib/livraison-soir-server'
 import { createClient } from '@/lib/supabase/server'
 import { guardPublicRoute, corsHeaders, handleCorsOptions } from '@/lib/public-api/guard'
 import { creneauxOccupes, tientAPartirDe } from '@/lib/creneaux-duree'
@@ -51,6 +52,9 @@ export async function GET(req: Request) {
   // peut donc pas commencer n'importe où. Sans ce paramètre on rendrait des
   // horaires que le serveur refuserait ensuite.
   const articles = Math.max(1, Number(url.searchParams.get('articles') ?? '1') || 1)
+  // ⚠️ La LIVRAISON du soir n'a pas les mêmes bornes que le retrait : elle
+  // s'arrête plus tôt, et sa contrainte n'est pas le four mais la ROUTE.
+  const livraison = url.searchParams.get('mode') === 'livraison'
 
   // Validation
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -147,14 +151,55 @@ export async function GET(req: Request) {
   // pas. Le dire ici évite de proposer un horaire que la validation refusera,
   // à la dernière étape, après la saisie des coordonnées.
   const restants = slots.map(s => s.restant)
-  const items = slots.map((s, i) => ({
+  let items = slots.map((s, i) => ({
     ...s,
     disponible: tientAPartirDe(restants, i, articles),
     creneauxOccupes: creneauxOccupes(articles),
   }))
 
+  // ─── La tournée du SOIR ─────────────────────────────────────────────
+  //
+  // Deux contraintes se superposent, et elles n'ont rien à voir :
+  //   · le FOUR, déjà calculé au-dessus (8 pizzas par quart d'heure) ;
+  //   · la ROUTE — un livreur ne fait pas quatre adresses en quinze minutes.
+  //
+  // ⚠️ Ne garder que la première ferait accepter des commandes que personne
+  // ne peut porter, et c'est le client qui l'apprendrait, sur son pas de
+  // porte. On compte donc les COMMANDES (un arrêt) et non les articles :
+  // trois pizzas à une seule adresse, c'est un seul arrêt.
+  if (livraison) {
+    const cfgSoir = await getConfigLivraisonSoir()
+    const hhmm = (iso: string) => new Intl.DateTimeFormat('fr-FR', {
+      timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date(iso)).replace('h', ':')
+
+    const { data: livs } = await sb
+      .from('commandes')
+      .select('creneau_retrait')
+      .eq('mode_retrait', 'livraison')
+      .not('statut', 'in', '(annule)')
+      .gte('creneau_retrait', `${dateStr}T00:00:00Z`)
+      .lt('creneau_retrait', `${dateStr}T23:59:59Z`)
+
+    const prises = new Map<string, number>()
+    for (const l of livs ?? []) {
+      const k = String(l.creneau_retrait)
+      prises.set(k, (prises.get(k) ?? 0) + 1)
+    }
+
+    items = items
+      .filter(it => {
+        const h = hhmm(it.iso)
+        return h >= cfgSoir.debut && h <= cfgSoir.fin
+      })
+      .map(it => ({
+        ...it,
+        disponible: it.disponible && (prises.get(it.iso) ?? 0) < cfgSoir.capaciteParCreneau,
+      }))
+  }
+
   return Response.json({
-    date: dateStr, tag, articles,
+    date: dateStr, tag, articles, mode: livraison ? 'livraison' : 'retrait',
     creneauxOccupes: creneauxOccupes(articles),
     items, count: items.length,
   }, {
