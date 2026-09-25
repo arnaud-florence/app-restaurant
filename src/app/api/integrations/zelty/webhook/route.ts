@@ -26,6 +26,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { journaliser } from '@/lib/integrations/journal'
+import { relancerPour, type ResultatRelance } from '@/lib/integrations/zelty/relances'
 import { mapperCommandes } from '@/lib/integrations/zelty/mapper'
 
 export const runtime = 'nodejs'
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
     return new NextResponse('Invalid signature', { status: 401 })
   }
 
+  let relance: ResultatRelance = { relance: false, raison: 'aucune' }
   let corps: Record<string, unknown>
   try { corps = JSON.parse(brut) } catch {
     return NextResponse.json({ ok: false, error: 'JSON invalide' }, { status: 400 })
@@ -145,13 +147,18 @@ export async function POST(req: Request) {
         })
       }
     } else {
-      // Les autres événements sont tracés avec leur charge brute : le jour où
-      // on branche `till.close` ou `dish.availability_update`, on aura des
-      // exemples réels sous la main au lieu d'une hypothèse.
+      // Tout le reste est TRACÉ avec sa charge brute — c'est elle qui permettra
+      // de brancher un événement sur des données réelles au lieu d'hypothèses.
       await journaliser({
         sens: 'entrant', systeme: 'zelty', type: 'webhook',
         reference: evenement, payload: corps, statut: 'succes',
       })
+
+      // …puis, pour ceux qu'on sait relire, on rappelle l'endpoint qui fait
+      // autorité. Le webhook est une SONNETTE, pas une source : on ne met
+      // jamais la base à jour depuis une charge utile dont on n'a pas observé
+      // la forme (cf. src/lib/integrations/zelty/relances.ts).
+      relance = await relancerPour(evenement, req.url, journaliser)
     }
   } catch (e) {
     await journaliser({
@@ -164,5 +171,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, recu: true })
   }
 
-  return NextResponse.json({ ok: true, evenement })
+  return NextResponse.json({ ok: true, evenement, relance })
 }

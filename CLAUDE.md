@@ -1189,6 +1189,68 @@ Test : `PORT=3000 node scripts/test-zelty-webhook.mjs` — 13 assertions, dont
 l'essentiel porte sur ce qui est REFUSÉ (corps non signé, signature fausse,
 corps altéré après signature).
 
+**LES 22 ÉVÉNEMENTS SONT DÉCLARÉS (25/09/2026).** Un seul l'était —
+`order.ended` — donc « temps réel » n'était vrai que pour les ventes. Tout le
+reste était du sondage : la carte relue à 3 h 10, les réservations au quart
+d'heure, le Z à 5 h 30. **Un prix corrigé sur la caisse à 9 h restait faux sur
+casatasia.fr jusqu'au lendemain matin**, et c'est le client qui voyait l'écart.
+
+⚠️ La charge utile de `POST /webhooks` est un **DICTIONNAIRE**
+(`{webhooks: {"dish.update": {target, version}}}`) : les 22 partent donc en UN
+SEUL appel. Vingt-deux POST à la file auraient rejoué les cinq `429` des
+familles — Zelty plafonne son débit et la documentation ne le dit pas.
+
+**Webhook = SIGNAL. GET = VÉRITÉ.** `src/lib/integrations/zelty/relances.ts`
+n'écrit RIEN depuis la charge utile : l'événement sert de sonnette, puis on
+rappelle la route qui fait autorité (miroir du catalogue, des réservations,
+des clients). Ce n'est pas de la prudence excessive, c'est la leçon de cette
+API — `expand[]=items` oublié, TVA en MILLIÈMES, `null` refusés par zod (84
+plats sur 84 rejetés en silence), `contents` au lieu d'`items`, `event_name`
+au lieu d'`event`. Aucun ne se devine ; une relecture passe par du code déjà
+éprouvé en production.
+
+⚠️⚠️ **LE VRAI DANGER EST LA TEMPÊTE, PAS LA PANNE.** Nos PROPRES écritures
+déclenchent ces webhooks : pousser la carte (84 plats en un POST) fait revenir
+84 `dish.update`, donc 84 relectures complètes du catalogue en quelques
+secondes, chacune rappelant Zelty — qui répond 429 au cinquième appel. On se
+serait mis soi-même en panne en croyant gagner du temps réel.
+
+D'où le **REGROUPEMENT par ROUTE RELUE**, pas par nom d'événement : les six
+événements de carte (`dish.update`, `dish.delete`, `dish_override.update`,
+`tag.update`, `tag.delete`, `catalog.push`) visent la même relecture et se
+groupent ensemble. Fenêtres : **120 s** pour la carte, **20 s** pour les
+réservations (deux tables prises à une minute d'intervalle le soir de
+l'inauguration doivent se voir toutes les deux), 300 s pour les clients —
+mais **30 s pour `customer.delete`**, qui est le chemin d'une demande
+d'effacement RGPD : la traiter le lendemain matin n'est pas une réponse.
+
+⚠️ Le verrou vit dans `integration_evenements`, **pas en mémoire** : Vercel est
+sans état, deux webhooks peuvent tomber sur deux instances, et une variable de
+module n'y compterait rien. La trace est écrite **AVANT** l'appel — écrite
+après, deux webhooks de la même seconde ne se verraient pas l'un l'autre.
+
+⚠️ **En cas de doute, on RELANCE.** Base injoignable ou requête en erreur →
+on ne groupe pas. Un appel de trop coûte une seconde ; une abstention laisse
+la carte fausse sur le site sans que rien ne le signale.
+
+⚠️ Un événement ABSENT de `RELANCES` est **TRACÉ, jamais ignoré** : sa charge
+brute s'accumule, et c'est elle qui permettra de le brancher sur des données
+réelles. Restent dans ce cas : `till.close` (le rapprochement part d'HIER, le
+brancher au Z du soir rapprocherait la veille), `order.status.update`,
+`promotion.update`, `restaurant.*`, et les `menu.*` / `option*` — vides tant
+que la pizzeria n'a pas ouvert.
+
+⚠️ **`dish.availability_update` n'est pas encore branché, et c'est le dernier
+trou** : une rupture marquée sur la caisse ne redescend pas chez nous, donc
+casatasia.fr continue de vendre. Le sens inverse, lui, fonctionne
+(`(ops)/ruptures` → caisse). `GET /restaurants/{id}/dishes_availability` répond
+et porte `outofstock` par plat — la forme est observée, il reste à écrire la
+relecture. ⚠️ Attention à la boucle : notre propre poussée de rupture
+déclenchera cet événement.
+
+Test : `PORT=3000 node scripts/test-zelty-relances.mjs` — 13 assertions.
+⚠️ Il RECOPIE la table des relances depuis le TS ; modifier les deux ensemble.
+
 **Planification (`sql/setup-pgcron-zelty.sql`, appliqué le 28/08/2026)** —
 cinq routes cron existaient pour le pont, **aucune n'était appelée**. Le
 webhook couvre le temps réel, mais un webhook n'a pas de mémoire : une
