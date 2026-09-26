@@ -25,6 +25,7 @@
 
 import fs from 'node:fs'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { unitesColis } from './_tarifs-communs.mjs'
 
 const PDF = process.argv.find(a => a.startsWith('--pdf='))?.slice(6)
   ?? 'data/catalogue-eurocash-ete-2026.pdf'
@@ -281,17 +282,6 @@ for (const [code, nom] of Object.entries(LIBELLES)) {
  * d'unités : le multiplier donnerait 792 canettes au lieu de 24, et le prix
  * de colis équivalent demandé serait absurde.
  */
-function unitesColis(colisage) {
-  if (!colisage) return null
-  const c = String(colisage).trim()
-  if (/^\d+$/.test(c)) return Number(c)
-  const facteurs = [...c.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml|pcs?)?/gi)]
-    .filter(m => !/^(kg|g|l|cl|ml)$/i.test(m[2] ?? ''))
-    .map(m => Number(m[1].replace(',', '.')))
-  if (!facteurs.length) return null
-  const n = facteurs.reduce((a, b) => a * b, 1)
-  return Number.isFinite(n) && n > 0 ? n : null
-}
 
 const lignes = []
 const tous = [...cat.values()]

@@ -70,3 +70,22 @@ export function contenance(description) {
 /** Normalisation d'un libellé, pour servir de clé. */
 export const norme = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim()
+
+/**
+ * Nombre d'unités dans un colis Euro-Cash : « c-24x33cl » → 24.
+ *
+ * ⚠️ ON IGNORE LE FACTEUR QUI PORTE UNE CONTENANCE. Multiplier le 33 de
+ * « c-24x33cl » donnerait 792 canettes et un prix unitaire absurde. En
+ * revanche « c-1x6pcs » vaut bien 6 : `pcs` compte des PIÈCES, pas un volume.
+ */
+export function unitesColis(colisage) {
+  if (!colisage) return null
+  const c = String(colisage).trim()
+  if (/^\d+$/.test(c)) return Number(c)
+  const facteurs = [...c.matchAll(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml|pcs?)?/gi)]
+    .filter(m => !/^(kg|g|l|cl|ml)$/i.test(m[2] ?? ''))
+    .map(m => Number(m[1].replace(',', '.')))
+  if (!facteurs.length) return null
+  const n = facteurs.reduce((a, b) => a * b, 1)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
