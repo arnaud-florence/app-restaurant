@@ -230,7 +230,11 @@ export default function TarifsClient({
                           <Nature nature={l.nature} />
                         </p>
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPrix(l.prix_ht)}<span className="text-zinc-400">/{l.unite}</span></td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {l.prix_ht == null
+                          ? <span className="text-amber-700">prix sur demande</span>
+                          : <>{fmtPrix(l.prix_ht)}<span className="text-zinc-400">/{l.unite}</span></>}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {r ? <span className={r.derive ? 'text-zinc-600' : ''}>{fmtRef(r)}</span>
                            : <Contenance ligne={l} />}
@@ -329,7 +333,9 @@ function LigneARapprocher({ ligne, matieres, pending, start }: {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-semibold text-zinc-900">{ligne.designation}</p>
         <p className="text-sm tabular-nums text-zinc-600">
-          {fmtPrix(ligne.prix_ht)}/{ligne.unite}
+          {ligne.prix_ht == null
+            ? <span className="text-amber-700">prix sur demande</span>
+            : <>{fmtPrix(ligne.prix_ht)}/{ligne.unite}</>}
           {r && <span className="ml-2 text-zinc-400">→ {fmtRef(r)}</span>}
         </p>
       </div>

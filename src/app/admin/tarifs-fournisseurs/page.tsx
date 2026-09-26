@@ -8,6 +8,7 @@
 // qui n'est pas comparable.
 
 import { createClient } from '@/lib/supabase/server'
+import { lireTout } from '@/lib/supabase/pagine'
 import { comparer, prixReference, prixReferenceMatiere, memeBase, score, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import TarifsClient from './TarifsClient'
 
@@ -17,10 +18,13 @@ export const metadata = { title: 'Tarifs fournisseurs' }
 export default async function TarifsFournisseursPage() {
   const sb = await createClient()
 
-  const [{ data: tarifs }, { data: fournisseurs }, { data: matieres }] = await Promise.all([
-    sb.from('catalogue_fournisseur')
-      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature')
-      .eq('actif', true).order('famille').order('designation'),
+  // ⚠️ Plus de 3 300 lignes depuis l'import du portail Gineys : au-delà de
+  // 1 000, PostgREST tronque SANS erreur, et le comparateur désignerait un
+  // « moins cher » choisi parmi une fraction du catalogue.
+  const [tarifs, { data: fournisseurs }, { data: matieres }] = await Promise.all([
+    lireTout<Record<string, unknown>>(() => sb.from('catalogue_fournisseur')
+      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature, remise_pct, tarif_negocie, achete')
+      .eq('actif', true).order('famille').order('designation')),
     sb.from('fournisseurs').select('id, nom').order('nom'),
     // Nos matières réellement comptées : ce sont elles qu'on rachète, donc
     // les seules pour lesquelles un tarif concurrent a un sens.
@@ -29,9 +33,12 @@ export default async function TarifsFournisseursPage() {
   ])
 
   const noms = new Map((fournisseurs ?? []).map(f => [f.id as string, f.nom as string]))
-  const lignes: LigneTarif[] = (tarifs ?? []).map(t => ({
+  const lignes: LigneTarif[] = tarifs.map(t => ({
     ...(t as unknown as LigneTarif),
-    prix_ht: Number(t.prix_ht),
+    // ⚠️ `Number(null)` vaut ZÉRO. Un « prix sur demande » (0158) passerait
+    // donc pour gratuit et sortirait en tête du comparateur comme le moins
+    // cher de tout le catalogue. L'absence doit rester une absence.
+    prix_ht: t.prix_ht === null ? null : Number(t.prix_ht),
     colis_quantite: t.colis_quantite === null ? null : Number(t.colis_quantite),
     contenance_valeur: t.contenance_valeur === null ? null : Number(t.contenance_valeur),
     fournisseur_nom: noms.get(t.fournisseur_id as string) ?? '—',

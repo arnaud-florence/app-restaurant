@@ -1,0 +1,134 @@
+// La plateforme d'achat — catalogue tous fournisseurs, remises, demandes.
+//
+//   PORT=3000 node scripts/test-achats.mjs
+//
+// ⚠️ Il RECOPIE les règles de `src/lib/catalogue-achats.ts` (la source est en
+// TS) : modifier les deux ensemble. L'essentiel des assertions porte sur ce
+// que l'écran REFUSE d'affirmer — c'est là que se logent les fautes de cette
+// famille (« rien déclaré » lu « aucun allergène », food cost 0 % en vert).
+
+import fs from 'node:fs'
+
+const env = {}
+for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
+  const i = l.indexOf('='); if (i < 0 || l.trim().startsWith('#')) continue
+  env[l.slice(0, i).trim()] = l.slice(i + 1).trim().replace(/^["']|["']$/g, '')
+}
+const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
+const sb = async p => {
+  const r = await fetch(U + '/rest/v1/' + p, { headers: { apikey: K, Authorization: `Bearer ${K}` } })
+  const t = await r.text(); const j = t ? JSON.parse(t) : null
+  if (!r.ok) throw new Error(j?.message ?? `HTTP ${r.status}`)
+  return j
+}
+// ⚠️ PostgREST plafonne à 1 000 lignes SANS le dire — `limit=5000` n'y change
+// rien. Sans pagination, ce test validerait un tiers du catalogue en croyant
+// le voir en entier. C'est ce plafond qui a fait échouer sa première version.
+const sbTout = async (p, max = 20000) => {
+  const out = []
+  for (let de = 0; de < max; de += 1000) {
+    const lot = await sb(`${p}&offset=${de}&limit=1000`)
+    out.push(...lot)
+    if (lot.length < 1000) break
+  }
+  return out
+}
+let ok = 0, ko = 0
+const t = (nom, cond) => { if (cond) { ok++; console.log(`  ✓ ${nom}`) } else { ko++; console.log(`  ✗ ${nom}`) } }
+const titre = s => console.log(`\n── ${s} ──`)
+
+// ─── Les règles pures, recopiées ──────────────────────────────────
+const etatRemise = a => a.tarif_negocie === true ? 'negocie'
+  : a.tarif_negocie === false ? 'public' : 'inconnu'
+const motsCles = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)
+const correspond = (a, q) => {
+  const termes = motsCles(q); if (!termes.length) return true
+  const cibles = motsCles(a.designation); const ref = (a.reference || '').toUpperCase()
+  return termes.every(x => ref.includes(x) || cibles.some(c => c.startsWith(x)))
+}
+
+titre('Trois états de remise, pas deux')
+t('un tarif vérifié est « négocié »',      etatRemise({ tarif_negocie: true }) === 'negocie')
+t('un tarif public confirmé est « public »', etatRemise({ tarif_negocie: false }) === 'public')
+t('⚠️ NULL est « inconnu », JAMAIS « public »', etatRemise({ tarif_negocie: null }) === 'inconnu')
+t('undefined ne vaut pas non plus « public »', etatRemise({}) === 'inconnu')
+
+titre('La recherche')
+const a1 = { designation: 'MOZZARELLA RAPEE BELLA STELLA SAC=2KG', reference: '0061414' }
+t('un préfixe trouve le mot entier',        correspond(a1, 'mozza'))
+t('plusieurs mots : TOUS doivent y être',   correspond(a1, 'mozza stella'))
+t('un mot absent exclut la ligne',          !correspond(a1, 'mozza jambon'))
+t('la référence se colle telle quelle',     correspond(a1, '0061414'))
+t('les accents ne gênent pas',              correspond({ designation: 'CRÈME FRAÎCHE ÉPAISSE', reference: 'X' }, 'creme fraiche'))
+t('une requête vide rend tout',             correspond(a1, '   '))
+
+titre('Le message envoyé au fournisseur')
+const message = arts => {
+  const lignes = arts.map(a => `  · ${a.reference} — ${a.designation} (affiché : ${
+    a.prix_ht == null ? 'prix sur demande' : `${a.prix_ht.toFixed(3).replace('.', ',')} € / ${a.unite}`})`)
+  return lignes.join('\n')
+}
+const m1 = message([{ reference: '0061414', designation: 'MOZZARELLA', prix_ht: 6.924, unite: 'kg' }])
+t('il porte la RÉFÉRENCE de l’article',  m1.includes('0061414'))
+t('il porte le prix affiché',            m1.includes('6,924'))
+const m2 = message([{ reference: '0053088', designation: 'HOMARD', prix_ht: null, unite: 'colis' }])
+t('⚠️ un prix absent se dit, il ne vaut pas 0', m2.includes('prix sur demande') && !m2.includes('0,000'))
+
+titre('Le catalogue en base')
+const portail = await sbTout('catalogue_fournisseur?nature=eq.portail&select=id,prix_ht,tarif_negocie,achete,remise_pct,reference,colis_quantite,unite')
+t('le portail Gineys est importé en ENTIER', portail.length === 2892)
+t('⚠️ la lecture n’est pas tronquée à 1 000', portail.length > 1000)
+t('les 92 articles achetés sont marqués', portail.filter(x => x.achete).length === 92)
+t('ils portent tous un tarif négocié confirmé',
+  portail.filter(x => x.achete).every(x => x.tarif_negocie === true))
+t('⚠️ le reste reste en remise INCONNUE, pas « public »',
+  portail.filter(x => !x.achete).every(x => x.tarif_negocie === null))
+t('⚠️ aucun prix n’est à zéro',           portail.every(x => x.prix_ht === null || Number(x.prix_ht) > 0))
+t('les « prix sur demande » sont NULL',   portail.filter(x => x.prix_ht === null).length > 0)
+t('toutes les lignes ont une référence',  portail.every(x => x.reference && x.reference.length >= 5))
+t('des promotions sont enregistrées',     portail.filter(x => x.remise_pct != null).length > 100)
+
+titre('Le multiplicateur vers le colis')
+// ⚠️ « 27,410 € / Col » avec « 30 PI / Col » : le colis coûte DÉJÀ 27,41 €.
+// Le multiplier par 30 afficherait un carton de pain à 822 €.
+const auColis = portail.filter(x => x.unite === 'colis')
+t('un prix au colis ne se multiplie pas', auColis.length > 0 && auColis.every(x => x.colis_quantite === null || Number(x.colis_quantite) === 1))
+t('un prix au kilo n’invente pas de colisage',
+  portail.filter(x => x.unite === 'kg').every(x => x.colis_quantite === null))
+
+titre('Qui a une remise connue, et qui reste à demander')
+// Un prix FACTURÉ est une preuve de paiement ; un DEVIS est un prix proposé
+// nommément à CASATASIA. Les deux sont « notre prix ». Seule une référence
+// de catalogue qu'on n'a jamais achetée reste à demander.
+const tous = await sbTout('catalogue_fournisseur?select=nature,achete,tarif_negocie')
+t('une ligne de facture vaut remise connue',
+  tous.filter(x => x.nature === 'facture').every(x => x.tarif_negocie === true))
+t('un devis aussi',
+  tous.filter(x => x.nature === 'devis').every(x => x.tarif_negocie === true))
+t('⚠️ TOUT ce qui reste inconnu est du catalogue jamais acheté',
+  tous.filter(x => x.tarif_negocie === null).every(x => x.nature === 'portail' && !x.achete))
+t('et il en reste vraiment (sinon l’écran ne sert à rien)',
+  tous.filter(x => x.tarif_negocie === null).length > 1000)
+
+titre('Un tarif n’est pas un prix payé')
+// La règle de la 0151 doit tenir MÊME ICI, où le tarif s'est révélé exact.
+const ings = await sb('ingredients?select=id,prix_achat_ht&stocke=eq.true&limit=500')
+t('des matières ont un prix d’achat',     ings.some(i => Number(i.prix_achat_ht) > 0))
+t('⚠️ l’import n’a écrit aucun prix d’achat nul', ings.every(i => i.prix_achat_ht === null || Number(i.prix_achat_ht) >= 0))
+
+titre('Demandé n’est pas obtenu')
+const demandes = await sb('catalogue_fournisseur?remise_demandee_le=not.is.null&select=id,tarif_negocie&limit=500')
+t('une demande ne pose pas de remise toute seule',
+  demandes.every(d => d.tarif_negocie === null || d.tarif_negocie === true))
+
+// ─── L'écran est-il fermé aux appels anonymes ? ───────────────────
+// Il expose des conditions négociées : le laisser répondre les publierait.
+if (process.env.PORT) {
+  titre('L’écran ne répond pas sans authentification')
+  const r = await fetch(`http://localhost:${process.env.PORT}/admin/achats`, { redirect: 'manual' })
+  t('appel anonyme refusé ou redirigé', r.status === 307 || r.status === 302 || r.status === 401 || r.status === 403)
+}
+
+console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
+process.exit(ko ? 1 : 0)

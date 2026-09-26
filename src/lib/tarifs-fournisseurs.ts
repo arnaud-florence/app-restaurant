@@ -33,7 +33,13 @@ export type LigneTarif = {
   designation: string
   famille: string | null
   unite: string
-  prix_ht: number
+  /**
+   * Prix de l'unité de facturation. NULL = « prix sur demande » (0158) :
+   * ⚠️ surtout pas 0, qui ferait remonter l'article en TÊTE du comparateur
+   * comme le moins cher du catalogue — la faute de `statutFoodCost(0)`.
+   * Tout lecteur doit donc traiter l'absence avant de calculer.
+   */
+  prix_ht: number | null
   colis_quantite: number | null
   colis_libelle: string | null
   contenance_valeur: number | null
@@ -146,6 +152,10 @@ export type PrixRef = {
 }
 
 export function prixReference(l: LigneTarif): PrixRef | null {
+  // ⚠️ Sans prix, pas de prix de référence — et surtout pas zéro : l'article
+  // sortirait « le moins cher » de sa comparaison. Un « prix sur demande »
+  // ne se compare à rien tant que le fournisseur n'a pas répondu.
+  if (l.prix_ht == null) return null
   // Une contenance saisie à la main l'emporte : c'est quelqu'un qui a lu
   // l'étiquette, contre un motif lu dans un libellé.
   if (l.contenance_valeur && l.contenance_unite) {
@@ -225,7 +235,8 @@ export const fmtRef = (r: { prix: number; unite: UniteRef }) =>
 
 /** Prix du colis — utile pour commander, jamais pour comparer. */
 export function prixColis(l: LigneTarif): number | null {
-  return l.colis_quantite ? l.prix_ht * Number(l.colis_quantite) : null
+  if (l.prix_ht == null || !l.colis_quantite) return null
+  return l.prix_ht * Number(l.colis_quantite)
 }
 
 // ─── Suggestion de rapprochement ────────────────────────────────────────
@@ -281,7 +292,10 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
     // boîte sans qu'on ait besoin d'en connaître le poids net.
     const formats = new Set(avecRef.map(l => formatConserve(l.designation)))
     if (avecRef.every(l => !l.ref) && formats.size === 1 && !formats.has(null)) {
-      for (const l of avecRef) l.ref = { prix: l.prix_ht, unite: 'piece', derive: false }
+      for (const l of avecRef) {
+        if (l.prix_ht == null) continue
+        l.ref = { prix: l.prix_ht, unite: 'piece', derive: false }
+      }
     }
     const chiffrees = avecRef.filter(l => l.ref)
     const bases = new Set(avecRef.map(l => l.ref ? `${l.ref.unite}|${l.ref.format ?? ''}` : null).filter(Boolean))

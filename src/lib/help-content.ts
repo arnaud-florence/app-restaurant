@@ -686,6 +686,45 @@ Les produits qui partagent une même matière sont donc repliés en une seule li
     ],
   },
 
+  '/admin/achats': {
+    title: "Aide — Plateforme d'achat",
+    intro: "Tout ce que nos fournisseurs proposent, en un seul catalogue cherchable.",
+    shortcuts: [
+      { emoji: '⚖️', label: 'Comparer les tarifs', href: '/admin/tarifs-fournisseurs' },
+      { emoji: '🧾', label: 'Factures', href: '/admin/fournisseurs' },
+    ],
+    sections: [
+      {
+        heading: '« Remise inconnue » ne veut pas dire « pas de remise »',
+        emoji: '⚠️',
+        markdown: `Trois états, et le troisième compte autant que les deux autres : **Remisé** (vérifié contre nos factures), **Tarif public** (confirmé), et **Remise inconnue** — personne n'a vérifié.
+
+Lire « inconnue » comme « pas de remise » serait une affirmation qu'on ne peut pas tenir, et ferait renoncer à demander. C'est justement cet état qui déclenche la demande au fournisseur.`,
+      },
+      {
+        heading: 'Un prix sur demande n\'est pas un prix de zéro',
+        emoji: '💸',
+        markdown: `Vingt-cinq références s'affichent « sur demande ». Y écrire 0 les ferait remonter **en tête** du comparateur comme les moins chères du catalogue — la même faute qu'un food cost à 0 % affiché en vert.
+
+Elles restent sans prix, et ce sont les premières pour lesquelles écrire au fournisseur.`,
+      },
+      {
+        heading: 'La demande part chez un seul fournisseur',
+        emoji: '✉️',
+        markdown: `On sélectionne des références, on demande les conditions. Le message porte la **référence** de chaque article, pas seulement son libellé : un commercial qui doit retrouver le produit dans son propre catalogue peut en chiffrer un autre, et une remise accordée sur le mauvais produit se découvre à la livraison.
+
+Le message ne cite **aucun prix d'un autre fournisseur** : divulguer un tarif négocié ailleurs est une décision de négociation, pas un automatisme.
+
+Sans adresse e-mail enregistrée, rien n'est envoyé et rien n'est daté — le message est simplement prêt à copier. Prétendre le contraire ferait croire qu'on attend une réponse qui ne viendra pas.`,
+      },
+      {
+        heading: 'Demandé n\'est pas obtenu',
+        emoji: '⏳',
+        markdown: `« Conditions demandées » dit qu'on a écrit, pas qu'on a eu une réponse. Tant que le fournisseur n'a rien répondu, l'article reste en « remise inconnue ».`,
+      },
+    ],
+  },
+
   '/admin/tarifs-fournisseurs': {
     title: 'Aide — Tarifs fournisseurs',
     intro: "Ce que les fournisseurs proposent, face à ce qu'on paie déjà.",

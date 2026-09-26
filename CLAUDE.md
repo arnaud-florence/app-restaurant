@@ -69,6 +69,7 @@ Chaque écran (ops) affiche en haut un `<BriefingPoste />` personnalisé (`src/l
 /admin/formation               → Module 27 (guides, fiches poste, quiz)
 /admin/securite                → Module 28 (RBAC, 2FA, journal d'audit, sauvegardes)
 /admin/tarifs-fournisseurs     → comparaison des tarifs (0151)
+/admin/achats                  → plateforme d'achat, 3 303 références (0158, 0159)
 ```
 
 Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en service). Les routes `/print/*` sont en dehors et héritent uniquement du root layout (fond blanc pour impression). Les routes `/admin/*` sont en thème clair par défaut. `/equipes` (Module 10) sera neutre — accessible aux postes de service comme à l'admin.
@@ -158,8 +159,10 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Liaison réservation ↔ caisse | socle de la synchro, en attente de la forme réelle | 0155 |
 | Liaison client ↔ caisse | un seul fichier client, deux vues | 0156 |
 | Le Z dans le rapprochement | témoin indépendant de notre ingestion | 0157 |
+| Catalogue du portail Gineys | 2 892 références, nos prix négociés vérifiés | 0158 |
+| Demander une remise | et savoir qu'on l'a déjà demandée | 0159 |
 
-**Migrations actuelles : 0001 → 0157.**
+**Migrations actuelles : 0001 → 0159.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2434,6 +2437,130 @@ facture scannée se rattache au lieu de produire 25 lignes orphelines.
 
 Test : `PORT=3000 node scripts/test-matieres-bar.mjs` — 24 assertions.
 
+### Le catalogue du portail Gineys, et la plateforme d'achat (0158, 0159)
+
+`commande.gineys.com` (Infologic « Copilote ») expose tout ce que Gineys
+vend : **92 « Mes articles »**, **266 promotions**, **2 892 références**.
+L'outil n'en connaissait que les 82 lignes tirées de nos factures — ce qu'on
+a DÉJÀ acheté, jamais ce qu'il propose. On ne pouvait pas répondre à « est-ce
+qu'il a ça ? ».
+
+`node scripts/import-portail-gineys.mjs [--ecrire]` — relit
+`data/gineys/*.json` (⚠️ **gitignoré** : conditions négociées, dépôt public).
+
+✅ **CES PRIX SONT NOS PRIX NÉGOCIÉS, ET C'EST VÉRIFIÉ.** Les 92 « Mes
+articles » ont été confrontés un par un aux prix réellement facturés :
+**47 des 64 rapprochements concordent AU CENTIME**. Les écarts restants sont
+des mouvements de tarif depuis août, ou des unités différentes (le croque-
+monsieur facturé au colis en août, affiché à la pièce aujourd'hui). Le
+portail est donc une source **plus fraîche que nos factures** — mais il
+reste un tarif affiché, pas une preuve de paiement, d'où `nature = 'portail'`
+et non `'facture'`.
+
+⚠️⚠️ **« NON REMISÉ » NE SE DÉDUIT PAS D'UNE ABSENCE.** Pour les 2 800
+références qu'on n'achète pas, on ignore si le prix porte notre remise ou le
+tarif public. Les marquer « non remisé » serait une affirmation qu'on ne peut
+pas tenir — même faute que le tableau d'allergènes vide lu « aucun
+allergène » (0138) et que `statutFoodCost(0)` affiché en vert (0150). D'où
+**TROIS états** sur `tarif_negocie` : `true`, `false`, et **NULL = personne
+n'a vérifié**. C'est NULL qui déclenche la demande au fournisseur ; le
+confondre avec « public » la rendrait inutile.
+
+Répartition au 26/09/2026 : **503 à remise connue** (92 du portail vérifiés,
+106 tirés de factures, 305 de devis) et **2 800 inconnues** — toutes des
+références de catalogue jamais achetées. Une facture est une preuve de
+paiement, un devis un prix proposé nommément à CASATASIA : les deux sont
+« notre prix ». Une assertion du test verrouille cet invariant.
+
+⚠️ **`prix_ht` EST DEVENU NULLABLE (0158).** Vingt-cinq articles s'affichent
+« N.C. » — prix sur demande. Y écrire 0 les ferait remonter **en tête** du
+comparateur comme les moins chers du catalogue ; les exclure les rendrait
+invisibles alors que ce sont exactement ceux pour lesquels il faut écrire.
+⚠️ Corollaire attrapé au passage : `Number(null)` vaut **zéro**, et les deux
+pages faisaient `prix_ht: Number(t.prix_ht)`. Tout nouveau lecteur doit
+traiter l'absence avant de calculer.
+
+⚠️⚠️ **POSTGREST PLAFONNE SES RÉPONSES À 1 000 LIGNES, SANS LE DIRE.** Ni
+`.limit(10000)` ni un en-tête `Range` n'y changent quoi que ce soit : mille
+lignes, code 200, aucun avertissement. Mesuré le jour où l'import a porté
+`catalogue_fournisseur` à 3 303 lignes — l'écran en affichait 1 000 et se
+croyait complet, et le comparateur aurait désigné un « moins cher » choisi
+parmi un tiers du catalogue. D'où **`src/lib/supabase/pagine.ts`**
+(`lireTout()`), utilisé par `/admin/achats` ET `/admin/tarifs-fournisseurs`.
+Même famille de faute que `expand[]=items` oublié chez Zelty : une troncature
+silencieuse ne lève aucune erreur, elle rend un chiffre faux dans lequel on a
+confiance.
+
+⚠️ **Le multiplicateur vers le colis ne vaut pas le nombre du colisage.**
+« 27,410 € / Col » avec « 30 PI / Col » : le colis coûte DÉJÀ 27,41 €, le
+multiplier par 30 afficherait un carton de pain à 822 €. On ne multiplie que
+si l'unité INTERNE du colisage est celle du prix, et on ne conclut rien
+sinon — un prix au kilo ne dit pas combien de kilos tient un colis.
+
+⚠️ **Le grattage a produit 25 prix FAUX au premier passage**, et c'est le
+cas d'école : une fiche sans prix (« N.C. ») remontait jusqu'au conteneur de
+la page et héritait du prix de la **première fiche**. Le homard sous glace
+sortait à 27,410 €/Col avec le colisage du pain. Le correctif borne la
+remontée au premier ancêtre contenant **un seul** titre d'article.
+
+**`/admin/achats` — la plateforme d'achat.** Recherche plein texte (tous les
+mots, en préfixe : « mozza » trouve MOZZARELLA ; un « ou » rendrait la moitié
+des 3 300 lignes et ne servirait à rien), filtres par fournisseur, par état
+de remise, promotions, « prix sur demande », « on l'achète ». Sélection puis
+**demande de conditions par e-mail**.
+
+⚠️ **L'ENVOI EST UN GESTE HUMAIN.** Rien ne part tout seul : un commercial
+relancé automatiquement cesse de répondre. La demande part chez **un seul**
+fournisseur à la fois, et le message porte la **référence** de chaque
+article — un commercial qui doit retrouver « BAGUETTE PRECUITE 280G » dans
+son propre catalogue peut en chiffrer un autre, et une remise accordée sur le
+mauvais produit se découvre à la livraison.
+
+⚠️ Le message ne cite **AUCUN prix d'un autre fournisseur** : divulguer un
+tarif négocié ailleurs est une décision de négociation, pas un automatisme
+(même règle que les deux lignes France Boissons du tableau Euro-Cash).
+
+⚠️ **Sans adresse e-mail, rien n'est envoyé et rien n'est daté.** Le message
+est rendu pour être copié, l'article reste « à demander ». Dater une demande
+qui n'est pas partie ferait attendre une réponse qui ne viendra jamais.
+Cinq fournisseurs sur huit n'ont pas d'adresse ; celle de Gineys
+(`gineys.facturation@…`) est une boîte de **facturation**, pas un commercial
+— à remplacer avant le premier envoi.
+
+⚠️ **« Conditions demandées » ne vaut PAS réponse** : `tarif_negocie` reste
+NULL tant que le fournisseur n'a rien dit. Confondre « demandé » et « obtenu »
+remplirait l'écran de remises imaginaires.
+
+⚠️ **L'import est rejouable sans rien détruire.** `tarif_negocie` n'est pas
+dans la charge de l'upsert — il est posé après, et seulement sur les 92
+vérifiés : sinon relancer l'import effacerait une remise confirmée à la main
+entre-temps.
+
+⚠️ Les règles de lecture d'un tarif (unité de facturation, colisage `C=N`,
+contenance) vivent désormais dans **`scripts/_tarifs-communs.mjs`**, importé
+par `catalogue-depuis-factures.mjs` ET par l'import du portail. C'était la
+troisième copie qui se profilait.
+
+**Le portail se gratte, il ne s'interroge pas.** `/json/<FQN>_<methode>`
+répond « Illegal protocol » à un appel direct, et `window.infologic` expose
+les services mais les appeler casse l'application. Deux pièges à connaître
+avant de recommencer :
+
+⚠️ **L'onglet doit être VISIBLE.** Masqué, Chrome gèle le rendu de l'appli
+entre deux frames : le DOM reste plusieurs pages en retard, et les timers
+sont bridés à un tour par minute. Une capture d'écran force une frame — c'est
+elle qui débloque la lecture.
+
+⚠️ **`javascript_tool` met ses résultats en cache sur le texte du script** :
+deux appels identiques rendent la même réponse, même si la page a changé
+entre-temps. Une heure perdue à croire que les clics ne passaient pas, alors
+qu'ils passaient tous. `get_page_text` et les captures, eux, sont frais.
+
+Test : `PORT=3000 node scripts/test-achats.mjs` — 32 assertions. ⚠️ Il
+RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
+que la page est **fermée aux appels anonymes** : elle expose des conditions
+négociées.
+
 ### Tarifs fournisseurs — qui est le moins cher, et sur quoi (0151)
 
 `/admin/tarifs-fournisseurs`. L'outil savait ce qu'on **paie** — les factures
@@ -4330,6 +4457,8 @@ PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans 
 PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
 node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
+PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat (0158, 0159)
+node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
