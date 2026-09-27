@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   etat, aCommander, coutReassort, bilan, parCategorie, parFournisseur,
-  parEtablissement, lignesCommandables,
+  parEtablissement, lignesCommandables, economieEstimee,
   comptagePerime, stockAReconstituer, PEREMPTION_COMPTAGE_JOURS,
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
@@ -28,6 +28,10 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   const [enCours, demarrer] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
   const [bons, setBons] = useState<string | null>(null)
+  // ⚠️ RÈGLE DU GÉRANT : on commande AU MOINS CHER. C'est le défaut, pas
+  // une option qu'on découvre. L'interrupteur existe pour le cas inverse
+  // — rester chez l'habituel quand on ne veut pas ouvrir un compte.
+  const [auMoinsCher, setAuMoinsCher] = useState(true)
   const [creation, creer] = useTransition()
 
   // Les saisies en cours priment sur ce qui vient du serveur.
@@ -59,23 +63,24 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   // ⚠️ La commande se construit sur TOUTES les lignes, jamais sur les
   // lignes FILTRÉES : une recherche en cours ne doit pas amputer un bon de
   // commande en silence — on partirait avec la moitié du réassort.
-  const commandables = useMemo(() => lignesCommandables(avecBrouillon), [avecBrouillon])
+  const commandables = useMemo(() => lignesCommandables(avecBrouillon, auMoinsCher), [avecBrouillon, auMoinsCher])
+  const economie = useMemo(() => economieEstimee(commandables.prets), [commandables])
   const nbFournisseurs = useMemo(
-    () => new Set(commandables.prets.map(l => l.fournisseur_id)).size, [commandables])
+    () => new Set(commandables.prets.map(l => l.retenu.id)).size, [commandables])
 
   function creerLesBons() {
     creer(async () => {
       try {
         const r = await creerBonsDepuisReassort({
           lignes: commandables.prets.map(l => ({
-            fournisseur_id: l.fournisseur_id!,
+            fournisseur_id: l.retenu.id,
             // La clé porte le préfixe `ing:` pour une matière (0133).
             recette_id: l.cle.startsWith('ing:') ? null : l.cle,
             ingredient_id: l.cle.startsWith('ing:') ? l.cle.slice(4) : null,
             libelle: l.nom,
             quantite: l.quantite,
             unite: l.unite ?? 'unité',
-            prix_unitaire_ht: l.cout_unitaire_ht,
+            prix_unitaire_ht: l.prix,
           })),
         })
         const n = r.crees.length
@@ -174,6 +179,28 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
                 Un bon de commande <strong>en brouillon</strong> par fournisseur. Rien ne part :
                 l&apos;envoi reste un second geste, dans Fournisseurs.
               </p>
+              <label className="mt-2 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={auMoinsCher}
+                  onChange={e => setAuMoinsCher(e.target.checked)}
+                  className="h-4 w-4 accent-violet-700" />
+                <span className="font-medium text-violet-800">Commander au moins cher</span>
+                {commandables.bascules.length > 0 && (
+                  <span className="text-xs text-violet-700">
+                    · {commandables.bascules.length} ligne(s) changent de fournisseur
+                    {economie > 0 && <> · <strong>≈ {fmtPrix(economie)} économisés</strong></>}
+                  </span>
+                )}
+              </label>
+              {/* ⚠️ Un tarif comparé n'est pas un prix négocié : le total du
+                  bon ne peut pas être annoncé comme ferme sur une ligne qui
+                  change de fournisseur. */}
+              {commandables.bascules.length > 0 && (
+                <p className="mt-1 text-xs text-amber-800">
+                  ⚠️ Ces lignes partent <strong>sans prix</strong> : notre coût est celui de NOTRE
+                  conditionnement, pas du leur. C&apos;est au fournisseur de confirmer son tarif.
+                  L&apos;économie ci-dessus est une estimation d&apos;après les tarifs comparés.
+                </p>
+              )}
             </div>
             <button onClick={creerLesBons} disabled={creation}
               className="min-h-[48px] rounded-lg bg-zinc-900 px-5 text-sm font-bold text-white disabled:opacity-40">
@@ -199,7 +226,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
               titre={e.etablissement ?? '⚠️ Non rattaché à un point de vente'}
               sous={`${e.lignes.length} référence(s)${e.aCommander ? ` · ${e.aCommander} à commander` : ''}`}
               cout={e.cout}>
-              {e.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} />)}
+              {e.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} auMoinsCher={auMoinsCher} />)}
             </Bloc>
           ))
         : vue === 'categories'
@@ -207,7 +234,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
             <Bloc key={c.categorie} titre={c.categorie}
               sous={`${c.lignes.length} référence(s)${c.aCommander ? ` · ${c.aCommander} à commander` : ''}`}
               cout={c.cout}>
-              {c.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} />)}
+              {c.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} auMoinsCher={auMoinsCher} />)}
             </Bloc>
           ))
         : fours.map(f => (
@@ -215,7 +242,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
               titre={f.fournisseur ?? '⚠️ Sans fournisseur connu'}
               sous={`${f.lignes.length} ligne(s) à commander${f.sansPrix ? ` · ${f.sansPrix} sans prix` : ''}`}
               cout={f.cout}>
-              {f.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} />)}
+              {f.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} auMoinsCher={auMoinsCher} />)}
             </Bloc>
           ))}
 
@@ -229,11 +256,12 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
 }
 
 function Ligne({
-  l, brouillon, saisir,
+  l, brouillon, saisir, auMoinsCher,
 }: {
   l: LigneReassort
   brouillon?: { seuil: string; cible: string }
   saisir: (cle: string, champ: 'seuil' | 'cible', v: string) => void
+  auMoinsCher: boolean
 }) {
   const e = etat(l)
   const q = aCommander(l)
@@ -259,9 +287,14 @@ function Ligne({
               un délai, un minimum de commande et une relation — ce n'est pas
               l'effet de bord d'un écran. Mais se taire ferait recommander au
               prix fort avec l'écart sous les yeux. */}
+          {/* ⚠️ Quand la commande bascule, la ligne doit dire OÙ ELLE PART.
+              Afficher encore le fournisseur habituel ferait croire que le
+              bon va chez lui, et l'écart se découvrirait à la livraison. */}
           {l.ailleurs && (
             <span className="ml-1 font-medium text-violet-700">
-              💡 −{Math.round(l.ailleurs.ecartPct)} % chez {l.ailleurs.fournisseur}
+              {auMoinsCher && l.ailleurs.fournisseur_id !== l.fournisseur_id
+                ? <>→ part chez {l.ailleurs.fournisseur} (−{Math.round(l.ailleurs.ecartPct)} %)</>
+                : <>💡 −{Math.round(l.ailleurs.ecartPct)} % chez {l.ailleurs.fournisseur}</>}
             </span>
           )}
           {/* ⚠️ « jamais compté » ≠ « zéro » : le premier dit que personne

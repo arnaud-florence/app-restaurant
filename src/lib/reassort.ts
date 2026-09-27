@@ -50,7 +50,7 @@ export type LigneReassort = {
    * concordent. Calculé par `comparer()`, jamais par un min/max brut :
    * opposer un colis à une pièce annonce « −97 % » sur des serviettes.
    */
-  ailleurs?: { fournisseur: string; ecartPct: number } | null
+  ailleurs?: { fournisseur_id: string; fournisseur: string; ecartPct: number } | null
 }
 
 /**
@@ -316,23 +316,88 @@ export function parEtablissement(lignes: LigneReassort[]): Array<{
 }
 
 /**
+ * CHEZ QUI CETTE LIGNE PART — règle du gérant : ON COMMANDE AU MOINS CHER.
+ *
+ * ⚠️ Mais seulement quand la comparaison TIENT. `ailleurs` n'est posé que
+ * sur un groupe rendu comparable par `comparer()` : deux fournisseurs
+ * distincts, des unités ramenées à la même base, un écart d'au moins 10 %.
+ * Là où la comparaison n'existe pas, il n'y a pas de « moins cher » à
+ * choisir — on garde celui chez qui on achète, faute de mieux, et ce n'est
+ * pas un arbitrage, c'est une absence d'information.
+ */
+export function fournisseurRetenu(
+  l: LigneReassort,
+  auMoinsCher: boolean,
+): { id: string; nom: string; bascule: boolean } | null {
+  if (auMoinsCher && l.ailleurs && l.ailleurs.fournisseur_id !== l.fournisseur_id) {
+    return { id: l.ailleurs.fournisseur_id, nom: l.ailleurs.fournisseur, bascule: true }
+  }
+  if (!l.fournisseur_id || !l.fournisseur) return null
+  return { id: l.fournisseur_id, nom: l.fournisseur, bascule: false }
+}
+
+/**
  * Ce qu'il faut commander, prêt à devenir des bons de commande.
  *
  * ⚠️ Une ligne SANS FOURNISSEUR CONNU est écartée et COMPTÉE à part : on
  * ne peut pas écrire un bon à personne. La taire ferait croire la commande
  * complète alors qu'il en manque un morceau.
+ *
+ * ⚠️⚠️ QUAND ON BASCULE CHEZ LE MOINS CHER, LE PRIX DEVIENT INCONNU.
+ * Notre coût est celui de NOTRE unité d'achat ; le prix du concurrent est
+ * celui de SON conditionnement. Les convertir de tête écrirait un faux
+ * prix sur un document qui engage de l'argent — et un faux prix ne se
+ * signale pas, il se découvre à la facture. `prix_unitaire_ht` passe donc
+ * à NULL, jamais à zéro, et le bon annonce combien de lignes sont dans ce
+ * cas : c'est au fournisseur de confirmer son tarif, ce qu'il fait de
+ * toute façon sur une première commande.
  */
-export function lignesCommandables(lignes: LigneReassort[]): {
-  prets: Array<LigneReassort & { quantite: number }>
+export function lignesCommandables(lignes: LigneReassort[], auMoinsCher = false): {
+  prets: Array<LigneReassort & {
+    quantite: number
+    retenu: { id: string; nom: string; bascule: boolean }
+    prix: number | null
+  }>
   sansFournisseur: LigneReassort[]
+  /** Lignes qui changent de fournisseur, et l'écart annoncé par le catalogue. */
+  bascules: Array<{ nom: string; de: string | null; vers: string; ecartPct: number }>
 } {
-  const prets: Array<LigneReassort & { quantite: number }> = []
+  const prets: Array<LigneReassort & {
+    quantite: number
+    retenu: { id: string; nom: string; bascule: boolean }
+    prix: number | null
+  }> = []
   const sansFournisseur: LigneReassort[] = []
+  const bascules: Array<{ nom: string; de: string | null; vers: string; ecartPct: number }> = []
+
   for (const l of lignes) {
     const q = aCommander(l)
     if (q <= 0) continue
-    if (!l.fournisseur_id) { sansFournisseur.push(l); continue }
-    prets.push({ ...l, quantite: q })
+    const retenu = fournisseurRetenu(l, auMoinsCher)
+    if (!retenu) { sansFournisseur.push(l); continue }
+    if (retenu.bascule && l.ailleurs) {
+      bascules.push({ nom: l.nom, de: l.fournisseur, vers: retenu.nom, ecartPct: l.ailleurs.ecartPct })
+    }
+    prets.push({ ...l, quantite: q, retenu, prix: retenu.bascule ? null : l.cout_unitaire_ht })
   }
-  return { prets, sansFournisseur }
+  return { prets, sansFournisseur, bascules }
+}
+
+/**
+ * Ce que la bascule fait GAGNER, d'après les tarifs comparés.
+ *
+ * ⚠️ C'est une ESTIMATION issue du catalogue, pas un prix négocié : elle
+ * se présente comme telle. Un écart en pourcentage ne décide de rien tant
+ * qu'il n'est pas multiplié par les quantités réelles — c'est ce que fait
+ * ce calcul, et c'est pour ça qu'il vaut mieux que le pourcentage seul.
+ */
+export function economieEstimee(
+  prets: Array<{ quantite: number; cout_unitaire_ht: number | null; retenu: { bascule: boolean }; ailleurs?: LigneReassort['ailleurs'] }>,
+): number {
+  let t = 0
+  for (const l of prets) {
+    if (!l.retenu.bascule || l.cout_unitaire_ht == null || !l.ailleurs) continue
+    t += l.quantite * l.cout_unitaire_ht * (l.ailleurs.ecartPct / 100)
+  }
+  return Math.round(t * 100) / 100
 }

@@ -2544,8 +2544,9 @@ interlocuteur se découvre à la livraison.
 ✅ **Le premier bon de commande de l'histoire de l'outil a été généré** dans
 la foulée : 10 kg de beurre doux chez Gineys, 80,49 € HT, en brouillon.
 
-⚠️ **LE BON PART CHEZ LE FOURNISSEUR HABITUEL, PAS CHEZ LE MOINS CHER**, et
-c'est délibéré : changer de fournisseur engage des délais, un minimum de
+⚠️ **PÉRIMÉ — le gérant a tranché l'inverse le 27/09/2026 : on commande au
+moins cher** (voir « Réassort »). Le paragraphe qui suit décrit l'ancien
+comportement de l'agent Stock, qui n'a pas encore suivi. Il disait : changer de fournisseur engage des délais, un minimum de
 commande, une qualité et une relation — ce n'est pas l'effet de bord d'un
 agent qui tourne toutes les deux heures. Mais se taire serait pire : on
 recommanderait au prix fort avec l'écart sous les yeux. Le bon porte donc la
@@ -2808,10 +2809,47 @@ tout le bar), Promocash 63,15 € (13)**, soit **1 608,92 € commandables**. Le
 68 restantes sont surtout les 52 ingrédients pizza/brasserie, jamais achetés
 une seule fois.
 
-⚠️ **Aucun bon FÉLIX POTIN, et c'est correct** : ils n'ont envoyé qu'un DEVIS,
-on n'y a jamais rien acheté. Le bon part chez le fournisseur HABITUEL et
-l'écart est SIGNALÉ (💡 −30 %) — changer de fournisseur engage un délai, un
-minimum de commande et une relation, ce n'est pas l'effet de bord d'un écran.
+**⚠️⚠️ CORRECTION D'UNE RÈGLE QUE LE PROJET S'ÉTAIT DONNÉE À TORT
+(27/09/2026).** Ce fichier affirmait : « LE BON PART CHEZ LE FOURNISSEUR
+HABITUEL, PAS CHEZ LE MOINS CHER ». **Le gérant a tranché l'inverse : on
+commande au moins cher.** C'était une prudence d'ingénieur, pas une décision
+de gestion — et elle produisait un résultat absurde : Félix Potin est moins
+cher sur 17 matières, et n'avait **aucun bon**.
+
+`fournisseurRetenu()` porte la règle, **active par défaut**. Interrupteur
+« Commander au moins cher » sur l'écran, pour le cas inverse (ne pas ouvrir
+un compte pour une ligne).
+
+Effet immédiat : **3 fournisseurs → 5**, Félix Potin (12 lignes) et La Frite
+Belge (1) entrent, **13 lignes changent de fournisseur, ≈ 48,55 € économisés**
+sur cette commande.
+
+⚠️ **On ne bascule QUE là où la comparaison TIENT** : `ailleurs` n'est posé
+que sur un groupe rendu comparable par `comparer()` — deux fournisseurs
+distincts, unités ramenées à la même base, écart ≥ 10 %. Ailleurs il n'y a
+pas de « moins cher » à choisir, il y a une absence d'information.
+
+⚠️⚠️ **UNE LIGNE QUI BASCULE PART SANS PRIX.** Notre coût est celui de NOTRE
+conditionnement (barquette 500 g), le leur est celui du sien (seau 4,65 kg) :
+les convertir de tête écrirait un faux prix sur un document qui engage de
+l'argent — et un faux prix ne se signale pas, il se découvre à la facture.
+`prix_unitaire_ht` passe à NULL, jamais à zéro.
+
+⚠️⚠️ **ET LE TOTAL DU BON AUSSI.** Sommer des NULL donnait **0,00 €** sur le
+bon Félix Potin de 12 lignes — un zéro se lit « gratuit », exactement la faute
+de `statutFoodCost(0)` (0150) et du tableau d'allergènes vide (0138).
+`montant_total_ht` reste NULL et l'écran affiche « tarif à confirmer ».
+
+⚠️ L'économie est annoncée **en euros, pas en pourcentage** (quantité × coût ×
+écart) : un pourcentage ne décide de rien tant qu'il n'est pas multiplié par
+les quantités réelles. Et elle est présentée comme une **estimation d'après
+les tarifs comparés**, pas comme un prix négocié.
+
+⚠️ On ne « bascule » pas vers celui chez qui on est déjà : le cas est testé.
+
+**Reste à trancher avec le gérant** : un minimum de commande peut rendre une
+ligne unique chez un nouveau fournisseur plus chère que l'économie — le bon
+La Frite Belge ne porte qu'un ketchup.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 

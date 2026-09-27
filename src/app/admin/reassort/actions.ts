@@ -118,8 +118,17 @@ export async function creerBonsDepuisReassort(input: z.infer<typeof SchemaBons>)
       throw new Error(e2.message)
     }
 
-    const total = payload.reduce((a, l) => a + (l.prix_unitaire_ht ?? 0) * l.quantite_commandee, 0)
-    await sb.from('bons_commande').update({ montant_total_ht: Number(total.toFixed(2)) }).eq('id', bon.id)
+    // ⚠️⚠️ UN TOTAL À ZÉRO SE LIT « GRATUIT ». Quand la commande bascule
+    // chez le moins cher, aucune ligne ne porte de prix — notre
+    // conditionnement n'est pas le leur. Sommer des NULL donnerait 0,00 €
+    // sur un bon de 12 lignes, et un zéro affiché est cru : c'est la faute
+    // de `statutFoodCost(0)` (0150) et du tableau d'allergènes vide (0138).
+    // Un montant inconnu reste NULL, et l'écran dit « tarif à confirmer ».
+    const connus = payload.filter(l => l.prix_unitaire_ht != null)
+    const total = connus.length
+      ? Number(connus.reduce((a, l) => a + (l.prix_unitaire_ht ?? 0) * l.quantite_commandee, 0).toFixed(2))
+      : null
+    await sb.from('bons_commande').update({ montant_total_ht: total }).eq('id', bon.id)
 
     crees.push({
       fournisseur_id, bon_id: bon.id, lignes: payload.length,

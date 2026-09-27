@@ -108,15 +108,32 @@ const parEtablissement = (lignes) => {
     cout: ls.reduce((a, l) => a + (coutReassort(l) ?? 0), 0),
   })).sort((a, b) => (a.etablissement === null ? 1 : b.etablissement === null ? -1 : b.cout - a.cout))
 }
-const lignesCommandables = (lignes) => {
-  const prets = [], sansFournisseur = []
+const fournisseurRetenu = (l, auMoinsCher) => {
+  if (auMoinsCher && l.ailleurs && l.ailleurs.fournisseur_id !== l.fournisseur_id)
+    return { id: l.ailleurs.fournisseur_id, nom: l.ailleurs.fournisseur, bascule: true }
+  if (!l.fournisseur_id || !l.fournisseur) return null
+  return { id: l.fournisseur_id, nom: l.fournisseur, bascule: false }
+}
+const lignesCommandables = (lignes, auMoinsCher = false) => {
+  const prets = [], sansFournisseur = [], bascules = []
   for (const l of lignes) {
     const q = aCommander(l)
     if (q <= 0) continue
-    if (!l.fournisseur_id) { sansFournisseur.push(l); continue }
-    prets.push({ ...l, quantite: q })
+    const retenu = fournisseurRetenu(l, auMoinsCher)
+    if (!retenu) { sansFournisseur.push(l); continue }
+    if (retenu.bascule && l.ailleurs)
+      bascules.push({ nom: l.nom, de: l.fournisseur, vers: retenu.nom, ecartPct: l.ailleurs.ecartPct })
+    prets.push({ ...l, quantite: q, retenu, prix: retenu.bascule ? null : l.cout_unitaire_ht })
   }
-  return { prets, sansFournisseur }
+  return { prets, sansFournisseur, bascules }
+}
+const economieEstimee = (prets) => {
+  let t = 0
+  for (const l of prets) {
+    if (!l.retenu.bascule || l.cout_unitaire_ht == null || !l.ailleurs) continue
+    t += l.quantite * l.cout_unitaire_ht * (l.ailleurs.ecartPct / 100)
+  }
+  return Math.round(t * 100) / 100
 }
 
 const L = (o) => ({
@@ -126,6 +143,7 @@ const L = (o) => ({
   seuil: o.seuil ?? null, cible: o.cible ?? null,
   cout_unitaire_ht: o.cout === undefined ? 10 : o.cout,
   fournisseur: o.f ?? null, fournisseur_id: o.fid ?? null,
+  ailleurs: o.ailleurs ?? null,
 })
 
 console.log('\n── Par établissement ──')
@@ -170,6 +188,49 @@ console.log('\n── Le préfixe décide de la colonne visée ──')
   t('une matière ne vise PAS recette_id', viser('ing:abc').recette_id === null)
   t('un produit vise recette_id', viser('abc').recette_id === 'abc')
   t('un produit ne vise PAS ingredient_id', viser('abc').ingredient_id === null)
+}
+
+console.log('\n── ON COMMANDE AU MOINS CHER (règle du gérant) ──')
+{
+  const moinsCher = { fournisseur_id: 'f2', fournisseur: 'Félix Potin', ecartPct: 30 }
+  const lignes = [
+    L({ cle: 'a', nom: 'Beurre', cible: 2, fid: 'f1', f: 'Gineys', cout: 8, ailleurs: moinsCher }),
+    L({ cle: 'b', nom: 'Huile', cible: 1, fid: 'f1', f: 'Gineys', cout: 4 }),
+  ]
+  const habituel = lignesCommandables(lignes, false)
+  const cher = lignesCommandables(lignes, true)
+
+  t('sans la règle, tout part chez l’habituel',
+    habituel.prets.every(l => l.retenu.id === 'f1') && habituel.bascules.length === 0)
+  t('⚠️ avec la règle, la ligne part chez le MOINS CHER',
+    cher.prets.find(l => l.cle === 'a').retenu.id === 'f2')
+  t('la bascule est TRACÉE, pas silencieuse',
+    cher.bascules.length === 1 && cher.bascules[0].vers === 'Félix Potin')
+  t('une ligne sans comparaison reste chez l’habituel — il n’y a pas de moins cher à choisir',
+    cher.prets.find(l => l.cle === 'b').retenu.id === 'f1')
+  t('⚠️⚠️ une ligne qui bascule part SANS PRIX — notre conditionnement n’est pas le leur',
+    cher.prets.find(l => l.cle === 'a').prix === null)
+  t('⚠️ et surtout pas à ZÉRO : un zéro sous-estimerait le total du bon',
+    cher.prets.find(l => l.cle === 'a').prix !== 0)
+  t('la ligne qui ne bascule pas garde son prix connu',
+    cher.prets.find(l => l.cle === 'b').prix === 4)
+  t('l’économie se chiffre en EUROS, pas en pourcentage — 2 × 8 € × 30 %',
+    economieEstimee(cher.prets) === 4.8)
+  t('sans bascule, aucune économie annoncée', economieEstimee(habituel.prets) === 0)
+
+  // ⚠️ Le cas qui compte : le « moins cher » EST déjà notre fournisseur.
+  const deja = lignesCommandables([
+    L({ cle: 'c', cible: 1, fid: 'f1', f: 'Gineys',
+        ailleurs: { fournisseur_id: 'f1', fournisseur: 'Gineys', ecartPct: 20 } })], true)
+  t('on ne « bascule » pas vers celui chez qui on est déjà',
+    deja.bascules.length === 0 && deja.prets[0].retenu.bascule === false)
+  t('et cette ligne garde donc son prix', deja.prets[0].prix === 10)
+
+  // ⚠️ Un moins cher sans fournisseur habituel doit quand même partir.
+  const orphelin = lignesCommandables([
+    L({ cle: 'd', cible: 1, fid: null, f: null, ailleurs: moinsCher })], true)
+  t('une ligne sans habituel mais avec un moins cher devient commandable',
+    orphelin.prets.length === 1 && orphelin.sansFournisseur.length === 0)
 }
 
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)

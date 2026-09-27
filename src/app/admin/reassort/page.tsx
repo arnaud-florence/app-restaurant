@@ -96,7 +96,7 @@ export default async function ReassortPage() {
     colis_quantite: c.colis_quantite === null ? null : Number(c.colis_quantite),
     contenance_valeur: c.contenance_valeur === null ? null : Number(c.contenance_valeur),
   }))
-  const meilleurPour = new Map<string, { fournisseur: string; ecartPct: number }>()
+  const meilleurPour = new Map<string, { fournisseur_id: string; fournisseur: string; ecartPct: number }>()
   for (const g of comparer(pourComparer)) {
     // Deux fournisseurs distincts, des unités qui concordent, et un écart
     // qui vaut la peine d'être dit. Sous 10 %, c'est du bruit d'emballage.
@@ -107,7 +107,7 @@ export default async function ReassortPage() {
     if (!nom) continue
     for (const l of g.lignes) {
       for (const cible of [l.ingredient_id, l.recette_id]) {
-        if (cible) meilleurPour.set(cible, { fournisseur: nom, ecartPct: g.ecartPct })
+        if (cible) meilleurPour.set(cible, { fournisseur_id: best.fournisseur_id, fournisseur: nom, ecartPct: g.ecartPct })
       }
     }
   }
