@@ -2556,11 +2556,47 @@ contrôle croisé — l'agent retrouve EXACTEMENT les écarts relevés à la mai
 kebab −27 %, olives −26 %, serrano −22 %) et ne signale **pas** l'huile
 d'olive ni l'emmental, moins chers chez Gineys.
 
-⚠️ **La surface de comparaison est petite, et c'est le vrai frein** :
-178 lignes sur 3 303 portent une `cle_comparaison`, soit **15 clés** qui
-confrontent deux fournisseurs. Elle se pose à la main dans
+**Les correspondances manquantes posées (27/09/2026).**
+`node scripts/correspondances-tarifs.mjs [--ecrire]` — **14 paires**, chacune
+examinée à la main, chacune avec sa RAISON écrite dans le fichier. La liste
+des paires **ÉCARTÉES** y figure aussi, avec son motif : sans ça, dans six
+mois, on ne saura plus si une paire absente est un oubli ou une décision.
+
+Écartées, et il faut que ça le reste : un mini-croissant de 25 g n'est pas
+notre 70 g ; une crème à 15 % allégée n'est pas une 30 % épaisse ; un filet
+de poulet **cru IQF** n'est pas notre filet **rôti tranché** — le travail
+diffère, exactement comme « JAMBON CUIT SUP AC 8K » face au jambon tranché.
+Et trois sauces burger chez La Frite Belge : rien ne dit laquelle vaut notre
+« suprême ».
+
+⚠️ **La Frite Belge portait 52 tarifs et AUCUN rattachement** — invisible du
+comparateur depuis son import. Ses contenances sont en kilos au catalogue,
+donc tout se ramène au kilo sans rien deviner. Deux formats retenus par
+sauce : le tube, qui est notre usage actuel, et le gros contenant, qui est
+l'économie réelle — l'écran montre alors ce que le format coûte.
+
+⚠️⚠️ **`'CONTENANT'` MANQUAIT DANS `CONTENANTS`** (`lib/tarifs-fournisseurs.ts`).
+C'est pourtant le mot que nos propres imports écrivent pour tout ce qui n'est
+ni kg, ni litre, ni pièce, ni colis. Conséquence : une ligne ainsi marquée
+sans contenance stockée rendait `prixReference()` nul, donc **tout son groupe
+incomparable**, et le comparateur se taisait. Le miel Gineys (« BTE=1KG »,
+8,454 €) ne se confrontait pas au miel Félix Potin à 4,674 €/kg — **45 %
+d'écart passés sous silence**. Encore une troncature qui ne lève aucune
+erreur.
+
+**Résultat : 7 économies → 12.** Les nouvelles : miel 45 %, sel fin 38 %
+(moins cher chez Gineys que chez Promocash), poivre noir 31 %, jambon blanc
+tranché 28 %, sauce pizza 20 %.
+
+⚠️ **La surface de comparaison reste le vrai frein** : environ 190 lignes sur
+3 303 portent une `cle_comparaison`. Elle se pose à la main dans
 `/admin/tarifs-fournisseurs` — jamais déduite (0151). Chaque clé posée est
 un face-à-face de plus.
+
+⚠️ **Le ketchup ne sort PAS, et c'est juste** : notre Saxo à 3,019 €/kg contre
+le seau La Frite Belge à 2,75 € fait 8,9 %, sous le seuil de 10 %. Le chiffre
+de « −12 % » noté plus haut comparait des prix de contenant sans ramener au
+kilo.
 
 ⚠️ La pagination est indispensable ici aussi : sans elle l'agent comparerait
 1 000 lignes sur 3 303 et annoncerait un « moins cher » choisi dedans.

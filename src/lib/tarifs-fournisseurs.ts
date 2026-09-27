@@ -65,7 +65,14 @@ const UNITES_REF: Record<string, UniteRef> = {
 }
 
 /** Conditionnements : une unité facturée = un contenant, pas un poids. */
-const CONTENANTS = new Set(['BA', 'SA', 'BT', 'SO', 'CO', 'PO', 'CT', 'BQ'])
+// ⚠️ « CONTENANT » est le mot que nos propres imports écrivent pour tout ce
+// qui n'est ni kg, ni litre, ni pièce, ni colis (`catalogue-depuis-factures`,
+// portail Gineys). Il MANQUAIT ici : une ligne ainsi marquée sans contenance
+// stockée rendait `prixReference()` nul, donc tout son groupe incomparable —
+// et le comparateur se taisait. Le miel Gineys (« BTE=1KG », 8,454 €) ne se
+// confrontait pas au miel Félix Potin à 4,674 €/kg, soit 45 % d'écart passés
+// sous silence. Une troncature de plus qui ne lève aucune erreur.
+const CONTENANTS = new Set(['BA', 'SA', 'BT', 'SO', 'CO', 'PO', 'CT', 'BQ', 'CONTENANT'])
 
 const norm = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
