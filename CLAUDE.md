@@ -163,8 +163,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Demander une remise | et savoir qu'on l'a déjà demandée | 0159 |
 | Bon de commande envoyable | il ne partait rien, et une ligne ne portait qu'un ingrédient | 0160 |
 | Promotions fournisseurs | offres conditionnelles ET datées | 0161 |
+| Tarif de catalogue | le prix PUBLIC, en face du nôtre | 0162 |
 
-**Migrations actuelles : 0001 → 0161.**
+**Migrations actuelles : 0001 → 0162.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2603,7 +2604,7 @@ kilo.
 1 000 lignes sur 3 303 et annoncerait un « moins cher » choisi dedans.
 
 Test : `PORT=3000 node scripts/test-achats.mjs` couvre les trois filtres et
-vérifie le contrôle croisé — 56 assertions.
+vérifie le contrôle croisé — 57 assertions.
 
 Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 ⚠️ Il RECOPIE les règles depuis le TS, et n'envoie AUCUN e-mail.
@@ -2777,6 +2778,61 @@ ligne est facturée au kilo) mais elle aurait faussé toute contenance
 dérivée. Même chose sur la farine de pois chiches, 4 kg au catalogue contre
 5 kg chez nous.
 
+**Le tarif PUBLIC d'Arti'Pat, en face du nôtre (0162).**
+`node scripts/importer-catalogue-artipat.mjs [--ecrire]` — 478 fiches lues,
+chacune CONTRÔLÉE (prix au carton ÷ nombre de pièces doit retomber sur le
+prix pièce imprimé ; 7 écartées pour incohérence).
+
+⚠️ **ARTI'PAT EST UNE MARQUE, PAS UN FOURNISSEUR** : ces lignes sont
+rattachées à **Gineys**, comme Lavazza l'a été à France Boissons et Pauwels
+à La Frite Belge.
+
+✅✅ **CE QUE LA COMPARAISON A RÉVÉLÉ, ET QUI CHANGE LA LECTURE DU PORTAIL.**
+Sur 445 références comparables :
+
+| | remise moyenne |
+|---|---|
+| 41 articles **que nous achetons** | **22,0 %** |
+| 404 autres du catalogue portail | **0,3 %** |
+
+Autrement dit : **le portail n'applique notre tarif négocié qu'aux articles
+de notre contrat ; tout le reste s'affiche au prix public**, au centime
+près. On ne pouvait pas le savoir sans ce catalogue — et ça confirme au
+passage les 20 à 30 % documentés depuis août.
+
+Deux conséquences, toutes deux appliquées :
+
+1. **on n'importe PAS une ligne de catalogue déjà au prix du portail** — 389
+   écartées sur 478. Elles n'ajouteraient qu'un doublon au centime près, et
+   400 doublons rendent l'écran illisible. Restent 89 lignes qui, elles,
+   disent quelque chose ;
+2. **388 références du portail passent de « remise inconnue » à « tarif
+   public confirmé »** — c'est le seul cas où `tarif_negocie = false` est
+   une affirmation qu'on peut tenir, puisqu'elle est MESURÉE contre un prix
+   imprimé. ⚠️ Seulement celles-là : généraliser aux 2 400 autres serait une
+   déduction, pas un constat.
+
+⚠️ Une référence payée AU-DESSUS du tarif public (11 cas, tous à −2 à −5 %)
+signale un mauvais rapprochement ou une hausse, pas une affaire. Les éclairs
+sont concernés — à vérifier sur la prochaine facture.
+
+⚠️ La contenance d'une ligne de catalogue est un NOMBRE DE PIÈCES, jamais le
+poids imprimé : « Poids : 280 g » est le poids d'UNE baguette, pas celui du
+carton. Le confondre donnerait un prix au kilo trente fois trop élevé.
+
+⚠️ `date_tarif` porte le **millésime du catalogue** (2026-01-01), pas la date
+du jour : c'est lui qui permettra de comparer avec l'édition suivante.
+
+⚠️⚠️ **PAGINER SANS TRI STABLE SAUTE ET DUPLIQUE DES LIGNES**, et c'est ce
+qui a failli fausser tout ce chantier. Deux exécutions du même import
+donnaient des remises différentes — 44 % puis 30 % sur les mêmes produits —
+parce que `range(0,999)` puis `range(1000,1999)` sans `order by` ne
+promettent aucun ordre : des lignes reviennent deux fois, d'autres jamais.
+Aucune erreur, un résultat plausible, et DIFFÉRENT à chaque fois : le pire
+des trois cas. Le tri doit porter sur une colonne **UNIQUE** (`id`) —
+`designation` ne suffit pas, les ex æquo se réordonnent. Corrigé partout :
+`lib/supabase/pagine.ts`, les deux écrans, l'agent Stock et les scripts.
+
 ⚠️ Les PDF vivent dans `~/Downloads` et **ne sont pas copiés dans le dépôt**
 (760 Mo, documents commerciaux de tiers). `data/catalogues/` est gitignoré
 pour le jour où on les y rangera. L'extraction, elle, est en base : le
@@ -2948,7 +3004,7 @@ deux appels identiques rendent la même réponse, même si la page a changé
 entre-temps. Une heure perdue à croire que les clics ne passaient pas, alors
 qu'ils passaient tous. `get_page_text` et les captures, eux, sont frais.
 
-Test : `PORT=3000 node scripts/test-achats.mjs` — 56 assertions. ⚠️ Il
+Test : `PORT=3000 node scripts/test-achats.mjs` — 57 assertions. ⚠️ Il
 RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
 que la page est **fermée aux appels anonymes** : elle expose des conditions
 négociées.

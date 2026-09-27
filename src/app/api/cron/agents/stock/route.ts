@@ -305,6 +305,10 @@ async function comparerPrixFournisseurs(
       .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature, achete')
       .eq('actif', true)
       .not('cle_comparaison', 'is', null)
+      // ⚠️ Tri sur une colonne UNIQUE : sans lui la pagination saute et
+      // duplique des lignes, et le « moins cher » change d'un passage à
+      // l'autre sans qu'aucune erreur ne le signale.
+      .order('id')
       .range(de, de + 999)
     const lot = data ?? []
     for (const l of lot) {

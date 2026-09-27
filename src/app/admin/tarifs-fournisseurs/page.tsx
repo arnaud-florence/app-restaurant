@@ -24,7 +24,7 @@ export default async function TarifsFournisseursPage() {
   const [tarifs, { data: fournisseurs }, { data: matieres }] = await Promise.all([
     lireTout<Record<string, unknown>>(() => sb.from('catalogue_fournisseur')
       .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature, remise_pct, tarif_negocie, achete')
-      .eq('actif', true).order('famille').order('designation')),
+      .eq('actif', true).order('famille').order('designation').order('id')),   // ⚠️ `id` en dernier : sans colonne UNIQUE au tri, la pagination saute des lignes
     sb.from('fournisseurs').select('id, nom').order('nom'),
     // Nos matières réellement comptées : ce sont elles qu'on rachète, donc
     // les seules pour lesquelles un tarif concurrent a un sens.

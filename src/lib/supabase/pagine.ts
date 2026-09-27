@@ -13,6 +13,23 @@
 /** Taille d'une page. Sous le plafond de PostgREST, volontairement. */
 const PAGE = 1000
 
+/**
+ * ⚠️⚠️ PAGINER SANS TRI STABLE SAUTE ET DUPLIQUE DES LIGNES.
+ *
+ * Sans `order by`, PostgreSQL ne promet aucun ordre : deux appels
+ * `range(0,999)` et `range(1000,1999)` peuvent renvoyer des lignes
+ * communes et en oublier d'autres. Mesuré le 27/09/2026 : deux
+ * exécutions du même import Arti'Pat donnaient des remises différentes
+ * (44 % puis 30 % sur les mêmes produits), parce que la table des prix
+ * du portail n'était pas la même d'un run à l'autre.
+ *
+ * Et ça ne lève aucune erreur — on obtient un résultat plausible, faux,
+ * et DIFFÉRENT à chaque fois. C'est le pire des trois.
+ *
+ * ⚠️ Le tri doit porter sur une colonne UNIQUE (`id`) : trier sur
+ * `designation` ne suffit pas, les ex æquo peuvent se réordonner.
+ */
+
 type Requete<T> = {
   range: (de: number, a: number) => PromiseLike<{ data: T[] | null; error: unknown }>
 }
@@ -27,6 +44,8 @@ type Requete<T> = {
  * ⚠️ `construire` doit rendre une requête NEUVE à chaque appel : un builder
  * Supabase déjà exécuté ne se rejoue pas, et le réutiliser rendrait la même
  * page indéfiniment — une boucle infinie qui ressemble à une lenteur.
+ *
+ * ⚠️ ET ELLE DOIT PORTER UN `.order('id')` : voir ci-dessus.
  */
 export async function lireTout<T>(
   construire: () => Requete<T>,

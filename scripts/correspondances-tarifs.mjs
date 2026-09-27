@@ -79,7 +79,7 @@ const ECARTEES = [
 // millième rang. Le catalogue en compte plus de 3 300.
 const lignes = []
 for (let de = 0; de < 20000; de += 1000) {
-  const lot = await sb(`catalogue_fournisseur?select=id,designation,cle_comparaison,fournisseur_id,prix_ht,unite&actif=eq.true&cle_comparaison=is.null&offset=${de}&limit=1000`)
+  const lot = await sb(`catalogue_fournisseur?select=id,designation,cle_comparaison,fournisseur_id,prix_ht,unite&actif=eq.true&cle_comparaison=is.null&order=id&offset=${de}&limit=1000`)
   lignes.push(...lot)
   if (lot.length < 1000) break
 }

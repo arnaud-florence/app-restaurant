@@ -161,7 +161,7 @@ const sb = async (p, o = {}) => {
 }
 const lignes = []
 for (let de = 0; de < 20000; de += 1000) {
-  const lot = await sb(`catalogue_fournisseur?select=id,reference,designation,famille&actif=eq.true&offset=${de}&limit=1000`)
+  const lot = await sb(`catalogue_fournisseur?select=id,reference,designation,famille&actif=eq.true&order=id&offset=${de}&limit=1000`)
   lignes.push(...lot); if (lot.length < 1000) break
 }
 const parRef = new Map()

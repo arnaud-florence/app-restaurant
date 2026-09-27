@@ -25,7 +25,7 @@ export default async function AchatsPage() {
     lireTout<Record<string, unknown>>(() => sb.from('catalogue_fournisseur')
       .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, remise_pct, tarif_negocie, achete, remise_demandee_le, date_tarif, nature')
       .eq('actif', true)
-      .order('designation')),
+      .order('designation').order('id')),   // ⚠️ `id` en dernier : sans colonne UNIQUE au tri, la pagination saute des lignes
     sb.from('fournisseurs').select('id, nom, email, actif').order('nom'),
   ])
 

@@ -58,7 +58,7 @@ if (!gineys) { console.error('✗ Fournisseur Gineys introuvable.'); process.exi
 // ⚠️ Pagination : PostgREST plafonne à 1 000 lignes sans le dire.
 const lignes = []
 for (let de = 0; de < 20000; de += 1000) {
-  const lot = await sb(`catalogue_fournisseur?fournisseur_id=eq.${gineys.id}&select=id,reference,famille&offset=${de}&limit=1000`)
+  const lot = await sb(`catalogue_fournisseur?fournisseur_id=eq.${gineys.id}&select=id,reference,famille&order=id&offset=${de}&limit=1000`)
   lignes.push(...lot)
   if (lot.length < 1000) break
 }

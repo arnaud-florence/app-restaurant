@@ -140,8 +140,16 @@ t('⚠️ la lecture n’est pas tronquée à 1 000', portail.length > 1000)
 t('les 92 articles achetés sont marqués', portail.filter(x => x.achete).length === 92)
 t('ils portent tous un tarif négocié confirmé',
   portail.filter(x => x.achete).every(x => x.tarif_negocie === true))
-t('⚠️ le reste reste en remise INCONNUE, pas « public »',
-  portail.filter(x => !x.achete).every(x => x.tarif_negocie === null))
+// ⚠️ Assertion RÉVISÉE le 27/09/2026. Elle exigeait que tout le portail
+// non acheté reste NULL — c'était juste tant qu'on ne savait rien. Le
+// catalogue Arti'Pat a MESURÉ que 388 de ces références sont au tarif
+// public au centime près : « false » y est désormais un constat, pas une
+// supposition. Ce qui reste interdit, c'est `true` sans l'avoir acheté.
+t('⚠️ une ligne du portail non achetée n’est JAMAIS « remisée »',
+  portail.filter(x => !x.achete).every(x => x.tarif_negocie !== true))
+t('⚠️ et « tarif public » n’est posé que sur ce qui a été MESURÉ',
+  portail.filter(x => x.tarif_negocie === false).length > 0
+  && portail.filter(x => x.tarif_negocie === false).length < portail.filter(x => !x.achete).length)
 t('⚠️ aucun prix n’est à zéro',           portail.every(x => x.prix_ht === null || Number(x.prix_ht) > 0))
 t('les « prix sur demande » sont NULL',   portail.filter(x => x.prix_ht === null).length > 0)
 t('toutes les lignes ont une référence',  portail.every(x => x.reference && x.reference.length >= 5))
