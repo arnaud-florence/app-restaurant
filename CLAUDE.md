@@ -167,8 +167,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Tarif de catalogue | le prix PUBLIC, en face du nôtre | 0162 |
 | Seuils et cibles de stock | ce qu'il FAUT avoir, pas seulement ce qu'on a | 0163 |
 | Fournisseur d'un produit vendu | un croissant dit chez qui il s'achète | 0164 |
+| Prix estimé, dit comme tel | une hypothèse ne ressemble plus à un relevé | 0165 |
 
-**Migrations actuelles : 0001 → 0164.**
+**Migrations actuelles : 0001 → 0165.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -3506,6 +3507,81 @@ RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
 que la page est **fermée aux appels anonymes** : elle expose des conditions
 négociées.
 
+### Les devis rattachés aux matières — le fournisseur ET le prix (27/09/2026)
+
+51 matières n'avaient **aucun fournisseur attitré**, pendant que **285 lignes
+de devis** (Félix Potin 184, La Frite Belge 52, France Boissons 43, Gel Var 26)
+dormaient au catalogue sans être reliées à rien. Le fournisseur manquant les
+tenait hors des bons de commande ; le lien manquant tenait leur prix hors de
+toute comparaison.
+
+`node scripts/rattacher-devis-matieres.mjs [--ecrire]` — **24 paires**,
+chacune décidée à la main, chacune avec sa raison. Les **16 écartées** y
+figurent aussi, avec leur motif : sans elles, dans six mois, on ne saura plus
+si une paire absente est un oubli ou une décision.
+
+⚠️⚠️ **LE RAPPROCHEMENT AUTOMATIQUE A ÉTÉ ESSAYÉ, ET IL PRODUIT DES
+HORREURS.** La méthode « racine de cinq lettres, deux mots communs » — celle
+qui marchait pour Gel Var — donne ici :
+
+| Notre matière | Ce qu'elle « matche » à 100 % |
+|---|---|
+| **Roquette** | **ROQUEFORT** (même racine de cinq lettres) |
+| Citron | GATEAU CITRON ROND |
+| Glace (boule) | SUCRE GLACE 25KG |
+| Sauce burger maison | PAIN BURGER BRIOCHE MAISON |
+| Vinaigrette | CAPRE FINE **VINAIGRE** |
+| Pommes de terre en rondelles | GNOCCHIS POMME DE TERRE |
+
+Un fromage pour une salade, un gâteau pour un fruit. C'est la démonstration la
+plus nette de la règle posée par la 0151 : **rien n'est rapproché
+automatiquement**, la suggestion se calcule, la décision s'enregistre.
+
+⚠️ **ON N'ÉCRIT PAS `ingredients.prix_achat_ht`.** Un devis est une
+PROPOSITION, une facture est une PREUVE — et une assertion du test le
+verrouille. Le prix du devis vit dans `catalogue_fournisseur` et sert à
+COMPARER ; le coût de revient attend la première facture.
+
+⚠️ Un fragment de désignation qui vise **plusieurs lignes** fait REFUSER
+l'écriture : prendre la première écrirait le prix d'un autre produit.
+
+**Les distinctions qui ont décidé** — toutes du même genre, et toutes déjà
+posées par la 0151 (« JAMBON CUIT SUP AC 8K » face au jambon tranché) : le
+travail restant à faire change le produit.
+
+- retenu : `COPPA SEL SEC **TR**`, `JAMBON CUIT SUP DD 1/2 LUNE 40GX20T`,
+  `JAMBON CRU **PETALE**`, `CHEDDAR FONDU 12.3GX**84TR**` — tous tranchés ;
+- écarté : `CHORIZO **CULAR**` (pièce entière), `Crevette **entière**`,
+  `Calamar anneau **crispy**` (pané), `Oignons rouges **épluchés**` (≠
+  émincés), `CHAMPIGNON HOTEL **5/1**` (conserve), `Cheddar — **Tube 1 L**`
+  (une sauce, pas du fromage).
+
+**Résultat : 66 matières sur 93 ont un fournisseur attitré**, contre 42.
+Félix Potin passe de 12 à **31 lignes** dans les bons. Les 27 restantes n'ont
+aucun devis qui les couvre — c'est une question à poser aux commerciaux, pas
+une correspondance à forcer.
+
+⚠️⚠️ **CE RATTACHEMENT A EFFACÉ UN MARQUEUR, ET C'EST LA 0165.** Le fait
+qu'un prix soit une ESTIMATION vivait dans le texte libre
+`fournisseur_principal` (« ESTIMATION 21/09/2026 — à remplacer par la
+première facture »). En y écrivant le vrai fournisseur, **24 matières dont le
+prix est une hypothèse se sont mises à ressembler à des prix relevés** — la
+faute exacte que ce projet traque partout : une absence rendue comme une
+certitude.
+
+`ingredients.prix_estime` (0165) porte désormais l'information seule.
+⚠️ Son défaut est **`true`** : tant que personne n'a prouvé qu'un prix vient
+d'une facture, il est présumé estimé. Présumer l'inverse ferait passer pour
+mesuré tout prix saisi à la main. Un prix n'est promu « relevé » que s'il
+existe une ligne de FACTURE (avoirs exclus) ou une ligne de catalogue de
+nature facture : **38 relevés, 55 estimés** sur 93 matières.
+
+⚠️ Une assertion de `test-tarifs-fournisseurs.mjs` a été **révisée, pas
+forcée** : elle vérifiait que la ligne coppa n'était rattachée à RIEN — un
+raccourci qui tenait tant qu'aucune matière « coppa » n'existait. La règle
+(« la coppa n'est pas du serrano ») n'a pas bougé ; c'est sa mesure qui
+était devenue trop large.
+
 ### Tarifs fournisseurs — qui est le moins cher, et sur quoi (0151)
 
 `/admin/tarifs-fournisseurs`. L'outil savait ce qu'on **paie** — les factures
@@ -5411,6 +5487,7 @@ PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160
 node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
+node scripts/rattacher-devis-matieres.mjs      # devis → fournisseur attitré (essai à blanc)
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal

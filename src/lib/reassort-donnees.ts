@@ -27,7 +27,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, fournisseur_id, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
-      .select('id, nom, unite, prix_achat_ht, fournisseur_principal, stock_minimum, stock_cible')
+      .select('id, nom, unite, prix_achat_ht, prix_estime, fournisseur_principal, stock_minimum, stock_cible')
       .eq('actif', true).eq('stocke', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('inventaires')
       .select('cible_id, date_inventaire, quantite').order('date_inventaire', { ascending: false }).order('cible_id')),
@@ -205,7 +205,13 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       cible: m.stock_cible == null ? null : Number(m.stock_cible),
       cout_unitaire_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
       fournisseur: f.nom,
-      estime: f.estime,
+      // ⚠️ `prix_estime` (0165) est la SOURCE DE VÉRITÉ. Le marqueur vivait
+      // dans le texte libre `fournisseur_principal` (« ESTIMATION … ») et
+      // a été effacé le jour où on y a écrit le vrai fournisseur : 24
+      // matières dont le prix est une hypothèse se sont mises à ressembler
+      // à des prix relevés. Le repli sur le texte reste pour les lignes
+      // que la 0165 n'aurait pas couvertes.
+      estime: m.prix_estime === undefined ? f.estime : Boolean(m.prix_estime),
       // ⚠️ `fournisseur_principal` est une FICHE saisie à la main, pas une
       // preuve d'achat : la source est dite, pour qu'on sache quoi croire.
       source_fournisseur: f.nom ? ('fiche' as const) : null,

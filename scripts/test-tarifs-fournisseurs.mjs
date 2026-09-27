@@ -115,8 +115,19 @@ if (f) {
 
   // La coppa n'est pas du jambon serrano, les herbes de Provence ne sont pas
   // de l'origan : écartés à la main, ils doivent le rester.
+  //
+  // ⚠️ ASSERTION RÉVISÉE LE 27/09/2026, et la nuance compte. Elle
+  // vérifiait que la ligne coppa n'était rattachée à RIEN — un raccourci
+  // qui tenait tant qu'aucune matière « coppa » n'existait. Depuis le
+  // rattachement des devis, elle est rattachée à « Coppa tranchée », ce
+  // qui est JUSTE. La règle n'a pas changé : on teste maintenant ce
+  // qu'elle dit vraiment — la coppa ne doit pas pointer sur le SERRANO.
   const coppa = tarifs.find(t => t.reference === '115748')
-  T('la coppa n’est pas rapprochée au serrano', !coppa?.ingredient_id)
+  const serrano = coppa?.ingredient_id
+    ? (await sb(`ingredients?select=nom&id=eq.${coppa.ingredient_id}`))[0]
+    : null
+  T('la coppa n’est pas rapprochée au serrano',
+    !serrano || !/serrano/i.test(serrano.nom), serrano?.nom ?? '')
   const herbes = tarifs.find(t => t.reference === '180396')
   T('les herbes de Provence ne sont pas rapprochées à l’origan', !herbes?.ingredient_id)
 
