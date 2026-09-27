@@ -39,6 +39,8 @@ const K = env.SUPABASE_SERVICE_ROLE_KEY
 const ECRIRE = process.argv.includes('--ecrire')
 const FICHIER = 'data/tarif-eurocash-2026-09-23.csv'
 const DATE = '2026-09-26'
+/** Le jour où le fichier leur a été envoyé (`selection-eurocash.mjs`). */
+const DEMANDE_LE = '2026-09-23'
 
 if (!fs.existsSync(FICHIER)) {
   console.error(`✗ ${FICHIER} introuvable. Le tarif vit hors dépôt (conditions négociées).`)
@@ -63,7 +65,24 @@ function lire(chemin) {
 }
 
 const lignes = lire(FICHIER)
-const chiffrees = lignes.filter(l => euros(l['VOTRE PRIX HT']) != null)
+
+// ⚠️ Seules les lignes portant un VRAI code article sont des références :
+// le fichier se termine par une section « ce que nous achetons ailleurs »
+// dont les lignes n'ont pas de code, et par quelques en-têtes.
+const reelles = lignes.filter(l => /^\d{4,6}$/.test((l.Code ?? '').trim()))
+const chiffrees = reelles.filter(l => euros(l['VOTRE PRIX HT']) != null)
+
+// ⚠️⚠️ ON IMPORTE AUSSI CE QU'ILS N'ONT PAS CHIFFRÉ — avec `prix_ht` à
+// NULL, JAMAIS à zéro. Euro-Cash n'a répondu que sur 3 rayons sur 21 :
+// les vins (220), les bières (95), les eaux (53), les jus (67) et le reste
+// sont revenus vides. Les laisser dehors donnait l'impression qu'Euro-Cash
+// ne vend pas de vin, alors qu'il en propose 220 références — et le gérant
+// l'a signalé : « j'ai pas toutes les boissons ».
+//
+// ⚠️ NULL et non zéro : un zéro se lit « gratuit » et remonterait en tête
+// du comparateur, exactement la faute de `statutFoodCost(0)`. `prix_ht`
+// est nullable depuis la 0158 pour ce cas précis — « prix sur demande ».
+const sansPrix = reelles.filter(l => euros(l['VOTRE PRIX HT']) == null)
 
 // ⚠️ LA PREUVE : notre propre prix, dans le même fichier, à la même ligne.
 // Si leur prix est plus proche de notre prix UNITAIRE que de notre prix
@@ -85,7 +104,8 @@ for (const l of chiffrees) {
 }
 
 console.log('\n══ TARIF EURO-CASH ══\n')
-console.log(`${lignes.length} références envoyées · ${chiffrees.length} chiffrées par eux`)
+console.log(`${reelles.length} références envoyées · ${chiffrees.length} chiffrées par eux`)
+console.log(`  ⚠️ ${sansPrix.length} revenues SANS PRIX — elles entrent quand même, à « prix sur demande »`)
 console.log(`  base PROUVÉE par notre propre prix : ${prouvees.length}`)
 console.log(`  base À CONFIRMER                   : ${aConfirmer.length}\n`)
 
@@ -104,7 +124,14 @@ console.log('   pack intérieur ou au colis ? Par rayon :')
 for (const [r, n] of Object.entries(parRayon).sort((a, b) => b[1] - a[1])) {
   console.log(`     ${String(n).padStart(4)}  ${r}`)
 }
-console.log('\n   Ces lignes entrent au catalogue SANS clé de comparaison : elles')
+const parRayonVide = {}
+for (const l of sansPrix) parRayonVide[l.Rayon] = (parRayonVide[l.Rayon] ?? 0) + 1
+console.log('\n⚠️ RAYONS QU’EURO-CASH N’A PAS CHIFFRÉS — à relancer :')
+for (const [r, n] of Object.entries(parRayonVide).sort((a, b) => b[1] - a[1]).slice(0, 12)) {
+  console.log(`     ${String(n).padStart(4)}  ${r}`)
+}
+
+console.log('\n   Les lignes à base incertaine entrent SANS clé de comparaison : elles')
 console.log('   sont visibles et cherchables, mais ne peuvent désigner personne')
 console.log('   comme « moins cher » tant que leur base n’est pas dite.')
 
@@ -147,7 +174,7 @@ const COMPARABLES = {
 }
 
 const charge = []
-for (const l of chiffrees) {
+for (const l of reelles) {
   const prouvee = prouvees.find(p => p.Code === l.Code)
   charge.push({
     fournisseur_id: fid,
@@ -167,6 +194,14 @@ for (const l of chiffrees) {
     contenance_valeur: COMPARABLES[l.Code]?.[1] ?? null,
     contenance_unite: COMPARABLES[l.Code]?.[2] ?? null,
     nature: 'devis',
+    // ⚠️ UNE LIGNE SANS PRIX N'EST NI NÉGOCIÉE NI PUBLIQUE : on a DEMANDÉ
+    // et ils n'ont pas répondu. `tarif_negocie` reste NULL — c'est le seul
+    // état honnête — mais `remise_demandee_le` porte la date d'envoi du
+    // fichier, pour que l'écran dise « conditions demandées » plutôt que
+    // « inconnue » : la différence décide de ce qu'on fait ensuite, écrire
+    // ou relancer.
+    tarif_negocie: euros(l['VOTRE PRIX HT']) == null ? null : true,
+    remise_demandee_le: euros(l['VOTRE PRIX HT']) == null ? DEMANDE_LE : null,
     date_tarif: DATE,
     source: 'Tarif Euro-Cash du 26/09/2026',
     actif: true,
@@ -177,5 +212,6 @@ console.log('\n── ÉCRITURE ──\n')
 for (let i = 0; i < charge.length; i += 200) {
   await req('catalogue_fournisseur?on_conflict=fournisseur_id,reference,date_tarif', 'POST', charge.slice(i, i + 200))
 }
-console.log(`  ✓ ${charge.length} tarif(s) Euro-Cash importé(s).`)
-console.log(`  ⚠️ ${aConfirmer.length} sans base de prix confirmée — hors comparaison.`)
+console.log(`  ✓ ${charge.length} référence(s) Euro-Cash importée(s).`)
+console.log(`     ${chiffrees.length} avec un prix · ${sansPrix.length} à « prix sur demande »`)
+console.log(`  ⚠️ ${aConfirmer.length} chiffrées sans base de prix confirmée — hors comparaison.`)

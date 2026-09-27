@@ -4320,6 +4320,45 @@ démontrée. **4 lignes prouvées, 195 marquées `base à confirmer`** — elles
 entrent visibles et cherchables, **sans `cle_comparaison`**, donc incapables
 de désigner qui que ce soit comme « moins cher ».
 
+⚠️⚠️ **ILS N'ONT CHIFFRÉ QUE 3 RAYONS SUR 21**, et le gérant l'a vu tout de
+suite : « j'ai pas toutes les boissons ». Réponse factuelle — **579
+références de boissons sont revenues VIDES** :
+
+| Rayon | envoyés | chiffrés |
+|---|---|---|
+| Boissons — canettes & briquettes | 130 | **128** |
+| Tartinables | 55 | **55** |
+| Pochettes cadeau enfants | 16 | **16** |
+| **Vins** | 220 | **0** |
+| **Bières** | 95 | **0** |
+| Boissons — PET & verres perdus | 86 | 0 |
+| Jus de fruits | 67 | 0 |
+| Eaux | 53 | 0 |
+| Champagnes / Proseccos / Cidres | 36 | 0 |
+| Emballages, pipier, briquets, hygiène… | 502 | 0 |
+
+**Les 1 081 non chiffrées entrent QUAND MÊME**, à `prix_ht = NULL`. Les
+laisser dehors donnait l'impression qu'Euro-Cash ne vend pas de vin alors
+qu'il en propose 220 références. ⚠️ **NULL et jamais zéro** : un zéro se lit
+« gratuit » et remonterait en tête du comparateur — la faute de
+`statutFoodCost(0)`. `prix_ht` est nullable depuis la 0158 pour ce cas.
+
+⚠️ **Elles portent `remise_demandee_le = 2026-09-23`**, le jour où le
+fichier leur a été envoyé. « Inconnu » sans demande est un OUBLI ; « inconnu »
+avec demande est une RELANCE à faire, et l'écran affiche « conditions
+demandées ». La différence décide de ce qu'on fait ensuite.
+
+⚠️ Deux assertions **précisées** : un devis CHIFFRÉ vaut remise connue, un
+devis revenu VIDE ne vaut rien — les compter comme négociés afficherait une
+remise qu'on n'a pas obtenue. Et « plus aucune inconnue » devient « toute
+inconnue a été demandée ».
+
+⚠️ Seules les lignes portant un **vrai code article** sont importées : le
+fichier se termine par une section « ce que nous achetons ailleurs » sans
+code, et par des en-têtes. 1 280 références sur 1 292 lignes.
+
+**Catalogue : 4 672 références, 7 fournisseurs, 1 106 à prix sur demande.**
+
 ✅ **Et le gérant avait raison** : Perrier **0,500 € chez Euro-Cash contre
 0,939 € chez France Boissons, −47 %**. Coca-Cola −9 % (Euro-Cash),
 Coca-Cola Zéro −10 % (Promocash).

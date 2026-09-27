@@ -186,17 +186,28 @@ titre('Qui a une remise connue, et qui reste à demander')
 // Un prix FACTURÉ est une preuve de paiement ; un DEVIS est un prix proposé
 // nommément à CASATASIA. Les deux sont « notre prix ». Seule une référence
 // de catalogue qu'on n'a jamais achetée reste à demander.
-const tous = await sbTout('catalogue_fournisseur?select=nature,achete,tarif_negocie')
+const tous = await sbTout('catalogue_fournisseur?select=nature,achete,tarif_negocie,prix_ht,remise_demandee_le')
 t('une ligne de facture vaut remise connue',
   tous.filter(x => x.nature === 'facture').every(x => x.tarif_negocie === true))
-t('un devis aussi',
-  tous.filter(x => x.nature === 'devis').every(x => x.tarif_negocie === true))
+// ⚠️ ASSERTION PRÉCISÉE LE 27/09/2026 : un devis CHIFFRÉ vaut remise
+// connue. Un devis revenu VIDE ne vaut rien du tout — Euro-Cash n'a
+// répondu que sur 3 rayons sur 21, et ses 1 081 autres références sont
+// « demandées, sans réponse ». Les compter comme négociées afficherait une
+// remise qu'on n'a pas obtenue.
+t('un devis CHIFFRÉ vaut remise connue',
+  tous.filter(x => x.nature === 'devis' && x.prix_ht != null).every(x => x.tarif_negocie === true))
+t('⚠️ un devis revenu SANS PRIX ne vaut PAS remise connue',
+  tous.filter(x => x.nature === 'devis' && x.prix_ht == null).every(x => x.tarif_negocie == null))
 // ⚠️ RÉVISÉE avec la précédente : il ne reste plus AUCUN « inconnu », et
 // c'est voulu. L'écran ne sert plus à trier l'inconnu du connu, il sert à
 // dire ce qui est ENCORE À DEMANDER — d'où le libellé « Tarif public —
 // remise à demander », qui ne se lit pas « remise refusée ».
-t('⚠️ plus aucune remise « inconnue » : tout est tranché',
-  tous.filter(x => x.tarif_negocie === null).length === 0)
+// ⚠️ RÉVISÉE : il reste des « inconnues », et c'est l'état juste — ce sont
+// les références qu'on a demandées et qui sont revenues vides. Elles
+// portent toutes une DATE DE DEMANDE : « inconnu » sans demande serait un
+// oubli, « inconnu » avec demande est une relance à faire.
+t('⚠️ toute remise encore inconnue a été DEMANDÉE — sinon c’est un oubli',
+  tous.filter(x => x.tarif_negocie === null).every(x => x.remise_demandee_le))
 t('et le gisement à demander reste ÉNORME — c’est la raison d’être de l’écran',
   tous.filter(x => x.tarif_negocie === false).length > 2000)
 
