@@ -1060,13 +1060,20 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
                       // découvre à la livraison — une référence fausse est
                       // pire qu'une référence absente (0142).
                       setRef(o.reference ?? '')
+                      // ⚠️⚠️ LE PRIX N'EST REPRIS QUE D'UNE FACTURE, et
+                      // seulement si l'unité est la nôtre. Un devis est
+                      // une proposition : l'écrire dans `prix_achat_ht`
+                      // en ferait un coût de revient, donc un food cost,
+                      // une marge et une valeur de fonds fondés sur une
+                      // marchandise jamais reçue.
                       const p = prixReprenable(o, a.unite)
-                      // ⚠️ On ne reprend le prix QUE si son unité est la
-                      // nôtre. Un sachet de neuf pains recopié sur une
-                      // ligne à la pièce multiplierait le coût par neuf.
-                      if (p != null) { setPrix(String(p)); setReleve(o.nature === 'facture') }
-                      else dire(`Fournisseur repris. ⚠️ Prix NON repris : l’offre est en ${o.unite_ref}, `
-                        + `notre ligne en ${a.unite ?? 'unité inconnue'} — à saisir à la main.`)
+                      if (p != null) { setPrix(String(p)); setReleve(true) }
+                      else dire(o.nature !== 'facture'
+                        ? `${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l’est pas : `
+                          + `${fmtPrix(o.prix_ref)}/${o.unite_ref} vient d’un ${o.nature}, pas d’une facture. `
+                          + `Il deviendra notre coût de revient à leur première livraison.`
+                        : `${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l’est pas : `
+                          + `l’offre est en ${o.unite_ref}, notre ligne en ${a.unite ?? 'unité inconnue'}.`)
                     }}
                     className="rounded border border-violet-400 bg-white px-2 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100">
                     Prendre celui-ci

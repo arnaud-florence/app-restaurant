@@ -526,18 +526,29 @@ export type OffreConcurrente = {
 }
 
 /**
- * ⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE TEL QUEL ?
+ * ⚠️⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE COMME COÛT DE REVIENT ?
  *
- * Seulement si son unité de référence est la NÔTRE. Notre « Beurre doux »
- * se compte au kg et l'offre est en €/kg : on peut. Mais notre « Pain
- * burger » se compte à la pièce quand l'offre est un sachet de neuf — y
- * recopier le prix du sachet multiplierait notre coût par neuf, sans que
- * rien ne le signale. Dans le doute, on ne pré-remplit pas et on le dit.
+ * DEUX conditions, et la première est la plus importante.
+ *
+ * 1. **L'offre doit être une FACTURE.** Un devis est une PROPOSITION, pas
+ *    un prix payé (0151) — et `prix_achat_ht` est le coût de revient, qui
+ *    nourrit le food cost, les marges et la valeur du fonds. Vécu trois
+ *    fois le 27/09/2026 : le beurre doux s'est retrouvé à 5,625 €, le prix
+ *    du devis Félix Potin, écrit comme s'il était payé. Un tarif de
+ *    portail ou de catalogue est un prix AFFICHÉ : même refus.
+ * 2. **L'unité doit être la NÔTRE.** Notre « Pain burger » se compte à la
+ *    pièce quand l'offre est un sachet de neuf : y recopier le prix du
+ *    sachet multiplierait notre coût par neuf, sans que rien ne le
+ *    signale.
+ *
+ * Dans les deux cas on reprend le FOURNISSEUR et sa RÉFÉRENCE — ce qui est
+ * le but du geste — et on laisse le prix tranquille en le disant.
  */
 export function prixReprenable(
-  offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref'>,
+  offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref' | 'nature'>,
   uniteNotre: string | null,
 ): number | null {
+  if (offre.nature !== 'facture') return null
   const n = (u: string | null | undefined) => {
     const t = String(u ?? '').trim().toLowerCase()
     if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'

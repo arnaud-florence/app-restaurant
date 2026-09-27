@@ -3715,6 +3715,28 @@ avec NOUS (−30 %). Deux nombres proches pour deux idées différentes, au mêm
 endroit — on finit par ne croire ni l'un ni l'autre. `ailleurs` dérive
 désormais de la première offre : une seule source.
 
+⚠️⚠️ **UN DEVIS NE DEVIENT JAMAIS NOTRE COÛT DE REVIENT, et « Prendre
+celui-ci » ne pré-remplit donc PAS son prix.** Vécu quatre fois le
+27/09/2026 en testant l'écran : le beurre doux s'est retrouvé à **5,625 €**
+— le prix du devis Félix Potin — écrit comme s'il était payé, et les
+lardons à 6,567 € au lieu de 7,50 €. `prix_achat_ht` nourrit le food cost,
+les marges et la valeur du fonds : y faire entrer une marchandise jamais
+reçue les fausse toutes, en silence.
+
+Seule une offre de nature **facture** pré-remplit le prix. Le fournisseur et
+sa référence, eux, sont toujours repris — c'est le but du geste — et l'écran
+dit pourquoi le prix ne l'est pas : « il deviendra notre coût de revient à
+leur première livraison ».
+
+✅ **C'est le test qui l'a attrapé**, deux fois : « aucun prix d'achat n'a
+pris la valeur d'un tarif ». Un contrôle qui ne dit jamais « écart » ne
+prouve rien ; celui-là a dit « Beurre doux », puis « Lardons fumés ».
+⚠️ Et il ne regarde que Félix Potin : les sept collisions avec le portail
+Gineys sont LÉGITIMES — c'est le même prix parce que c'est la même facture.
+`historique_prix_ingredients` (module 3) a permis de retrouver la valeur
+d'avant et de la restaurer : sans ce journal, la correction se faisait au
+jugé.
+
 ⚠️ **Le prix n'est repris QUE si son unité est la nôtre**
 (`prixReprenable()`). Notre « Pain burger » se compte à la pièce quand
 l'offre est un sachet de neuf : y recopier le prix du sachet multiplierait
