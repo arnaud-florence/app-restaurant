@@ -4284,6 +4284,65 @@ fût de 20 L donne 20 (des litres), une caisse de 24 bouteilles donne 24 (des
 bouteilles). Diviser par lui rend le prix de l'unité vendue — vrai dans les
 deux cas, à condition de ne pas le prendre pour un volume.
 
+**LE TARIF EURO-CASH EST ARRIVÉ — et il n'avait jamais été importé
+(27/09/2026).** Le gérant l'a signalé : « pourquoi j'ai pas les tarifs
+Euro-Cash ? il y a des boissons où elle est moins chère que France Boissons
+et c'est pas marqué ». Le fichier était sur le poste depuis le 26/09, le
+script d'import aussi — **il n'a jamais été lancé**, bloqué sur une
+question d'unité que le gérant avait pourtant tranchée. Un import qui
+attend une réponse et que personne ne relance équivaut à un import qui
+n'existe pas.
+
+**199 prix sur les 1 292 références envoyées.** `node
+scripts/import-tarif-eurocash.mjs [--ecrire]`.
+
+⚠️⚠️ **LEUR FICHIER MÉLANGE TROIS BASES DE PRIX, et rien ne dit laquelle
+s'applique à quelle ligne** — démontré sur leurs propres chiffres :
+
+| Ligne | Leur prix | Ce que c'est |
+|---|---|---|
+| `Pot Nutella c-2x3kg` | 49,78 € | le **COLIS** (notre colis : 52,92 €) |
+| `Perrier c-24x33cl` | 0,50 € | l'**UNITÉ** (le colis ferait 12 € les 24) |
+| `Multivitamine c-4x10x20cl` | 3,50 € | ni l'un ni l'autre : le **PACK INTÉRIEUR** de 10 — la brique à 3,50 € est absurde, le colis de 40 donnerait 8 centimes pièce |
+
+Trois bases **dans le même rayon**. Une règle automatique se tromperait d'un
+facteur 10 à 40, et dans le mauvais sens elle ferait passer Euro-Cash pour
+deux fois moins cher sur toute la cannette — donc changer de fournisseur sur
+un chiffre faux. ⚠️ Une heuristique a été essayée (« si le prix divisé par
+le colisage descend sous 10 centimes, c'est un prix unitaire ») : elle
+classait le Multivitamine en unitaire, c'est-à-dire faux.
+
+**D'où la règle : on importe TOUT, on ne compare QUE ce que le fichier
+PROUVE.** La colonne « Notre prix actuel HT » du fichier envoyé porte nos
+propres prix sur 15 lignes ; quand leur prix est plus proche de notre prix
+unitaire que de notre prix colis (à un facteur 3 près), la base est
+démontrée. **4 lignes prouvées, 195 marquées `base à confirmer`** — elles
+entrent visibles et cherchables, **sans `cle_comparaison`**, donc incapables
+de désigner qui que ce soit comme « moins cher ».
+
+✅ **Et le gérant avait raison** : Perrier **0,500 € chez Euro-Cash contre
+0,939 € chez France Boissons, −47 %**. Coca-Cola −9 % (Euro-Cash),
+Coca-Cola Zéro −10 % (Promocash).
+
+⚠️ `contenance_unite` n'admet que **kg / L / piece** (`UniteRef`) : les
+33 cl s'écrivent `0.33 L`. Y laisser « cl » fait échouer l'insert sur une
+contrainte CHECK, et l'échec porte sur la ligne entière.
+
+⚠️ Le **Coca Zéro de Promocash était rangé sous la clé du Coca** : la
+comparaison opposait deux produits différents. Clés séparées.
+
+⚠️ **Une assertion a été PRÉCISÉE, pas contournée** : « aucune contenance
+n'est déduite des libellés France Boissons » interdisait TOUTE contenance
+sur leurs lignes. Ce qu'il faut interdire, c'est une contenance INVENTÉE —
+celle du Perrier est écrite dans son propre libellé (« Perrier VC 33 ») et
+confirmée par la ligne Euro-Cash du même produit (« c-24x33cl »). Le test
+vérifie désormais que le nombre posé se RETROUVE dans le libellé.
+
+⚠️ Un devis est chiffré NOMMÉMENT pour CASATASIA : les 199 lignes sont donc
+`tarif_negocie = true`, comme les autres devis. Les laisser à NULL faisait
+tomber deux assertions — et aurait affiché « remise inconnue » sur un tarif
+qu'on vient de négocier.
+
 **Euro-Cash — la demande de tarif (23/09/2026).** Le catalogue général été
 2026 fait 221 pages et ~2 280 références. Le gérant a retenu **20 rayons** :
 pochettes cadeau enfants, tartinables, boissons, jus, eaux, bières, vins,

@@ -231,8 +231,24 @@ T('le café en grains y est chiffré au kilo', grains && grains.unite === 'kg' &
 // ⚠️ « 70cl », « 1L », « VC33 », « 75 » : quatre écritures pour la même idée.
 // En déduire une contenance donnerait un prix au litre faux, affiché comme
 // les autres.
-T('aucune contenance n’est déduite des libellés France Boissons',
-  catFB.filter(t => t.famille === 'Boissons').every(t => !t.contenance_valeur))
+//
+// ⚠️ ASSERTION PRÉCISÉE LE 27/09/2026 — la règle n'a pas bougé, sa mesure
+// était absolue. Elle interdisait TOUTE contenance sur une ligne France
+// Boissons ; ce qu'il faut interdire, c'est une contenance INVENTÉE. Le
+// Perrier en porte une depuis que son face-à-face avec Euro-Cash existe
+// (0,939 € contre 0,500 €), et elle n'est pas devinée : son libellé se
+// termine par « Perrier VC 33 », et la ligne Euro-Cash du MÊME produit
+// écrit « c-24x33cl ». Le test vérifie donc que le nombre posé se
+// RETROUVE dans le libellé.
+const inventees = catFB.filter(t => t.famille === 'Boissons' && t.contenance_valeur)
+  .filter(t => {
+    // 0,33 L doit se lire « 33 » (cl) ou « 0.33 » / « 0,33 » (L) dans le libellé.
+    const v = Number(t.contenance_valeur)
+    const formes = [String(v), String(v).replace('.', ','), String(Math.round(v * 100))]
+    return !formes.some(f => t.designation.includes(f))
+  })
+T('aucune contenance INVENTÉE sur un libellé France Boissons',
+  inventees.length === 0, inventees.map(t => t.designation.slice(0, 40)).join(', '))
 
 if (PORT) {
   // ⚠️ On ne vérifie PAS le contenu de la page : depuis le module 28 le
