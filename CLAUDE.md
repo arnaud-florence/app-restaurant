@@ -3715,22 +3715,36 @@ avec NOUS (−30 %). Deux nombres proches pour deux idées différentes, au mêm
 endroit — on finit par ne croire ni l'un ni l'autre. `ailleurs` dérive
 désormais de la première offre : une seule source.
 
-⚠️⚠️ **UN DEVIS NE DEVIENT JAMAIS NOTRE COÛT DE REVIENT, et « Prendre
-celui-ci » ne pré-remplit donc PAS son prix.** Vécu quatre fois le
-27/09/2026 en testant l'écran : le beurre doux s'est retrouvé à **5,625 €**
-— le prix du devis Félix Potin — écrit comme s'il était payé, et les
-lardons à 6,567 € au lieu de 7,50 €. `prix_achat_ht` nourrit le food cost,
-les marges et la valeur du fonds : y faire entrer une marchandise jamais
-reçue les fausse toutes, en silence.
+⚠️⚠️ **LE PRIX SUIT LE FOURNISSEUR — correction d'une sur-prudence
+(27/09/2026).** Une première version refusait de reprendre tout prix qui ne
+venait pas d'une facture, pour protéger `prix_achat_ht`. **Le gérant a
+tranché l'inverse, et il a raison : garder l'ancien prix après avoir changé
+de fournisseur est PLUS FAUX que reprendre le nouveau.** Laisser 8,049 €
+(Gineys) sur un beurre désormais acheté chez Félix Potin affirme qu'on paie
+un tarif qui ne s'applique plus ; reprendre 5,625 € dit ce qu'on va payer.
 
-Seule une offre de nature **facture** pré-remplit le prix. Le fournisseur et
-sa référence, eux, sont toujours repris — c'est le but du geste — et l'écran
-dit pourquoi le prix ne l'est pas : « il deviendra notre coût de revient à
-leur première livraison ».
+⚠️ **Ce qui protège n'est donc PAS le refus, c'est le DRAPEAU.** Un prix
+repris d'un devis, d'un portail ou d'un catalogue arrive marqué
+`prix_estime = true` (0165) : il nourrit le food cost en disant qu'il est
+une hypothèse, et la première facture le confirmera. Seule une offre de
+nature `facture` coche « prix relevé ». Vérifié à l'écran : « Prendre
+celui-ci » sur le beurre pose Félix Potin, 5,625 €, case DÉCOCHÉE, avec le
+message « ce prix vient d'un devis : il reste marqué ESTIMÉ jusqu'à leur
+première facture ».
 
-✅ **C'est le test qui l'a attrapé**, deux fois : « aucun prix d'achat n'a
-pris la valeur d'un tarif ». Un contrôle qui ne dit jamais « écart » ne
-prouve rien ; celui-là a dit « Beurre doux », puis « Lardons fumés ».
+✅ **C'est le test qui a attrapé les fuites** pendant la mise au point, deux
+fois : le beurre doux écrit à 5,625 € et les lardons à 6,567 €, tous deux
+marqués RELEVÉS alors qu'ils venaient d'un devis. Un contrôle qui ne dit
+jamais « écart » ne prouve rien.
+
+⚠️ **L'assertion a changé d'OBJET, pas de sévérité.** Elle exigeait
+qu'aucun prix d'achat n'égale un tarif de devis — juste tant que rien ne
+permettait de basculer, puisque seul un import pouvait produire cette
+égalité. Maintenant qu'un humain peut décider de changer de fournisseur, le
+prix DOIT suivre : ce qui est contrôlé est donc qu'il porte le drapeau
+`prix_estime`. Le test reste le filet de l'IMPORT — si
+`rapprocher-tarifs-*.mjs` se mettait à écrire des prix, il les écrirait sans
+drapeau et l'assertion tomberait.
 ⚠️ Et il ne regarde que Félix Potin : les sept collisions avec le portail
 Gineys sont LÉGITIMES — c'est le même prix parce que c'est la même facture.
 `historique_prix_ingredients` (module 3) a permis de retrouver la valeur

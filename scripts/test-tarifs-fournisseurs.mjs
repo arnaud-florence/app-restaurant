@@ -126,11 +126,27 @@ if (f) {
   // ⚠️ La règle qui protège le food cost : un devis ne devient jamais un
   // prix payé. Si elle saute, toutes les marges bougent sans qu'une seule
   // facture soit arrivée.
+  // ⚠️⚠️ ASSERTION RÉVISÉE LE 27/09/2026, et l'objet du contrôle a changé.
+  //
+  // Elle exigeait qu'AUCUN prix d'achat n'égale un tarif de devis. C'était
+  // juste tant que rien ne permettait de basculer de fournisseur : seul un
+  // import pouvait produire cette égalité, et c'était une fuite.
+  //
+  // Depuis que « Prendre celui-ci » existe, un humain peut décider de
+  // passer chez Félix Potin — et le prix DOIT suivre, sinon la fiche
+  // affirme qu'on paie encore le tarif de l'ancien fournisseur. Ce qui
+  // protège n'est donc plus l'écart entre les deux nombres, c'est le
+  // DRAPEAU : un prix qui vient d'un devis doit être marqué ESTIMÉ (0165).
+  //
+  // ⚠️ Ce test reste le filet de l'import : si `rapprocher-tarifs-*.mjs`
+  // se mettait à écrire des prix, il les écrirait sans drapeau et cette
+  // assertion tomberait.
   const ids = [...new Set(lies.map(t => t.ingredient_id))]
-  const ings = await sb(`ingredients?select=id,nom,prix_achat_ht&id=in.(${ids.join(',')})`)
-  const colle = ings.filter(i => lies.some(t => Math.abs(Number(t.prix_ht) - Number(i.prix_achat_ht)) < 0.0001))
-  T('aucun prix d’achat n’a pris la valeur d’un tarif', colle.length === 0,
-    colle.map(i => i.nom).join(', '))
+  const ings = await sb(`ingredients?select=id,nom,prix_achat_ht,prix_estime&id=in.(${ids.join(',')})`)
+  const menteurs = ings.filter(i =>
+    !i.prix_estime && lies.some(t => Math.abs(Number(t.prix_ht) - Number(i.prix_achat_ht)) < 0.0001))
+  T('un prix venu d’un DEVIS est marqué estimé, jamais relevé', menteurs.length === 0,
+    menteurs.map(i => i.nom).join(', '))
 
   // La coppa n'est pas du jambon serrano, les herbes de Provence ne sont pas
   // de l'origan : écartés à la main, ils doivent le rester.

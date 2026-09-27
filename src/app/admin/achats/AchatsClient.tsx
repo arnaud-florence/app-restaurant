@@ -1060,20 +1060,28 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
                       // découvre à la livraison — une référence fausse est
                       // pire qu'une référence absente (0142).
                       setRef(o.reference ?? '')
-                      // ⚠️⚠️ LE PRIX N'EST REPRIS QUE D'UNE FACTURE, et
-                      // seulement si l'unité est la nôtre. Un devis est
-                      // une proposition : l'écrire dans `prix_achat_ht`
-                      // en ferait un coût de revient, donc un food cost,
-                      // une marge et une valeur de fonds fondés sur une
-                      // marchandise jamais reçue.
+                      // ⚠️ LE PRIX SUIT LE FOURNISSEUR. Garder l'ancien
+                      // après avoir basculé affirmerait qu'on paie encore
+                      // un tarif qui ne s'applique plus — c'est plus faux
+                      // que de reprendre le nouveau. Ce qui protège, c'est
+                      // le DRAPEAU : un prix qui ne vient pas d'une
+                      // facture arrive marqué « estimé » (0165).
                       const p = prixReprenable(o, a.unite)
-                      if (p != null) { setPrix(String(p)); setReleve(true) }
-                      else dire(o.nature !== 'facture'
-                        ? `${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l’est pas : `
-                          + `${fmtPrix(o.prix_ref)}/${o.unite_ref} vient d’un ${o.nature}, pas d’une facture. `
-                          + `Il deviendra notre coût de revient à leur première livraison.`
-                        : `${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l’est pas : `
-                          + `l’offre est en ${o.unite_ref}, notre ligne en ${a.unite ?? 'unité inconnue'}.`)
+                      if (p != null) {
+                        setPrix(String(p))
+                        setReleve(o.nature === 'facture')
+                        dire(o.nature === 'facture' ? null
+                          : `${o.fournisseur} repris à ${fmtPrix(o.prix_ref)}/${o.unite_ref}. `
+                            + `⚠️ Ce prix vient d'un ${o.nature} : il reste marqué ESTIMÉ `
+                            + `jusqu'à leur première facture.`)
+                      } else {
+                        // ⚠️ L'unité ne concorde pas : un sachet de neuf
+                        // pains recopié sur une ligne à la pièce
+                        // multiplierait le coût par neuf.
+                        dire(`${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l'est pas : `
+                          + `l'offre est en ${o.unite_ref}, notre ligne en ${a.unite ?? 'unité inconnue'} `
+                          + `— à saisir à la main.`)
+                      }
                     }}
                     className="rounded border border-violet-400 bg-white px-2 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100">
                     Prendre celui-ci
@@ -1082,7 +1090,8 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-violet-900">
-              ⚠️ Un devis est une <strong>proposition</strong>, pas un prix payé — et un écart
+              ⚠️ Un prix repris d&apos;un <strong>devis</strong> reste marqué « estimé » jusqu&apos;à
+              la première facture : il dit ce qu&apos;on va payer, pas ce qu&apos;on a payé. Un écart
               en pourcentage ne décide de rien tant qu&apos;il n&apos;est pas multiplié par les
               quantités réelles. Vérifiez le minimum de commande et le délai avant de basculer.
             </p>

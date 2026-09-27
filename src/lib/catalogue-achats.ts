@@ -526,29 +526,34 @@ export type OffreConcurrente = {
 }
 
 /**
- * ⚠️⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE COMME COÛT DE REVIENT ?
+ * ⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE ?
  *
- * DEUX conditions, et la première est la plus importante.
+ * OUI dès que son unité de référence est la NÔTRE — quelle que soit sa
+ * nature.
  *
- * 1. **L'offre doit être une FACTURE.** Un devis est une PROPOSITION, pas
- *    un prix payé (0151) — et `prix_achat_ht` est le coût de revient, qui
- *    nourrit le food cost, les marges et la valeur du fonds. Vécu trois
- *    fois le 27/09/2026 : le beurre doux s'est retrouvé à 5,625 €, le prix
- *    du devis Félix Potin, écrit comme s'il était payé. Un tarif de
- *    portail ou de catalogue est un prix AFFICHÉ : même refus.
- * 2. **L'unité doit être la NÔTRE.** Notre « Pain burger » se compte à la
- *    pièce quand l'offre est un sachet de neuf : y recopier le prix du
- *    sachet multiplierait notre coût par neuf, sans que rien ne le
- *    signale.
+ * ⚠️ CORRECTION D'UNE SUR-PRUDENCE (27/09/2026). Une première version
+ * refusait tout prix qui ne venait pas d'une facture, pour protéger
+ * `prix_achat_ht`. Le gérant a tranché l'inverse, et il a raison :
+ * **garder l'ancien prix après avoir changé de fournisseur est PLUS FAUX
+ * que reprendre le nouveau.** Laisser 8,049 € (Gineys) sur un beurre
+ * désormais acheté chez Félix Potin affirme qu'on paie un tarif qui ne
+ * s'applique plus ; reprendre 5,625 € dit ce qu'on va payer.
  *
- * Dans les deux cas on reprend le FOURNISSEUR et sa RÉFÉRENCE — ce qui est
- * le but du geste — et on laisse le prix tranquille en le disant.
+ * ⚠️ Ce qui protège n'est donc PAS le refus, c'est le DRAPEAU : un prix
+ * repris d'un devis, d'un portail ou d'un catalogue arrive marqué
+ * `prix_estime = true` (0165). Il nourrit le food cost et les marges en
+ * disant qu'il est une hypothèse, et la première facture le confirmera.
+ * Seule une offre de nature `facture` coche « prix relevé ».
+ *
+ * ⚠️ L'unité, elle, reste une condition dure : notre « Pain burger » se
+ * compte à la pièce quand l'offre est un sachet de neuf — y recopier le
+ * prix du sachet multiplierait notre coût par neuf, sans que rien ne le
+ * signale. Là, on reprend le fournisseur et pas le prix, et on le dit.
  */
 export function prixReprenable(
-  offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref' | 'nature'>,
+  offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref'>,
   uniteNotre: string | null,
 ): number | null {
-  if (offre.nature !== 'facture') return null
   const n = (u: string | null | undefined) => {
     const t = String(u ?? '').trim().toLowerCase()
     if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'

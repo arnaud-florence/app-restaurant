@@ -466,23 +466,24 @@ titre('Basculer chez le moins cher, depuis la fiche')
     if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
     return t
   }
-  const prixReprenable = (o, notre) =>
-    o.nature !== 'facture' ? null : (nU(o.unite_ref) === nU(notre) ? o.prix_ref : null)
+  const prixReprenable = (o, notre) => (nU(o.unite_ref) === nU(notre) ? o.prix_ref : null)
+  // ⚠️ Ce n'est PAS le refus du prix qui protège, c'est le drapeau.
+  const estimeApres = nature => nature !== 'facture'
 
-  t('⚠️ le prix se reprend d’une FACTURE quand l’unité est la nôtre',
-    prixReprenable({ nature: 'facture', unite_ref: 'kg', prix_ref: 5.6 }, 'kg') === 5.6)
+  t('⚠️ LE PRIX SUIT LE FOURNISSEUR — garder l’ancien serait plus faux',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 5.625 }, 'kg') === 5.625)
   t('« Kg » et « kg » sont la même unité',
-    prixReprenable({ nature: 'facture', unite_ref: 'Kg', prix_ref: 5.6 }, 'kg') === 5.6)
-  t('⚠️⚠️ un DEVIS ne devient JAMAIS notre coût de revient — même unité',
-    prixReprenable({ nature: 'devis', unite_ref: 'kg', prix_ref: 5.625 }, 'kg') === null)
-  t('⚠️ un tarif de PORTAIL non plus — c’est un prix affiché',
-    prixReprenable({ nature: 'portail', unite_ref: 'kg', prix_ref: 5.6 }, 'kg') === null)
-  t('⚠️⚠️ il ne se reprend PAS d’un sachet de neuf vers une pièce',
-    prixReprenable({ nature: 'facture', unite_ref: 'sachet', prix_ref: 5.776 }, 'pièce') === null)
+    prixReprenable({ unite_ref: 'Kg', prix_ref: 5.6 }, 'kg') === 5.6)
+  t('⚠️⚠️ un prix repris d’un DEVIS arrive marqué ESTIMÉ', estimeApres('devis') === true)
+  t('⚠️ d’un PORTAIL aussi — c’est un prix affiché', estimeApres('portail') === true)
+  t('d’un CATALOGUE aussi', estimeApres('catalogue') === true)
+  t('seule une FACTURE vaut prix relevé', estimeApres('facture') === false)
+  t('⚠️⚠️ le prix ne se reprend PAS d’un sachet de neuf vers une pièce',
+    prixReprenable({ unite_ref: 'sachet', prix_ref: 5.776 }, 'pièce') === null)
   t('ni d’un kilo vers une barquette de 500 g',
-    prixReprenable({ nature: 'facture', unite_ref: 'kg', prix_ref: 9 }, 'barquette 500 g') === null)
+    prixReprenable({ unite_ref: 'kg', prix_ref: 9 }, 'barquette 500 g') === null)
   t('une unité inconnue des deux côtés ne se reprend pas non plus',
-    prixReprenable({ nature: 'facture', unite_ref: 'BT', prix_ref: 3 }, null) === null)
+    prixReprenable({ unite_ref: 'BT', prix_ref: 3 }, null) === null)
 
   // Construction des offres : strictement moins cher, et jamais chez soi.
   const offres = (lignes, mien, monFournisseur) => lignes
@@ -512,10 +513,8 @@ titre('Basculer chez le moins cher, depuis la fiche')
   t('et celle du nouveau la remplace', refApres('0061024', { reference: '63470' }) === '63470')
 
   // ⚠️ Un devis repris ne devient pas un prix relevé.
-  // ⚠️ Un prix n'est repris que d'une facture : quand il l'est, il est
-  // donc relevé par construction.
-  t('un prix repris vient forcément d’une facture, donc il est relevé',
-    prixReprenable({ nature: 'facture', unite_ref: 'kg', prix_ref: 5.6 }, 'kg') !== null)
+  t('⚠️ un prix repris et une case « relevé » vont ENSEMBLE : jamais un devis coché',
+    !(estimeApres('devis') === false))
 }
 
 titre('Les rayons du catalogue')
