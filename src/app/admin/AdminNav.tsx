@@ -11,6 +11,7 @@ import {
   Calendar, Building2, Truck, Sparkles, Settings, Tv, GraduationCap,
   AlertTriangle, FileText, Trash2, Zap, NotebookPen, CloudSun, Wrench,
   Store, BookOpen, Trophy, Calculator, ChevronDown, ChevronRight, Home, Star,
+  ShoppingCart, Scale, TrendingUp, Landmark, Link2, Plug, Percent,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
@@ -49,6 +50,12 @@ const GROUPES: Group[] = [
       { href: '/admin/ingredients',  label: 'Ingrédients',  icon: Store },
       { href: '/admin/stock',        label: 'Stock',        icon: Truck },
       { href: '/admin/fournisseurs', label: 'Fournisseurs', icon: Truck },
+      // ⚠️ Ces deux écrans existaient sans être atteignables d'ici : la barre
+      // latérale a sa PROPRE liste, indépendante de `lib/navigation.ts`, et on
+      // oublie de la nourrir. Un écran livré qu'on ne trouve pas n'existe pas.
+      { href: '/admin/achats',      label: "Plateforme d'achat", icon: ShoppingCart },
+      { href: '/admin/tarifs-fournisseurs', label: 'Tarifs fournisseurs', icon: Scale },
+      { href: '/admin/correspondances', label: "Correspondances d'achat", icon: Link2 },
       { href: '/admin/boissons',     label: 'Boissons',     icon: Wine },
       { href: '/admin/allergenes',   label: 'Allergènes',   icon: AlertTriangle },
     ],
@@ -78,7 +85,11 @@ const GROUPES: Group[] = [
       { href: '/admin/formation',    label: 'Gérer guides',        icon: GraduationCap },
       { href: '/admin/challenges',   label: 'Challenges',          icon: Trophy },
       { href: '/admin/economie',     label: 'Centre économique',   icon: Calculator },
+      { href: '/admin/ventes',       label: 'Statistiques de vente', icon: TrendingUp },
+      { href: '/admin/ventes-pdv',   label: 'Ventes par activité', icon: TrendingUp },
       { href: '/admin/finances',     label: 'Finances / TVA',      icon: Wallet },
+      { href: '/admin/patrimoine',   label: "Valeur de l'affaire", icon: Landmark },
+      { href: '/admin/commissions',  label: 'Commissions tiers',   icon: Percent },
       { href: '/admin/energie',      label: 'Énergie',             icon: Zap },
     ],
   },
@@ -95,6 +106,12 @@ const GROUPES: Group[] = [
     label: 'Système', emoji: '⚙️',
     items: [
       { href: '/admin/setup',        label: 'Configuration',       icon: Settings },
+      // ⚠️ C'est l'écran qui porte « Ouvrir le restaurant ». Absent d'ici, il
+      // ne se trouvait que par le Centre de contrôle — mauvais endroit pour
+      // le geste du matin de l'ouverture.
+      { href: '/admin/etablissements', label: 'Activités & ouverture', icon: Building2 },
+      { href: '/admin/caisse-agreee', label: 'Caisse agréée',       icon: Store },
+      { href: '/admin/integrations', label: 'Pont caisse ↔ outil', icon: Plug },
       { href: '/admin/securite',     label: 'Sécurité',            icon: ShieldCheck },
     ],
   },
