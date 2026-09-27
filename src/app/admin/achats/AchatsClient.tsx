@@ -12,6 +12,7 @@ import {
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
+import { modifierArticleAchat } from './modifier-actions'
 
 type Fournisseur = { id: string; nom: string; email: string | null; actif: boolean }
 type Onglet = 'promos' | 'achetes' | 'catalogue' | 'etat'
@@ -109,7 +110,7 @@ export default function AchatsClient({
       </div>
 
       {onglet === 'achetes'
-        ? <Achetes articles={achetes} />
+        ? <Achetes articles={achetes} fournisseurs={fournisseurs} />
         : onglet === 'etat'
         ? <Etat etat={etat} manques={manques} suivies={matieresSuivies} couvertes={matieresCouvertes} />
         : onglet === 'promos'
@@ -726,7 +727,11 @@ function Nature({ nature, n }: { nature: string; n: number }) {
  * entre quatre écrans : introuvable d'un coup d'œil, donc jamais consultée
  * avant de passer commande.
  */
-function Achetes({ articles }: { articles: ArticleAchete[] }) {
+function Achetes({ articles, fournisseurs: tousF }: {
+  articles: ArticleAchete[]; fournisseurs: Fournisseur[]
+}) {
+  const [edite, setEdite] = useState<string | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
   const [f, setF] = useState<FiltresAchete>(FILTRES_ACHETE_VIDES)
   const trouves = useMemo(() => filtrerAchetes(articles, f), [articles, f])
   const b = useMemo(() => bilanAchats(articles), [articles])
@@ -776,6 +781,7 @@ function Achetes({ articles }: { articles: ArticleAchete[] }) {
       <p className="text-sm text-zinc-500">
         {trouves.length.toLocaleString('fr-FR')} référence(s) affichée(s) sur {articles.length}
       </p>
+      {erreur && <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{erreur}</p>}
 
       {groupes.map(g => (
         <section key={g.fournisseur ?? '—'} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
@@ -798,11 +804,15 @@ function Achetes({ articles }: { articles: ArticleAchete[] }) {
                   <th className="px-3 py-2 text-left font-medium">Unité</th>
                   <th className="px-3 py-2 text-left font-medium">Dernier achat</th>
                   <th className="px-4 py-2 text-left font-medium">Ailleurs</th>
+                  <th className="px-2 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {g.articles.map(a => (
-                  <tr key={a.cle} className={acheteIncomplet(a) ? 'bg-red-50/40' : undefined}>
+                  edite === a.cle
+                  ? <EditionAchat key={a.cle} a={a} fournisseurs={tousF}
+                      fermer={() => setEdite(null)} dire={setErreur} />
+                  : <tr key={a.cle} className={acheteIncomplet(a) ? 'bg-red-50/40' : undefined}>
                     <td className="px-4 py-2">
                       <span className="font-medium text-zinc-900">{a.nom}</span>
                       {a.etablissement && <span className="ml-2 text-[11px] text-zinc-400">{a.etablissement}</span>}
@@ -831,6 +841,12 @@ function Achetes({ articles }: { articles: ArticleAchete[] }) {
                           </span>
                         : <span className="text-zinc-300">—</span>}
                     </td>
+                    <td className="px-2 py-2 text-right">
+                      <button onClick={() => { setErreur(null); setEdite(a.cle) }}
+                        className="rounded border border-zinc-300 px-2 py-1 text-xs font-medium hover:border-zinc-900">
+                        Modifier
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -843,5 +859,85 @@ function Achetes({ articles }: { articles: ArticleAchete[] }) {
         <p className="py-12 text-center text-sm text-zinc-500">Aucune référence ne correspond.</p>
       )}
     </div>
+  )
+}
+
+/* ─── Modifier une ligne du catalogue d'achat ─────────────────────────────
+ *
+ * Le geste le plus courant : « on prend ça ailleurs maintenant ». Il se
+ * faisait jusqu'ici dans trois écrans différents — ou pas du tout.
+ */
+function EditionAchat({ a, fournisseurs, fermer, dire }: {
+  a: ArticleAchete
+  fournisseurs: Fournisseur[]
+  fermer: () => void
+  dire: (m: string | null) => void
+}) {
+  const [fid, setFid] = useState<string>(
+    fournisseurs.find(f => f.nom === a.fournisseur)?.id ?? '')
+  const [ref, setRef] = useState(a.reference ?? '')
+  const [prix, setPrix] = useState(a.prix == null ? '' : String(a.prix))
+  const [releve, setReleve] = useState(!a.estime && a.prix != null)
+  const [enCours, demarrer] = useTransition()
+
+  function enregistrer() {
+    dire(null)
+    const n = prix.trim() === '' ? null : Number(prix.replace(',', '.'))
+    if (n != null && !Number.isFinite(n)) { dire('Prix illisible.'); return }
+    demarrer(async () => {
+      const r = await modifierArticleAchat({
+        cle: a.cle,
+        fournisseur_id: fid || null,
+        reference: ref.trim() || null,
+        prix: n,
+        prix_releve: releve,
+      })
+      if (!r.ok) { dire(r.message); return }
+      fermer()
+    })
+  }
+
+  return (
+    <tr className="bg-zinc-50">
+      <td className="px-4 py-3 font-medium text-zinc-900">{a.nom}</td>
+      <td colSpan={5} className="px-3 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={fid} onChange={e => setFid(e.target.value)}
+            className="h-10 rounded border border-zinc-300 px-2 text-sm">
+            <option value="">— sans fournisseur</option>
+            {fournisseurs.filter(f => f.actif).map(f => (
+              <option key={f.id} value={f.id}>{f.nom}</option>
+            ))}
+          </select>
+          <input value={ref} onChange={e => setRef(e.target.value)}
+            placeholder="Code article" className="h-10 w-36 rounded border border-zinc-300 px-2 text-sm" />
+          <div className="flex items-center gap-1">
+            <input value={prix} onChange={e => setPrix(e.target.value)} inputMode="decimal"
+              placeholder="Prix" className="h-10 w-28 rounded border border-zinc-300 px-2 text-right text-sm tabular-nums" />
+            <span className="text-xs text-zinc-500">€ / {a.unite ?? 'unité'}</span>
+          </div>
+          {/* ⚠️ C'est l'humain qui dit si le prix est relevé : un prix tapé
+              peut venir d'une facture sous les yeux comme d'une estimation.
+              Le déduire serait inventer (0165). */}
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" checked={releve} onChange={e => setReleve(e.target.checked)}
+              className="h-4 w-4 accent-emerald-700" />
+            <span>prix relevé sur une facture</span>
+          </label>
+          <button onClick={enregistrer} disabled={enCours}
+            className="ml-auto h-10 rounded bg-zinc-900 px-4 text-sm font-bold text-white disabled:opacity-40">
+            {enCours ? '…' : 'Enregistrer'}
+          </button>
+          <button onClick={fermer} className="h-10 rounded border border-zinc-300 px-3 text-sm">
+            Annuler
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] text-zinc-500">
+          ⚠️ Le prix saisi est celui de l&apos;unité <strong>achetée</strong> ({a.unite ?? 'unité'}),
+          pas de l&apos;unité vendue. Un coût atteignant 95 % du prix de vente est refusé —
+          c&apos;est presque toujours le prix du colis saisi à la place de celui de la pièce.
+        </p>
+      </td>
+    </tr>
   )
 }

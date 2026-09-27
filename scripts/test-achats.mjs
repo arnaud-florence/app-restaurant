@@ -422,5 +422,38 @@ titre('Notre catalogue d’achat')
     g[g.length - 1].articles[0].nom === 'Roquette' || g[g.length - 1].articles[0].nom === 'Tomates')
 }
 
+titre('Modifier une ligne du catalogue d’achat')
+{
+  // ⚠️ RECOPIE des règles de `modifierArticleAchat()`
+  // (src/app/admin/achats/modifier-actions.ts).
+  const coutVendu = (prixAchat, parAchat) =>
+    prixAchat == null ? null : Number((prixAchat / (Number(parAchat ?? 1) || 1)).toFixed(4))
+  const refuse = (prixAchat, parAchat, vente) => {
+    const c = coutVendu(prixAchat, parAchat)
+    return c != null && vente != null && vente > 0 && c >= vente * 0.95
+  }
+  const estime = (prix, releve) => (prix == null ? true : !releve)
+
+  t('⚠️ le prix saisi est celui de l’unité ACHETÉE, divisé par les unités vendues',
+    coutVendu(28.84, 96) === 0.3004)
+  t('sans conditionnement, il passe tel quel', coutVendu(2.5, null) === 2.5)
+  t('un prix effacé efface le coût', coutVendu(null, 96) === null)
+
+  t('⚠️ un coût à 95 % du prix de vente est REFUSÉ — le croissant à 40 €',
+    refuse(28.84, 1, 0.55))
+  t('le même prix divisé par son colis de 96 passe',
+    !refuse(28.84, 96, 0.55))
+  t('sans prix de vente connu, on ne refuse pas — on ne sait pas comparer',
+    !refuse(28.84, 1, null))
+  t('juste sous le seuil, ça passe', !refuse(0.94, 1, 1))
+  t('pile au seuil, ça bloque', refuse(0.95, 1, 1))
+
+  t('⚠️ un prix tapé reste ESTIMÉ tant que personne ne coche « relevé »',
+    estime(5, false) === true)
+  t('coché, il devient relevé', estime(5, true) === false)
+  t('⚠️ un prix EFFACÉ redevient estimé, même si la case était cochée',
+    estime(null, true) === true)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

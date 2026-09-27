@@ -3635,6 +3635,32 @@ chiffres.
 ⚠️ Deux désignations qui se normalisent pareil pour deux codes différents
 sont ÉCARTÉES : on ne tire pas au sort un identifiant.
 
+**Le catalogue est MODIFIABLE (27/09/2026).** « On prend ça ailleurs
+maintenant » est le geste le plus courant, et il se faisait dans trois
+écrans différents — ou pas du tout. Bouton « Modifier » sur chaque ligne :
+fournisseur, code article, prix. `modifier-actions.ts`.
+
+⚠️⚠️ **LE PRIX SAISI EST CELUI DE L'UNITÉ ACHETÉE, `cout_achat_ht` CELUI DE
+L'UNITÉ VENDUE** (0131). Une part de flan coûte le dixième du flan ; l'action
+divise par `unites_par_achat`. Écrire le prix du carton tel quel a déjà
+produit **un croissant à 40 €** (22/08/2026), et une marge fausse ne se
+signale pas.
+
+⚠️ **Même garde-fou que la propagation des factures** : un coût atteignant
+**95 % du prix de vente** est REFUSÉ, avec le calcul en clair. Vérifié à
+l'écran en saisissant 28,84 € (le carton de 96 croissants) sur le croissant :
+« Refusé : 28,8400 € par unité vendue atteindrait 95 % du prix de vente
+(1,1374 € HT) » — et rien n'a été écrit.
+
+⚠️ **C'EST L'HUMAIN QUI DIT SI LE PRIX EST RELEVÉ.** Un prix tapé peut venir
+d'une facture sous les yeux comme d'une estimation de coin de table : le
+déduire serait inventer. Case à cocher, et par défaut il reste ESTIMÉ (0165).
+⚠️ Un prix EFFACÉ redevient estimé, même si la case était cochée — on ne
+peut pas avoir relevé un prix qui n'existe pas.
+
+⚠️ `ingredients.fournisseur_principal` est du TEXTE (module 3) : on y écrit
+le NOM. Y coller un uuid rendrait la ligne illisible partout ailleurs.
+
 ### « Inconnu » tranché en « tarif public » — décision du gérant (27/09/2026)
 
 **2 412 références étaient en remise INCONNUE, toutes du portail Gineys.**
