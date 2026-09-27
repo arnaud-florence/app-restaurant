@@ -2724,6 +2724,24 @@ expiré au moment de le faire** (fenêtre « Reconnexion »). ⚠️ On ne saisi
 jamais le mot de passe du gérant à sa place : c'est lui qui rouvre la
 session, puis on relève.
 
+⚠️⚠️ **LES PROMOTIONS FRANCE BOISSONS DÉPENDENT DE LA DATE DE LIVRAISON.**
+`eazle.france-boissons.fr/promotions` répond, le 27/09/2026 :
+« Aucune promotion à la date du 27 septembre 2026. Modifiez votre date de
+livraison pour voir les promotions disponibles à une autre date. »
+
+Ce n'est PAS « France Boissons ne fait pas de promotions » — c'est « pas ce
+jour-là ». Les livraisons sont le **jeudi** (seuls jours proposés par Eazle) :
+un relevé doit donc parcourir les jeudis à venir, pas interroger « aujourd'hui ».
+Lire cette phrase comme une absence de promotions, c'est la même faute que le
+tableau d'allergènes vide lu « aucun allergène » — une réponse qui dit « pas
+ici » prise pour « nulle part ».
+
+⚠️ La page des promotions s'ouvre sans session, mais **les prix demandent la
+connexion**, et les prix REMISÉS ne sortent qu'à la simulation du panier
+(voir plus haut). Un relevé de promotions sans session ne rendrait donc que
+des tarifs publics — à ne surtout pas faire entrer dans
+`catalogue_fournisseur`, qui porte nos prix négociés.
+
 ⚠️ **AUCUN DE CES FOURNISSEURS N'A D'API**, et il ne faut pas le laisser
 croire. Le portail Gineys refuse les appels directs (« Illegal protocol ») ;
 Félix Potin, Gel Var, La Frite Belge et Euro-Cash n'ont envoyé que des PDF ;
