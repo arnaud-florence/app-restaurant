@@ -7,7 +7,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { lireTout } from '@/lib/supabase/pagine'
-import type { ArticleAchat, OffreFournisseur } from '@/lib/catalogue-achats'
+import {
+  etatPlateforme, manques,
+  type ArticleAchat, type OffreFournisseur, type GroupeComparaison,
+} from '@/lib/catalogue-achats'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import AchatsClient from './AchatsClient'
 
@@ -51,11 +54,26 @@ export default async function AchatsPage() {
   }))
   const refParLigne = new Map<string, { prix: number; unite: string }>()
   const meilleurs = new Set<string>()
+  const groupes: GroupeComparaison[] = []
   for (const g of comparer(pourComparer)) {
     for (const l of g.lignes) if (l.ref) refParLigne.set(l.id, { prix: l.ref.prix, unite: l.ref.unite })
     // ⚠️ On ne désigne un « moins cher » QUE si le groupe est comparable :
     // sinon on couronnerait une poche de 600 g face à une d'un kilo.
     if (g.comparable && g.meilleur) meilleurs.add(g.meilleur)
+
+    // ⚠️ L'état de la plateforme se mesure sur CES groupes, jamais sur un
+    // min/max brut des prix. Un comptage naïf annonçait « Serviettes
+    // −97 % » en opposant notre colis de 3 000 au paquet de 200 de
+    // Promocash : le compteur d'avancement aurait été le premier menteur.
+    // `comparer()` porte DÉJÀ `fournisseurs` et `ecartPct` — les recalculer
+    // ici serait la troisième implémentation, et elle finirait par
+    // annoncer un chiffre que l'écran d'à côté ne montre pas.
+    groupes.push({
+      cle: g.cle,
+      comparable: g.comparable,
+      fournisseurs: g.fournisseurs,
+      ecartPct: g.ecartPct,
+    })
   }
 
   const articles: ArticleAchat[] = lignes.map(l => ({
@@ -93,14 +111,32 @@ export default async function AchatsPage() {
     releve_le: o.releve_le as string,
   }))
 
+  // ⚠️ La couverture de NOS matières est la mesure qui compte vraiment :
+  // un catalogue de 3 300 références ne sert à rien s'il ne croise pas ce
+  // qu'on achète. Seules les matières réellement suivies au stock comptent
+  // — les 100 lignes de démo fausseraient le ratio (leçon de Gel Var).
+  const { data: matieres } = await sb.from('ingredients')
+    .select('id').eq('actif', true).eq('stocke', true)
+  const { data: liens } = await sb.from('catalogue_fournisseur')
+    .select('ingredient_id').eq('actif', true).not('ingredient_id', 'is', null)
+  const couverts = new Set((liens ?? []).map(l => l.ingredient_id as string))
+  const matieresSansOffre = (matieres ?? []).filter(m => !couverts.has(m.id as string)).length
+
+  const fourns = (fournisseurs ?? []).map(f => ({
+    id: f.id as string, nom: f.nom as string,
+    email: (f.email as string) ?? null, actif: Boolean(f.actif),
+  }))
+  const etat = etatPlateforme(articles, offres, fourns, groupes)
+
   return (
     <AchatsClient
+      etat={etat}
+      manques={manques(etat, matieresSansOffre)}
+      matieresSuivies={(matieres ?? []).length}
+      matieresCouvertes={(matieres ?? []).length - matieresSansOffre}
       articles={articles}
       offres={offres}
-      fournisseurs={(fournisseurs ?? []).map(f => ({
-        id: f.id as string, nom: f.nom as string,
-        email: (f.email as string) ?? null, actif: Boolean(f.actif),
-      }))}
+      fournisseurs={fourns}
     />
   )
 }

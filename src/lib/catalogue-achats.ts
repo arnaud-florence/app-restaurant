@@ -285,3 +285,186 @@ export function offresTriees(offres: OffreFournisseur[], aujourdhui = new Date()
       Number(a.finie) - Number(b.finie)
       || (a.restants ?? 9999) - (b.restants ?? 9999))
 }
+
+// ─── L'ÉTAT DE LA PLATEFORME ────────────────────────────────────────────
+//
+// « Qu'est-ce qui est en place ? » n'avait pas de réponse dans l'outil : il
+// fallait relancer un script pour le savoir, donc personne ne le savait.
+// Un chantier dont on ne voit pas l'avancement est un chantier qu'on croit
+// fini — et ici « fini » voudrait dire qu'on arbitre ses fournisseurs sur
+// une surface de comparaison de 22 lignes en la croyant complète.
+
+/** Un groupe de comparaison, tel que `comparer()` le rend. */
+export type GroupeComparaison = {
+  cle: string
+  /** Toutes les lignes ont pu être ramenées à la même base. */
+  comparable: boolean
+  /** Nombre de fournisseurs DISTINCTS dans le groupe. */
+  fournisseurs: number
+  /** Écart entre le moins cher et le plus cher, en %, si comparable. */
+  ecartPct: number | null
+}
+
+export type LigneFournisseurEtat = {
+  nom: string
+  lignes: number
+  avecPrix: number
+  /** Répartition par nature : facture / devis / portail / catalogue. */
+  natures: Array<{ nature: string; n: number }>
+  email: string | null
+  /** Tarif le plus récent connu pour ce fournisseur. */
+  dernierTarif: string | null
+}
+
+export type Manque = {
+  /** Ce qui manque, en une phrase. */
+  quoi: string
+  /** Combien, quand ça se compte. */
+  combien: number | null
+  /** Pourquoi ça compte — jamais une simple constatation. */
+  consequence: string
+}
+
+export type EtatPlateforme = {
+  lignes: number
+  fournisseurs: number
+  avecPrix: number
+  /** ⚠️ Prix sur demande. Ni zéro, ni exclu : à demander. */
+  sansPrix: number
+  avecFamille: number
+  /** Clés de comparaison posées à la main. */
+  cles: number
+  /** Les VRAIS face-à-face : ≥ 2 fournisseurs ET comparables. */
+  faceAFace: number
+  /** Groupes à ≥ 2 fournisseurs mais dont les unités ne concordent pas. */
+  nonComparables: number
+  /** Groupes d'un seul fournisseur : ce n'est pas une comparaison. */
+  seul: number
+  remises: Record<EtatRemise, number>
+  demandees: number
+  achetes: number
+  promos: number
+  parFournisseur: LigneFournisseurEtat[]
+}
+
+export function etatPlateforme(
+  articles: ArticleAchat[],
+  offres: OffreFournisseur[],
+  fournisseurs: Array<{ id: string; nom: string; email: string | null; actif: boolean }>,
+  groupes: GroupeComparaison[],
+): EtatPlateforme {
+  const remises: Record<EtatRemise, number> = { negocie: 0, public: 0, inconnu: 0 }
+  const parF = new Map<string, LigneFournisseurEtat & { _nat: Map<string, number> }>()
+
+  for (const f of fournisseurs) {
+    if (!f.actif) continue
+    parF.set(f.id, { nom: f.nom, lignes: 0, avecPrix: 0, natures: [], email: f.email, dernierTarif: null, _nat: new Map() })
+  }
+
+  for (const a of articles) {
+    remises[etatRemise(a)]++
+    let e = parF.get(a.fournisseur_id)
+    // Un fournisseur désactivé peut porter des lignes (Lavazza) : on le
+    // montre quand même, sinon des lignes existent sans être attribuées.
+    if (!e) {
+      e = { nom: a.fournisseur_nom, lignes: 0, avecPrix: 0, natures: [], email: null, dernierTarif: null, _nat: new Map() }
+      parF.set(a.fournisseur_id, e)
+    }
+    e.lignes++
+    if (a.prix_ht != null) e.avecPrix++
+    e._nat.set(a.nature, (e._nat.get(a.nature) ?? 0) + 1)
+    if (!e.dernierTarif || a.date_tarif > e.dernierTarif) e.dernierTarif = a.date_tarif
+  }
+
+  const liste = [...parF.values()]
+    .map(e => ({
+      nom: e.nom, lignes: e.lignes, avecPrix: e.avecPrix, email: e.email, dernierTarif: e.dernierTarif,
+      natures: [...e._nat.entries()].map(([nature, n]) => ({ nature, n })).sort((a, b) => b.n - a.n),
+    }))
+    .sort((a, b) => b.lignes - a.lignes)
+
+  // ⚠️ UN FACE-À-FACE EXIGE DEUX CONDITIONS, pas une. Deux fournisseurs ne
+  // suffisent pas si les unités ne concordent pas — c'est le cas du colis
+  // de 3 000 serviettes face au paquet de 200, qui affichait « −97 % ».
+  // Et un groupe d'un seul fournisseur ne compare rien du tout.
+  const aDeux = groupes.filter(g => g.fournisseurs >= 2)
+
+  return {
+    lignes: articles.length,
+    fournisseurs: liste.length,
+    avecPrix: articles.filter(a => a.prix_ht != null).length,
+    sansPrix: articles.filter(a => a.prix_ht == null).length,
+    avecFamille: articles.filter(a => a.famille).length,
+    cles: groupes.length,
+    faceAFace: aDeux.filter(g => g.comparable).length,
+    nonComparables: aDeux.filter(g => !g.comparable).length,
+    seul: groupes.length - aDeux.length,
+    remises,
+    demandees: articles.filter(a => a.remise_demandee_le).length,
+    achetes: articles.filter(a => a.achete).length,
+    promos: offres.length,
+    parFournisseur: liste,
+  }
+}
+
+/**
+ * ⚠️ CE QUI MANQUE, DIT EN TOUTES LETTRES.
+ *
+ * Un écran qui n'affiche que ce qu'il a laisse croire que c'est tout ce
+ * qu'il y a. Même raisonnement que la fiche technique, qui dit « aucune
+ * composition saisie » plutôt que de paraître complète : la conséquence est
+ * nommée, pas seulement le trou — sinon la liste se lit comme une plainte
+ * et personne n'agit.
+ */
+export function manques(e: EtatPlateforme, matieresSansOffre: number): Manque[] {
+  const m: Manque[] = []
+
+  if (matieresSansOffre > 0) m.push({
+    quoi: 'matières suivies au stock sans AUCUNE offre fournisseur',
+    combien: matieresSansOffre,
+    consequence: 'on ne peut pas savoir si on les paie au bon prix — ni les commander ailleurs.',
+  })
+
+  const sansEmail = e.parFournisseur.filter(f => !f.email).length
+  if (sansEmail > 0) m.push({
+    quoi: 'fournisseurs sans adresse e-mail',
+    combien: sansEmail,
+    consequence: 'aucun bon de commande ni demande de conditions ne peut partir chez eux.',
+  })
+
+  if (e.remises.inconnu > 0) m.push({
+    quoi: 'références dont on ignore si le prix porte notre remise',
+    combien: e.remises.inconnu,
+    consequence: '« inconnu » n’est pas « tarif public » : c’est exactement ce qu’il faut demander.',
+  })
+
+  if (e.nonComparables > 0) m.push({
+    quoi: 'groupes à plusieurs fournisseurs dont les unités ne concordent pas',
+    combien: e.nonComparables,
+    consequence: 'un colis face à une pièce donnerait un écart faux — la contenance se tranche à la main.',
+  })
+
+  const sansFamille = e.lignes - e.avecFamille
+  if (sansFamille > 0) m.push({
+    quoi: 'références sans famille',
+    combien: sansFamille,
+    consequence: 'elles sont introuvables par le filtre par catégorie, seulement par la recherche.',
+  })
+
+  if (e.sansPrix > 0) m.push({
+    quoi: 'références à « prix sur demande »',
+    combien: e.sansPrix,
+    consequence: 'jamais comptées pour zéro — ce sont celles pour lesquelles il faut écrire.',
+  })
+
+  // ⚠️ Celui-ci n'est pas un chiffre, et c'est le plus structurant : aucune
+  // de ces sources ne se rafraîchit toute seule. Le taire ferait croire à
+  // des prix vivants alors qu'ils datent du dernier relevé.
+  m.push({
+    quoi: 'aucun fournisseur n’expose d’API',
+    combien: null,
+    consequence: 'tous ces prix datent du dernier relevé manuel et ne se mettent jamais à jour seuls.',
+  })
+
+  return m
+}

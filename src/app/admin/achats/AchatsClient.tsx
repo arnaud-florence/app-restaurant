@@ -5,13 +5,13 @@ import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
   offresTriees,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
-  type OffreFournisseur,
+  type OffreFournisseur, type EtatPlateforme, type Manque,
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
 
 type Fournisseur = { id: string; nom: string; email: string | null; actif: boolean }
-type Onglet = 'promos' | 'catalogue'
+type Onglet = 'promos' | 'catalogue' | 'etat'
 
 /** ⚠️ 3 300 lignes ne se rendent pas d'un bloc : sur la tablette du comptoir,
  *  chaque frappe coûterait plusieurs secondes. Une page à la fois, et le
@@ -19,8 +19,12 @@ type Onglet = 'promos' | 'catalogue'
 const PAR_PAGE = 60
 
 export default function AchatsClient({
-  articles, offres, fournisseurs,
-}: { articles: ArticleAchat[]; offres: OffreFournisseur[]; fournisseurs: Fournisseur[] }) {
+  articles, offres, fournisseurs, etat, manques, matieresSuivies, matieresCouvertes,
+}: {
+  articles: ArticleAchat[]; offres: OffreFournisseur[]; fournisseurs: Fournisseur[]
+  etat: EtatPlateforme; manques: Manque[]
+  matieresSuivies: number; matieresCouvertes: number
+}) {
   const promos = useMemo(() => promotions(articles), [articles])
   const [onglet, setOnglet] = useState<Onglet>(promos.length ? 'promos' : 'catalogue')
   const [f, setF] = useState<Filtres>(FILTRES_VIDES)
@@ -92,9 +96,14 @@ export default function AchatsClient({
         <Onglets actif={onglet === 'catalogue'} onClick={() => setOnglet('catalogue')}>
           📚 Catalogue <Compteur n={articles.length} />
         </Onglets>
+        <Onglets actif={onglet === 'etat'} onClick={() => setOnglet('etat')}>
+          🧭 Ce qui est en place
+        </Onglets>
       </div>
 
-      {onglet === 'promos'
+      {onglet === 'etat'
+        ? <Etat etat={etat} manques={manques} suivies={matieresSuivies} couvertes={matieresCouvertes} />
+        : onglet === 'promos'
         ? <Promos promos={promos} offres={offres} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
         : (
           <>
@@ -536,4 +545,167 @@ const COULEUR: Record<EtatRemise, string> = {
 
 function Pastille({ etat }: { etat: EtatRemise }) {
   return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${COULEUR[etat]}`}>{LIBELLE_REMISE[etat]}</span>
+}
+
+/* ═══ CE QUI EST EN PLACE ═══════════════════════════════════════════════
+ *
+ * ⚠️ Cet écran doit dire ce qui MANQUE aussi clairement que ce qu'il a.
+ * Un tableau de bord qui n'affiche que ses réussites fait croire le
+ * chantier fini — et ici « fini » voudrait dire arbitrer ses fournisseurs
+ * sur une poignée de comparaisons en la croyant exhaustive.
+ */
+function Etat({
+  etat, manques, suivies, couvertes,
+}: { etat: EtatPlateforme; manques: Manque[]; suivies: number; couvertes: number }) {
+  const pct = suivies > 0 ? Math.round((couvertes / suivies) * 100) : 0
+  return (
+    <div className="space-y-6 pb-16">
+      {/* Ce que la plateforme contient */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Carte n={etat.lignes.toLocaleString('fr-FR')} libelle="références" />
+        <Carte n={etat.fournisseurs} libelle="fournisseurs" />
+        <Carte n={etat.avecPrix.toLocaleString('fr-FR')} libelle="avec un prix"
+          sous={etat.sansPrix ? `${etat.sansPrix} sur demande` : undefined} />
+        <Carte n={etat.promos} libelle="offres en cours" />
+      </section>
+
+      {/* La mesure qui compte vraiment */}
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500">
+          Ce qu’on peut vraiment comparer
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600">
+          Un catalogue de {etat.lignes.toLocaleString('fr-FR')} références ne sert à rien
+          s’il ne croise pas ce qu’on achète. Le chiffre utile n’est pas la taille du
+          catalogue, c’est le nombre de <strong>face-à-face</strong> réels.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Carte n={etat.faceAFace} libelle="face-à-face" accent="text-emerald-700"
+            sous="≥ 2 fournisseurs, unités concordantes" />
+          <Carte n={etat.nonComparables} libelle="unités discordantes" accent="text-amber-700"
+            sous="à trancher à la main" />
+          <Carte n={etat.seul} libelle="un seul fournisseur" accent="text-zinc-400"
+            sous="ce n’est pas une comparaison" />
+          <Carte n={`${couvertes} / ${suivies}`} libelle="matières couvertes"
+            accent={pct >= 70 ? 'text-emerald-700' : 'text-amber-700'} sous={`${pct} % du stock suivi`} />
+        </div>
+      </section>
+
+      {/* Ce qu'on sait de nos remises */}
+      <section className="rounded-lg border border-zinc-200 bg-white p-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500">
+          Ce qu’on sait de nos remises
+        </h2>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <Carte n={etat.remises.negocie.toLocaleString('fr-FR')} libelle="tarif négocié"
+            accent="text-emerald-700" sous="vérifié" />
+          <Carte n={etat.remises.public.toLocaleString('fr-FR')} libelle="tarif public"
+            accent="text-zinc-600" sous="mesuré contre le catalogue" />
+          <Carte n={etat.remises.inconnu.toLocaleString('fr-FR')} libelle="inconnu"
+            accent="text-amber-700" sous="personne n’a vérifié" />
+        </div>
+        {/* ⚠️ La nuance est tout le sujet : « inconnu » n'est PAS « pas de
+            remise ». C'est ce qui déclenche la demande au fournisseur. */}
+        <p className="mt-3 text-xs text-amber-800">
+          ⚠️ « Inconnu » ne veut pas dire « pas de remise » : personne n’a vérifié.
+          C’est exactement ce qu’il faut demander — {etat.demandees} demande(s) partie(s) à ce jour.
+        </p>
+      </section>
+
+      {/* Par fournisseur */}
+      <section className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <h2 className="border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-bold uppercase tracking-wider text-zinc-500">
+          Par fournisseur
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs uppercase tracking-wider text-zinc-400">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Fournisseur</th>
+                <th className="px-3 py-2 text-right font-medium">Réfs</th>
+                <th className="px-3 py-2 text-left font-medium">D’où viennent les prix</th>
+                <th className="px-3 py-2 text-left font-medium">Dernier tarif</th>
+                <th className="px-4 py-2 text-left font-medium">Contact</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {etat.parFournisseur.map(f => (
+                <tr key={f.nom}>
+                  <td className="px-4 py-2 font-medium text-zinc-900">{f.nom}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {f.lignes.toLocaleString('fr-FR')}
+                    {f.avecPrix < f.lignes && (
+                      <span className="ml-1 text-xs text-amber-700">({f.lignes - f.avecPrix} s/dem.)</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {f.natures.map(n => <Nature key={n.nature} nature={n.nature} n={n.n} />)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 tabular-nums text-zinc-500">{f.dernierTarif ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    {/* ⚠️ Sans adresse, aucun bon ni aucune demande ne part. */}
+                    {f.email
+                      ? <span className="text-zinc-600">{f.email}</span>
+                      : <span className="font-medium text-red-700">✗ pas d’adresse</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Ce qui manque */}
+      <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-amber-900">
+          Ce qui manque encore
+        </h2>
+        <ul className="mt-3 space-y-2">
+          {manques.map((m, i) => (
+            <li key={i} className="text-sm text-amber-900">
+              {m.combien != null && (
+                <strong className="tabular-nums">{m.combien.toLocaleString('fr-FR')} </strong>
+              )}
+              {m.quoi} — <span className="text-amber-800">{m.consequence}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  )
+}
+
+function Carte({ n, libelle, sous, accent }: {
+  n: number | string; libelle: string; sous?: string; accent?: string
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-3">
+      <p className={`text-2xl font-black tabular-nums ${accent ?? 'text-zinc-900'}`}>{n}</p>
+      <p className="text-xs font-medium text-zinc-600">{libelle}</p>
+      {sous && <p className="mt-0.5 text-[11px] leading-tight text-zinc-400">{sous}</p>}
+    </div>
+  )
+}
+
+/* ⚠️ La NATURE d'un prix change ce qu'on a le droit d'en conclure : une
+ * facture est une preuve de paiement, un devis une proposition qui peut
+ * être un tarif d'appel, un tarif de portail ou de catalogue un prix
+ * affiché. Arbitrer un fournisseur sur l'un en croyant lire l'autre se
+ * paie pendant des mois (0152). */
+const NATURES: Record<string, { texte: string; classe: string }> = {
+  facture:   { texte: 'payé',      classe: 'bg-emerald-100 text-emerald-800' },
+  devis:     { texte: 'devis',     classe: 'bg-blue-100 text-blue-800' },
+  portail:   { texte: 'portail',   classe: 'bg-violet-100 text-violet-800' },
+  catalogue: { texte: 'catalogue', classe: 'bg-zinc-100 text-zinc-700' },
+}
+
+function Nature({ nature, n }: { nature: string; n: number }) {
+  const v = NATURES[nature] ?? { texte: nature, classe: 'bg-zinc-100 text-zinc-700' }
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${v.classe}`}>
+      {v.texte} {n.toLocaleString('fr-FR')}
+    </span>
+  )
 }

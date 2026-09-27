@@ -219,5 +219,105 @@ if (process.env.PORT) {
   t('appel anonyme refusé ou redirigé', r.status === 307 || r.status === 302 || r.status === 401 || r.status === 403)
 }
 
+// ═══ L'ÉTAT DE LA PLATEFORME ═══════════════════════════════════════════
+// ⚠️ RECOPIE de `etatPlateforme()` / `manques()` (src/lib/catalogue-achats.ts).
+const etatPlateforme = (articles, offres, fournisseurs, groupes) => {
+  const remises = { negocie: 0, public: 0, inconnu: 0 }
+  const parF = new Map()
+  for (const f of fournisseurs) {
+    if (!f.actif) continue
+    parF.set(f.id, { nom: f.nom, lignes: 0, avecPrix: 0, email: f.email, dernierTarif: null, _nat: new Map() })
+  }
+  for (const a of articles) {
+    remises[a.tarif_negocie === true ? 'negocie' : a.tarif_negocie === false ? 'public' : 'inconnu']++
+    let e = parF.get(a.fournisseur_id)
+    if (!e) { e = { nom: a.fournisseur_nom, lignes: 0, avecPrix: 0, email: null, dernierTarif: null, _nat: new Map() }; parF.set(a.fournisseur_id, e) }
+    e.lignes++
+    if (a.prix_ht != null) e.avecPrix++
+    e._nat.set(a.nature, (e._nat.get(a.nature) ?? 0) + 1)
+    if (!e.dernierTarif || a.date_tarif > e.dernierTarif) e.dernierTarif = a.date_tarif
+  }
+  const liste = [...parF.values()].map(e => ({
+    nom: e.nom, lignes: e.lignes, avecPrix: e.avecPrix, email: e.email, dernierTarif: e.dernierTarif,
+    natures: [...e._nat.entries()].map(([nature, n]) => ({ nature, n })).sort((a, b) => b.n - a.n),
+  })).sort((a, b) => b.lignes - a.lignes)
+  const aDeux = groupes.filter(g => g.fournisseurs >= 2)
+  return {
+    lignes: articles.length, fournisseurs: liste.length,
+    avecPrix: articles.filter(a => a.prix_ht != null).length,
+    sansPrix: articles.filter(a => a.prix_ht == null).length,
+    avecFamille: articles.filter(a => a.famille).length,
+    cles: groupes.length,
+    faceAFace: aDeux.filter(g => g.comparable).length,
+    nonComparables: aDeux.filter(g => !g.comparable).length,
+    seul: groupes.length - aDeux.length,
+    remises,
+    demandees: articles.filter(a => a.remise_demandee_le).length,
+    achetes: articles.filter(a => a.achete).length,
+    promos: offres.length, parFournisseur: liste,
+  }
+}
+
+const art = (o) => ({
+  id: o.id, fournisseur_id: o.fid ?? 'f1', fournisseur_nom: o.fnom ?? 'Gineys',
+  reference: '', designation: o.d ?? 'X', famille: o.fam ?? null, cle: o.cle ?? null,
+  ref: null, meilleur: false, unite: 'kg', prix_ht: o.prix === undefined ? 1 : o.prix,
+  remise_pct: null, tarif_negocie: o.neg === undefined ? null : o.neg,
+  achete: Boolean(o.achete), remise_demandee_le: o.dem ?? null,
+  date_tarif: o.date ?? '2026-09-01', nature: o.nat ?? 'portail',
+})
+const FS = [{ id: 'f1', nom: 'Gineys', email: 'a@b.c', actif: true },
+            { id: 'f2', nom: 'Promocash', email: null, actif: true }]
+
+console.log('\n── L\'état de la plateforme ──')
+{
+  const e = etatPlateforme(
+    [art({ id: '1' }), art({ id: '2', prix: null }), art({ id: '3', fid: 'f2', fnom: 'Promocash', fam: 'ÉPICERIE' })],
+    [], FS,
+    [{ cle: 'a', comparable: true, fournisseurs: 2, ecartPct: 30 },
+     { cle: 'b', comparable: false, fournisseurs: 2, ecartPct: null },
+     { cle: 'c', comparable: true, fournisseurs: 1, ecartPct: null }])
+
+  t('un prix sur demande n\'est pas compté comme un prix', e.avecPrix === 2 && e.sansPrix === 1)
+  t('⚠️ un face-à-face exige DEUX fournisseurs ET des unités concordantes', e.faceAFace === 1)
+  t('un groupe à unités discordantes est compté à part, pas perdu', e.nonComparables === 1)
+  t('un groupe à un seul fournisseur n\'est pas une comparaison', e.seul === 1)
+  t('les trois compteurs couvrent tous les groupes', e.faceAFace + e.nonComparables + e.seul === e.cles)
+  t('« inconnu » est compté à part de « tarif public »', e.remises.inconnu === 3 && e.remises.public === 0)
+  t('la famille absente n\'est pas comptée', e.avecFamille === 1)
+  t('le dernier tarif est le PLUS RÉCENT', 
+    etatPlateforme([art({ id: '1', date: '2026-01-01' }), art({ id: '2', date: '2026-09-27' })], [], FS, [])
+      .parFournisseur[0].dernierTarif === '2026-09-27')
+  t('un fournisseur sans ligne apparaît quand même', e.parFournisseur.length === 2)
+  t('les fournisseurs sont triés par volume', e.parFournisseur[0].lignes >= e.parFournisseur[1].lignes)
+}
+
+console.log('\n── Ce qui manque est DIT, avec sa conséquence ──')
+{
+  const manques = (e, matieresSansOffre) => {
+    const m = []
+    if (matieresSansOffre > 0) m.push({ quoi: 'matières sans offre', combien: matieresSansOffre, consequence: 'x' })
+    const sansEmail = e.parFournisseur.filter(f => !f.email).length
+    if (sansEmail > 0) m.push({ quoi: 'sans e-mail', combien: sansEmail, consequence: 'x' })
+    if (e.remises.inconnu > 0) m.push({ quoi: 'remise inconnue', combien: e.remises.inconnu, consequence: 'x' })
+    if (e.nonComparables > 0) m.push({ quoi: 'unités discordantes', combien: e.nonComparables, consequence: 'x' })
+    const sf = e.lignes - e.avecFamille
+    if (sf > 0) m.push({ quoi: 'sans famille', combien: sf, consequence: 'x' })
+    if (e.sansPrix > 0) m.push({ quoi: 'prix sur demande', combien: e.sansPrix, consequence: 'x' })
+    m.push({ quoi: 'aucune API', combien: null, consequence: 'x' })
+    return m
+  }
+  const e = etatPlateforme([art({ id: '1' })], [], FS, [])
+  const m = manques(e, 54)
+  t('un fournisseur sans e-mail est signalé', m.some(x => x.quoi === 'sans e-mail' && x.combien === 1))
+  t('les matières sans offre sont signalées', m.some(x => x.combien === 54))
+  t('l\'absence d\'API est TOUJOURS dite — elle n\'a pas de chiffre',
+    m.some(x => x.quoi === 'aucune API' && x.combien === null))
+  t('chaque manque porte une CONSÉQUENCE, jamais un simple constat',
+    m.every(x => x.consequence && x.consequence.length > 0))
+  const parfait = etatPlateforme([art({ id: '1', neg: true, fam: 'X' })], [], [FS[0]], [])
+  t('une plateforme sans trou ne liste que l\'absence d\'API', manques(parfait, 0).length === 1)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

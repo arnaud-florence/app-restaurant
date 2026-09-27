@@ -3248,7 +3248,53 @@ deux appels identiques rendent la même réponse, même si la page a changé
 entre-temps. Une heure perdue à croire que les clics ne passaient pas, alors
 qu'ils passaient tous. `get_page_text` et les captures, eux, sont frais.
 
-Test : `PORT=3000 node scripts/test-achats.mjs` — 57 assertions. ⚠️ Il
+**« Ce qui est en place » — le troisième onglet (27/09/2026).**
+
+La question « où en est la plateforme ? » n'avait pas de réponse DANS l'outil :
+il fallait relancer un script pour le savoir, donc personne ne le savait. Un
+chantier dont on ne voit pas l'avancement est un chantier qu'on croit fini —
+et ici « fini » voudrait dire arbitrer ses fournisseurs sur dix-sept
+comparaisons en les croyant exhaustives.
+
+⚠️⚠️ **LE CHIFFRE UTILE N'EST PAS LA TAILLE DU CATALOGUE.** 3 392 références
+ne servent à rien si elles ne croisent pas ce qu'on achète. Les deux mesures
+qui comptent sont les **face-à-face réels** et la **couverture de nos
+matières** — 39 sur 93, soit **42 %** au 27/09/2026.
+
+⚠️ **UN COMPTAGE NAÏF AURAIT ÉTÉ LE PREMIER MENTEUR.** Un simple min/max des
+prix par clé annonçait **22 face-à-face** et des écarts de « −97 % »
+(Serviettes), « −94 % » (mayonnaise), « −92 % » (éclair) : il opposait notre
+colis de 3 000 serviettes au paquet de 200 de Promocash. Le panneau se calcule
+donc sur les groupes rendus par **`comparer()`**, qui exige la même base —
+**17 face-à-face**, 5 groupes à unités discordantes, 43 à un seul fournisseur.
+Les trois compteurs couvrent tous les groupes, et le test le vérifie.
+
+⚠️ `comparer()` porte DÉJÀ `fournisseurs` et `ecartPct` : les recalculer dans
+la page aurait été la troisième implémentation, et elle aurait fini par
+annoncer un chiffre que l'écran d'à côté ne montre pas.
+
+⚠️ **La NATURE de chaque prix est affichée par fournisseur** — payé / devis /
+portail / catalogue. Gineys : portail 2 892, catalogue 89, **payé 82**. C'est
+ce qui empêche d'arbitrer sur un tarif d'appel en croyant lire un prix réglé.
+
+**`manques()` dit ce qui MANQUE, avec sa CONSÉQUENCE.** Un écran qui n'affiche
+que ses réussites fait croire le chantier terminé ; et une liste de trous sans
+conséquence se lit comme une plainte, donc personne n'agit. Au 27/09/2026 :
+54 matières sans aucune offre, 4 fournisseurs sans adresse, 2 412 remises
+inconnues, 5 groupes à unités discordantes, 1 093 références sans famille,
+25 prix sur demande — et **l'absence d'API chez tous les fournisseurs**, le
+seul manque sans chiffre, systématiquement affiché : le taire ferait croire à
+des prix vivants alors qu'ils datent du dernier relevé manuel.
+
+⚠️ Seules les matières **réellement suivies** (`stocke = true`) comptent dans
+la couverture : les 100 lignes de démo fausseraient le ratio (leçon de Gel Var).
+
+⚠️ Le service worker a encore servi sa page **hors-ligne** pendant la
+vérification, puis un bundle sans CSS (chunks en 503 pendant la compilation).
+Deux symptômes distincts, même réflexe : purger le cache avant de conclure que
+l'écran est cassé. `CACHE_VERSION` bumpée en v218.
+
+Test : `PORT=3000 node scripts/test-achats.mjs` — 72 assertions. ⚠️ Il
 RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
 que la page est **fermée aux appels anonymes** : elle expose des conditions
 négociées.
@@ -5149,7 +5195,7 @@ PORT=3000 node scripts/test-scanner-allergenes.mjs # scanner d'emballages (sans 
 PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ acheté du bar
 node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
-PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat (0158, 0159)
+PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat + son état (0158, 0159)
 PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
 node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vient chaque cible
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
