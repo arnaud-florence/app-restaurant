@@ -8,7 +8,7 @@ import {
   comptagePerime, stockAReconstituer, PEREMPTION_COMPTAGE_JOURS,
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
-import { fmtPrix } from '@/lib/foodCost'
+import { fmtPrix, fmtEcart } from '@/lib/foodCost'
 import { enregistrerParametres, creerBonsDepuisReassort } from './actions'
 
 type Vue = 'categories' | 'fournisseurs' | 'etablissements'
@@ -299,8 +299,8 @@ function Ligne({
           {l.ailleurs && (
             <span className="ml-1 font-medium text-violet-700">
               {auMoinsCher && l.ailleurs.fournisseur_id !== l.fournisseur_id
-                ? <>→ part chez {l.ailleurs.fournisseur} (−{Math.round(l.ailleurs.ecartPct)} %)</>
-                : <>💡 −{Math.round(l.ailleurs.ecartPct)} % chez {l.ailleurs.fournisseur}</>}
+                ? <>→ part chez {l.ailleurs.fournisseur} (−{fmtEcart(l.ailleurs.ecartPct)})</>
+                : <>💡 −{fmtEcart(l.ailleurs.ecartPct)} chez {l.ailleurs.fournisseur}</>}
             </span>
           )}
           {/* ⚠️ « jamais compté » ≠ « zéro » : le premier dit que personne

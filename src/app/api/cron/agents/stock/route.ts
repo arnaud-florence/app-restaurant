@@ -407,34 +407,89 @@ async function comparerPrixFournisseurs(
   const { data: fourns } = await ctx.supabase.from('fournisseurs').select('id, nom')
   const nomF = new Map((fourns ?? []).map(f => [f.id as string, f.nom as string]))
 
+  // ── CHEZ QUI ON ACHÈTE AUJOURD'HUI ───────────────────────────────────
+  //
+  // ⚠️⚠️ SANS CECI, L'AGENT CRIE SUR DES ÉCONOMIES DÉJÀ PRISES. Mesuré le
+  // 28/09/2026 : 13 de ses 17 trouvailles disaient « Gineys → Félix Potin »
+  // alors que la matière était PASSÉE chez Félix Potin depuis. Il lisait le
+  // fournisseur sur la ligne de FACTURE — c'est-à-dire un fait du passé, pas
+  // notre fournisseur actuel — et un écran qui redemande ce qui est fait
+  // cesse d'être lu, ce qui coûte les quatre trouvailles qui, elles, sont
+  // vraies.
+  //
+  // L'ordre est donc : notre fournisseur ENREGISTRÉ d'abord, la facture
+  // ensuite. La facture reste le repli — beaucoup de matières n'ont pas
+  // encore de fournisseur attitré, et sans elle on ne comparerait rien.
+  const notreFournisseur = new Map<string, string>()   // cible → fournisseur_id
+  const { data: ingsF } = await ctx.supabase
+    .from('ingredients').select('id, fournisseur_principal').eq('actif', true)
+  const idParNom = new Map([...nomF].map(([id, n]) => [n, id]))
+  for (const i of ingsF ?? []) {
+    const id = idParNom.get((i.fournisseur_principal ?? '') as string)
+    if (id) notreFournisseur.set(i.id as string, id)
+  }
+  for (let de = 0; de < 20000; de += 1000) {
+    const { data } = await ctx.supabase
+      .from('recettes').select('id, fournisseur_id')
+      .not('fournisseur_id', 'is', null).order('id').range(de, de + 999)
+    for (const r of data ?? []) notreFournisseur.set(r.id as string, r.fournisseur_id as string)
+    if ((data ?? []).length < 1000) break
+  }
+
   const out: Array<{
     ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number
     fournAlternatifId: string; ingredientIds: string[]
   }> = []
 
   for (const g of comparer(lignes)) {
-    // ⚠️ Trois conditions, et chacune écarte un faux positif :
+    // ⚠️ Deux conditions, et chacune écarte un faux positif :
     //   · `comparable` — toutes les lignes ramenées à la MÊME base, sinon on
     //     compare une poche de 600 g à une poche d'un kilo ;
     //   · deux fournisseurs DISTINCTS — sinon on compare deux de nos propres
-    //     références chez le même vendeur ;
-    //   · un écart franc — sous 10 %, c'est du bruit de conditionnement.
-    if (!g.comparable || g.fournisseurs < 2 || (g.ecartPct ?? 0) < 10) continue
+    //     références chez le même vendeur.
+    //
+    // ⚠️ IL N'Y A PLUS DE SEUIL D'ÉCART — décision du gérant du 28/09/2026 :
+    // « même moins 1 %, un produit se change ». Les 10 % qui dormaient ici
+    // taisaient le Coca-Cola à −9 % chez Euro-Cash. Ce sont deux choses
+    // différentes : un écart qu'on ne sait pas MESURER (unités qui ne
+    // concordent pas) est un faux positif et reste écarté ; un écart petit
+    // mais MESURÉ est une information, et c'est le gérant qui décide s'il
+    // vaut un changement de fournisseur.
+    if (!g.comparable || g.fournisseurs < 2 || g.ecartPct == null) continue
 
     const chiffrees = g.lignes.filter(l => l.ref)
     const tri = [...chiffrees].sort((a, b) => a.ref!.prix - b.ref!.prix)
     const moinsCher = tri[0]
 
-    // ⚠️ Ce qu'on achète DÉJÀ : une ligne tirée d'une facture (un prix
-    // réellement payé) ou marquée « Mes articles » au portail. Sans ce
-    // repère, l'agent crierait « moins cher ailleurs » alors qu'on y est
-    // déjà — et on cesserait de le lire.
-    const incumbent = chiffrees.find(l => l.nature === 'facture' || (l as { achete?: boolean }).achete)
+    // ⚠️ Ce qu'on achète DÉJÀ. D'abord le fournisseur ENREGISTRÉ sur la
+    // matière ou le produit — c'est la décision en vigueur. À défaut, une
+    // ligne tirée d'une facture (un prix réellement payé) ou marquée « Mes
+    // articles » au portail. Sans ce repère, l'agent crierait « moins cher
+    // ailleurs » alors qu'on y est déjà — et on cesserait de le lire.
+    //
+    // ⚠️ La résolution se fait au niveau du GROUPE, pas de la ligne. La
+    // ligne qui porte notre cible est presque toujours celle de la
+    // FACTURE — un devis reçu par mail n'est rattaché à rien. Chercher
+    // « la ligne dont la cible désigne son propre fournisseur » ne
+    // trouvait donc jamais le nouveau : le Coca restait « Promocash →
+    // Euro-Cash » alors qu'on achète chez Euro-Cash depuis.
+    let notreF: string | null = null
+    for (const l of g.lignes) {
+      for (const cible of [l.ingredient_id, l.recette_id]) {
+        const f = cible ? notreFournisseur.get(cible) : undefined
+        if (f) { notreF = f; break }
+      }
+      if (notreF) break
+    }
+    const incumbent = (notreF ? chiffrees.find(l => l.fournisseur_id === notreF) : undefined)
+      ?? chiffrees.find(l => l.nature === 'facture' || (l as { achete?: boolean }).achete)
     if (!incumbent) continue
     if (incumbent.id === moinsCher.id) continue
 
+    // Strictement moins cher, rien de plus : à égalité de prix il n'y a
+    // pas d'économie, et « 0 % moins cher » n'est pas une alerte.
     const economiePct = ((incumbent.ref!.prix - moinsCher.ref!.prix) / incumbent.ref!.prix) * 100
-    if (economiePct < 10) continue
+    if (economiePct <= 0) continue
 
     const nomActuel = nomF.get(incumbent.fournisseur_id) ?? '—'
     const nomAlt = nomF.get(moinsCher.fournisseur_id) ?? '—'
@@ -451,7 +506,7 @@ async function comparerPrixFournisseurs(
       await emitFinding(ctx, {
         urgence: 'jaune',
         type: 'comparaison_fournisseur',
-        titre: `${g.cle} : ${economiePct.toFixed(0)} % moins cher chez ${nomAlt}`,
+        titre: `${g.cle} : ${economiePct.toFixed(economiePct < 10 ? 1 : 0)} % moins cher chez ${nomAlt}`,
         message: `${nomActuel} : ${incumbent.ref!.prix.toFixed(3)} €/${u} (${nature(incumbent.nature)}). `
           + `${nomAlt} : ${moinsCher.ref!.prix.toFixed(3)} €/${u} (${nature(moinsCher.nature)}). `
           + `⚠️ Un devis est une proposition, pas une preuve de prix — et l'écart ne décide de rien tant qu'il n'est pas multiplié par les quantités réelles.`,

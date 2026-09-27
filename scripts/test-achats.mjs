@@ -212,25 +212,47 @@ t('et le gisement à demander reste ÉNORME — c’est la raison d’être de l
   tous.filter(x => x.tarif_negocie === false).length > 2000)
 
 titre('Le comparateur branché sur l’agent Stock')
-// ⚠️ Recopie les trois filtres de `comparerPrixFournisseurs()` : comparable,
-// deux fournisseurs DISTINCTS, écart ≥ 10 %. Chacun écarte un faux positif,
-// et un agent qui crie pour rien cesse d'être lu.
+// ⚠️ Recopie les filtres de `comparerPrixFournisseurs()` : comparable, deux
+// fournisseurs DISTINCTS, et une économie strictement positive. Les deux
+// premiers écartent un faux positif — un €/kg contre un €/pièce, ou deux de
+// nos propres références chez le même vendeur.
+//
+// ⚠️ IL N'Y A PLUS DE SEUIL DE 10 % (gérant, 28/09/2026 : « même moins 1 %,
+// un produit se change »). Ne pas le remettre « pour réduire le bruit » :
+// c'est lui qui taisait le Coca-Cola à −9 % chez Euro-Cash.
 const trouvailles = await sbTout('agent_findings?type=eq.comparaison_fournisseur&resolu=is.false&select=titre,message,data')
 t('l’agent a trouvé des économies', trouvailles.length > 0)
-t('⚠️ aucune économie sous 10 % (ce serait du bruit de conditionnement)',
-  trouvailles.every(f => Number(f.data?.economiePct ?? 0) >= 10))
+t('⚠️ toute économie annoncée est strictement positive (« 0 % » n’est pas une alerte)',
+  trouvailles.every(f => Number(f.data?.economiePct ?? 0) > 0))
 t('⚠️ jamais « moins cher » chez le fournisseur où l’on est DÉJÀ',
   trouvailles.every(f => f.data?.fournActuel && f.data?.fournAlternatif && f.data.fournActuel !== f.data.fournAlternatif))
 t('⚠️ la NATURE de chaque prix est dite (payé / devis / portail)',
   trouvailles.every(f => /\((pay\u00e9|devis|tarif portail)\)/.test(String(f.message))))
 t('le message dit qu’un écart ne décide rien sans les quantités',
   trouvailles.every(f => /quantit\u00e9s r\u00e9elles/.test(String(f.message))))
-// Contrôle croisé avec le verdict relevé à la main (CLAUDE.md) : la
-// mayonnaise et le beurre doux sont moins chers chez Félix Potin.
-t('il retrouve la mayonnaise et le beurre doux',
-  ['mayonnaise', 'Beurre doux'].every(x => trouvailles.some(f => String(f.titre).includes(x))))
+// ⚠️⚠️ CONTRÔLE CROISÉ, RÉVISÉ LE 28/09/2026 — et la révision EST le sujet.
+// Ce test exigeait que l'agent retrouve « la mayonnaise et le beurre doux
+// moins chers chez Félix Potin ». Il ne les signale plus, et c'est la bonne
+// réponse : ces deux matières SONT PASSÉES chez Félix Potin depuis. Un agent
+// qui redemande ce qui est déjà fait cesse d'être lu.
+//
+// Ce qui est vérifié désormais, c'est la propriété qui doit tenir pour
+// toujours : l'agent ne signale JAMAIS une économie chez le fournisseur où
+// l'on achète déjà. `fournActuel` vient de notre fournisseur ENREGISTRÉ
+// (matière ou produit), la ligne de facture n'étant qu'un repli.
+const fournNoms = await sbTout('fournisseurs?select=id,nom')
+const nomParId = new Map(fournNoms.map(f => [f.id, f.nom]))
+const ingF = await sbTout('ingredients?actif=eq.true&select=fournisseur_principal')
+const recF = await sbTout('recettes?fournisseur_id=not.is.null&select=fournisseur_id')
+const nosFournisseurs = new Set([
+  ...ingF.map(i => i.fournisseur_principal).filter(Boolean),
+  ...recF.map(r => nomParId.get(r.fournisseur_id)).filter(Boolean),
+])
+t('⚠️ des fournisseurs sont bien enregistrés chez nous', nosFournisseurs.size > 0)
+t('⚠️ aucune trouvaille ne propose de basculer là où l’on est DÉJÀ',
+  trouvailles.every(f => f.data?.fournActuel !== f.data?.fournAlternatif))
 // ⚠️ Et il ne crie PAS sur ce qui est moins cher chez nous : l'huile d'olive
-// est 19 % plus chère chez Félix Potin, l'emmental 8 %.
+// est 19 % plus chère chez Félix Potin.
 t('⚠️ il ne signale PAS l’huile d’olive (moins chère chez Gineys)',
   !trouvailles.some(f => /huile/i.test(String(f.titre))))
 

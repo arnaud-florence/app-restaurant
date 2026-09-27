@@ -11,7 +11,7 @@ import {
   type OffreFournisseur, type EtatPlateforme, type Manque,
   type ArticleAchete, type FiltresAchete, type OffreConcurrente,
 } from '@/lib/catalogue-achats'
-import { fmtPrix } from '@/lib/foodCost'
+import { fmtPrix, fmtEcart } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
 import { modifierArticleAchat } from './modifier-actions'
 
@@ -935,7 +935,7 @@ function LigneAchat({ a, parFourn, modifier }: {
 
       {a.ailleurs && (
         <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
-          −{Math.round(a.ailleurs.ecartPct)} % {a.ailleurs.fournisseur}
+          −{fmtEcart(a.ailleurs.ecartPct)} {a.ailleurs.fournisseur}
         </span>
       )}
 
@@ -1077,7 +1077,7 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
             <ul className="mt-2 space-y-1.5">
               {a.offres.map(o => (
                 <li key={o.fournisseur_id + o.designation} className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-bold tabular-nums text-violet-800">−{Math.round(o.ecartPct)} %</span>
+                  <span className="font-bold tabular-nums text-violet-800">−{fmtEcart(o.ecartPct)}</span>
                   <span className="font-medium text-zinc-900">{o.fournisseur}</span>
                   <span className="tabular-nums text-zinc-700">
                     {fmtPrix(o.prix_ref)}/{o.unite_ref}

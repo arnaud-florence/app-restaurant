@@ -131,9 +131,22 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   // plus bas, à la construction de la ligne.
   const groupePour = new Map<string, Array<LigneTarif & { ref: { prix: number; unite: string } | null }>>()
   for (const g of comparer(pourComparer)) {
-    // Deux fournisseurs distincts, des unités qui concordent, et un écart
-    // qui vaut la peine d'être dit. Sous 10 %, c'est du bruit d'emballage.
-    if (!g.comparable || g.fournisseurs < 2 || g.ecartPct == null || g.ecartPct < 10) continue
+    // Deux fournisseurs distincts, et des unités qui concordent.
+    //
+    // ⚠️ AUCUN SEUIL D'ÉCART — décision du gérant du 28/09/2026 : « même
+    // moins 1 %, un produit se change ». Un seuil de 10 % dormait ici et
+    // cachait le Coca-Cola à −9 % chez Euro-Cash ; sur une caisse de 24
+    // commandée chaque semaine, ces 9 % font une somme, et surtout ce
+    // n'est pas au code de décider ce qui « vaut la peine d'être dit ».
+    //
+    // ⚠️ Les deux conditions qui RESTENT ne sont pas des seuils, ce sont
+    // des garde-fous : `comparable` exige des prix ramenés à la même
+    // base — sans lui, notre colis de 3 000 serviettes affrontait le
+    // paquet de 200 et annonçait « −97 % » — et `fournisseurs >= 2`
+    // empêche de comparer deux de nos propres références chez le même
+    // vendeur. Un `ecartPct` nul signale un prix de référence à zéro :
+    // aucun pourcentage ne s'y ancre.
+    if (!g.comparable || g.fournisseurs < 2 || g.ecartPct == null) continue
     const best = g.lignes.find(l => l.id === g.meilleur)
     if (!best) continue
     const nom = nomF.get(best.fournisseur_id)

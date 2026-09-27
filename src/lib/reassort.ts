@@ -388,10 +388,11 @@ export function parEtablissement(lignes: LigneReassort[]): Array<{
  *
  * ⚠️ Mais seulement quand la comparaison TIENT. `ailleurs` n'est posé que
  * sur un groupe rendu comparable par `comparer()` : deux fournisseurs
- * distincts, des unités ramenées à la même base, un écart d'au moins 10 %.
- * Là où la comparaison n'existe pas, il n'y a pas de « moins cher » à
- * choisir — on garde celui chez qui on achète, faute de mieux, et ce n'est
- * pas un arbitrage, c'est une absence d'information.
+ * distincts et des unités ramenées à la même base. Aucun seuil d'écart —
+ * « même moins 1 %, un produit se change » (gérant, 28/09/2026). Là où la
+ * comparaison n'existe pas, il n'y a pas de « moins cher » à choisir — on
+ * garde celui chez qui on achète, faute de mieux, et ce n'est pas un
+ * arbitrage, c'est une absence d'information.
  */
 export function fournisseurRetenu(
   l: LigneReassort,

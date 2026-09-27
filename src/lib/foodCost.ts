@@ -137,3 +137,16 @@ export const fmtPrix4 = (n: number) =>
 
 export const fmtPct = (n: number) =>
   `${(Math.round(n * 10) / 10).toLocaleString('fr-FR')} %`
+
+/**
+ * Un ÉCART de prix entre deux fournisseurs, en pourcentage.
+ *
+ * ⚠️ Une décimale sous 10 %, aucune au-dessus. Depuis que le seuil de
+ * comparaison a sauté (28/09/2026 — « même moins 1 %, un produit se
+ * change »), un arrondi à l'entier affiche « −0 % » sur un écart de
+ * 0,4 % : un chiffre qui dit « aucune différence » à côté d'un bouton
+ * qui propose d'en changer. Au-delà de 10 %, la décimale n'apprend rien
+ * et alourdit une colonne qu'on lit de loin.
+ */
+export const fmtEcart = (n: number) =>
+  `${(Math.abs(n) < 10 ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString('fr-FR')} %`
