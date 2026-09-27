@@ -579,5 +579,70 @@ titre('Le titre affiché : vitrine ou libellé d’achat')
     titre({ nom: 'BAGUETTE …', nom_vente: 'Baguette campestre' }) === 'Baguette campestre')
 }
 
+titre('Les rayons du catalogue FOURNISSEUR')
+{
+  // ⚠️ RECOPIE de `rayonFournisseur()` (catalogue-achats.ts) — ordre compris.
+  const R = [
+    ['f-cremerie', ['B.O.F', 'BOF', 'LAITIER', 'FROMAGE', 'BEURRE', 'CREME', 'CRÈME', 'OEUF', 'ŒUF', 'YAOURT']],
+    ['f-boulangerie', ['BOULANG', 'VIENNOIS', 'PATISS', 'PÂTISS', 'PAIN', 'BRIOCH', 'DESSERT', 'GOURMAND', 'MACARON', 'TARTE', 'BEIGNET', 'BAVAROISE', 'BÛCHETTE', 'BUCHETTE', 'CHOCOLAT', 'FEUILLET', 'CROISSANT', 'GATEAU', 'GÂTEAU', 'ENTREMET', 'BUCHE', 'BÛCHE', 'COOKIE', 'MUFFIN', 'DONUT', 'CREPE', 'CRÊPE', 'GAUFRE', 'CANELE', 'CANELÉ', 'ECLAIR', 'ÉCLAIR']],
+    ['f-boucherie', ['VIANDE', 'BOEUF', 'BŒUF', 'POULET', 'VOLAILLE', 'PORC', 'CHARCUT', 'AGNEAU', 'CANARD', 'VEAU', 'SAUCISS', 'HACHÉ', 'HACHE', 'TARTARE', 'JAMBON', 'MERGUEZ', 'BROCHETTE']],
+    ['f-maree', ['POISSON', 'CREVETTE', 'CRUSTACE', 'CRUSTACÉ', 'SAUMON', 'COQUILLAGE', 'CALAMAR', 'POULPE', 'MAREE', 'MARÉE', 'MOLLUSQUE', 'FILET', 'ST-JACQUES', 'MOULE', 'HUITRE', 'HUÎTRE', 'SEICHE']],
+    ['f-primeur', ['LEGUME', 'LÉGUME', 'FRUIT', 'VERGER', 'SALADE', 'POMME DE TERRE', 'HERBE']],
+    ['f-cave', ['VIN', 'BIERE', 'BIÈRE', 'ALCOOL', 'SPIRITUEUX', 'CHAMPAGNE', 'APERITIF', 'APÉRITIF']],
+    ['f-boissons', ['BOISSON', 'BOUTEILLE', 'JUS', 'SODA', 'CAFE', 'CAFÉ', 'THE', 'THÉ']],
+    ['f-traiteur', ['SNACK', 'TRAITEUR', 'PIZZA', 'RESTAURATION', 'ACCOMPAGNEMENT', 'RECEPTION', 'RÉCEPTION', 'APERO', 'APÉRO', 'PANINI', 'CROQUE', 'BURGER', 'SANDWICH', 'PLANCHE', 'BRUNCH', 'CUISINE', 'BAGEL', 'WRAP', 'QUICHE', 'TACOS']],
+    ['f-epicerie', ['EPICERIE', 'ÉPICERIE', 'SECS', 'SAUCE', 'ASSAISON', 'CONDIMENT', 'HUILE', 'CONSERVE', 'FARINE', 'SUCRE', 'EPICE', 'ÉPICE', 'AIDE CULINAIRE', 'AIDES CULINAIRE', 'VINAIGRE', 'PUREE', 'PURÉE', 'RIZ', 'PATE', 'PÂTE', 'SEL', 'POIVRE']],
+    ['f-surgeles', ['SURGEL', 'GLACE', 'SORBET']],
+    ['f-emballage', ['EMBALLAGE', 'SERVICE', 'HYGIENE', 'HYGIÈNE', 'VAISSELLE', 'NETTOYAGE', 'PAPIER']],
+    ['f-frais', ['FRAIS']],
+  ]
+  const rayonF = f => {
+    if (!f) return 'f-autres'
+    const u = f.toUpperCase()
+    for (const [cle, mots] of R) if (mots.some(m => u.includes(m))) return cle
+    return 'f-autres'
+  }
+
+  t('« B.O.F. » est de la crémerie', rayonF('B.O.F.') === 'f-cremerie')
+  t('« DESSERTS PÂTISSIERS » va en boulangerie', rayonF('DESSERTS PÂTISSIERS') === 'f-boulangerie')
+  t('« SAUCES FROIDES » va en épicerie', rayonF('SAUCES FROIDES') === 'f-epicerie')
+  t('« CRUSTACE » va à la marée', rayonF('CRUSTACE') === 'f-maree')
+  t('⚠️ « FRUITS SURGELÉS » va aux FRUITS, pas aux surgelés — c’est le produit qu’on cherche',
+    rayonF('FRUITS SURGELÉS') === 'f-primeur')
+  t('mais « SURGELES » seul va bien aux surgelés', rayonF('SURGELES') === 'f-surgeles')
+  t('⚠️ un chapitre de prose n’est PAS rangé de force',
+    rayonF('DANS LES BOIS') === 'f-autres' && rayonF('PALAIS AIGUISÉ') === 'f-autres')
+  t('⚠️ et une famille ABSENTE non plus — 1 093 références sont dans ce cas',
+    rayonF(null) === 'f-autres')
+  t('« PRODUITS SERVICES » va aux emballages & hygiène',
+    rayonF('PRODUITS SERVICES') === 'f-emballage')
+  // Deuxième vague de mots-clés (27/09/2026) : la longue traîne des
+  // catalogues de marques, 168 familles pour 694 lignes.
+  t('« MOLLUSQUE » et « NOIX DE ST-JACQUES » vont à la marée',
+    rayonF('MOLLUSQUE') === 'f-maree' && rayonF('NOIX DE ST-JACQUES') === 'f-maree')
+  t('« SAUCISSERIE » et « HACHÉS » vont à la boucherie',
+    rayonF('SAUCISSERIE') === 'f-boucherie' && rayonF('HACHÉS') === 'f-boucherie')
+  t('« BEIGNETS », « BAVAROISE » et « CHOCOLATS NOIRS » vont en boulangerie',
+    rayonF('BEIGNETS') === 'f-boulangerie' && rayonF('BAVAROISE') === 'f-boulangerie'
+    && rayonF('CHOCOLATS NOIRS') === 'f-boulangerie')
+  t('« ARTI’PANINI » et « & CROQUES MR » vont au traiteur',
+    rayonF('ARTI’PANINI') === 'f-traiteur' && rayonF('& CROQUES MR') === 'f-traiteur')
+  t('« ÉPICES » et « AIDES CULINAIRES » vont à l’épicerie',
+    rayonF('ÉPICES') === 'f-epicerie' && rayonF('AIDES CULINAIRES') === 'f-epicerie')
+  t('⚠️ mais la PROSE reste non classée, même après la deuxième vague',
+    ['EXOTIQUES', 'D’EXCEPTION', 'BUCOLIQUES', 'HERBACÉS', 'ANGLAISES', 'ULTRA']
+      .every(x => rayonF(x) === 'f-autres'))
+  t('la casse n’a pas d’importance', rayonF('boulangerie') === 'f-boulangerie')
+
+  // ⚠️ Le classement ne doit RIEN perdre : chaque référence tombe quelque part.
+  const familles = ['B.O.F.', 'ACCOMPAGNEMENT', 'VIENNOISERIE', 'BOULANGERIE', 'PÂTISSERIE',
+    'SECS', 'SURGELES', 'ÉPICERIE', 'SAUCE', 'BOISSONS', 'FRAIS', 'PRODUITS LAITIERS',
+    'DESSERT', 'BŒUF', 'CHARCUTERIE', 'CREVETTE', 'CRUSTACE', null, 'DANS LES BOIS']
+  t('toute famille tombe dans un rayon, « Non classé » compris',
+    familles.every(f => typeof rayonF(f) === 'string'))
+  t('les 17 familles les plus nombreuses sont toutes classées sauf la prose',
+    familles.filter(f => f && rayonF(f) === 'f-autres').length === 1)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

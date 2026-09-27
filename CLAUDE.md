@@ -3635,6 +3635,40 @@ chiffres.
 ⚠️ Deux désignations qui se normalisent pareil pour deux codes différents
 sont ÉCARTÉES : on ne tire pas au sort un identifiant.
 
+**LE CATALOGUE FOURNISSEUR AUSSI (27/09/2026).** Les 3 392 références
+portent **279 familles** venues des catalogues de marques : « B.O.F. »,
+« ACCOMPAGNEMENT », « SECS », mais aussi « DANS LES BOIS », « P'TITS
+GOURMANDS », « PALAIS AIGUISÉ ». Un menu déroulant de 279 entrées ne se
+parcourt pas. `rayonFournisseur()` les range en **douze rayons**, en
+pastilles filtrantes comme l'onglet 🧺.
+
+⚠️ **Par MOTS-CLÉS, pas par correspondance exacte** : les fournisseurs
+n'écrivent pas leurs rayons de la même façon, et chaque nouveau catalogue en
+apporterait d'autres. Une table exacte serait périmée au devis suivant.
+
+⚠️ **L'ORDRE COMPTE, et il est délibéré.** « FRUITS SURGELÉS » contient
+FRUIT et SURGEL : on veut le fruit, c'est ce qu'on cherche quand on
+commande. Les produits passent donc AVANT le mode de conservation, et le
+test le verrouille.
+
+⚠️ **CE QUI RESTE « NON CLASSÉ » L'EST VOLONTAIREMENT.** Sur les 1 563
+lignes du rayon, **1 093 n'ont aucune famille** (le portail Gineys ne la
+donnait pas au relevé) et **470 portent un chapitre de prose** — personne
+ne cherchera un produit sous « BUCOLIQUES », et le ranger au jugé le
+mettrait dans le mauvais rayon. C'est le même raisonnement que l'ordre des
+catalogues à l'indexation, où les livres d'inspiration passent en dernier.
+Le rayon est AFFICHÉ comme les autres : un produit qu'on ne voit pas ne se
+commande pas.
+
+⚠️ **La famille reste accessible pour affiner DANS un rayon** :
+« ACCOMPAGNEMENT » compte 118 références à lui seul, le rayon ne suffit pas
+à s'y retrouver.
+
+Couverture au 27/09/2026 : **1 829 références rangées sur 3 392** —
+boulangerie 537, épicerie 264, crémerie 255, traiteur 251, boucherie 168,
+marée 81, primeurs 79, boissons 66, surgelés 62, frais 35, emballages 16,
+cave 15.
+
 **Rangé par RAYONS, et lisible (27/09/2026).** Les 193 références portent
 **21 catégories** — « Pain », « Viennoiserie », « Pâtisserie »,
 « Gourmandise »… C'est la bonne granularité pour une carte, pas pour une

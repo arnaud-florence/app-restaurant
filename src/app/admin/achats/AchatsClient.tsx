@@ -6,6 +6,7 @@ import {
   offresTriees,
   filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
   prixReprenable, parRayon, rayonDe, RAYONS, RAYON_AUTRES, FILTRES_ACHETE_VIDES,
+  rayonFournisseur, RAYONS_FOURNISSEUR_LISTE, RAYON_NON_CLASSE,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
   type OffreFournisseur, type EtatPlateforme, type Manque,
   type ArticleAchete, type FiltresAchete, type OffreConcurrente,
@@ -34,6 +35,7 @@ export default function AchatsClient({
   const [onglet, setOnglet] = useState<Onglet>(promos.length ? 'promos' : 'catalogue')
   const [f, setF] = useState<Filtres>(FILTRES_VIDES)
   const [limite, setLimite] = useState(PAR_PAGE)
+  const [rayonF, setRayonF] = useState<string | undefined>(undefined)
   const [choisis, setChoisis] = useState<Set<string>>(new Set())
   const [ouvert, setOuvert] = useState<string | null>(null)   // clé de comparaison dépliée
   const [res, setRes] = useState<ResultatDemande | null>(null)
@@ -41,7 +43,21 @@ export default function AchatsClient({
 
   const maj = (p: Partial<Filtres>) => { setF(x => ({ ...x, ...p })); setLimite(PAR_PAGE) }
 
-  const trouves = useMemo(() => filtrer(articles, f), [articles, f])
+  const parRayonF = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const a of articles) {
+      const k = rayonFournisseur(a.famille).cle
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [articles])
+
+  const trouves = useMemo(() => {
+    const base = filtrer(articles, f)
+    // ⚠️ Le rayon est un filtre d'AFFICHAGE : il s'ajoute aux autres, il
+    // ne les remplace pas. Une recherche en cours reste valable dedans.
+    return rayonF === undefined ? base : base.filter(a => rayonFournisseur(a.famille).cle === rayonF)
+  }, [articles, f, rayonF])
   const visibles = trouves.slice(0, limite)
   const lesFamilles = useMemo(() => familles(articles), [articles])
 
@@ -117,6 +133,23 @@ export default function AchatsClient({
         ? <Promos promos={promos} offres={offres} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
         : (
           <>
+            {/* ─── Les rayons, comme dans « Ce que nous achetons » ──
+                279 familles ne se parcourent pas ; douze rayons, si. */}
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Filtre actif={rayonF === undefined} onClick={() => { setRayonF(undefined); setLimite(PAR_PAGE) }}>
+                Tous <span className="tabular-nums opacity-60">{articles.length.toLocaleString('fr-FR')}</span>
+              </Filtre>
+              {[...RAYONS_FOURNISSEUR_LISTE, RAYON_NON_CLASSE]
+                .filter(r => parRayonF.get(r.cle))
+                .map(r => (
+                  <Filtre key={r.cle} actif={rayonF === r.cle}
+                    onClick={() => { setRayonF(x => (x === r.cle ? undefined : r.cle)); setLimite(PAR_PAGE) }}>
+                    <span>{r.emoji}</span> {r.nom}{' '}
+                    <span className="tabular-nums opacity-60">{parRayonF.get(r.cle)!.toLocaleString('fr-FR')}</span>
+                  </Filtre>
+                ))}
+            </div>
+
             {/* ─── Recherche et filtres ───────────────────────── */}
             <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
               <input
@@ -126,14 +159,16 @@ export default function AchatsClient({
                 className="h-12 w-full rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-900"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                {/* La famille reste accessible pour affiner DANS un rayon :
+                    « ACCOMPAGNEMENT » compte 118 références à lui seul. */}
                 <select value={f.famille === undefined ? '' : f.famille === null ? '·' : f.famille}
                   onChange={e => maj({ famille: e.target.value === '' ? undefined : e.target.value === '·' ? null : e.target.value })}
                   className="h-9 rounded-lg border border-zinc-300 px-2">
-                  <option value="">Toutes les catégories</option>
+                  <option value="">Toutes les familles</option>
                   {lesFamilles.filter(x => x.nom).map(x =>
                     <option key={x.nom} value={x.nom!}>{x.nom} ({x.n})</option>)}
                   {lesFamilles.some(x => x.nom === null) &&
-                    <option value="·">Non classés ({lesFamilles.find(x => x.nom === null)!.n})</option>}
+                    <option value="·">Sans famille ({lesFamilles.find(x => x.nom === null)!.n})</option>}
                 </select>
 
                 <select value={f.fournisseur_id ?? ''}

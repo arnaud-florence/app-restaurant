@@ -733,3 +733,87 @@ export function parRayon(articles: ArticleAchete[]): Array<{
       }
     })
 }
+
+// ─── LES RAYONS DU CATALOGUE FOURNISSEUR ────────────────────────────────
+//
+// Les 3 392 références portent **279 familles** venues des catalogues de
+// marques : « B.O.F. », « ACCOMPAGNEMENT », « SECS », mais aussi « DANS
+// LES BOIS », « P'TITS GOURMANDS », « PALAIS AIGUISÉ » — des chapitres de
+// prose commerciale, déjà signalés comme tels à l'indexation. Un menu de
+// 279 entrées ne se parcourt pas.
+//
+// ⚠️ On range par MOTS-CLÉS, pas par correspondance exacte : les
+// fournisseurs n'écrivent pas leurs rayons de la même façon, et chaque
+// nouveau catalogue en apporterait d'autres. Une table exacte serait
+// périmée au devis suivant.
+//
+// ⚠️ L'ORDRE COMPTE, et il est délibéré : « FRUITS SURGELÉS » contient
+// FRUIT et SURGEL. On veut le fruit — c'est ce qu'on cherche quand on
+// commande — donc les produits passent AVANT le mode de conservation.
+//
+// ⚠️ CE QUI RESTE « NON CLASSÉ » L'EST VOLONTAIREMENT. Les chapitres de
+// prose des livres d'inspiration — « DANS LES BOIS », « PALAIS AIGUISÉ »,
+// « BUCOLIQUES », « D'EXCEPTION », « EXOTIQUES », « HERBACÉS » — ne
+// décrivent aucun rayon : personne ne cherchera un produit sous ce nom, et
+// les ranger au jugé les mettrait dans le mauvais. C'est le même
+// raisonnement que l'ordre des catalogues à l'indexation, où les livres
+// d'inspiration passent en dernier.
+
+const RAYONS_FOURNISSEUR: Array<Rayon & { mots: string[] }> = [
+  { cle: 'f-cremerie', nom: 'Crémerie', emoji: '🧀', teinte: 'bg-yellow-300', categories: [],
+    mots: ['B.O.F', 'BOF', 'LAITIER', 'FROMAGE', 'BEURRE', 'CREME', 'CRÈME', 'OEUF', 'ŒUF', 'YAOURT'] },
+  { cle: 'f-boulangerie', nom: 'Boulangerie & pâtisserie', emoji: '🥖', teinte: 'bg-amber-400', categories: [],
+    mots: ['BOULANG', 'VIENNOIS', 'PATISS', 'PÂTISS', 'PAIN', 'BRIOCH', 'DESSERT', 'GOURMAND', 'MACARON',
+      'TARTE', 'BEIGNET', 'BAVAROISE', 'BÛCHETTE', 'BUCHETTE', 'CHOCOLAT', 'FEUILLET', 'CROISSANT',
+      'GATEAU', 'GÂTEAU', 'ENTREMET', 'BUCHE', 'BÛCHE', 'COOKIE', 'MUFFIN', 'DONUT', 'CREPE', 'CRÊPE',
+      'GAUFRE', 'CANELE', 'CANELÉ', 'ECLAIR', 'ÉCLAIR'] },
+  { cle: 'f-boucherie', nom: 'Boucherie & charcuterie', emoji: '🥩', teinte: 'bg-rose-400', categories: [],
+    mots: ['VIANDE', 'BOEUF', 'BŒUF', 'POULET', 'VOLAILLE', 'PORC', 'CHARCUT', 'AGNEAU', 'CANARD', 'VEAU',
+      'SAUCISS', 'HACHÉ', 'HACHE', 'TARTARE', 'JAMBON', 'MERGUEZ', 'BROCHETTE'] },
+  { cle: 'f-maree', nom: 'Marée', emoji: '🐟', teinte: 'bg-sky-500', categories: [],
+    mots: ['POISSON', 'CREVETTE', 'CRUSTACE', 'CRUSTACÉ', 'SAUMON', 'COQUILLAGE', 'CALAMAR', 'POULPE',
+      'MAREE', 'MARÉE', 'MOLLUSQUE', 'FILET', 'ST-JACQUES', 'MOULE', 'HUITRE', 'HUÎTRE', 'SEICHE'] },
+  { cle: 'f-primeur', nom: 'Fruits & légumes', emoji: '🥬', teinte: 'bg-lime-500', categories: [],
+    mots: ['LEGUME', 'LÉGUME', 'FRUIT', 'VERGER', 'SALADE', 'POMME DE TERRE', 'HERBE'] },
+  { cle: 'f-cave', nom: 'Cave & bar', emoji: '🍷', teinte: 'bg-violet-500', categories: [],
+    mots: ['VIN', 'BIERE', 'BIÈRE', 'ALCOOL', 'SPIRITUEUX', 'CHAMPAGNE', 'APERITIF', 'APÉRITIF'] },
+  { cle: 'f-boissons', nom: 'Boissons', emoji: '🥤', teinte: 'bg-sky-400', categories: [],
+    mots: ['BOISSON', 'BOUTEILLE', 'JUS', 'SODA', 'CAFE', 'CAFÉ', 'THE', 'THÉ'] },
+  { cle: 'f-traiteur', nom: 'Traiteur & snacking', emoji: '🍕', teinte: 'bg-red-500', categories: [],
+    mots: ['SNACK', 'TRAITEUR', 'PIZZA', 'RESTAURATION', 'ACCOMPAGNEMENT', 'RECEPTION', 'RÉCEPTION',
+      'APERO', 'APÉRO', 'PANINI', 'CROQUE', 'BURGER', 'SANDWICH', 'PLANCHE', 'BRUNCH', 'CUISINE',
+      'BAGEL', 'WRAP', 'QUICHE', 'TACOS'] },
+  { cle: 'f-epicerie', nom: 'Épicerie', emoji: '🧂', teinte: 'bg-orange-400', categories: [],
+    mots: ['EPICERIE', 'ÉPICERIE', 'SECS', 'SAUCE', 'ASSAISON', 'CONDIMENT', 'HUILE', 'CONSERVE',
+      'FARINE', 'SUCRE', 'EPICE', 'ÉPICE', 'AIDE CULINAIRE', 'AIDES CULINAIRE', 'VINAIGRE', 'PUREE',
+      'PURÉE', 'RIZ', 'PATE ', 'PÂTE ', 'SEL', 'POIVRE'] },
+  { cle: 'f-surgeles', nom: 'Surgelés & glaces', emoji: '❄️', teinte: 'bg-cyan-300', categories: [],
+    mots: ['SURGEL', 'GLACE', 'SORBET'] },
+  { cle: 'f-emballage', nom: 'Emballages & hygiène', emoji: '📦', teinte: 'bg-zinc-400', categories: [],
+    mots: ['EMBALLAGE', 'SERVICE', 'HYGIENE', 'HYGIÈNE', 'VAISSELLE', 'NETTOYAGE', 'PAPIER'] },
+  { cle: 'f-frais', nom: 'Frais', emoji: '🧊', teinte: 'bg-teal-400', categories: [],
+    mots: ['FRAIS'] },
+]
+
+/**
+ * ⚠️ « Non classé » est un rayon À PART ENTIÈRE, affiché comme les autres.
+ * 1 093 références n'ont aucune famille (le portail Gineys ne la donnait
+ * pas au relevé) et 239 familles sont des chapitres de prose que personne
+ * ne cherchera sous ce nom. Les fondre dans un rayon existant les rendrait
+ * introuvables là où on les attend ; les masquer les rendrait
+ * introuvables tout court.
+ */
+export const RAYON_NON_CLASSE: Rayon = {
+  cle: 'f-autres', nom: 'Non classé', emoji: '•', teinte: 'bg-zinc-300', categories: [],
+}
+
+export function rayonFournisseur(famille: string | null): Rayon {
+  if (!famille) return RAYON_NON_CLASSE
+  const f = famille.toUpperCase()
+  for (const r of RAYONS_FOURNISSEUR) {
+    if (r.mots.some(m => f.includes(m))) return r
+  }
+  return RAYON_NON_CLASSE
+}
+
+export const RAYONS_FOURNISSEUR_LISTE: Rayon[] = RAYONS_FOURNISSEUR
