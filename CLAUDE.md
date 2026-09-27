@@ -2833,6 +2833,33 @@ des trois cas. Le tri doit porter sur une colonne **UNIQUE** (`id`) —
 `designation` ne suffit pas, les ex æquo se réordonnent. Corrigé partout :
 `lib/supabase/pagine.ts`, les deux écrans, l'agent Stock et les scripts.
 
+⚠️⚠️ **LE CATALOGUE ITALIEN DE CARIGEL (« Il gusto Italiano », 92 pages)
+N'EST PAS INDEXABLE**, et la tentative a produit la meilleure illustration
+possible de la règle « les codes sont TIRÉS du PDF, jamais recopiés ».
+
+Il n'existe qu'en liseuse Calaméo (`calameo.com/read/0056994890dbc7033b4b1`).
+Trois portes, trois impasses :
+- la page est en **canvas** : aucun texte dans le DOM ;
+- les pages sont servies en **SVGZ signés** (`ps.calameoassets.com/…/pN.svgz`
+  avec un jeton) — le texte y est, mais toute requête hors du liseur revient
+  en **403** ;
+- le bouton « Télécharger le document » ne produit rien sans compte Calaméo.
+
+Reste la lecture à l'œil sur capture — et c'est là que le piège s'est
+refermé. Sur la page 78-79, j'ai lu **« 67669 Huile de Pistache »**. Or
+`67660` est l'huile de pistache (17,88 €) et **`67669` est l'huile d'olive
+de Crète (14,76 €)** : un chiffre mal lu, tombé sur un AUTRE PRODUIT RÉEL.
+Aucune erreur ne se serait déclenchée. Sur 92 pages et ~600 références, ce
+n'est pas un risque, c'est une certitude.
+
+⚠️ Et la valeur marginale est faible, ce qui tranche la question : sur les
+18 références relevées de cette page, **13 sont déjà chez nous et 11 ont
+déjà une famille** (ACCOMPAGNEMENT, ÉPICERIE, B.O.F., SAUCES TOMATES…). Ce
+catalogue redit ce que les neuf PDF ont déjà donné.
+
+→ **Il ne sera indexé que le jour où on en aura le PDF** — à demander à
+Carigel ou à Gineys, comme le fichier catalogue de Gineys.
+
 ⚠️ Les PDF vivent dans `~/Downloads` et **ne sont pas copiés dans le dépôt**
 (760 Mo, documents commerciaux de tiers). `data/catalogues/` est gitignoré
 pour le jour où on les y rangera. L'extraction, elle, est en base : le
