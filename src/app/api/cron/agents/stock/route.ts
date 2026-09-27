@@ -130,6 +130,11 @@ export async function GET(req: Request) {
       }
     }
 
+    // (E-bis) Le comparateur tourne AVANT la génération des bons : ceux-ci
+    // portent la mention « moins cher ailleurs » quand elle existe, et on ne
+    // peut pas l'écrire après avoir écrit le bon.
+    const compares = await comparerPrixFournisseurs(ctx)
+
     // (E) Génère bons de commande EN BROUILLON, 1 par fournisseur
     const six_h = new Date(Date.now() - 6 * 3600_000).toISOString()
     let bonsCreated = 0
@@ -186,6 +191,21 @@ export async function GET(req: Request) {
         `${lignes.length} ingrédient(s) à racheter`,
         lignes.filter(l => l.urgence === 'rouge').length > 0 ? `dont ${lignes.filter(l => l.urgence === 'rouge').length} en rupture imminente` : null,
         minNonAtteint ? `⚠ Sous le minimum commande (${fournInfo.minCmd.toFixed(2)}€)` : null,
+        // ⚠️ Le bon part chez le fournisseur HABITUEL, pas chez le moins
+        // cher — changer de fournisseur est une décision commerciale, pas
+        // un effet de bord d'un agent qui tourne toutes les deux heures
+        // (délais, minimum de commande, qualité, relation). Mais se taire
+        // serait pire : on recommanderait au prix fort en ayant l'écart
+        // sous les yeux. Alors on le DIT sur le bon.
+        ...(() => {
+          const moins = lignes
+            .map(l => compares.find(c => c.ingredient === l.ing.nom && c.fournAlternatif !== fournInfo.nom))
+            .filter((c): c is NonNullable<typeof c> => Boolean(c))
+          if (!moins.length) return []
+          const top = moins.sort((a, b) => b.economiePct - a.economiePct)[0]
+          return [`💡 ${top.ingredient} : ${top.economiePct.toFixed(0)} % moins cher chez ${top.fournAlternatif}`
+            + (moins.length > 1 ? ` (et ${moins.length - 1} autre(s))` : '')]
+        })(),
       ].filter(Boolean).join(' · ')
 
       const { data: bc, error: bcErr } = await ctx.supabase.from('bons_commande').insert({
@@ -223,8 +243,6 @@ export async function GET(req: Request) {
       })
     }
 
-    // (F) Comparateur de prix, sur le CATALOGUE des fournisseurs
-    const compares = await comparerPrixFournisseurs(ctx)
 
     // (G) DLC proche : check bon_commande_lignes.dlc_observee
     const dlcAlertes = await detecterDlcProche(ctx)

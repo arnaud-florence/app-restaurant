@@ -2513,6 +2513,52 @@ valant zéro, un prix inconnu écrit tel quel sous-estimerait le total.
 qui doit retrouver « BAGUETTE PRECUITE 280G » dans son propre catalogue peut
 en servir une autre, et ça se découvre au déchargement.
 
+**Diagnostic de capacité à commander (27/09/2026).**
+`node scripts/diagnostic-commandes.mjs` — lecture seule, il compte étage par
+étage ce qu'on sait commander. Verdict du jour : **125 produits sur 181
+(69 %) savent dire ce qu'il faut acheter**.
+
+| étage | achat-revente identifié | composition chiffrée | ni l'un ni l'autre |
+|---|---|---|---|
+| Fournil (89) | 51 | 0 | **38** |
+| Bar (59) | 44 | 0 | **15** |
+| Restauration (33) | 0 | 30 | 3 |
+
+⚠️⚠️ **`ingredients.fournisseur_principal` ÉTAIT VIDE SUR 40 MATIÈRES SUR
+41**, et c'est ce qui expliquait que `bons_commande` soit restée VIDE depuis
+toujours : l'agent Stock construit ses bons PAR FOURNISSEUR — sans ce champ,
+il n'en crée aucun, et il ne le signale pas. Un agent qui ne produit rien
+ressemble à un agent qui n'a rien trouvé.
+
+`node scripts/fournisseur-des-matieres.mjs [--ecrire]` le remplit **depuis
+nos factures** : le fournisseur de la ligne la plus RÉCENTE rattachée à la
+matière, avoirs exclus. 38 matières sur 41 (34 Gineys, 4 Promocash).
+⚠️ Les 3 restantes — miel, saumon fumé, jambon blanc tranché — n'ont aucune
+trace d'achat : elles restent VIDES. Un bon parti chez le mauvais
+interlocuteur se découvre à la livraison.
+
+✅ **Le premier bon de commande de l'histoire de l'outil a été généré** dans
+la foulée : 10 kg de beurre doux chez Gineys, 80,49 € HT, en brouillon.
+
+⚠️ **LE BON PART CHEZ LE FOURNISSEUR HABITUEL, PAS CHEZ LE MOINS CHER**, et
+c'est délibéré : changer de fournisseur engage des délais, un minimum de
+commande, une qualité et une relation — ce n'est pas l'effet de bord d'un
+agent qui tourne toutes les deux heures. Mais se taire serait pire : on
+recommanderait au prix fort avec l'écart sous les yeux. Le bon porte donc la
+mention « 💡 Beurre doux : 30 % moins cher chez Félix Potin Provence ». Le
+comparateur tourne pour cette raison AVANT la génération des bons.
+
+**Ce qui manque encore pour commander toute la carte**, mesuré :
+
+| | |
+|---|---|
+| 38 produits du Fournil | sandwiches, salades, focaccias, formules : **aucune composition** — leurs matières sont suivies, mais rien ne dit COMBIEN il en faut |
+| 15 produits du bar | les composites (Spritz, Kir royal, Monaco, pichets) — déjà documenté, ils mélangent deux matières |
+| 52 ingrédients sur 62 des fiches pizzas/brasserie | **`stocke = false`** : ils n'apparaissent dans aucun inventaire ni aucune commande |
+| le stock | **un seul comptage, daté du 24/08/2026** — sans comptage d'ouverture, la quantité se fait à l'estime |
+| 4 fournisseurs sur 7 | **pas d'adresse e-mail** (Gel Var, Promocash, France Boissons, Euro-Cash) — et celle de Gineys est une boîte de facturation |
+| la commande conseillée | ne calcule que sur l'historique des VENTES, qui s'arrête au 24/08 |
+
 **Ce qui reste à faire**, et qui n'est pas fait :
 
 | | |
