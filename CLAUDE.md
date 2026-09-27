@@ -2270,6 +2270,26 @@ supprimés. Trouvé par le test, pas à l'œil : `getMainRoute()` et `canAccess(
 se contredisaient. **Tout poste dont le `main` n'est pas dans son `allowed` est
 un poste qui ne peut pas travailler.**
 
+⚠️⚠️ **DEUX SOURCES DE MENU, ET ELLES DIVERGENT** (constaté à nouveau le
+27/09/2026). `src/lib/navigation.ts` alimente le Centre de contrôle, le fil
+d'Ariane et la recherche ; **`src/app/admin/AdminNav.tsx` porte sa PROPRE
+liste** pour la barre de gauche. Ajouter un écran à la première ne le rend pas
+atteignable depuis la seconde — et c'est la seconde que l'équipe utilise.
+
+Mesuré ce jour : **9 écrans sur 46 étaient absents de la barre**, dont
+`/admin/etablissements`, qui porte le bouton « Ouvrir le restaurant ». Le
+3 octobre au matin, il n'aurait été trouvable que par le Centre de contrôle.
+Étaient aussi absents `/admin/ventes` et `/admin/ventes-pdv` — le chiffre
+d'affaires.
+
+**Contrôle à relancer après tout ajout d'écran** : comparer les `href` de
+`navigation.ts` à ceux d'`AdminNav.tsx`, l'écart doit être **zéro**.
+
+⚠️ Et quand le gérant dit « je ne vois pas », le **service worker est le
+premier suspect** : son navigateur servait encore `static-v205`, trois
+versions de retard. C'est le symptôme inverse de celui déjà documenté (des
+fonctions « absentes » qui sont en prod depuis des jours), et la même cause.
+
 **4. Un test rouge depuis un mois.** `test-rbac-snack-livreur.mjs` affirmait
 `snack → /emporter`. Il échouait déjà avant cette revue — même symptôme que
 `test-rh.mjs` : un test rouge en permanence finit par être ignoré, et ce
