@@ -2515,9 +2515,58 @@ en servir une autre, et ça se découvre au déchargement.
 
 | | |
 |---|---|
-| Le « moins cher » de l'agent Stock | il compare des moyennes 90 j de `mouvements_stock` par nom de fournisseur en TEXTE LIBRE — **il n'utilise pas `catalogue_fournisseur`**, donc les 3 303 prix importés ne choisissent pas encore où commander |
+| ~~Le « moins cher » de l'agent Stock~~ | **fait le 27/09/2026** — voir ci-dessous |
 | Gineys | commande passée **à la main sur leur portail** (décision du gérant, 27/09/2026) — pas d'API, et leur adresse enregistrée est une boîte de facturation |
 | L'envoi automatique | volontairement non branché — voir ci-dessus |
+
+**Le comparateur de prix est branché sur l'agent Stock (27/09/2026).**
+
+⚠️ L'ancienne version moyennait `mouvements_stock` sur 90 jours et regroupait
+par **nom de fournisseur en TEXTE LIBRE**. Elle ignorait donc
+`catalogue_fournisseur`, et surtout elle ne pouvait rien dire d'un
+fournisseur chez qui on n'a encore rien acheté — ce qui est justement la
+question qu'on se pose.
+
+⚠️ **Toute la discipline de comparaison est REPRISE de
+`lib/tarifs-fournisseurs.ts`** (`comparer()`, `prixReference()`,
+`memeBase()`), pas réécrite : ramener à l'unité, exiger la même base,
+refuser les formats qui ne concordent pas. Une seconde implémentation
+finirait par désigner un « moins cher » que l'écran ne montre pas — et c'est
+l'écran que le gérant croira.
+
+**Trois filtres, chacun écarte un faux positif** : `comparable` (sinon on
+compare une poche de 600 g à une poche d'un kilo), **deux fournisseurs
+DISTINCTS** (sinon on compare deux de nos propres références chez le même
+vendeur), et un écart ≥ 10 % (sous ça, c'est du bruit de conditionnement).
+
+⚠️ **Le repère « où l'on achète DÉJÀ »** est une ligne de `nature = 'facture'`
+(un prix réellement payé) ou marquée `achete` au portail. Sans lui, l'agent
+crierait « moins cher ailleurs » alors qu'on y est déjà — et on cesserait de
+le lire.
+
+⚠️ **La NATURE de chaque prix est dite dans le message** : « Gineys :
+17,600 €/kg (payé). Félix Potin : 13,778 €/kg (devis). » Arbitrer un
+fournisseur sur un tarif d'appel en croyant lire un prix payé se paie
+pendant des mois (0152). Et le message rappelle qu'un écart en pourcentage
+ne décide de rien tant qu'il n'est pas multiplié par les quantités réelles.
+
+**Premier passage sur les données réelles** : **7 économies**, et c'est un bon
+contrôle croisé — l'agent retrouve EXACTEMENT les écarts relevés à la main
+(mayonnaise −58 %, barbecue −35 %, beurre doux −30 %, sauce burger −29 %,
+kebab −27 %, olives −26 %, serrano −22 %) et ne signale **pas** l'huile
+d'olive ni l'emmental, moins chers chez Gineys.
+
+⚠️ **La surface de comparaison est petite, et c'est le vrai frein** :
+178 lignes sur 3 303 portent une `cle_comparaison`, soit **15 clés** qui
+confrontent deux fournisseurs. Elle se pose à la main dans
+`/admin/tarifs-fournisseurs` — jamais déduite (0151). Chaque clé posée est
+un face-à-face de plus.
+
+⚠️ La pagination est indispensable ici aussi : sans elle l'agent comparerait
+1 000 lignes sur 3 303 et annoncerait un « moins cher » choisi dedans.
+
+Test : `PORT=3000 node scripts/test-achats.mjs` couvre les trois filtres et
+vérifie le contrôle croisé — 39 assertions.
 
 Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 ⚠️ Il RECOPIE les règles depuis le TS, et n'envoie AUCUN e-mail.

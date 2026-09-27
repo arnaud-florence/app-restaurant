@@ -111,6 +111,29 @@ t('⚠️ TOUT ce qui reste inconnu est du catalogue jamais acheté',
 t('et il en reste vraiment (sinon l’écran ne sert à rien)',
   tous.filter(x => x.tarif_negocie === null).length > 1000)
 
+titre('Le comparateur branché sur l’agent Stock')
+// ⚠️ Recopie les trois filtres de `comparerPrixFournisseurs()` : comparable,
+// deux fournisseurs DISTINCTS, écart ≥ 10 %. Chacun écarte un faux positif,
+// et un agent qui crie pour rien cesse d'être lu.
+const trouvailles = await sbTout('agent_findings?type=eq.comparaison_fournisseur&resolu=is.false&select=titre,message,data')
+t('l’agent a trouvé des économies', trouvailles.length > 0)
+t('⚠️ aucune économie sous 10 % (ce serait du bruit de conditionnement)',
+  trouvailles.every(f => Number(f.data?.economiePct ?? 0) >= 10))
+t('⚠️ jamais « moins cher » chez le fournisseur où l’on est DÉJÀ',
+  trouvailles.every(f => f.data?.fournActuel && f.data?.fournAlternatif && f.data.fournActuel !== f.data.fournAlternatif))
+t('⚠️ la NATURE de chaque prix est dite (payé / devis / portail)',
+  trouvailles.every(f => /\((pay\u00e9|devis|tarif portail)\)/.test(String(f.message))))
+t('le message dit qu’un écart ne décide rien sans les quantités',
+  trouvailles.every(f => /quantit\u00e9s r\u00e9elles/.test(String(f.message))))
+// Contrôle croisé avec le verdict relevé à la main (CLAUDE.md) : la
+// mayonnaise et le beurre doux sont moins chers chez Félix Potin.
+t('il retrouve la mayonnaise et le beurre doux',
+  ['mayonnaise', 'Beurre doux'].every(x => trouvailles.some(f => String(f.titre).includes(x))))
+// ⚠️ Et il ne crie PAS sur ce qui est moins cher chez nous : l'huile d'olive
+// est 19 % plus chère chez Félix Potin, l'emmental 8 %.
+t('⚠️ il ne signale PAS l’huile d’olive (moins chère chez Gineys)',
+  !trouvailles.some(f => /huile/i.test(String(f.titre))))
+
 titre('Un tarif n’est pas un prix payé')
 // La règle de la 0151 doit tenir MÊME ICI, où le tarif s'est révélé exact.
 const ings = await sb('ingredients?select=id,prix_achat_ht&stocke=eq.true&limit=500')

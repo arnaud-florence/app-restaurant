@@ -17,6 +17,7 @@
 
 import { NextResponse } from 'next/server'
 import { runAgent, emitFinding, authCron, type AgentContext } from '@/lib/agents/runner'
+import { comparer, prixReference, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -222,8 +223,8 @@ export async function GET(req: Request) {
       })
     }
 
-    // (F) Comparateur prix entre fournisseurs (90j)
-    const compares = await comparerPrixFournisseurs(ctx, ingredients, trouverFournisseur)
+    // (F) Comparateur de prix, sur le CATALOGUE des fournisseurs
+    const compares = await comparerPrixFournisseurs(ctx)
 
     // (G) DLC proche : check bon_commande_lignes.dlc_observee
     const dlcAlertes = await detecterDlcProche(ctx)
@@ -276,61 +277,104 @@ function formatJour(d: Date): string {
   return `${JOURS[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`
 }
 
-// Compare prix sur 90j entre fournisseurs (via mouvements_stock type=entree)
+/**
+ * Où acheter moins cher — sur les TARIFS, plus sur nos entrées de stock.
+ *
+ * ⚠️ L'ancienne version moyennait `mouvements_stock` sur 90 jours et
+ * regroupait par NOM DE FOURNISSEUR EN TEXTE LIBRE. Elle ignorait donc
+ * `catalogue_fournisseur` — soit, depuis le 26/09/2026, 3 303 tarifs dont
+ * 503 confirmés. Elle ne pouvait rien dire d'un fournisseur chez qui on
+ * n'avait encore rien acheté, ce qui est justement la question.
+ *
+ * ⚠️ TOUTE la discipline de comparaison est REPRISE de
+ * `lib/tarifs-fournisseurs.ts`, pas réécrite : ramener à l'unité, exiger
+ * la même base, refuser les formats qui ne concordent pas. Une seconde
+ * implémentation finirait par désigner un « moins cher » que l'écran ne
+ * montre pas — et c'est l'écran que le gérant croira.
+ */
 async function comparerPrixFournisseurs(
   ctx: AgentContext,
-  ingredients: Array<{ id: string; nom: string; unite: string | null; prix_achat_ht: number | null; fournisseur_principal: string | null }>,
-  trouverFournisseur: (nom: string | null) => { id: string; nom: string; delai: number; minCmd: number } | null,
 ): Promise<Array<{ ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number }>> {
-  const ninety = new Date()
-  ninety.setDate(ninety.getDate() - 90)
-  const { data: entrees } = await ctx.supabase
-    .from('mouvements_stock')
-    .select('ingredient_id, prix_unitaire_ht, fournisseur')
-    .eq('type', 'entree')
-    .gte('created_at', ninety.toISOString())
-  if (!entrees || entrees.length === 0) return []
-
-  // Pour chaque ingrédient : agrège prix moyen par nom de fournisseur (texte libre)
-  const prixParIngrFourn = new Map<string, Map<string, { sum: number; n: number }>>()
-  for (const e of entrees as Array<{ ingredient_id: string | null; prix_unitaire_ht: number | null; fournisseur: string | null }>) {
-    if (!e.ingredient_id || !e.fournisseur || !e.prix_unitaire_ht) continue
-    const sub = prixParIngrFourn.get(e.ingredient_id) ?? new Map()
-    const cur = sub.get(e.fournisseur) ?? { sum: 0, n: 0 }
-    cur.sum += Number(e.prix_unitaire_ht)
-    cur.n += 1
-    sub.set(e.fournisseur, cur)
-    prixParIngrFourn.set(e.ingredient_id, sub)
+  // ⚠️ PostgREST plafonne à 1 000 lignes SANS le dire. Le catalogue en compte
+  // plus de 3 300 : sans pagination, l'agent comparerait un tiers des tarifs
+  // et annoncerait un « moins cher » choisi dedans.
+  const lignes: LigneTarif[] = []
+  for (let de = 0; de < 20000; de += 1000) {
+    const { data } = await ctx.supabase
+      .from('catalogue_fournisseur')
+      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, ingredient_id, recette_id, date_tarif, source, nature, achete')
+      .eq('actif', true)
+      .not('cle_comparaison', 'is', null)
+      .range(de, de + 999)
+    const lot = data ?? []
+    for (const l of lot) {
+      lignes.push({
+        ...(l as unknown as LigneTarif),
+        // ⚠️ `Number(null)` vaut ZÉRO : un « prix sur demande » sortirait
+        // le moins cher de tout le catalogue.
+        prix_ht: l.prix_ht === null ? null : Number(l.prix_ht),
+        colis_quantite: l.colis_quantite === null ? null : Number(l.colis_quantite),
+        contenance_valeur: l.contenance_valeur === null ? null : Number(l.contenance_valeur),
+      })
+    }
+    if (lot.length < 1000) break
   }
+  if (!lignes.length) return []
+
+  const { data: fourns } = await ctx.supabase.from('fournisseurs').select('id, nom')
+  const nomF = new Map((fourns ?? []).map(f => [f.id as string, f.nom as string]))
 
   const out: Array<{ ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number }> = []
-  for (const ing of ingredients) {
-    const map = prixParIngrFourn.get(ing.id)
-    if (!map || map.size < 2) continue
-    const prix = [...map.entries()].map(([nom, v]) => ({ nom, moy: v.sum / v.n }))
-    prix.sort((a, b) => a.moy - b.moy)
-    const moinsCher = prix[0]
-    const fournActuelNom = trouverFournisseur(ing.fournisseur_principal)?.nom ?? ing.fournisseur_principal
-    if (!fournActuelNom) continue
-    const actuel = prix.find(p => p.nom.toLowerCase().includes(fournActuelNom.toLowerCase()))
-                ?? prix.find(p => p.nom === fournActuelNom)
-    if (!actuel || actuel.nom === moinsCher.nom) continue
-    const economiePct = ((actuel.moy - moinsCher.moy) / actuel.moy) * 100
-    if (economiePct < 10) continue   // bruit, skip
 
-    const dejaEmis = await findingDejaActif(ctx, 'comparaison_fournisseur', { ingredient_id: ing.id })
+  for (const g of comparer(lignes)) {
+    // ⚠️ Trois conditions, et chacune écarte un faux positif :
+    //   · `comparable` — toutes les lignes ramenées à la MÊME base, sinon on
+    //     compare une poche de 600 g à une poche d'un kilo ;
+    //   · deux fournisseurs DISTINCTS — sinon on compare deux de nos propres
+    //     références chez le même vendeur ;
+    //   · un écart franc — sous 10 %, c'est du bruit de conditionnement.
+    if (!g.comparable || g.fournisseurs < 2 || (g.ecartPct ?? 0) < 10) continue
+
+    const chiffrees = g.lignes.filter(l => l.ref)
+    const tri = [...chiffrees].sort((a, b) => a.ref!.prix - b.ref!.prix)
+    const moinsCher = tri[0]
+
+    // ⚠️ Ce qu'on achète DÉJÀ : une ligne tirée d'une facture (un prix
+    // réellement payé) ou marquée « Mes articles » au portail. Sans ce
+    // repère, l'agent crierait « moins cher ailleurs » alors qu'on y est
+    // déjà — et on cesserait de le lire.
+    const incumbent = chiffrees.find(l => l.nature === 'facture' || (l as { achete?: boolean }).achete)
+    if (!incumbent) continue
+    if (incumbent.id === moinsCher.id) continue
+
+    const economiePct = ((incumbent.ref!.prix - moinsCher.ref!.prix) / incumbent.ref!.prix) * 100
+    if (economiePct < 10) continue
+
+    const nomActuel = nomF.get(incumbent.fournisseur_id) ?? '—'
+    const nomAlt = nomF.get(moinsCher.fournisseur_id) ?? '—'
+    if (nomActuel === nomAlt) continue
+
+    const dejaEmis = await findingDejaActif(ctx, 'comparaison_fournisseur', { cle: g.cle })
     if (!dejaEmis) {
+      const u = moinsCher.ref!.unite
+      // ⚠️ La NATURE de chaque prix est dite. Un devis est une PROPOSITION —
+      // il peut être un tarif d'appel consenti pour emporter un client ;
+      // une facture est une preuve. Arbitrer un fournisseur sur le premier
+      // en croyant lire le second se paie pendant des mois (0152).
+      const nature = (n: string) => n === 'facture' ? 'payé' : n === 'portail' ? 'tarif portail' : 'devis'
       await emitFinding(ctx, {
         urgence: 'jaune',
         type: 'comparaison_fournisseur',
-        titre: `${ing.nom} : économie ${economiePct.toFixed(0)}% chez ${moinsCher.nom}`,
-        message: `Prix moyen 90j chez ${actuel.nom} : ${actuel.moy.toFixed(3)}€/${ing.unite}. Chez ${moinsCher.nom} : ${moinsCher.moy.toFixed(3)}€/${ing.unite}.`,
-        action_label: 'Voir l\'ingrédient',
-        action_url:   `/admin/ingredients`,
-        data: { ingredient_id: ing.id, nom: ing.nom, fournActuel: actuel.nom, fournAlternatif: moinsCher.nom, economiePct },
+        titre: `${g.cle} : ${economiePct.toFixed(0)} % moins cher chez ${nomAlt}`,
+        message: `${nomActuel} : ${incumbent.ref!.prix.toFixed(3)} €/${u} (${nature(incumbent.nature)}). `
+          + `${nomAlt} : ${moinsCher.ref!.prix.toFixed(3)} €/${u} (${nature(moinsCher.nature)}). `
+          + `⚠️ Un devis est une proposition, pas une preuve de prix — et l'écart ne décide de rien tant qu'il n'est pas multiplié par les quantités réelles.`,
+        action_label: 'Comparer les tarifs',
+        action_url: '/admin/tarifs-fournisseurs',
+        data: { cle: g.cle, fournActuel: nomActuel, fournAlternatif: nomAlt, economiePct },
       })
     }
-    out.push({ ingredient: ing.nom, fournActuel: actuel.nom, fournAlternatif: moinsCher.nom, economiePct })
+    out.push({ ingredient: g.cle, fournActuel: nomActuel, fournAlternatif: nomAlt, economiePct })
   }
   return out
 }
