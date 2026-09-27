@@ -14,6 +14,25 @@ for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
 }
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const PORT = process.env.PORT
+/**
+ * ⚠️⚠️ TOUT LE CATALOGUE, PAS LES MILLE PREMIÈRES LIGNES. PostgREST
+ * plafonne ses réponses à 1 000 lignes SANS le dire, et sans `order` il ne
+ * promet AUCUN ordre : deux appels ne rendent pas les mêmes lignes. Ce
+ * test lisait donc 1 000 références sur 3 392, tirées au hasard — il a
+ * compté 100 factures et 10 face-à-face un jour, 43 et 5 le lendemain, sur
+ * des données inchangées. Un test dont le verdict dépend du tirage ne
+ * prouve rien. Le tri porte sur `id`, colonne UNIQUE (0162).
+ */
+const sbTout = async (p) => {
+  const out = []
+  for (let d = 0; d < 60_000; d += 1000) {
+    const lot = await sb(`${p}${p.includes('?') ? '&' : '?'}order=id&offset=${d}&limit=1000`)
+    out.push(...lot)
+    if (lot.length < 1000) break
+  }
+  return out
+}
+
 const sb = async (p, o = {}) => {
   const r = await fetch(U + '/rest/v1/' + p, { ...o, headers: {
     apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json',
@@ -137,7 +156,7 @@ if (f) {
 }
 
 console.log('\n── Le catalogue tiré de nos factures ──')
-const tousF = await sb('catalogue_fournisseur?select=designation,unite,prix_ht,contenance_valeur,contenance_unite,nature,fournisseur_id,cle_comparaison')
+const tousF = await sbTout('catalogue_fournisseur?select=id,designation,unite,prix_ht,contenance_valeur,contenance_unite,nature,fournisseur_id,cle_comparaison')
 const factures = tousF.filter(t => t.nature === 'facture')
 T('des tarifs viennent de nos factures', factures.length >= 100, `${factures.length}`)
 T('ils sont tous marqués « facture »', factures.every(t => t.nature === 'facture'))

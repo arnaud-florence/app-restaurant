@@ -147,9 +147,28 @@ t('ils portent tous un tarif négocié confirmé',
 // supposition. Ce qui reste interdit, c'est `true` sans l'avoir acheté.
 t('⚠️ une ligne du portail non achetée n’est JAMAIS « remisée »',
   portail.filter(x => !x.achete).every(x => x.tarif_negocie !== true))
-t('⚠️ et « tarif public » n’est posé que sur ce qui a été MESURÉ',
-  portail.filter(x => x.tarif_negocie === false).length > 0
-  && portail.filter(x => x.tarif_negocie === false).length < portail.filter(x => !x.achete).length)
+// ⚠️ ASSERTION RÉVISÉE LE 27/09/2026 — sur DÉCISION DU GÉRANT, pas par
+// commodité. Elle exigeait que « tarif public » reste minoritaire, pour
+// interdire de le déduire d'une absence. Deux choses l'ont levée :
+//   · la MESURE du catalogue Arti'Pat — 41 articles sous contrat à 22 % de
+//     remise, 404 autres à 0,3 %, c'est-à-dire le tarif public au centime ;
+//   · le gérant : « ce sont seulement des prix publics pas encore remisés,
+//     car aucune demande de remise n'a été faite sur ces produits ».
+// Ce n'est donc plus une supposition, c'est le fonctionnement du portail.
+// ⚠️ Ce qui reste interdit n'a pas bougé : `true` sans l'avoir acheté, et
+// l'extension de cette règle À UN AUTRE FOURNISSEUR — la mesure n'a été
+// faite que chez Gineys.
+t('⚠️ tout le portail non acheté est au tarif public',
+  portail.filter(x => !x.achete).every(x => x.tarif_negocie === false))
+// ⚠️ La règle ne déborde pas : « tarif public » ne peut porter que sur un
+// prix AFFICHÉ — le portail, ou le catalogue imprimé d'Arti'Pat, public par
+// définition. Un DEVIS est chiffré nommément pour CASATASIA et une FACTURE
+// est un prix payé : marquer l'un des deux « public » effacerait une
+// négociation obtenue.
+t('⚠️ un devis ou une facture n’est JAMAIS marqué « tarif public »',
+  (await sbTout('catalogue_fournisseur?select=nature,tarif_negocie'))
+    .filter(x => x.nature === 'devis' || x.nature === 'facture')
+    .every(x => x.tarif_negocie !== false))
 t('⚠️ aucun prix n’est à zéro',           portail.every(x => x.prix_ht === null || Number(x.prix_ht) > 0))
 t('les « prix sur demande » sont NULL',   portail.filter(x => x.prix_ht === null).length > 0)
 t('toutes les lignes ont une référence',  portail.every(x => x.reference && x.reference.length >= 5))
@@ -172,10 +191,14 @@ t('une ligne de facture vaut remise connue',
   tous.filter(x => x.nature === 'facture').every(x => x.tarif_negocie === true))
 t('un devis aussi',
   tous.filter(x => x.nature === 'devis').every(x => x.tarif_negocie === true))
-t('⚠️ TOUT ce qui reste inconnu est du catalogue jamais acheté',
-  tous.filter(x => x.tarif_negocie === null).every(x => x.nature === 'portail' && !x.achete))
-t('et il en reste vraiment (sinon l’écran ne sert à rien)',
-  tous.filter(x => x.tarif_negocie === null).length > 1000)
+// ⚠️ RÉVISÉE avec la précédente : il ne reste plus AUCUN « inconnu », et
+// c'est voulu. L'écran ne sert plus à trier l'inconnu du connu, il sert à
+// dire ce qui est ENCORE À DEMANDER — d'où le libellé « Tarif public —
+// remise à demander », qui ne se lit pas « remise refusée ».
+t('⚠️ plus aucune remise « inconnue » : tout est tranché',
+  tous.filter(x => x.tarif_negocie === null).length === 0)
+t('et le gisement à demander reste ÉNORME — c’est la raison d’être de l’écran',
+  tous.filter(x => x.tarif_negocie === false).length > 2000)
 
 titre('Le comparateur branché sur l’agent Stock')
 // ⚠️ Recopie les trois filtres de `comparerPrixFournisseurs()` : comparable,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Rattache les DEVIS reçus à nos matières — le fournisseur ET son prix.
+// Rattache les TARIFS reçus à nos matières — le fournisseur ET son prix.
 //
 // 51 matières n'avaient aucun fournisseur attitré, alors que 285 lignes de
 // devis (Félix Potin 184, La Frite Belge 52, France Boissons 43, Gel Var 26)
@@ -41,18 +41,27 @@ const ECRIRE = process.argv.includes('--ecrire')
 // d'un autre produit.
 const RETENUES = [
   // — même produit, même format, aucune ambiguïté —
-  ['Aubergines grillées (kg)',      'Aubergine grillée'],
+  // ⚠️ PLUSIEURS LIGNES POUR UNE MÊME MATIÈRE, C'EST VOULU : deux
+  // fournisseurs sur la même clé, c'est un FACE-À-FACE. Le premier de la
+  // liste devient le fournisseur attitré ; les suivants ne posent que le
+  // lien et la clé. C'est le garde-fou d'ambiguïté qui les a révélés —
+  // Gineys vend aussi ce que Gel Var et Félix Potin proposent.
+  ['Aubergines grillées (kg)',      'Aubergine grillée — Barquette'],
+  ['Aubergines grillées (kg)',      'AUBERGINE GRILLEE EN TRANCHE'],
   ['Courgettes grillées (kg)',      'Courgette grillée marinée'],
   ['Cerneaux de noix (kg)',         'CERNEAU NOIX INVALIDE'],
   ['Entrecôte de bœuf (kg)',        'ENTRECOTE BOEUF MATUREE'],
   ['Gorgonzola (kg)',               'GORGONZOLA AOP'],
-  ['Reblochon (kg)',                'REBLOCHON AOP'],
+  ['Reblochon (kg)',                'REBLOCHON AOP FRUITIER'],
+  ['Reblochon (kg)',                'TRANCHE DE REBLOCHON AOP'],
   ['Huile de friture (litre)',      'HUILE FRITURE GRILL'],
   ['Poivrons en lanières (kg)',     'POIVRON ROUGE VERT LANIERE'],
-  ['Lardons fumés (kg)',            'LARDON FUME ALLUMETTE'],
+  ['Lardons fumés (kg)',            'LARDON FUME ALLUMETTE 1K SFF'],
+  ['Lardons fumés (kg)',            'LARDON FUME ALLUMETTE IQF'],
   ['Miel liquide',                  'MIEL MILLE FLEURS'],
   ['Gnocchis frais (kg)',           'GNOCCHIS POMME DE TERRE'],
-  ['Frites surgelées (kg)',         'FRITE 10/10 BI-TEMP'],
+  ['Frites surgelées (kg)',         'FRITE 10/10 BI-TEMP FR'],
+  ['Frites surgelées (kg)',         'FRITE 10/10 BI-TEMPERATURE CARIGEL'],
   ['Pain burger (pièce)',           'PAIN BURGER BRIOCHE'],
   ['Aïoli (kg)',                    'Aïoli — PET 3 L'],
 
@@ -70,6 +79,7 @@ const RETENUES = [
   // tranché. C'est le « Cheddar — Tube 1 L » de La Frite Belge qui est
   // une SAUCE, et qui reste écarté juste en dessous.
   ['Cheddar en tranches (kg)',      'CHEDDAR FONDU 26%'],
+  ['Cheddar en tranches (kg)',      'TRANCHETTE DE CHEDDAR ROUGE MATURE'],
 
   // — « émincé » de part et d'autre —
   ['Oignons jaunes émincés (kg)',   'OIGNON EMINCE CN'],
@@ -79,6 +89,28 @@ const RETENUES = [
   ['Câpres (kg)',                   'CAPRE FINE VINAIGRE'],
   ['Viande hachée de bœuf (kg)',    'Viande de boeuf égrenée'],
   ['Steak haché de bœuf 150 g (pièce)', 'STEAK HACHE BOEUF BLACK ANGUS'],
+
+  // ─── LE PORTAIL GINEYS, 2 892 RÉFÉRENCES ─────────────────────────────
+  // ⚠️ La première passe n'avait cherché QUE dans les devis — 285 lignes
+  // sur 3 392. Neuf matières déclarées « sans fournisseur » étaient en
+  // fait au catalogue Gineys depuis le début. Chercher dans un sous-
+  // ensemble et conclure « personne ne l'a » est la même faute que lire
+  // `GET /bookings` sans `?date=` et conclure « carnet vide ».
+  ['Œuf (pièce)',                   'OEUF TRACE G PLEIN AIR'],
+  ['Éperlans (kg)',                 'EPERLAN D\'AMERIQUE POUR FRITURE'],
+  ['Crème de balsamique (litre)',   'CREME DE VINAIGRE BALSAMIQUIE DE MODENE'],
+  ['Andouillette (pièce)',          'ANDOUILLETTE TABLE CAMPAGNE'],
+  // « TRANCHE » sur l'étiquette : c'est bien du tranché, pas le bâton.
+  ['Chorizo tranché (kg)',          'CHORIZO VELA 75 TRANCHE'],
+  // « ÉMINCÉ » de part et d'autre, et la couleur concorde.
+  ['Oignons rouges émincés (kg)',   'OIGNON ROUGE EMINCE'],
+  // En RONDELLES et « spécial burger » : exactement notre usage.
+  ['Cornichons (kg)',               'CORNICHON EN RONDELLE AIGRE DOUX'],
+  // Le carpaccio de bœuf prêt, portionné — c'est le produit du plat.
+  ['Bœuf pour carpaccio (kg)',      'CARPACCIO DE BŒUF ASSAISONNE'],
+  // La gamme Pauwels est une gamme de SAUCES : leur « Moutarde » est la
+  // sauce moutarde, pas le condiment en pot.
+  ['Sauce moutarde (kg)',           'Moutarde — Tube 1 L'],
 ]
 
 // ─── LES PAIRES ÉCARTÉES, ET POURQUOI ───────────────────────────────────
@@ -100,7 +132,13 @@ const ECARTEES = [
   ['Salade mesclun (kg)', 'Salade spartacus / taboulé', 'des salades COMPOSÉES, pas de la feuille'],
   ['Oignons rouges émincés (kg)', 'Oignons rouges épluchés', 'épluchés ≠ émincés (règle déjà posée pour La Frite Belge)'],
   ['Champignons émincés (kg)', 'CHAMPIGNON HOTEL 5/1', 'conserve 5/1 : ni le format ni l’état ne concordent'],
-  ['Saumon fumé tranché', 'TARTARE SAUMON / Filet', 'ni tartare ni filet ne sont des tranches fumées'],
+  ['Saumon fumé tranché', 'BARON / CHUTE DE SAUMON FUME', 'un baron est un côté entier, des chutes sont des chutes — ni l’un ni l’autre n’est tranché'],
+  ['Lard fumé en tranches (kg)', 'DEMI POITRINE PORC FUME', 'la poitrine entière, pas des tranches'],
+  ['Crevettes décortiquées (kg)', 'CREVETTE ENT CRUE BLACK TIGER', '« ENT » = entière : tout l’écart de prix est là'],
+  ['Champignons émincés (kg)', 'COCKTAIL / MELANGE CHAMPIGNON', 'des mélanges entiers, pas des émincés'],
+  ['Vinaigrette (litre)', 'MIGNONETTE / DOSETTE VINAIGRETTE', 'des dosettes de 20 ml quand il nous faut du litre'],
+  ['Parmesan (kg)', 'GIRASOLI A LA PARMESANE', 'des pâtes farcies, pas du fromage'],
+  ['Tomates (kg)', 'TOMATE SECHEE SEAU=3KG', 'séchée en seau : ni fraîche, ni le format'],
 ]
 
 const T = async p => {
@@ -133,7 +171,13 @@ async function main() {
   for (const [nomMatiere, fragment] of RETENUES) {
     const m = parNom.get(nomMatiere)
     if (!m) { problemes.push(`matière introuvable : ${nomMatiere}`); continue }
-    const hits = cat.filter(c => c.nature === 'devis' && norm(c.designation).includes(norm(fragment)))
+    // ⚠️ TOUTES LES NATURES, pas seulement les devis. Une première version
+    // ne regardait que `nature = 'devis'` — 285 lignes sur 3 392 — et
+    // concluait « aucun fournisseur ne l'a » sur les neuf matières que le
+    // portail Gineys vendait depuis le début. Chercher dans un
+    // sous-ensemble et conclure sur le tout est la faute récurrente de ce
+    // projet (`GET /bookings` sans `?date=`, `expand[]=items` oublié).
+    const hits = cat.filter(c => c.prix_ht != null && norm(c.designation).includes(norm(fragment)))
     // ⚠️ Un fragment qui désigne PLUSIEURS lignes ferait écrire le prix
     // d'un autre produit. On refuse plutôt que de prendre le premier.
     if (hits.length === 0) { problemes.push(`aucune ligne de devis pour « ${fragment} » (${nomMatiere})`); continue }
@@ -141,16 +185,19 @@ async function main() {
       problemes.push(`AMBIGU — « ${fragment} » désigne ${hits.length} lignes : ${hits.map(h => h.designation.slice(0, 40)).join(' | ')}`)
       continue
     }
-    aEcrire.push({ m, c: hits[0], fournisseur: nomF.get(hits[0].fournisseur_id) ?? '?' })
+    // Le PREMIER de la liste donne le fournisseur attitré ; les suivants
+    // n'ajoutent qu'une offre concurrente sur la même clé.
+    const premier = !aEcrire.some(x => x.m.id === m.id)
+    aEcrire.push({ m, c: hits[0], fournisseur: nomF.get(hits[0].fournisseur_id) ?? '?', attitre: premier })
   }
 
   console.log('\n══ RATTACHEMENT DES DEVIS AUX MATIÈRES ══\n')
   console.log(`${aEcrire.length} paire(s) retenue(s) · ${ECARTEES.length} écartée(s) · ${problemes.length} problème(s)\n`)
 
-  for (const { m, c, fournisseur } of aEcrire) {
+  for (const { m, c, fournisseur, attitre } of aEcrire) {
     const avant = m.fournisseur_principal && !/^ESTIMATION/i.test(m.fournisseur_principal)
       ? m.fournisseur_principal : '—'
-    console.log(`  ${m.nom.padEnd(32)} → ${fournisseur.padEnd(22)} ${Number(c.prix_ht).toFixed(3).padStart(8)} /${(c.unite ?? '?').padEnd(9)} ${c.designation.slice(0, 44)}`)
+    console.log(`  ${(attitre ? '  ' : '  ↳ ') + m.nom}`.padEnd(36) + `→ ${fournisseur.padEnd(22)} ${Number(c.prix_ht).toFixed(3).padStart(8)} /${(c.unite ?? '?').padEnd(9)} ${c.designation.slice(0, 44)}`)
     if (avant !== '—') console.log(`     ⚠️ remplace « ${avant} »`)
   }
 
@@ -169,8 +216,11 @@ async function main() {
     const sans = !b || /^ESTIMATION/i.test(b)
     return sans && !aEcrire.some(x => x.m.id === i.id)
   })
-  console.log(`\n⚠️ ${restantes.length} matière(s) resteront sans fournisseur : aucun devis reçu ne les couvre.`)
-  console.log('   C’est une question à poser aux commerciaux, pas une correspondance à forcer.')
+  console.log(`\n⚠️ ${restantes.length} matière(s) resteront sans fournisseur :`)
+  console.log('   ' + restantes.map(r => r.nom).sort().join(' · '))
+  console.log('   ⚠️ Ce sont pour l’essentiel des produits FRAIS — aucun de nos')
+  console.log('   fournisseurs actuels n’en vend. C’est une question à poser à un')
+  console.log('   maraîcher, pas une correspondance à forcer.')
 
   if (!ECRIRE) {
     console.log('\n\n── ESSAI À BLANC — rien n’a été écrit. ──\n')
@@ -190,6 +240,7 @@ async function main() {
 
     // 2. le FOURNISSEUR ATTITRÉ — ⚠️ mais PAS le prix : un devis n'est pas
     //    une facture, et `prix_achat_ht` est le coût de revient.
+    if (!aEcrire.find(x => x.m.id === m.id)?.attitre) continue
     const r2 = await fetch(`${U}/rest/v1/ingredients?id=eq.${m.id}`, {
       method: 'PATCH',
       headers: { apikey: K, Authorization: 'Bearer ' + K, 'Content-Type': 'application/json', Prefer: 'return=minimal' },

@@ -3582,6 +3582,90 @@ raccourci qui tenait tant qu'aucune matière « coppa » n'existait. La règle
 (« la coppa n'est pas du serrano ») n'a pas bougé ; c'est sa mesure qui
 était devenue trop large.
 
+### « Inconnu » tranché en « tarif public » — décision du gérant (27/09/2026)
+
+**2 412 références étaient en remise INCONNUE, toutes du portail Gineys.**
+Le gérant a tranché : « ce sont seulement des prix publics pas encore
+remisés, car aucune demande de remise n'a été faite sur ces produits ».
+
+Ce n'est pas une déduction de confort — c'est **mesuré** depuis la 0162 : le
+catalogue Arti'Pat avait montré **22 % de remise sur nos 41 articles
+contractuels et 0,3 % sur les 404 autres**, c'est-à-dire le tarif public au
+centime. Le portail n'applique notre tarif négocié qu'aux articles du
+contrat ; tout le reste s'affiche au prix public. La règle de la 0158
+(« non remisé ne se déduit pas d'une absence ») tenait tant qu'on ne savait
+rien ; on sait maintenant.
+
+**Plus aucune ligne « inconnue » : 503 négociées, 2 889 au tarif public.**
+
+⚠️ **Le libellé porte la nuance, sinon le sujet paraît clos** : « Tarif
+public — **remise à demander** ». Un tarif refusé se subit ; un tarif jamais
+demandé s'obtient en écrivant. C'est le gisement principal de l'écran.
+
+⚠️ **La règle ne déborde pas du portail Gineys** — c'est là, et seulement
+là, que la mesure a été faite. Un DEVIS est chiffré nommément pour CASATASIA,
+une FACTURE est un prix payé : marquer l'un des deux « public » effacerait
+une négociation obtenue. Deux assertions le verrouillent.
+
+⚠️ Deux assertions de `test-achats.mjs` ont été **révisées sur décision**,
+pas forcées, et le commentaire dit laquelle et pourquoi. Ce qui reste
+interdit n'a pas bougé : `tarif_negocie = true` sans avoir acheté.
+
+⚠️⚠️ **ET `test-tarifs-fournisseurs.mjs` LISAIT 1 000 LIGNES SUR 3 392.** Son
+helper interrogeait `catalogue_fournisseur` sans pagination ni `order` :
+PostgREST plafonne à mille SANS le dire et ne promet aucun ordre. Le test
+comptait donc un échantillon tiré au hasard — 100 factures et 10 face-à-face
+un jour, **43 et 5 le lendemain, sur des données inchangées**. Il passait par
+chance. Corrigé avec `sbTout()` (tri sur `id`, colonne unique) : les vrais
+chiffres sont **106 lignes de facture et 26 face-à-face**. Un test dont le
+verdict dépend du tirage ne prouve rien.
+
+### Poser les clés : chercher dans TOUT le catalogue (27/09/2026)
+
+⚠️⚠️ **LA PREMIÈRE PASSE N'AVAIT CHERCHÉ QUE DANS LES DEVIS** — 285 lignes
+sur 3 392 — et avait conclu « aucun fournisseur ne les vend » sur neuf
+matières que **le portail Gineys proposait depuis le début** : œufs, éperlans
+pour friture, crème de balsamique, andouillette, chorizo tranché, oignons
+rouges émincés, cornichons en rondelles, carpaccio de bœuf. C'est la faute
+récurrente de ce projet — `GET /bookings` sans `?date=`, `expand[]=items`
+oublié : chercher dans un sous-ensemble et conclure sur le tout.
+
+✅ **Et le garde-fou d'ambiguïté a rendu mieux que prévu.** Refusant d'écrire
+quand un fragment désigne plusieurs lignes, il a révélé que **Gineys vend
+aussi** l'aubergine grillée de Gel Var, le reblochon, les lardons, les frites
+et le cheddar de Félix Potin. Cinq **face-à-face** créés au lieu de cinq
+refus : plusieurs lignes sur une même clé, c'est exactement ce qu'on cherche.
+Le premier de la liste devient le fournisseur attitré, les suivants n'ajoutent
+qu'une offre concurrente.
+
+**38 paires posées, 22 écartées avec leur motif. 75 matières sur 93 ont un
+fournisseur attitré** (42 avant-hier), et les bons couvrent **158 lignes,
+2 089,64 €**.
+
+### Le frais : personne ne le vend (27/09/2026)
+
+Les **18 matières restantes** sont presque toutes du frais — tomates, tomates
+cerises, salade mesclun, roquette, citron, parmesan, pommes de terre en
+rondelles, champignons. Vérifié sur les **3 392 lignes**, tous fournisseurs
+confondus : aucun ne les propose. Ce n'est pas un trou de rapprochement,
+c'est un fournisseur qui manque.
+
+`node scripts/demande-tarif-frais.mjs [--creer-fournisseur]` sort la liste à
+faire chiffrer, **avec nos prix en face** — un fournisseur qui ignore ce
+qu'il doit battre propose son tarif public.
+
+⚠️ Chaque prix est marqué « ⚠ estimation, à confirmer » ou « prix payé »
+(0165). Les 18 sont TOUS des estimations : les présenter comme des prix payés
+fausserait la négociation dans les deux sens.
+
+⚠️⚠️ **« Pomona TerreAzur » a été RETIRÉ de la liste des fournisseurs de
+démo.** Le seed de mai-juin 2026 avait emprunté le nom d'une entreprise
+RÉELLE, que le gérant rencontre le 28/09/2026 pour les fruits et légumes. Le
+laisser dans cette liste aurait fait traiter le vrai fournisseur comme une
+donnée de test — ses matières seraient ressorties « sans fournisseur » après
+son premier devis, sans que rien ne le signale. Les 12 ingrédients de démo
+qui portent ce nom sont tous inactifs.
+
 ### Tarifs fournisseurs — qui est le moins cher, et sur quoi (0151)
 
 `/admin/tarifs-fournisseurs`. L'outil savait ce qu'on **paie** — les factures
@@ -5487,7 +5571,8 @@ PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160
 node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
-node scripts/rattacher-devis-matieres.mjs      # devis → fournisseur attitré (essai à blanc)
+node scripts/rattacher-devis-matieres.mjs      # tarifs → fournisseur attitré (essai à blanc)
+node scripts/demande-tarif-frais.mjs           # ce que personne ne vend — à faire chiffrer
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal

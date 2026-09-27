@@ -55,9 +55,15 @@ export function etatRemise(a: Pick<ArticleAchat, 'tarif_negocie'>): EtatRemise {
   return 'inconnu'
 }
 
+/**
+ * ⚠️ « Tarif public » ne veut pas dire « remise refusée », mais « remise
+ * JAMAIS DEMANDÉE ». La nuance décide de ce qu'on fait ensuite : un tarif
+ * refusé se subit, un tarif jamais demandé s'obtient en écrivant. Le
+ * libellé le dit, sinon 2 400 références passeraient pour un sujet clos.
+ */
 export const LIBELLE_REMISE: Record<EtatRemise, string> = {
   negocie: 'Remisé',
-  public: 'Tarif public',
+  public: 'Tarif public — remise à demander',
   inconnu: 'Remise inconnue',
 }
 

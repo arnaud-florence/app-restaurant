@@ -284,9 +284,15 @@ export function cleMatiere(p: {
  */
 const FOURNISSEURS_DEMO = new Set([
   'Metro France', 'Sysco France', 'Brake France', 'Transgourmet',
-  'Pomona TerreAzur', 'Ferme du Plateau', 'Boucherie Bio', 'Boulangerie Coop',
+  'Ferme du Plateau', 'Boucherie Bio', 'Boulangerie Coop',
   'Maraîcher du coin', 'Marée fraîche', 'Domaine Provence', 'Crémerie Local',
   'Épicerie fine', 'Gynes',
+  // ⚠️ « Pomona TerreAzur » A ÉTÉ RETIRÉ de cette liste le 27/09/2026 : le
+  // jeu de démo avait emprunté le nom d'une entreprise RÉELLE, que le
+  // gérant rencontre le 28/09 pour les fruits et légumes. Le laisser ici
+  // ferait traiter le vrai fournisseur comme une donnée de test — et ses
+  // matières ressortiraient « sans fournisseur » après son premier devis.
+  // Les 12 ingrédients de démo qui portent ce nom sont tous inactifs.
 ])
 
 export function lireFournisseur(brut: string | null | undefined): {
