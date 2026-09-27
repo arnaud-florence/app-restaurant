@@ -90,8 +90,28 @@ export async function creerBonsDepuisReassort(input: z.infer<typeof SchemaBons>)
   }
 
   const crees: Array<{ fournisseur_id: string; bon_id: string; lignes: number; sansPrix: number }> = []
+  const dejaEnCours: string[] = []
+
+  // ⚠️⚠️ L'AGENT STOCK CRÉE LES MÊMES BROUILLONS, toutes les deux heures et
+  // depuis les mêmes lignes. Sans garde-fou, l'écran et l'agent produisent
+  // chacun leur bon pour le même besoin : deux documents identiques, et si
+  // les deux partent, la marchandise arrive en double. L'agent a son propre
+  // anti-doublon (6 h) ; voici le pendant, côté écran.
+  const sixHeures = new Date(Date.now() - 6 * 3600_000).toISOString()
+  const { data: enCours } = await sb.from('bons_commande')
+    .select('fournisseur_id, fournisseurs(nom)')
+    .eq('statut', 'brouillon')
+    .gte('created_at', sixHeures)
+    .in('fournisseur_id', [...parFournisseur.keys()])
+  const bloques = new Set((enCours ?? []).map(b => b.fournisseur_id as string))
 
   for (const [fournisseur_id, siennes] of parFournisseur) {
+    if (bloques.has(fournisseur_id)) {
+      const nom = (enCours ?? []).find(b => b.fournisseur_id === fournisseur_id)
+      const f = nom?.fournisseurs as { nom?: string } | { nom?: string }[] | null
+      dejaEnCours.push((Array.isArray(f) ? f[0]?.nom : f?.nom) ?? 'fournisseur')
+      continue
+    }
     const { data: bon, error } = await sb.from('bons_commande').insert({
       fournisseur_id,
       statut: 'brouillon',
@@ -138,5 +158,7 @@ export async function creerBonsDepuisReassort(input: z.infer<typeof SchemaBons>)
 
   revalidatePath('/admin/fournisseurs')
   revalidatePath('/admin/reassort')
-  return { ok: true as const, crees }
+  // ⚠️ Un doublon évité est DIT, pas tu : sans ça le gérant croirait avoir
+  // créé cinq bons et n'en trouverait que trois, sans savoir pourquoi.
+  return { ok: true as const, crees, dejaEnCours }
 }

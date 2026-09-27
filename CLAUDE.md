@@ -2565,10 +2565,49 @@ montant inconnu serait faux.
 car moins chères ») : sans ça on reçoit un bon d'un fournisseur chez qui on
 n'a jamais commandé, sans comprendre pourquoi.
 
-⚠️ **L'agent reste limité par `stock_actuel`** — le compteur entretenu, qui
-dérive (0135). C'est pour ça qu'il ne propose qu'une poignée de lignes là où
-`/admin/reassort` en trouve 126 : le réassort part d'un COMPTAGE et de
-cibles, pas d'un compteur. L'écran fait foi ; l'agent est un filet.
+⚠️⚠️ **L'AGENT LIT DÉSORMAIS LES LIGNES DU RÉASSORT, plus `stock_actuel`
+(27/09/2026).** Il s'appuyait sur le compteur entretenu à chaque mouvement —
+celui qui dérive au premier oubli et auquel « personne ne croit » (0135).
+Mesuré : **2 lignes** à commander là où l'écran en trouvait **126**. Deux
+chiffres pour la même question, et c'est l'agent qu'on lit le matin.
+
+**`src/lib/reassort-donnees.ts`** (server-only) porte `chargerLignesReassort()`
+— UNE construction, deux lecteurs. La page `/admin/reassort` fait désormais
+trois lignes. Les règles PURES restent dans `reassort.ts`, testables sans base.
+
+⚠️⚠️ **LA PÉREMPTION DES COMPTAGES VIVAIT DANS L'ÉCRAN**, en une ligne de
+`useMemo`. L'agent, qui lit les mêmes lignes, héritait donc des comptages du
+**24 août** et voyait 31 références « au niveau » dans une maison fermée.
+`sansComptagePerime()` est monté dans la lib pure et appelé par les DEUX.
+⚠️ `compte_le` est conservé : « périmé » n'est pas « jamais compté » — l'un
+dit que le chiffre ne décrit plus rien, l'autre que personne n'a regardé.
+
+Résultat : **écran et agent donnent exactement le même bilan** — 193
+références, 126 lignes commandables, 67 sans fournisseur, et la même
+répartition (Gineys 60, France Boissons 42, Félix Potin 12, Promocash 11,
+La Frite Belge 1).
+
+⚠️ **UNE ALERTE GROUPÉE, PAS CENT QUATRE-VINGT-TREIZE.** L'agent émettait un
+finding PAR ingrédient : sur un stock d'ouverture à zéro, ça fait 193 lignes
+rouges d'un coup, et un tableau de bord illisible n'est pas lu — donc il ne
+protège plus de rien (même leçon que le test rouge en permanence). Il dit
+COMBIEN et renvoie sur `/admin/reassort`.
+
+⚠️ **Ce qu'on ne peut PAS commander est remonté** (`stock_sans_fournisseur`) :
+sans ça l'agent annoncerait une commande complète alors qu'il manque 67
+références.
+
+⚠️⚠️ **L'ÉCRAN ET L'AGENT CRÉAIENT CHACUN LEUR BROUILLON pour le même
+besoin** — dix bons pour cinq fournisseurs, et si les deux partent la
+marchandise arrive en double. L'agent avait son anti-doublon (6 h) ; l'écran
+n'en avait aucun. `creerBonsDepuisReassort()` applique le même, et **DIT** ce
+qu'il a ignoré : sans ça on croit avoir créé cinq bons et on n'en trouve que
+trois, sans savoir pourquoi.
+
+⚠️ La consommation moyenne sur 30 jours a disparu avec `stock_actuel` : elle
+se calculait sur `mouvements_stock`, alimenté par le même compteur. La
+quantité vient maintenant de la CIBLE (0163) — une décision, pas une
+extrapolation.
 
 Vérifié le 27/09/2026 sur les données réelles : l'agent a créé un bon
 **Félix Potin de 2 lignes réaiguillées, « tarif à confirmer »**, là où il

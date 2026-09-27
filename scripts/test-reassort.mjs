@@ -233,5 +233,28 @@ console.log('\n── ON COMMANDE AU MOINS CHER (règle du gérant) ──')
     orphelin.prets.length === 1 && orphelin.sansFournisseur.length === 0)
 }
 
+console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteurs ──')
+{
+  // ⚠️ RECOPIE de `sansComptagePerime()` (src/lib/reassort.ts).
+  const sansComptagePerime = (lignes, auj) =>
+    lignes.map(l => (comptagePerime(l, auj) ? { ...l, tenu: null } : l))
+  const REF2 = new Date('2026-09-27T00:00:00Z')
+  const brut = [
+    L({ cle: 'vieux', tenu: 28, le: '2026-08-24', seuil: 5, cible: 10 }),
+    L({ cle: 'frais', tenu: 28, le: '2026-09-25', seuil: 5, cible: 10 }),
+  ]
+  const net = sansComptagePerime(brut, REF2)
+
+  t('un comptage du 24 août est ramené à INCONNU', net[0].tenu === null)
+  t('⚠️ mais sa DATE est conservée — « périmé » n’est pas « jamais compté »',
+    net[0].compte_le === '2026-08-24')
+  t('un comptage récent est laissé tel quel', net[1].tenu === 28)
+  t('⚠️ sans neutralisation, la ligne périmée passe pour au niveau',
+    etat(brut[0]) === 'complet')
+  t('⚠️ et avec, elle repasse à commander — c’est tout l’enjeu',
+    etat(net[0]) === 'a_commander')
+  t('la quantité redevient la cible entière', aCommander(net[0]) === 10)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

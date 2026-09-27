@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   etat, aCommander, coutReassort, bilan, parCategorie, parFournisseur,
-  parEtablissement, lignesCommandables, economieEstimee,
+  parEtablissement, lignesCommandables, economieEstimee, sansComptagePerime,
   comptagePerime, stockAReconstituer, PEREMPTION_COMPTAGE_JOURS,
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
@@ -38,8 +38,11 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   // ⚠️ Un comptage périmé est ramené à « inconnu » pour le CALCUL : sinon
   // l'écran proposerait un complément sur un stock qui n'existe plus.
   // La date reste affichée — on signale, on ne masque pas.
-  const avecBrouillon = useMemo(() => lignes.map(l0 => {
-    const l = comptagePerime(l0) ? { ...l0, tenu: null } : l0
+  // ⚠️ La péremption est appliquée par `sansComptagePerime()`, la même
+  // fonction que l'agent Stock : en la gardant ici en une ligne, l'agent
+  // lisait des comptages d'août comme du stock.
+  const avecBrouillon = useMemo(() => sansComptagePerime(lignes).map(l0 => {
+    const l = l0
     const b = brouillon[l.cle]
     if (!b) return l
     const n = (v: string) => v.trim() === '' ? null : Number(v.replace(',', '.'))
@@ -85,7 +88,10 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
         })
         const n = r.crees.length
         const sansPrix = r.crees.reduce((a, c) => a + c.sansPrix, 0)
-        setBons(`✓ ${n} bon(s) créé(s) en brouillon${sansPrix ? ` · ${sansPrix} ligne(s) sans prix connu` : ''}.`)
+        const dejaLa = r.dejaEnCours.length
+          ? ` · ${r.dejaEnCours.length} ignoré(s), un brouillon récent existe déjà (${r.dejaEnCours.join(', ')})`
+          : ''
+        setBons(`✓ ${n} bon(s) créé(s) en brouillon${sansPrix ? ` · ${sansPrix} ligne(s) sans prix connu` : ''}${dejaLa}.`)
       } catch (e) {
         setBons(e instanceof Error ? e.message : 'Création impossible.')
       }

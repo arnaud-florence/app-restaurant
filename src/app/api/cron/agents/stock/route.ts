@@ -18,6 +18,8 @@
 import { NextResponse } from 'next/server'
 import { runAgent, emitFinding, authCron, type AgentContext } from '@/lib/agents/runner'
 import { comparer, prixReference, type LigneTarif } from '@/lib/tarifs-fournisseurs'
+import { chargerLignesReassort } from '@/lib/reassort-donnees'
+import { lignesCommandables, comptagePerime, sansComptagePerime, etat as etatReassort } from '@/lib/reassort'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -30,17 +32,10 @@ export async function GET(req: Request) {
 
   const result = await runAgent('stock', async (ctx) => {
     // (A) Charge tous les ingrédients actifs + leurs 2 fournisseurs
-    const { data: ingredients } = await ctx.supabase
-      .from('ingredients')
-      .select('id, nom, unite, prix_achat_ht, stock_actuel, stock_minimum, stock_maximum, fournisseur_principal, fournisseur_secondaire')
-      .eq('actif', true)
-    if (!ingredients || ingredients.length === 0) {
-      return {
-        summary: 'Aucun ingrédient actif',
-        data: { nbIngredients: 0, nbRuptures: 0, nbAlerteMin: 0, bonsCreated: 0, bonsDetails: [], compares: [], dlcAlertes: 0 },
-      }
-    }
-    type Ing = (typeof ingredients)[number]
+    // ⚠️ Le périmètre de l'agent est le RÉASSORT (produits ET matières),
+    // plus la seule table `ingredients` : une table vide ne veut plus dire
+    // « rien à faire ». Le modèle du Fournil est l'achat-revente — on
+    // commande des croissants et des fûts, pas des matières.
 
     // (B) Charge tous les fournisseurs actifs (la colonne `fournisseur_principal`
     // sur ingredients est un TEXTE libre — nom du fournisseur — pas un UUID).
@@ -60,115 +55,116 @@ export async function GET(req: Request) {
         minCmd: Number(f.minimum_commande ?? 0),
       })
     }
-    function trouverFournisseur(nom: string | null): { id: string; nom: string; delai: number; minCmd: number } | null {
-      if (!nom) return null
-      return fournisseurParNom.get(nom.toLowerCase().trim()) ?? null
-    }
 
-    // (C) Consommation moyenne 30j par ingrédient (sorties uniquement)
-    const trente = new Date()
-    trente.setDate(trente.getDate() - 30)
-    const { data: sorties } = await ctx.supabase
-      .from('mouvements_stock')
-      .select('ingredient_id, quantite, type')
-      .eq('type', 'sortie')
-      .gte('created_at', trente.toISOString())
-    const consoParIngredient = new Map<string, number>()  // total sortie / 30 jours
-    for (const m of (sorties ?? []) as Array<{ ingredient_id: string | null; quantite: number | null }>) {
-      if (!m.ingredient_id) continue
-      consoParIngredient.set(m.ingredient_id, (consoParIngredient.get(m.ingredient_id) ?? 0) + Math.abs(Number(m.quantite ?? 0)))
-    }
+    // ⚠️ La consommation moyenne sur 30 jours a disparu avec
+    // `stock_actuel` : elle se calculait sur `mouvements_stock`, alimenté
+    // par le même compteur qui dérive. La quantité vient désormais de la
+    // CIBLE (0163), posée à partir des ventes réelles ou des fiches
+    // techniques — c'est-à-dire d'une décision, pas d'une extrapolation.
 
-    // (D) Pour chaque ingrédient : calcule jours_avant_rupture + classifie
+    // (D) ⚠️⚠️ CE QU'IL FAUT COMMANDER VIENT DU RÉASSORT, PAS DE
+    // `stock_actuel`. L'agent lisait le compteur entretenu à chaque
+    // mouvement — celui qui dérive au premier oubli (café offert, saisie
+    // manquée, ticket non remonté) et auquel « personne ne croit » (0135).
+    // Mesuré le 27/09/2026 : il trouvait **2 lignes** à commander là où
+    // `/admin/reassort` en trouvait **126**. Deux chiffres pour la même
+    // question, et c'est l'agent qu'on lit le matin.
+    //
+    // Il lit désormais EXACTEMENT les mêmes lignes que l'écran —
+    // `chargerLignesReassort()` : dernier COMPTAGE (périmé au-delà de
+    // 30 jours), seuil et cible (0163), fournisseur déduit de faits, et le
+    // moins cher quand la comparaison tient.
+    // ⚠️ `sansComptagePerime()` est la MÊME fonction que l'écran. Sans
+    // elle, l'agent lisait les comptages du 24 août comme du stock et
+    // voyait 31 références « au niveau » dans une maison fermée.
+    const lignesR = sansComptagePerime(await chargerLignesReassort(ctx.supabase))
+
+    // ⚠️ RÈGLE DU GÉRANT : on commande au moins cher. Même appel que
+    // l'écran, donc même arbitrage — une seconde règle finirait par
+    // envoyer le bon ailleurs.
+    const { prets, sansFournisseur } = lignesCommandables(lignesR, true)
+
     type BesoinAchat = {
-      ing: Ing; quantite: number; jours_restants: number; urgence: 'rouge' | 'jaune'
-      /** Cette ligne quitte le fournisseur habituel pour le moins cher. */
-      bascule: boolean
-      ecartPct: number
-      /** Chez qui on l'achetait — pour que le bon le DISE. */
-      depuis: string | null
+      ligne: (typeof prets)[number]
+      urgence: 'rouge' | 'jaune'
     }
     const besoinsParFournisseur = new Map<string, BesoinAchat[]>()
-
-    // ⚠️ Le comparateur tourne AVANT le regroupement : c'est lui qui décide
-    // chez qui chaque ligne part. Le lancer après, comme avant, ne
-    // permettait plus que de commenter un bon déjà écrit.
-    const compares = await comparerPrixFournisseurs(ctx)
-    const moinsCherParIngredient = new Map<string, (typeof compares)[number]>()
-    for (const c of compares) {
-      for (const id of c.ingredientIds) {
-        const vu = moinsCherParIngredient.get(id)
-        // Si une matière relève de deux groupes, le plus gros écart gagne.
-        if (!vu || c.economiePct > vu.economiePct) moinsCherParIngredient.set(id, c)
-      }
-    }
     let nbRuptures = 0
     let nbAlerteMin = 0
 
-    for (const ing of ingredients) {
-      const stock = Number(ing.stock_actuel ?? 0)
-      const conso30j = consoParIngredient.get(ing.id as string) ?? 0
-      const consoJour = conso30j / 30
-      const joursRestants = consoJour > 0 ? stock / consoJour : 999
+    const enRupture: string[] = []
+    const sousSeuil: string[] = []
+    for (const l of lignesR) {
+      if (etatReassort(l) !== 'a_commander') continue
+      // ⚠️ « Jamais compté » et « compté il y a deux mois » ne sont pas un
+      // stock : c'est une rupture tant que personne n'a regardé.
+      const inconnu = l.tenu === null || comptagePerime(l)
+      if (inconnu || (l.tenu ?? 0) <= 0) { nbRuptures++; enRupture.push(l.nom) }
+      else { nbAlerteMin++; sousSeuil.push(l.nom) }
+    }
 
-      const enRupture = joursRestants <= JOURS_AVANT_RUPTURE_CRITIQUE && consoJour > 0
-      const enAlerteMin = stock <= Number(ing.stock_minimum ?? 0)
+    // ⚠️ UNE ALERTE GROUPÉE, PAS CENT VINGT-SIX. L'agent émettait un
+    // finding PAR ingrédient : sur un stock d'ouverture à zéro, ça fait
+    // 126 lignes rouges d'un coup, et un tableau de bord illisible n'est
+    // pas lu — donc il ne protège plus de rien (même leçon que le test
+    // rouge en permanence). Le détail est sur `/admin/reassort`, qui est
+    // fait pour ça ; l'agent dit COMBIEN et renvoie là-bas.
+    if (nbRuptures > 0 && !(await findingDejaActif(ctx, 'rupture_stock', {}))) {
+      await emitFinding(ctx, {
+        urgence: 'rouge',
+        type: 'rupture_stock',
+        titre: `${nbRuptures} référence(s) à zéro ou jamais comptées`,
+        message: `${enRupture.slice(0, 10).join(', ')}${enRupture.length > 10 ? `… et ${enRupture.length - 10} autre(s)` : ''}. `
+          + `⚠️ Un comptage de plus de 30 jours ne décrit plus le stock : il est traité comme inconnu, pas comme un stock plein.`,
+        action_label: 'Voir le réassort',
+        action_url: '/admin/reassort',
+        data: { nb: nbRuptures },
+      })
+    }
+    if (nbAlerteMin > 0 && !(await findingDejaActif(ctx, 'stock_minimum', {}))) {
+      await emitFinding(ctx, {
+        urgence: 'jaune',
+        type: 'stock_minimum',
+        titre: `${nbAlerteMin} référence(s) sous leur seuil`,
+        message: `${sousSeuil.slice(0, 10).join(', ')}${sousSeuil.length > 10 ? `… et ${sousSeuil.length - 10} autre(s)` : ''}.`,
+        action_label: 'Voir le réassort',
+        action_url: '/admin/reassort',
+        data: { nb: nbAlerteMin },
+      })
+    }
 
-      if (!enRupture && !enAlerteMin) continue   // ingrédient sain → skip
+    for (const l of prets) {
+      const inconnu = l.tenu === null || comptagePerime(l)
+      besoinsParFournisseur.set(l.retenu.id, [
+        ...(besoinsParFournisseur.get(l.retenu.id) ?? []),
+        { ligne: l, urgence: (inconnu || (l.tenu ?? 0) <= 0) ? 'rouge' : 'jaune' },
+      ])
+    }
 
-      const urgence: 'rouge' | 'jaune' = enRupture ? 'rouge' : 'jaune'
-      if (enRupture) nbRuptures++
-      else nbAlerteMin++
-
-      // Finding individuel (avec dédup sur ingredient_id non résolu)
-      const dejaEmis = await findingDejaActif(ctx, enRupture ? 'rupture_stock' : 'stock_minimum', { ingredient_id: ing.id })
+    // ⚠️ Ce qu'on NE PEUT PAS commander est REMONTÉ, pas perdu : sans ça
+    // l'agent annoncerait une commande complète alors qu'il manque un
+    // morceau, et personne n'irait chercher pourquoi.
+    if (sansFournisseur.length) {
+      const dejaEmis = await findingDejaActif(ctx, 'stock_sans_fournisseur', {})
       if (!dejaEmis) {
-        const dateRupture = consoJour > 0 ? new Date(Date.now() + joursRestants * 86400_000) : null
         await emitFinding(ctx, {
-          urgence,
-          type: enRupture ? 'rupture_stock' : 'stock_minimum',
-          titre: enRupture
-            ? `${ing.nom} : rupture prévue ${dateRupture ? formatJour(dateRupture) : ''}`
-            : `${ing.nom} : stock sous le minimum (${stock} ${ing.unite ?? ''})`,
-          message: `Conso moyenne : ${consoJour.toFixed(1)} ${ing.unite ?? ''}/jour · Stock actuel : ${stock} ${ing.unite ?? ''} · ${enRupture ? `Épuisement dans ${Math.max(0, joursRestants).toFixed(1)} jour(s)` : `Minimum : ${ing.stock_minimum} ${ing.unite ?? ''}`}`,
-          action_label: 'Voir le stock',
-          action_url:   '/admin/stock',
-          data: { ingredient_id: ing.id, nom: ing.nom, stock, conso_jour: consoJour, jours_restants: joursRestants },
+          urgence: 'jaune',
+          type: 'stock_sans_fournisseur',
+          titre: `${sansFournisseur.length} référence(s) à commander sans fournisseur connu`,
+          message: `Elles sont écartées des bons de commande — on ne peut écrire à personne. `
+            + `Exemples : ${sansFournisseur.slice(0, 6).map(l => l.nom).join(', ')}`
+            + `${sansFournisseur.length > 6 ? '…' : ''}. `
+            + `⚠️ Un fournisseur ne se devine pas : un bon parti chez le mauvais interlocuteur se découvre à la livraison.`,
+          action_label: 'Voir le réassort',
+          action_url: '/admin/reassort',
+          data: { nb: sansFournisseur.length },
         })
-      }
-
-      // Calcule la quantité à commander : amener au stock_max (ou si pas défini, conso 14 jours)
-      const stockMax = Number(ing.stock_maximum ?? 0)
-      const cible = stockMax > 0 ? stockMax : consoJour * 14
-      const aCommander = Math.max(0, Math.ceil(cible - stock))
-
-      // ⚠️⚠️ ON COMMANDE AU MOINS CHER — règle du gérant (27/09/2026).
-      // L'agent envoyait chez le fournisseur HABITUEL et se contentait de
-      // SIGNALER l'écart : Félix Potin était moins cher sur 17 matières et
-      // ne recevait aucun bon. Le réaiguillage se fait ici, au moment du
-      // regroupement — après, le bon est déjà écrit.
-      //
-      // ⚠️ On ne réaiguille QUE sur un groupe où la comparaison TIENT
-      // (`comparerPrixFournisseurs` a déjà exigé : unités ramenées à la
-      // même base, deux fournisseurs distincts, écart ≥ 10 %, et un
-      // incumbent identifié par une facture). Ailleurs, il n'y a pas de
-      // moins cher à choisir.
-      const habituel = trouverFournisseur(ing.fournisseur_principal as string | null)
-      const alt = moinsCherParIngredient.get(ing.id as string)
-      const destinataire = alt && alt.fournAlternatifId !== habituel?.id
-        ? { id: alt.fournAlternatifId, bascule: true, ecartPct: alt.economiePct }
-        : habituel ? { id: habituel.id, bascule: false, ecartPct: 0 } : null
-
-      if (destinataire && aCommander > 0) {
-        const list = besoinsParFournisseur.get(destinataire.id) ?? []
-        list.push({
-          ing, quantite: aCommander, jours_restants: joursRestants, urgence,
-          bascule: destinataire.bascule, ecartPct: destinataire.ecartPct,
-          depuis: destinataire.bascule ? (habituel?.nom ?? null) : null,
-        })
-        besoinsParFournisseur.set(destinataire.id, list)
       }
     }
+
+    // Le comparateur tourne pour SIGNALER les écarts ; le réaiguillage,
+    // lui, est déjà fait par `lignesCommandables()` ci-dessus.
+    const compares = await comparerPrixFournisseurs(ctx)
 
     // (E) Génère bons de commande EN BROUILLON, 1 par fournisseur
     const six_h = new Date(Date.now() - 6 * 3600_000).toISOString()
@@ -220,14 +216,13 @@ export async function GET(req: Request) {
       // NOTRE conditionnement, pas du leur : les convertir écrirait un faux
       // prix sur un document qui engage de l'argent, et un faux prix ne se
       // signale pas — il se découvre à la facture.
-      const prixLigne = (l: BesoinAchat): number | null =>
-        l.bascule ? null : (l.ing.prix_achat_ht == null ? null : Number(l.ing.prix_achat_ht))
+      const prixLigne = (b: BesoinAchat): number | null => b.ligne.prix
 
       // ⚠️ ET LE TOTAL NON PLUS. Sommer des NULL donnerait 0,00 € sur un bon
       // de douze lignes, et un zéro se lit « gratuit » — la faute de
       // `statutFoodCost(0)`. Un montant inconnu reste NULL.
       const chiffrees = lignes.filter(l => prixLigne(l) != null)
-      const montantHt = chiffrees.reduce((s, l) => s + l.quantite * (prixLigne(l) ?? 0), 0)
+      const montantHt = chiffrees.reduce((s, b) => s + b.ligne.quantite * (prixLigne(b) ?? 0), 0)
       const montantConnu = chiffrees.length > 0
 
       // Si minimum commande non atteint → ajoute une note mais crée quand même
@@ -244,11 +239,11 @@ export async function GET(req: Request) {
         // lettres — sans ça, on recevrait un bon d'un fournisseur chez qui
         // on n'a jamais commandé sans comprendre pourquoi.
         ...(() => {
-          const venues = lignes.filter(l => l.bascule)
+          const venues = lignes.filter(b => b.ligne.retenu.bascule)
           if (!venues.length) return []
-          const top = [...venues].sort((a, b) => b.ecartPct - a.ecartPct)[0]
+          const top = [...venues].sort((a, b) => (b.ligne.ailleurs?.ecartPct ?? 0) - (a.ligne.ailleurs?.ecartPct ?? 0))[0]
           return [`↪ ${venues.length} ligne(s) réaiguillée(s) ici car moins chères `
-            + `(jusqu'à −${top.ecartPct.toFixed(0)} % vs ${top.depuis ?? 'notre fournisseur'})`
+            + `(jusqu'à −${(top.ligne.ailleurs?.ecartPct ?? 0).toFixed(0)} % vs ${top.ligne.fournisseur ?? 'notre fournisseur'})`
             + ` · tarif à confirmer : notre conditionnement n'est pas le leur`]
         })(),
       ].filter(Boolean).join(' · ')
@@ -264,11 +259,17 @@ export async function GET(req: Request) {
       if (bcErr || !bc) continue
 
       // Insère les lignes
-      const lignesPayload = lignes.map(l => ({
+      // ⚠️ Une ligne vise SOIT une matière SOIT un produit vendu : la clé
+      // porte le préfixe `ing:` pour la première (0133). Se tromper de
+      // colonne écrirait la commande sur un objet qui n'existe pas.
+      const lignesPayload = lignes.map(b => ({
         bon_commande_id: bc.id,
-        ingredient_id:   l.ing.id,
-        quantite_commandee: l.quantite,
-        prix_unitaire_ht: prixLigne(l),
+        ingredient_id: b.ligne.cle.startsWith('ing:') ? b.ligne.cle.slice(4) : null,
+        recette_id:    b.ligne.cle.startsWith('ing:') ? null : b.ligne.cle,
+        libelle: b.ligne.nom,
+        unite: b.ligne.unite ?? 'unité',
+        quantite_commandee: b.ligne.quantite,
+        prix_unitaire_ht: prixLigne(b),
       }))
       await ctx.supabase.from('bon_commande_lignes').insert(lignesPayload)
 
@@ -302,8 +303,15 @@ export async function GET(req: Request) {
     ].filter(Boolean).join(' · ')
 
     return {
-      summary: summary || `${ingredients.length} ingrédients OK`,
-      data: { nbIngredients: ingredients.length, nbRuptures, nbAlerteMin, bonsCreated, bonsDetails, compares, dlcAlertes },
+      // ⚠️ Le périmètre du bilan est celui du RÉASSORT, pas la table des
+      // ingrédients : il couvre aussi les produits vendus (croissants,
+      // fûts), que le modèle achat-revente fait commander tels quels.
+      summary: summary || `${lignesR.length} référence(s) au niveau`,
+      data: {
+        nbReferences: lignesR.length,
+        nbRuptures, nbAlerteMin, bonsCreated, bonsDetails,
+        compares, dlcAlertes, sansFournisseur: sansFournisseur.length,
+      } as Record<string, unknown>,
     }
   })
 

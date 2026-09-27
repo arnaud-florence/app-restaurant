@@ -87,6 +87,24 @@ export function comptagePerime(l: Pick<LigneReassort, 'compte_le'>, aujourdhui =
  * Le stock est-il à reconstituer entièrement ? Vrai quand AUCUNE référence
  * n'a de comptage récent — le cas d'une réouverture.
  */
+/**
+ * ⚠️⚠️ NEUTRALISE LES COMPTAGES PÉRIMÉS — à appliquer par TOUT lecteur.
+ *
+ * `etat()` et `aCommander()` lisent `tenu` tel quel : ils ne savent pas si
+ * le chiffre date d'hier ou du 24 août. La péremption vivait dans l'écran,
+ * en une ligne de `useMemo` — donc l'agent Stock, qui lit les mêmes
+ * lignes, héritait de comptages vieux de deux mois et voyait 31 références
+ * « en stock » dans une maison fermée.
+ *
+ * ⚠️ `compte_le` est CONSERVÉ : c'est lui qui permet d'écrire « compté le
+ * 24/08 — périmé » plutôt que « jamais compté ». Les deux ne disent pas la
+ * même chose — l'un veut dire que personne n'a regardé, l'autre que le
+ * chiffre ne décrit plus rien.
+ */
+export function sansComptagePerime(lignes: LigneReassort[], aujourdhui = new Date()): LigneReassort[] {
+  return lignes.map(l => (comptagePerime(l, aujourdhui) ? { ...l, tenu: null } : l))
+}
+
 export function stockAReconstituer(lignes: LigneReassort[], aujourdhui = new Date()): boolean {
   return lignes.length > 0 && lignes.every(l => l.tenu === null || comptagePerime(l, aujourdhui))
 }
