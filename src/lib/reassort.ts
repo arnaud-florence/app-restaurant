@@ -33,6 +33,8 @@ export type LigneReassort = {
   /** Prix de l'unité commandée, quand on le connaît. */
   cout_unitaire_ht: number | null
   fournisseur: string | null
+  /** ⚠️ Le prix vient d'une ESTIMATION, pas d'une facture ni d'un relevé. */
+  estime?: boolean
 }
 
 /**
@@ -172,4 +174,97 @@ export function parFournisseur(lignes: LigneReassort[]): Array<{
   // ⚠️ Les lignes sans fournisseur en DERNIER, et jamais masquées : ce sont
   // celles qu'on oublierait de commander.
   })).sort((a, b) => (a.fournisseur === null ? 1 : 0) - (b.fournisseur === null ? 1 : 0) || b.cout - a.cout)
+}
+
+/**
+ * ⚠️ CE QUI NE SE STOCKE PAS.
+ *
+ * Un plat ASSEMBLÉ n'a pas de stock : on stocke ses composants. Le
+ * congélateur contient des pâtons, pas « La Marguerite » ; la cave
+ * contient du cassis et du blanc, pas des kirs.
+ *
+ * Les compter ferait commander DEUX FOIS la même marchandise — une fois
+ * sous le nom du plat, une fois sous celui de l'ingrédient — et le
+ * doublon ne se verrait nulle part : les deux lignes ont l'air normales.
+ *
+ * `Sandwich / Panini / Salade / Formule` étaient déjà exclues (0133).
+ * Les six autres sont les familles de la brasserie et de la pizzeria,
+ * créées après — elles avaient donc échappé à la règle, et les 30 plats
+ * à fiche technique figuraient au réassort pendant que leurs 52
+ * ingrédients, eux, en étaient absents. Exactement l'inverse.
+ */
+export const CATEGORIES_ASSEMBLEES = new Set([
+  'Sandwich', 'Panini', 'Salade', 'Formule',
+  'Pizzeria', 'Burger', 'Plat', 'Planche', 'Grande salade', 'Menu',
+  // ⚠️ Catégorie DISTINCTE de « Formule », et c'est par là que quatre
+  // formules du matin (Express, Tartine, Douceur chaude, Petit-déjeuner
+  // complet) passaient au travers : un lot n'a pas de stock, ses
+  // composants en ont un.
+  'Formule petit-déjeuner',
+])
+
+export function estStockable(p: {
+  nom: string
+  categorie: string | null
+  tag_destination?: string | null
+  nom_matiere?: string | null
+}): boolean {
+  if (p.categorie && CATEGORIES_ASSEMBLEES.has(p.categorie)) return false
+  if (p.nom.startsWith('Formule —')) return false
+  // ⚠️ Au bar, un produit sans `nom_matiere` MÉLANGE deux matières (Kir,
+  // Spritz, Panaché, Pichet…) : le rattacher à une seule perdrait l'autre,
+  // qui sortirait du stock sans que rien ne le signale. Même règle que
+  // `(ops)/inventaire`.
+  if (p.tag_destination === 'BAR' && !p.nom_matiere) return false
+  return true
+}
+
+/**
+ * La clé de regroupement : on COMPTE et on COMMANDE la matière achetée,
+ * pas le produit vendu.
+ *
+ * ⚠️ Sans regroupement, « Demi pression » et « Pinte pression » font DEUX
+ * lignes portant toutes deux le nom « Fût Moretti 20 L » — deux cibles,
+ * et le fût commandé deux fois.
+ */
+export function cleMatiere(p: {
+  nom: string
+  nom_matiere?: string | null
+  libelle_achat?: string | null
+}): string {
+  return p.nom_matiere ?? p.libelle_achat ?? p.nom
+}
+
+/**
+ * ⚠️ `ingredients.fournisseur_principal` EST UN CHAMP LIBRE.
+ *
+ * Il porte tantôt un fournisseur (« Gineys »), tantôt une note de méthode
+ * (« ESTIMATION 21/09/2026 — à remplacer par la première facture »,
+ * « Gineys — colis de 36 à 25,12 € ramené à la pièce »), tantôt un nom du
+ * jeu de démonstration purgé en septembre (Metro, Sysco, Transgourmet…).
+ *
+ * Lu tel quel, « ESTIMATION 21/09/2026 » apparaissait comme le PREMIER
+ * fournisseur de la commande d'ouverture, pour 875 € — c'est-à-dire un
+ * destinataire à qui on ne peut rien envoyer, en tête de l'écran qui sert
+ * à commander.
+ */
+const FOURNISSEURS_DEMO = new Set([
+  'Metro France', 'Sysco France', 'Brake France', 'Transgourmet',
+  'Pomona TerreAzur', 'Ferme du Plateau', 'Boucherie Bio', 'Boulangerie Coop',
+  'Maraîcher du coin', 'Marée fraîche', 'Domaine Provence', 'Crémerie Local',
+  'Épicerie fine', 'Gynes',
+])
+
+export function lireFournisseur(brut: string | null | undefined): {
+  nom: string | null
+  /** Le prix n'est pas relevé : il a été estimé pour bâtir la carte. */
+  estime: boolean
+} {
+  if (!brut) return { nom: null, estime: false }
+  // ⚠️ Une ESTIMATION n'a pas de fournisseur, et le total qu'elle alimente
+  // doit s'annoncer à part : c'est sur ce total qu'on engage la trésorerie.
+  if (/^ESTIMATION/i.test(brut)) return { nom: null, estime: true }
+  const nom = brut.split(' — ')[0].trim()
+  if (FOURNISSEURS_DEMO.has(nom)) return { nom: null, estime: false }
+  return { nom, estime: false }
 }

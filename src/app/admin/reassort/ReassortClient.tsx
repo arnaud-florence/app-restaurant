@@ -166,6 +166,10 @@ function Ligne({
           {l.etablissement && <>{l.etablissement} · </>}
           {l.unite}
           {l.fournisseur && <> · {l.fournisseur}</>}
+          {/* ⚠️ Un prix ESTIMÉ n'est pas un prix relevé. Le montant affiché
+              en face a l'air d'un devis ; il faut qu'on voie qu'il n'en est
+              pas un AVANT d'engager la trésorerie d'une ouverture. */}
+          {l.estime && <span className="ml-1 text-amber-700">prix estimé</span>}
           {/* ⚠️ « jamais compté » ≠ « zéro » : le premier dit que personne
               n'a regardé. */}
           {l.tenu === null

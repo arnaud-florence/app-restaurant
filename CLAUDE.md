@@ -2712,6 +2712,121 @@ vue par fournisseur, et jamais masquées : ce sont celles qu'on oublierait de
 commander.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 21 assertions.
+
+### Les cibles de stock — posées, et chacune dit d'où elle vient (27/09/2026)
+
+`/admin/reassort` affichait **191 références sans cible** : l'écran savait
+comparer un stock à un objectif, et il n'y avait pas d'objectif. Il ne
+proposait donc aucune quantité. `node scripts/cibles-stock.mjs [--ecrire]
+[--couverts=N] [--pizzas=N]` les pose — 193 aujourd'hui, essai à blanc par
+défaut.
+
+⚠️⚠️ **LE PÉRIMÈTRE ÉTAIT EXACTEMENT INVERSÉ, et c'est la vraie trouvaille.**
+Les **30 plats à fiche technique** (12 pizzas, 18 brasserie) FIGURAIENT au
+réassort, pendant que leurs **52 ingrédients** — la marchandise qu'il faut
+réellement commander — en étaient absents, à `stocke = false`. On stockait la
+Marguerite et pas le pâton.
+
+`CATEGORIES_ASSEMBLEES` / `estStockable()` (`src/lib/reassort.ts`) ferment la
+règle. `Sandwich / Panini / Salade / Formule` étaient déjà exclues (0133) ;
+les familles de la brasserie et de la pizzeria, créées après, y avaient
+échappé — plus `Formule petit-déjeuner`, catégorie DISTINCTE de `Formule`,
+par où quatre formules du matin passaient encore.
+
+⚠️ **Un plat assemblé compté ferait commander DEUX FOIS la même
+marchandise** — une fois sous le nom du plat, une fois sous celui de
+l'ingrédient — et le doublon ne se verrait nulle part : les deux lignes ont
+l'air normales.
+
+⚠️ **L'écran ne REGROUPAIT pas par matière.** « Demi pression » et « Pinte
+pression » sortent du même fût et faisaient DEUX lignes portant toutes deux
+« Fût Moretti 20 L » : deux cibles, le fût commandé deux fois. `cleMatiere()`
+les replie, sur un représentant STABLE (premier par id) — sans stabilité, la
+cible saisie change de porteur au rechargement et paraît s'être effacée.
+
+⚠️ Au bar, un produit **sans `nom_matiere` est exclu** : Kir, Spritz, Panaché,
+pichets mélangent deux matières, en rattacher une perdrait l'autre. Même règle
+que `(ops)/inventaire`.
+
+**TROIS ORIGINES, et le script le dit pour chaque ligne.** Une cible dont on
+ignore la provenance serait relue dans six mois comme une mesure.
+
+| Origine | Combien | D'où |
+|---|---|---|
+| **MESURÉ** | 49 | ventes réelles, 9 jours d'août 2026 — Fournil seul |
+| **DÉRIVÉ** | 62 | arithmétique des fiches techniques × une hypothèse de volume |
+| **PLANCHER** | 82 | la carte promet la référence : il en faut au moins une |
+
+⚠️ **Les DEUX hypothèses de volume sont les seuls nombres inventés du
+fichier** — 25 couverts au déjeuner, 30 pizzas au soir. Elles sont isolées en
+tête, réglables en ligne de commande, et le script imprime ce que coûte chaque
+niveau : une décision se prend sur des euros, pas sur une intuition. Repère de
+capacité : 8 pizzas par quart d'heure × 12 créneaux = 96 pizzas possibles un
+soir ; on part au tiers.
+
+⚠️ **La sensibilité se RECALCULE, elle ne s'extrapole pas.** Chaque cible est
+arrondie au-dessus, et à faible volume cet arrondi domine (0,3 kg et 3 kg de
+câpres se commandent tous deux au kilo supérieur). Une règle de trois
+sous-estimait la part restaurant.
+
+⚠️ **Faute d'historique, les portions se répartissent UNIFORMÉMENT sur la
+carte.** C'est faux — la Marguerite se vendra plus que la Signature — mais
+c'est la seule hypothèse neutre, et l'erreur se corrige d'elle-même après deux
+semaines de ventes. Une pondération inventée aurait l'air d'un savoir.
+
+**La commande d'ouverture : 193 références, 2 637,58 € HT.** Et ce total se
+présente COUPÉ EN DEUX, parce que c'est sur lui qu'on engage la trésorerie :
+
+- **1 762,13 €** sur des prix RELEVÉS (factures, relevés fournisseurs) ;
+- **875,45 €** sur des **ESTIMATIONS** — les ingrédients des fiches pizza et
+  brasserie, chiffrés pour bâtir la carte, jamais facturés. À confirmer avant
+  d'engager.
+- **16 références sans prix connu**, NON chiffrées et jamais estimées (les
+  boissons en canette, le pâton, le pain aux céréales).
+
+⚠️⚠️ **UN COMPTAGE VIEUX N'EST PAS UN STOCK — le script l'avait oublié.**
+Huit boissons (Coca, Fanta, Ice Tea, Red Bull…) sortaient de la commande
+d'ouverture avec « 28 en stock », sur un comptage du **24 août**, dans un
+frigo vide. La règle existait pourtant déjà — `PEREMPTION_COMPTAGE_JOURS`,
+30 jours — et l'écran la respectait ; c'est le script qui la rejouait à
+l'envers. Il écarte désormais 33 comptages périmés.
+
+⚠️ **`ingredients.fournisseur_principal` EST UN CHAMP LIBRE.** Il porte
+tantôt un fournisseur, tantôt une note de méthode (« ESTIMATION 21/09/2026 —
+à remplacer par la première facture », « Gineys — colis de 36 ramené à la
+pièce »), tantôt un nom du jeu de démonstration purgé en septembre. Lu tel
+quel, **« ESTIMATION 21/09/2026 » apparaissait comme le PREMIER fournisseur
+de la commande, pour 875 €** — un destinataire à qui on ne peut rien envoyer,
+en tête de l'écran qui sert à commander. `lireFournisseur()` le démêle et
+rend le drapeau `estime`, affiché sur chaque ligne concernée (48 aujourd'hui).
+
+⚠️⚠️ **ON NE COMPARE QUE DES UNITÉS QUI CONCORDENT.** Notre « Serviettes »
+est un COLIS DE 3000 à 38,10 € ; le « PQ 200 SERV BLC » de Promocash est un
+paquet de deux cents à 1,15 €. Rapprochés à l'aveugle, le script annonçait
+**« −97 % »** — un écart qui compare deux contenants. Le prix de référence
+sait lire les contenances, mais il vit dans `/admin/tarifs-fournisseurs` :
+ici on s'abstient dès qu'il y a doute, et les 29 paires écartées sont
+listées pour y être tranchées. Restent 4 pistes sûres (olives −26 %, jambon
+blanc −28 %, beurre −30 %, emmental −9 %).
+
+⚠️ **Le script EFFACE les cibles devenues orphelines.** Une exécution
+antérieure en avait posé sur les quatre formules du matin ; laissées en
+place, elles ne s'affichent plus mais restent vraies en base, et le premier
+écran qui relira `stock_cible` sans la règle d'exclusion recommanderait des
+formules.
+
+⚠️ La 0163 impose `cible >= seuil`. Le contrôle se fait **avant** la boucle
+d'écriture : un échec en cours de route poserait la moitié du réassort et
+laisserait l'autre, un état mixte qu'on ne verrait qu'à l'usage.
+
+⚠️ **Le service worker a masqué la correction**, une fois de plus : le badge
+« prix estimé » n'apparaissait pas alors que le code était juste. Purge du
+cache, et il s'affiche. `CACHE_VERSION` bumpée en v217.
+
+Tests : `node scripts/test-cibles-stock.mjs` — 30 assertions.
+⚠️ Il RECOPIE `estStockable()`, `cleMatiere()` et `PEREMPTION_COMPTAGE_JOURS`
+depuis le TS ; modifier les deux ensemble.
+
 ⚠️ Il RECOPIE les règles depuis le TS ; modifier les deux ensemble.
 
 ### Le catalogue du portail Gineys, et la plateforme d'achat (0158, 0159)
@@ -5036,6 +5151,8 @@ node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé +
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
 PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat (0158, 0159)
 PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
+node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vient chaque cible
+node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
 node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc

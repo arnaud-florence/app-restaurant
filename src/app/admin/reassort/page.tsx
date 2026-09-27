@@ -6,7 +6,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { lireTout } from '@/lib/supabase/pagine'
-import type { LigneReassort } from '@/lib/reassort'
+import { estStockable, cleMatiere, lireFournisseur, type LigneReassort } from '@/lib/reassort'
 import ReassortClient from './ReassortClient'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,7 @@ export default async function ReassortPage() {
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
     lireTout<Record<string, unknown>>(() => sb.from('recettes')
-      .select('id, nom, categorie, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, stock_minimum, stock_cible')
+      .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
       .select('id, nom, unite, prix_achat_ht, fournisseur_principal, stock_minimum, stock_cible')
@@ -39,23 +39,36 @@ export default async function ReassortPage() {
     if (!dernier.has(k)) dernier.set(k, { q: Number(i.quantite), le: i.date_inventaire as string })
   }
 
-  const EXCLUES = new Set(['Sandwich', 'Panini', 'Salade', 'Formule'])
-
   const lignes: LigneReassort[] = []
 
+  // ⚠️ On COMPTE la matière, pas le produit vendu : le congélateur contient
+  // des pâtons, pas « Pizza Reine » (0132). Le regroupement est ce qui
+  // empêche de commander deux fois le même fût sous deux noms de boisson.
+  const groupes = new Map<string, Record<string, unknown>[]>()
   for (const p of produits) {
-    const cat = (p.categorie as string) ?? null
-    if (cat && EXCLUES.has(cat)) continue
+    if (!estStockable({
+      nom: p.nom as string,
+      categorie: (p.categorie as string) ?? null,
+      tag_destination: (p.tag_destination as string) ?? null,
+      nom_matiere: (p.nom_matiere as string) ?? null,
+    })) continue
+    const k = cleMatiere(p as { nom: string; nom_matiere?: string | null; libelle_achat?: string | null })
+    if (!groupes.has(k)) groupes.set(k, [])
+    groupes.get(k)!.push(p)
+  }
+
+  for (const [nom, membres] of groupes) {
+    // Un représentant STABLE porte la ligne : le premier par id, comme à
+    // l'inventaire. Sans stabilité, la cible saisie change de porteur au
+    // rechargement et paraît s'être effacée.
+    const p = membres.slice().sort((a, b) => ((a.id as string) < (b.id as string) ? -1 : 1))[0]
     const d = dernier.get(p.id as string)
     const parAchat = Number(p.unites_par_achat ?? 1) || 1
     const cout = p.cout_achat_ht == null ? null : Number(p.cout_achat_ht) * parAchat
     lignes.push({
       cle: p.id as string,
-      // ⚠️ On COMPTE la matière, pas le produit vendu : le congélateur
-      // contient des pâtons, pas « Pizza Reine ». Même clé d'affichage que
-      // l'inventaire (0132).
-      nom: (p.nom_matiere as string) ?? (p.libelle_achat as string) ?? (p.nom as string),
-      categorie: cat,
+      nom,
+      categorie: (p.categorie as string) ?? null,
       etablissement: nomE.get(p.etablissement_id as string) ?? null,
       unite: 'unité d’achat',
       tenu: d ? d.q : null,
@@ -69,6 +82,7 @@ export default async function ReassortPage() {
 
   for (const m of matieres) {
     const d = dernier.get(m.id as string)
+    const f = lireFournisseur(m.fournisseur_principal as string | null)
     lignes.push({
       cle: `ing:${m.id as string}`,
       nom: m.nom as string,
@@ -86,7 +100,8 @@ export default async function ReassortPage() {
       seuil: m.stock_minimum == null ? null : Number(m.stock_minimum),
       cible: m.stock_cible == null ? null : Number(m.stock_cible),
       cout_unitaire_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
-      fournisseur: (m.fournisseur_principal as string) ?? null,
+      fournisseur: f.nom,
+      estime: f.estime,
     })
   }
 
