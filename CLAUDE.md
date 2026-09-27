@@ -2544,9 +2544,37 @@ interlocuteur se découvre à la livraison.
 ✅ **Le premier bon de commande de l'histoire de l'outil a été généré** dans
 la foulée : 10 kg de beurre doux chez Gineys, 80,49 € HT, en brouillon.
 
-⚠️ **PÉRIMÉ — le gérant a tranché l'inverse le 27/09/2026 : on commande au
-moins cher** (voir « Réassort »). Le paragraphe qui suit décrit l'ancien
-comportement de l'agent Stock, qui n'a pas encore suivi. Il disait : changer de fournisseur engage des délais, un minimum de
+⚠️⚠️ **L'AGENT STOCK COMMANDE AU MOINS CHER (aligné le 27/09/2026).** Il
+envoyait chez le fournisseur HABITUEL et se contentait de SIGNALER l'écart.
+Le gérant a tranché : on commande au moins cher. Le réaiguillage se fait
+**au moment du REGROUPEMENT** — `comparerPrixFournisseurs()` tourne donc
+avant la boucle, plus seulement avant l'écriture des bons ; lancé après, il
+ne permettait que de commenter un bon déjà écrit.
+
+La comparaison rend désormais `fournAlternatifId` et `ingredientIds` :
+l'identifiant, pas le nom. Se contenter du nom obligeait à le rapprocher
+ensuite, et un rapprochement par le nom est exactement ce que ce projet
+évite. Si une matière relève de deux groupes, le plus gros écart gagne.
+
+⚠️ Une ligne réaiguillée part **sans prix**, et le bon **sans montant** —
+sommer des NULL donnerait 0,00 €, qui se lit « gratuit ». Le minimum de
+commande n'est alors pas contrôlé : l'annoncer « sous le minimum » sur un
+montant inconnu serait faux.
+
+⚠️ Le bon DIT d'où viennent ses lignes (« ↪ 2 ligne(s) réaiguillée(s) ici
+car moins chères ») : sans ça on reçoit un bon d'un fournisseur chez qui on
+n'a jamais commandé, sans comprendre pourquoi.
+
+⚠️ **L'agent reste limité par `stock_actuel`** — le compteur entretenu, qui
+dérive (0135). C'est pour ça qu'il ne propose qu'une poignée de lignes là où
+`/admin/reassort` en trouve 126 : le réassort part d'un COMPTAGE et de
+cibles, pas d'un compteur. L'écran fait foi ; l'agent est un filet.
+
+Vérifié le 27/09/2026 sur les données réelles : l'agent a créé un bon
+**Félix Potin de 2 lignes réaiguillées, « tarif à confirmer »**, là où il
+aurait envoyé chez Gineys au prix fort la veille.
+
+L'ancien commentaire du code disait : changer de fournisseur engage des délais, un minimum de
 commande, une qualité et une relation — ce n'est pas l'effet de bord d'un
 agent qui tourne toutes les deux heures. Mais se taire serait pire : on
 recommanderait au prix fort avec l'écart sous les yeux. Le bon porte donc la

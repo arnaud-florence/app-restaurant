@@ -80,8 +80,28 @@ export async function GET(req: Request) {
     }
 
     // (D) Pour chaque ingrédient : calcule jours_avant_rupture + classifie
-    type BesoinAchat = { ing: Ing; quantite: number; jours_restants: number; urgence: 'rouge' | 'jaune' }
+    type BesoinAchat = {
+      ing: Ing; quantite: number; jours_restants: number; urgence: 'rouge' | 'jaune'
+      /** Cette ligne quitte le fournisseur habituel pour le moins cher. */
+      bascule: boolean
+      ecartPct: number
+      /** Chez qui on l'achetait — pour que le bon le DISE. */
+      depuis: string | null
+    }
     const besoinsParFournisseur = new Map<string, BesoinAchat[]>()
+
+    // ⚠️ Le comparateur tourne AVANT le regroupement : c'est lui qui décide
+    // chez qui chaque ligne part. Le lancer après, comme avant, ne
+    // permettait plus que de commenter un bon déjà écrit.
+    const compares = await comparerPrixFournisseurs(ctx)
+    const moinsCherParIngredient = new Map<string, (typeof compares)[number]>()
+    for (const c of compares) {
+      for (const id of c.ingredientIds) {
+        const vu = moinsCherParIngredient.get(id)
+        // Si une matière relève de deux groupes, le plus gros écart gagne.
+        if (!vu || c.economiePct > vu.economiePct) moinsCherParIngredient.set(id, c)
+      }
+    }
     let nbRuptures = 0
     let nbAlerteMin = 0
 
@@ -122,18 +142,33 @@ export async function GET(req: Request) {
       const cible = stockMax > 0 ? stockMax : consoJour * 14
       const aCommander = Math.max(0, Math.ceil(cible - stock))
 
-      const fourn = trouverFournisseur(ing.fournisseur_principal as string | null)
-      if (fourn && aCommander > 0) {
-        const list = besoinsParFournisseur.get(fourn.id) ?? []
-        list.push({ ing, quantite: aCommander, jours_restants: joursRestants, urgence })
-        besoinsParFournisseur.set(fourn.id, list)
+      // ⚠️⚠️ ON COMMANDE AU MOINS CHER — règle du gérant (27/09/2026).
+      // L'agent envoyait chez le fournisseur HABITUEL et se contentait de
+      // SIGNALER l'écart : Félix Potin était moins cher sur 17 matières et
+      // ne recevait aucun bon. Le réaiguillage se fait ici, au moment du
+      // regroupement — après, le bon est déjà écrit.
+      //
+      // ⚠️ On ne réaiguille QUE sur un groupe où la comparaison TIENT
+      // (`comparerPrixFournisseurs` a déjà exigé : unités ramenées à la
+      // même base, deux fournisseurs distincts, écart ≥ 10 %, et un
+      // incumbent identifié par une facture). Ailleurs, il n'y a pas de
+      // moins cher à choisir.
+      const habituel = trouverFournisseur(ing.fournisseur_principal as string | null)
+      const alt = moinsCherParIngredient.get(ing.id as string)
+      const destinataire = alt && alt.fournAlternatifId !== habituel?.id
+        ? { id: alt.fournAlternatifId, bascule: true, ecartPct: alt.economiePct }
+        : habituel ? { id: habituel.id, bascule: false, ecartPct: 0 } : null
+
+      if (destinataire && aCommander > 0) {
+        const list = besoinsParFournisseur.get(destinataire.id) ?? []
+        list.push({
+          ing, quantite: aCommander, jours_restants: joursRestants, urgence,
+          bascule: destinataire.bascule, ecartPct: destinataire.ecartPct,
+          depuis: destinataire.bascule ? (habituel?.nom ?? null) : null,
+        })
+        besoinsParFournisseur.set(destinataire.id, list)
       }
     }
-
-    // (E-bis) Le comparateur tourne AVANT la génération des bons : ceux-ci
-    // portent la mention « moins cher ailleurs » quand elle existe, et on ne
-    // peut pas l'écrire après avoir écrit le bon.
-    const compares = await comparerPrixFournisseurs(ctx)
 
     // (E) Génère bons de commande EN BROUILLON, 1 par fournisseur
     const six_h = new Date(Date.now() - 6 * 3600_000).toISOString()
@@ -181,30 +216,40 @@ export async function GET(req: Request) {
       const dateLiv = new Date()
       dateLiv.setDate(dateLiv.getDate() + fournInfo.delai)
 
-      // Montant total HT estimé
-      const montantHt = lignes.reduce((s, l) => s + l.quantite * Number(l.ing.prix_achat_ht ?? 0), 0)
+      // ⚠️⚠️ UNE LIGNE BASCULÉE N'A PAS DE PRIX. Notre coût est celui de
+      // NOTRE conditionnement, pas du leur : les convertir écrirait un faux
+      // prix sur un document qui engage de l'argent, et un faux prix ne se
+      // signale pas — il se découvre à la facture.
+      const prixLigne = (l: BesoinAchat): number | null =>
+        l.bascule ? null : (l.ing.prix_achat_ht == null ? null : Number(l.ing.prix_achat_ht))
+
+      // ⚠️ ET LE TOTAL NON PLUS. Sommer des NULL donnerait 0,00 € sur un bon
+      // de douze lignes, et un zéro se lit « gratuit » — la faute de
+      // `statutFoodCost(0)`. Un montant inconnu reste NULL.
+      const chiffrees = lignes.filter(l => prixLigne(l) != null)
+      const montantHt = chiffrees.reduce((s, l) => s + l.quantite * (prixLigne(l) ?? 0), 0)
+      const montantConnu = chiffrees.length > 0
 
       // Si minimum commande non atteint → ajoute une note mais crée quand même
-      const minNonAtteint = montantHt < fournInfo.minCmd
+      // ⚠️ Un minimum de commande ne se contrôle que sur un montant CONNU :
+      // sur un bon sans prix, l'annoncer « sous le minimum » serait faux.
+      const minNonAtteint = montantConnu && montantHt < fournInfo.minCmd
       const notes = [
         NOTE_AGENT_BC,
         `${lignes.length} ingrédient(s) à racheter`,
         lignes.filter(l => l.urgence === 'rouge').length > 0 ? `dont ${lignes.filter(l => l.urgence === 'rouge').length} en rupture imminente` : null,
         minNonAtteint ? `⚠ Sous le minimum commande (${fournInfo.minCmd.toFixed(2)}€)` : null,
-        // ⚠️ Le bon part chez le fournisseur HABITUEL, pas chez le moins
-        // cher — changer de fournisseur est une décision commerciale, pas
-        // un effet de bord d'un agent qui tourne toutes les deux heures
-        // (délais, minimum de commande, qualité, relation). Mais se taire
-        // serait pire : on recommanderait au prix fort en ayant l'écart
-        // sous les yeux. Alors on le DIT sur le bon.
+        // ⚠️ RÈGLE DU GÉRANT : on commande au moins cher. Les lignes qui
+        // ARRIVENT ici depuis un autre fournisseur le disent en toutes
+        // lettres — sans ça, on recevrait un bon d'un fournisseur chez qui
+        // on n'a jamais commandé sans comprendre pourquoi.
         ...(() => {
-          const moins = lignes
-            .map(l => compares.find(c => c.ingredient === l.ing.nom && c.fournAlternatif !== fournInfo.nom))
-            .filter((c): c is NonNullable<typeof c> => Boolean(c))
-          if (!moins.length) return []
-          const top = moins.sort((a, b) => b.economiePct - a.economiePct)[0]
-          return [`💡 ${top.ingredient} : ${top.economiePct.toFixed(0)} % moins cher chez ${top.fournAlternatif}`
-            + (moins.length > 1 ? ` (et ${moins.length - 1} autre(s))` : '')]
+          const venues = lignes.filter(l => l.bascule)
+          if (!venues.length) return []
+          const top = [...venues].sort((a, b) => b.ecartPct - a.ecartPct)[0]
+          return [`↪ ${venues.length} ligne(s) réaiguillée(s) ici car moins chères `
+            + `(jusqu'à −${top.ecartPct.toFixed(0)} % vs ${top.depuis ?? 'notre fournisseur'})`
+            + ` · tarif à confirmer : notre conditionnement n'est pas le leur`]
         })(),
       ].filter(Boolean).join(' · ')
 
@@ -213,7 +258,7 @@ export async function GET(req: Request) {
         statut: 'brouillon',
         date_commande: new Date().toISOString().slice(0, 10),
         date_livraison_prevue: dateLiv.toISOString().slice(0, 10),
-        montant_total_ht: Math.round(montantHt * 100) / 100,
+        montant_total_ht: montantConnu ? Math.round(montantHt * 100) / 100 : null,
         notes,
       }).select('id').single()
       if (bcErr || !bc) continue
@@ -223,7 +268,7 @@ export async function GET(req: Request) {
         bon_commande_id: bc.id,
         ingredient_id:   l.ing.id,
         quantite_commandee: l.quantite,
-        prix_unitaire_ht: Number(l.ing.prix_achat_ht ?? 0),
+        prix_unitaire_ht: prixLigne(l),
       }))
       await ctx.supabase.from('bon_commande_lignes').insert(lignesPayload)
 
@@ -312,7 +357,15 @@ function formatJour(d: Date): string {
  */
 async function comparerPrixFournisseurs(
   ctx: AgentContext,
-): Promise<Array<{ ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number }>> {
+): Promise<Array<{
+  ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number
+  /** ⚠️ L'identifiant, pas le nom : c'est lui qui permet de RÉAIGUILLER le
+   *  bon. Se contenter du nom obligeait à le rapprocher ensuite, et un
+   *  rapprochement par le nom est exactement ce que le projet évite. */
+  fournAlternatifId: string
+  /** Les matières concernées par ce groupe de comparaison. */
+  ingredientIds: string[]
+}>> {
   // ⚠️ PostgREST plafonne à 1 000 lignes SANS le dire. Le catalogue en compte
   // plus de 3 300 : sans pagination, l'agent comparerait un tiers des tarifs
   // et annoncerait un « moins cher » choisi dedans.
@@ -346,7 +399,10 @@ async function comparerPrixFournisseurs(
   const { data: fourns } = await ctx.supabase.from('fournisseurs').select('id, nom')
   const nomF = new Map((fourns ?? []).map(f => [f.id as string, f.nom as string]))
 
-  const out: Array<{ ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number }> = []
+  const out: Array<{
+    ingredient: string; fournActuel: string; fournAlternatif: string; economiePct: number
+    fournAlternatifId: string; ingredientIds: string[]
+  }> = []
 
   for (const g of comparer(lignes)) {
     // ⚠️ Trois conditions, et chacune écarte un faux positif :
@@ -396,7 +452,11 @@ async function comparerPrixFournisseurs(
         data: { cle: g.cle, fournActuel: nomActuel, fournAlternatif: nomAlt, economiePct },
       })
     }
-    out.push({ ingredient: g.cle, fournActuel: nomActuel, fournAlternatif: nomAlt, economiePct })
+    out.push({
+      ingredient: g.cle, fournActuel: nomActuel, fournAlternatif: nomAlt, economiePct,
+      fournAlternatifId: moinsCher.fournisseur_id,
+      ingredientIds: [...new Set(g.lignes.map(l => l.ingredient_id).filter((x): x is string => !!x))],
+    })
   }
   return out
 }
