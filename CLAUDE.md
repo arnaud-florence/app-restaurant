@@ -166,8 +166,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Promotions fournisseurs | offres conditionnelles ET datées | 0161 |
 | Tarif de catalogue | le prix PUBLIC, en face du nôtre | 0162 |
 | Seuils et cibles de stock | ce qu'il FAUT avoir, pas seulement ce qu'on a | 0163 |
+| Fournisseur d'un produit vendu | un croissant dit chez qui il s'achète | 0164 |
 
-**Migrations actuelles : 0001 → 0163.**
+**Migrations actuelles : 0001 → 0164.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2532,7 +2533,8 @@ toujours : l'agent Stock construit ses bons PAR FOURNISSEUR — sans ce champ,
 il n'en crée aucun, et il ne le signale pas. Un agent qui ne produit rien
 ressemble à un agent qui n'a rien trouvé.
 
-`node scripts/fournisseur-des-matieres.mjs [--ecrire]` le remplit **depuis
+`node scripts/fournisseur-des-produits.mjs   # chez qui s'achète chaque PRODUIT (0164)
+node scripts/fournisseur-des-matieres.mjs [--ecrire]` le remplit **depuis
 nos factures** : le fournisseur de la ligne la plus RÉCENTE rattachée à la
 matière, avoirs exclus. 38 matières sur 41 (34 Gineys, 4 Promocash).
 ⚠️ Les 3 restantes — miel, saumon fumé, jambon blanc tranché — n'ont aucune
@@ -2760,12 +2762,56 @@ FILTRÉES** : une recherche en cours amputerait le bon en silence.
 SOIT `recette_id` SOIT `ingredient_id`, et se tromper de colonne écrirait la
 commande sur un objet qui n'existe pas. Quatre assertions le verrouillent.
 
-**Premier passage réel, le 27/09/2026** — 193 références, 2 637,58 € :
-**108 lignes prêtes chez 3 fournisseurs, 85 sans fournisseur connu.** Trois
-brouillons créés : Gineys 999,26 € (70 lignes), France Boissons 379,27 € (25),
-Promocash 63,15 € (13). Soit **1 441,68 € commandables aujourd'hui** sur
-2 637,58 € — l'écart, ce sont les 85 lignes sans interlocuteur, dont les
-52 ingrédients pizza/brasserie jamais achetés.
+**⚠️⚠️ UN PRODUIT VENDU N'AVAIT AUCUN CHAMP FOURNISSEUR (0164).** Le premier
+passage réel l'a rendu visible : le bon France Boissons sortait à **25 lignes
+alors que le bar en compte 42**, et le gérant l'a vu tout de suite — son
+panier Eazle en contenait 63. Les 17 manquantes portaient pourtant leur
+référence France Boissons ; elle n'était simplement pas dans
+`catalogue_fournisseur`, donc la recherche échouait.
+
+`recettes.fournisseur_id` (uuid, `on delete set null`) répond. ⚠️ Un uuid et
+pas du texte libre : `ingredients.fournisseur_principal` est une chaîne, et
+elle porte aujourd'hui des notes de méthode qu'il faut démêler à la lecture.
+
+`node scripts/fournisseur-des-produits.mjs [--ecrire]` le remplit — **86
+produits**, jamais une déduction, trois sources factuelles par ordre de force :
+
+| Source | Combien | Ce que ça vaut |
+|---|---|---|
+| **ligne de facture** | 46 | preuve de paiement ; un AVOIR est écarté — marchandise rendue |
+| **référence retrouvée au catalogue** | 22 | un identifiant, exact (0142) |
+| **relevé du bar** | 18 | voir ci-dessous |
+
+⚠️ **Toute référence portée par un produit du BAR vient d'un relevé Eazle** :
+`couts-france-boissons.mjs`, `complements-bar.mjs` et `bieres-artisanales.mjs`
+lisent tous les trois le même relevé France Boissons. Les bières **La Rade en
+font partie** — La Rade est la MARQUE, France Boissons le distributeur, comme
+Lavazza et comme Pauwels chez La Frite Belge.
+
+⚠️ **Et c'est l'ABSENCE de référence qui porte l'autre moitié du sens** : le
+vin tranquille (Coteaux Varois, les trois BIB) n'en a délibérément AUCUNE,
+parce qu'il vient d'un vignoble et pas de France Boissons (`VIN_HORS_FB`). Il
+reste donc sans fournisseur — ce qui est la vérité, pas un trou.
+
+⚠️ **La règle du bar est bornée au BAR.** Un produit du Fournil porte une
+référence GINEYS : l'appliquer partout enverrait les croissants chez le
+marchand de boissons.
+
+⚠️ `recettes.fournisseur_id` **prime sur toute déduction** : c'est une
+décision posée. Les deux chemins déduits restent pour ce qu'aucun script n'a
+encore rattaché.
+
+**Résultat au 27/09/2026** — 193 références, 2 637,58 € : **125 lignes prêtes
+chez 3 fournisseurs** (contre 108 avant la 0164), 68 sans interlocuteur. Trois
+brouillons : **Gineys 999,26 € (70 lignes), France Boissons 546,51 € (42 —
+tout le bar), Promocash 63,15 € (13)**, soit **1 608,92 € commandables**. Les
+68 restantes sont surtout les 52 ingrédients pizza/brasserie, jamais achetés
+une seule fois.
+
+⚠️ **Aucun bon FÉLIX POTIN, et c'est correct** : ils n'ont envoyé qu'un DEVIS,
+on n'y a jamais rien acheté. Le bon part chez le fournisseur HABITUEL et
+l'écart est SIGNALÉ (💡 −30 %) — changer de fournisseur engage un délai, un
+minimum de commande et une relation, ce n'est pas l'effet de bord d'un écran.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 

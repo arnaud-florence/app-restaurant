@@ -20,7 +20,7 @@ export default async function ReassortPage() {
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
     lireTout<Record<string, unknown>>(() => sb.from('recettes')
-      .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, stock_minimum, stock_cible')
+      .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, fournisseur_id, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
       .select('id, nom, unite, prix_achat_ht, fournisseur_principal, stock_minimum, stock_cible')
@@ -160,6 +160,14 @@ export default async function ReassortPage() {
       ...(() => {
         // Le groupe partage une matière : n'importe lequel de ses membres
         // peut porter la preuve d'achat. `find` sur le premier qui répond.
+        // ⚠️ `recettes.fournisseur_id` (0164) est une DÉCISION POSÉE, donc
+        // plus forte que toute déduction : elle prime. Les deux chemins
+        // qui suivent restent pour les produits qu'aucun script n'a
+        // encore rattachés.
+        const pose = membres.map(m => m.fournisseur_id as string | null).find(Boolean)
+        if (pose && nomF.get(pose)) {
+          return { fournisseur: nomF.get(pose)!, fournisseur_id: pose, source_fournisseur: 'fiche' as const }
+        }
         const parFacture = membres.map(m => fournisseurDeProduit.get(m.id as string)).find(Boolean)
         if (parFacture) return { fournisseur: parFacture.nom, fournisseur_id: parFacture.id, source_fournisseur: 'facture' as const }
         const ref = membres.map(m => m.reference_fournisseur as string | null).find(Boolean)
