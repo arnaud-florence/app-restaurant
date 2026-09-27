@@ -7,10 +7,14 @@
 // Chaque colis s'ajuste en ± ; « Copier la commande » produit la liste
 // texte prête à coller dans un e-mail ou un SMS à Gineys.
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
+import { creerBonDepuisSuggestion } from './actions'
 import { cn } from '@/lib/utils'
 
 export type LigneSuggestion = {
+  /** Le produit REPRÉSENTATIF du groupe — porte le lien vers le bon. */
+  recette_id: string
   nom: string
   categorie: string
   ventesJour: number
@@ -23,12 +27,18 @@ export type LigneSuggestion = {
 }
 
 export default function CommandeFournilClient({
-  lignes, joursACouvrir,
-}: { lignes: LigneSuggestion[]; joursACouvrir: number }) {
+  lignes, joursACouvrir, fournisseur,
+}: {
+  lignes: LigneSuggestion[]
+  joursACouvrir: number
+  fournisseur: { id: string; nom: string } | null
+}) {
   // Quantité retenue par produit : colis si connu, sinon pièces
   const [retenu, setRetenu] = useState<Record<string, number>>(() =>
     Object.fromEntries(lignes.map(l => [l.nom, l.colis ?? l.pieces])))
   const [copie, setCopie] = useState(false)
+  const [bon, setBon] = useState<{ ok: boolean; message: string; bon_id?: string } | null>(null)
+  const [enCours, demarrer] = useTransition()
 
   const parFamille = useMemo(() => {
     const m = new Map<string, LigneSuggestion[]>()
@@ -57,6 +67,30 @@ export default function CommandeFournilClient({
     await navigator.clipboard.writeText(txt)
     setCopie(true)
     setTimeout(() => setCopie(false), 2500)
+  }
+
+  // ⚠️ Créer le bon N'ENVOIE RIEN : il naît en brouillon, et l'envoi est un
+  // second geste explicite. Un bouton qui commanderait en un clic depuis un
+  // écran de suggestion ferait partir des commandes qu'on croyait simuler.
+  function creerLeBon() {
+    if (!fournisseur) return
+    const choisies = lignes
+      .filter(l => (retenu[l.nom] ?? 0) > 0)
+      .map(l => ({
+        recette_id: l.recette_id,
+        libelle: l.nom,
+        quantite: retenu[l.nom] ?? 0,
+        unite: l.conditionnement != null ? `colis de ${l.conditionnement}` : 'pièce',
+      }))
+    if (!choisies.length) { setBon({ ok: false, message: 'Aucun produit retenu.' }); return }
+    demarrer(async () => {
+      try {
+        const r = await creerBonDepuisSuggestion({ fournisseur_id: fournisseur.id, lignes: choisies })
+        setBon(r)
+      } catch (e) {
+        setBon({ ok: false, message: e instanceof Error ? e.message : 'Création impossible.' })
+      }
+    })
   }
 
   if (lignes.length === 0) {
@@ -112,11 +146,30 @@ export default function CommandeFournilClient({
           <p className="text-sm text-zinc-600 tabular-nums">
             {lignes.filter(l => (retenu[l.nom] ?? 0) > 0).length} produit(s) dans la commande
           </p>
-          <button onClick={copier}
-            className="min-h-[48px] px-5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-sm">
-            {copie ? '✓ Copiée !' : '📋 Copier la commande'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={copier}
+              className="min-h-[48px] px-4 rounded-lg border border-zinc-300 bg-white hover:border-zinc-500 font-bold text-sm">
+              {copie ? '✓ Copiée !' : '📋 Copier'}
+            </button>
+            {fournisseur && (
+              <button onClick={creerLeBon} disabled={enCours}
+                className="min-h-[48px] px-5 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold text-sm">
+                {enCours ? 'Création…' : `🧾 Créer le bon ${fournisseur.nom}`}
+              </button>
+            )}
+          </div>
         </div>
+        {bon && (
+          <div className="max-w-4xl mx-auto mt-2 flex flex-wrap items-center gap-3">
+            <p className={`text-sm ${bon.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{bon.message}</p>
+            {bon.ok && (
+              <Link href="/admin/fournisseurs"
+                className="text-sm font-bold underline underline-offset-2">
+                Relire et envoyer →
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

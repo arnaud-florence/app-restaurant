@@ -29,6 +29,7 @@ import {
   changerStatutBon, changerStatutFacture, deleteFournisseur, deleteFacture, deleteBonCommande,
   autoGenererBonsDepuisStock, validerReception,
 } from './actions'
+import { envoyerBonAuFournisseur } from './envoi-actions'
 
 import FournisseurFormModal from './FournisseurFormModal'
 import BonCommandeFormModal from './BonCommandeFormModal'
@@ -73,6 +74,7 @@ export default function FournisseursClient({
   peutVoirPrix?: boolean
 }) {
   const router = useRouter()
+  const [brouillonEnvoi, setBrouillonEnvoi] = useState<{ destinataire: string | null; objet: string; texte: string } | null>(null)
   const [tab, setTab] = useState<Tab>('fournisseurs')
   const [search, setSearch] = useState('')
 
@@ -226,6 +228,28 @@ export default function FournisseursClient({
           />
         )}
 
+        {/* ⚠️ Rendu dès qu'un envoi ÉCHOUE — typiquement un fournisseur sans
+            adresse e-mail (cinq sur huit). Sans ça, le bouton ne servirait à
+            rien pour eux : ici le message est prêt à copier, et le bon reste
+            « à envoyer », ce qui est la vérité. */}
+        {brouillonEnvoi && (
+          <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-amber-900">
+                Message prêt à copier
+                {brouillonEnvoi.destinataire
+                  ? <> — pour {brouillonEnvoi.destinataire}</>
+                  : <> — ce fournisseur n&apos;a pas d&apos;adresse enregistrée</>}
+              </p>
+              <button onClick={() => setBrouillonEnvoi(null)}
+                className="text-sm text-amber-900 underline">Fermer</button>
+            </div>
+            <p className="mt-1 text-[12px] text-amber-800">Objet : {brouillonEnvoi.objet}</p>
+            <textarea readOnly rows={12} value={brouillonEnvoi.texte}
+              className="mt-1 w-full rounded border border-amber-200 bg-white p-2 font-mono text-[12px]" />
+          </div>
+        )}
+
         {tab === 'bons' && (
           <BonsTab
             bons={bons}
@@ -250,6 +274,20 @@ export default function FournisseursClient({
                 router.refresh()
               }
               catch (e) { flashKo(e) }
+            })}
+            // ⚠️ C'est ICI que la commande part vraiment. Avant, « Envoyer »
+            // ne faisait que changer une étiquette et le fournisseur ne
+            // recevait rien — on croyait la commande passée.
+            onEnvoyer={(id, forcer) => startTransition(async () => {
+              try {
+                const r = await envoyerBonAuFournisseur({ bon_id: id, forcer })
+                if (r.ok) flashOk(r.message)
+                else {
+                  flashKo(new Error(r.message))
+                  if (r.brouillon) setBrouillonEnvoi(r.brouillon)
+                }
+                router.refresh()
+              } catch (e) { flashKo(e) }
             })}
             onValiderReception={id => startTransition(async () => {
               try { await validerReception(id); flashOk('Réception validée'); router.refresh() }
@@ -548,7 +586,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 // ─── Onglet : Bons de commande ───────────────────────────────────────
 function BonsTab({
-  bons, fournisseurs, isManager, peutVoirPrix, onCreate, onEdit, onReception, onDelete, onChangerStatut, onValiderReception,
+  bons, fournisseurs, isManager, peutVoirPrix, onCreate, onEdit, onReception, onDelete, onChangerStatut, onEnvoyer, onValiderReception,
 }: {
   bons: BonCommande[]
   fournisseurs: Fournisseur[]
@@ -559,6 +597,7 @@ function BonsTab({
   onReception: (b: BonCommande) => void
   onDelete: (b: BonCommande) => void
   onChangerStatut: (id: string, statut: 'brouillon'|'a_valider'|'envoye'|'recu'|'annule') => void
+  onEnvoyer: (id: string, forcer?: boolean) => void
   onValiderReception: (id: string) => void
 }) {
   return (
@@ -601,14 +640,15 @@ function BonsTab({
                       <Button size="sm" variant="outline">🖨 Imprimer</Button>
                     </Link>
                     {b.statut === 'brouillon' && (
-                      <Button size="sm" variant="default" onClick={() => onChangerStatut(b.id, 'envoye')}>
-                        {isManager ? '📧 Envoyer' : '📤 Soumettre au gérant'}
+                      <Button size="sm" variant="default"
+                        onClick={() => isManager ? onEnvoyer(b.id) : onChangerStatut(b.id, 'envoye')}>
+                        {isManager ? '📧 Envoyer au fournisseur' : '📤 Soumettre au gérant'}
                       </Button>
                     )}
                     {b.statut === 'a_valider' && (
                       isManager ? (
                         <>
-                          <Button size="sm" variant="success" onClick={() => onChangerStatut(b.id, 'envoye')}>✅ Valider &amp; envoyer</Button>
+                          <Button size="sm" variant="success" onClick={() => onEnvoyer(b.id)}>✅ Valider &amp; envoyer</Button>
                           <Button size="sm" variant="outline" onClick={() => onChangerStatut(b.id, 'brouillon')}>↩ Renvoyer en brouillon</Button>
                         </>
                       ) : (

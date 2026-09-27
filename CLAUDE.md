@@ -161,8 +161,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Le Z dans le rapprochement | témoin indépendant de notre ingestion | 0157 |
 | Catalogue du portail Gineys | 2 892 références, nos prix négociés vérifiés | 0158 |
 | Demander une remise | et savoir qu'on l'a déjà demandée | 0159 |
+| Bon de commande envoyable | il ne partait rien, et une ligne ne portait qu'un ingrédient | 0160 |
 
-**Migrations actuelles : 0001 → 0159.**
+**Migrations actuelles : 0001 → 0160.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2457,6 +2458,73 @@ facture scannée se rattache au lieu de produire 25 lignes orphelines.
 
 Test : `PORT=3000 node scripts/test-matieres-bar.mjs` — 24 assertions.
 
+### Commander : de la suggestion au fournisseur (0160)
+
+La chaîne existait en morceaux et **ne se rejoignait pas**. Mesuré le
+27/09/2026 :
+
+⚠️⚠️ **« ENVOYER » N'ENVOYAIT RIEN.** `changerStatutBon(id, 'envoye')` ne
+faisait que changer une étiquette : aucun message ne quittait l'outil, et
+l'écran affichait « envoyé ». Un bon marqué envoyé que personne n'a reçu est
+**pire qu'un brouillon** — on croit la commande passée, et on l'apprend le
+matin où la marchandise n'arrive pas. `envoyerBonAuFournisseur()`
+(`fournisseurs/envoi-actions.ts`) envoie pour de vrai, via Resend.
+
+⚠️ **UNE LIGNE NE POUVAIT PORTER QU'UN INGRÉDIENT.** Or le Fournil est en
+achat-revente : on commande des PRODUITS VENDUS (croissants, pâtons), pas des
+matières. C'est pour ça que `/admin/commande-fournil` ne savait produire
+qu'une liste à recopier. `bon_commande_lignes.recette_id` (+ `libelle` libre
+pour le port, la consigne, un article vu au catalogue) ouvre le chemin —
+même trou que `facture_lignes` avant la 0145. Une contrainte exige **au moins
+une** identification : une ligne vide dans un document qui engage de l'argent
+n'a pas de sens.
+
+**Le chemin complet** : `/admin/commande-fournil` (ventes 14 j + casse +
+colisage) → bouton **« Créer le bon »** → brouillon dans
+`/admin/fournisseurs` → **« Envoyer au fournisseur »**.
+
+⚠️ **Créer un bon N'ENVOIE RIEN.** Il naît en brouillon, et l'envoi est un
+second geste. Un bouton qui commanderait depuis un écran de *suggestion*
+ferait partir des commandes qu'on croyait simuler.
+
+⚠️⚠️ **L'ENVOI EST UN GESTE HUMAIN, ET AUCUN CRON NE L'APPELLE.** Un bon de
+commande engage de l'argent. L'automatiser complètement se décidera un jour,
+mais ce ne sera pas l'effet de bord d'un agent qui tourne toutes les deux
+heures — d'autant que `bons_commande` était **vide** : l'agent Stock n'en a
+jamais produit un seul, donc rien n'est éprouvé.
+
+⚠️ **Quatre refus, et chacun est une façon de payer deux fois** : bon sans
+ligne, quantité nulle ou négative (signe inversé), fournisseur sans adresse,
+et surtout **bon DÉJÀ envoyé** — le renvoyer, c'est une seconde livraison et
+une seconde facture. `forcer: true` passe outre, pour un renvoi assumé.
+
+⚠️ **Sur refus, le brouillon est TOUJOURS rendu.** Cinq fournisseurs sur huit
+n'ont pas d'adresse : sans ça, le bouton ne leur servirait à rien. Le message
+est prêt à copier, et le bon reste « à envoyer » — ce qui est la vérité.
+
+⚠️ **Le total annoncé DIT ce qu'il ignore** : « 52,58 € — 1 ligne sans prix
+connu de notre côté, à confirmer ». Un total présenté comme ferme alors qu'il
+saute trois lignes devient une contestation de facture. Et `Number(null)`
+valant zéro, un prix inconnu écrit tel quel sous-estimerait le total.
+
+⚠️ Chaque ligne porte la **référence fournisseur** quand on l'a. Un commercial
+qui doit retrouver « BAGUETTE PRECUITE 280G » dans son propre catalogue peut
+en servir une autre, et ça se découvre au déchargement.
+
+**Ce qui reste à faire**, et qui n'est pas fait :
+
+| | |
+|---|---|
+| Le « moins cher » de l'agent Stock | il compare des moyennes 90 j de `mouvements_stock` par nom de fournisseur en TEXTE LIBRE — **il n'utilise pas `catalogue_fournisseur`**, donc les 3 303 prix importés ne choisissent pas encore où commander |
+| Gineys | commande passée **à la main sur leur portail** (décision du gérant, 27/09/2026) — pas d'API, et leur adresse enregistrée est une boîte de facturation |
+| L'envoi automatique | volontairement non branché — voir ci-dessus |
+
+Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
+⚠️ Il RECOPIE les règles depuis le TS, et n'envoie AUCUN e-mail.
+⚠️ Vérifié de bout en bout le 27/09/2026 avec un bon de contrôle chez
+Promocash (sans adresse, donc refus garanti) : brouillon affiché, rien
+envoyé, rien marqué — puis supprimé.
+
 ### Le catalogue du portail Gineys, et la plateforme d'achat (0158, 0159)
 
 `commande.gineys.com` (Infologic « Copilote ») expose tout ce que Gineys
@@ -4478,6 +4546,7 @@ PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ achet�
 node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
 PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat (0158, 0159)
+PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
 node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc

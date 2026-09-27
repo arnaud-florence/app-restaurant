@@ -110,6 +110,7 @@ export default async function CommandeFournilPage({
       conditionnement: cond,
     })
     return {
+      recette_id: p.id,
       nom: p.nom,
       categorie: p.categorie,
       ventesJour: Math.round(v / JOURS_OBSERVES * 10) / 10,
@@ -121,6 +122,12 @@ export default async function CommandeFournilPage({
       surCommande: sug.surCommande,
     }
   }).filter(l => l.ventesJour > 0 || l.casseJour > 0)
+
+  // Le fournisseur de cette commande. ⚠️ Recherché par son NOM : s'il est
+  // absent, on n'invente pas d'identifiant — le bouton disparaît et
+  // l'écran le dit, plutôt que de créer un bon chez personne.
+  const { data: fourns } = await sb.from('fournisseurs').select('id, nom').eq('actif', true)
+  const gineys = (fourns ?? []).find(f => /gineys/i.test(f.nom as string)) ?? null
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -148,7 +155,8 @@ export default async function CommandeFournilPage({
           ))}
         </div>
 
-        <CommandeFournilClient lignes={lignes} joursACouvrir={joursACouvrir} />
+        <CommandeFournilClient lignes={lignes} joursACouvrir={joursACouvrir}
+          fournisseur={gineys ? { id: gineys.id as string, nom: gineys.nom as string } : null} />
       </div>
     </div>
   )
