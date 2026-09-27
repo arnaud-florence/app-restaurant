@@ -4348,6 +4348,46 @@ fichier leur a été envoyé. « Inconnu » sans demande est un OUBLI ; « incon
 avec demande est une RELANCE à faire, et l'écran affiche « conditions
 demandées ». La différence décide de ce qu'on fait ensuite.
 
+**LA BASE DE PRIX SE DÉDUIT — et elle se REFUSE quand elle ne se déduit
+pas (28/09/2026).** `node scripts/base-prix-eurocash.mjs [--ecrire]`.
+**104 lignes tranchées sur 199**, trois épreuves dans l'ordre :
+
+1. **NOTRE PROPRE PRIX** — le fichier renvoyé porte nos colonnes sur 15
+   lignes. La base dont leur chiffre est le plus proche (à un facteur 3
+   près) est la bonne. ⚠️ Cette épreuve était **décrite en tête du script
+   sans être écrite** : il échouait sur le Pot Nutella, dont la base est
+   pourtant démontrée par nos deux colonnes. Une épreuve documentée mais
+   absente est pire qu'une épreuve manquante — on la croit faite.
+2. **L'ANCRAGE** — le même produit existe ailleurs au catalogue avec un
+   prix au litre ou au kilo connu.
+3. **LA FOURCHETTE OBSERVÉE** — calibrée sur nos **52 boissons** dont la
+   contenance est lisible : 0,49 €/L (eau plate) à 3 €/L (Perrier), élargie
+   à 6 pour les énergisantes qu'on n'achète pas encore. Elle ne tranche que
+   si **une seule** base y entre et que les autres en sortent d'un facteur 2.
+
+⚠️ **LE SCRIPT SE CONTRÔLE LUI-MÊME ET REFUSE D'ÉCRIRE S'IL SE TROMPE.**
+Quatre lignes ont une base PROUVÉE ; s'il en manque une, rien n'est écrit.
+C'est ce garde-fou qui a révélé l'épreuve ① manquante.
+
+⚠️ **Il S'ABSTIENT sur le pack intérieur**, et c'est voulu.
+« Multivitamine c-4x10x20cl à 3,50 € » : la brique à 3,50 € est absurde, le
+pack de 10 donne 1,75 €/L (plausible), le colis de 40 donne 0,44 €/L (juste
+sous la fourchette). Deux lectures tenables → on ne tranche pas. Une
+première heuristique la classait « unitaire », soit faux d'un facteur dix.
+
+⚠️⚠️ **L'ANCRAGE TROUVE LA BASE, IL NE POSE PAS DE CLÉ DE COMPARAISON.**
+Essayé le 28/09 et annulé le jour même : deux mots communs et un prix du
+même ordre ont rangé **« Pepsi Zéro » sous « Coca-Cola Zéro »** et un
+« Orange » en 33 cl sous « Pago orange 20 cl ». Le prix au litre étant
+voisin sur toutes les canettes, le garde-fou du facteur 2 ne filtre RIEN
+dans cette famille — il n'attrape que les erreurs grossières, pas la
+confusion entre deux sodas. La règle de la 0151 tient : la suggestion se
+calcule, la DÉCISION s'enregistre.
+
+**Les face-à-face réels au 28/09/2026** : Perrier **−47 %** (Euro-Cash
+1,52 €/L contre France Boissons 2,85), Coca-Cola −9 %, Coca-Cola Zéro
+−10 % (Promocash gagne).
+
 ⚠️ Deux assertions **précisées** : un devis CHIFFRÉ vaut remise connue, un
 devis revenu VIDE ne vaut rien — les compter comme négociés afficherait une
 remise qu'on n'a pas obtenue. Et « plus aucune inconnue » devient « toute
