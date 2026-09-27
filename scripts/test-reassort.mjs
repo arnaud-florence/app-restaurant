@@ -96,5 +96,81 @@ if (process.env.PORT) {
   t('appel anonyme refusé ou redirigé', [301,302,307,401,403].includes(r.status))
 }
 
+// ═══ COORDINATION STOCK → COMMANDE ═════════════════════════════════════
+// ⚠️ RECOPIE de `parEtablissement()` / `lignesCommandables()`
+// (src/lib/reassort.ts) — modifier les deux ensemble.
+const parEtablissement = (lignes) => {
+  const m = new Map()
+  for (const l of lignes) { const k = l.etablissement ?? '\u0000'; if (!m.has(k)) m.set(k, []); m.get(k).push(l) }
+  return [...m.entries()].map(([k, ls]) => ({
+    etablissement: k === '\u0000' ? null : k, lignes: ls,
+    aCommander: ls.filter(l => etat(l) === 'a_commander').length,
+    cout: ls.reduce((a, l) => a + (coutReassort(l) ?? 0), 0),
+  })).sort((a, b) => (a.etablissement === null ? 1 : b.etablissement === null ? -1 : b.cout - a.cout))
+}
+const lignesCommandables = (lignes) => {
+  const prets = [], sansFournisseur = []
+  for (const l of lignes) {
+    const q = aCommander(l)
+    if (q <= 0) continue
+    if (!l.fournisseur_id) { sansFournisseur.push(l); continue }
+    prets.push({ ...l, quantite: q })
+  }
+  return { prets, sansFournisseur }
+}
+
+const L = (o) => ({
+  cle: o.cle ?? 'x', nom: o.nom ?? 'X', categorie: null,
+  etablissement: o.etab ?? null, unite: 'kg',
+  tenu: o.tenu === undefined ? null : o.tenu, compte_le: o.le ?? null,
+  seuil: o.seuil ?? null, cible: o.cible ?? null,
+  cout_unitaire_ht: o.cout === undefined ? 10 : o.cout,
+  fournisseur: o.f ?? null, fournisseur_id: o.fid ?? null,
+})
+
+console.log('\n── Par établissement ──')
+{
+  const g = parEtablissement([
+    L({ cle: 'a', etab: 'Le Fournil', cible: 2 }),
+    L({ cle: 'b', etab: 'Le Fournil', cible: 1 }),
+    L({ cle: 'c', etab: null, cible: 1 }),
+    L({ cle: 'd', etab: 'Bar', cible: 1 }),
+  ])
+  t('un groupe par établissement', g.length === 3)
+  t('⚠️ « non rattaché » passe en DERNIER, jamais masqué',
+    g[g.length - 1].etablissement === null)
+  t('le plus gros coût passe en premier', g[0].etablissement === 'Le Fournil')
+  t('le coût du groupe additionne ses lignes', g[0].cout === 30)
+}
+
+console.log('\n── Ce qui part en bon de commande ──')
+{
+  const r = lignesCommandables([
+    L({ cle: 'a', cible: 3, fid: 'f1', f: 'Gineys' }),
+    L({ cle: 'b', cible: 2, fid: null, f: null }),
+    L({ cle: 'c', cible: 0 }),
+    L({ cle: 'd', cible: 5, tenu: 5, le: new Date().toISOString().slice(0, 10), fid: 'f1' }),
+  ])
+  t('⚠️ une ligne SANS fournisseur est écartée — on n’écrit à personne',
+    r.prets.length === 1 && r.sansFournisseur.length === 1)
+  t('⚠️ elle est COMPTÉE, pas perdue en silence', r.sansFournisseur[0].cle === 'b')
+  t('une ligne déjà au niveau ne part pas', !r.prets.some(l => l.cle === 'd'))
+  t('rien à commander sur une cible nulle', !r.prets.some(l => l.cle === 'c'))
+  t('la quantité retenue est le manque, pas la cible', r.prets[0].quantite === 3)
+}
+
+console.log('\n── Le préfixe décide de la colonne visée ──')
+{
+  // ⚠️ Une ligne de bon porte SOIT recette_id SOIT ingredient_id : se
+  // tromper de colonne écrirait la commande sur un objet qui n’existe pas.
+  const viser = (cle) => cle.startsWith('ing:')
+    ? { recette_id: null, ingredient_id: cle.slice(4) }
+    : { recette_id: cle, ingredient_id: null }
+  t('une matière vise ingredient_id', viser('ing:abc').ingredient_id === 'abc')
+  t('une matière ne vise PAS recette_id', viser('ing:abc').recette_id === null)
+  t('un produit vise recette_id', viser('abc').recette_id === 'abc')
+  t('un produit ne vise PAS ingredient_id', viser('abc').ingredient_id === null)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

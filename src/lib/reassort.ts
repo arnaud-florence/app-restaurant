@@ -35,6 +35,22 @@ export type LigneReassort = {
   fournisseur: string | null
   /** ⚠️ Le prix vient d'une ESTIMATION, pas d'une facture ni d'un relevé. */
   estime?: boolean
+  /**
+   * D'OÙ VIENT LE NOM DU FOURNISSEUR. Un bon parti chez le mauvais
+   * interlocuteur se découvre à la livraison : il faut pouvoir dire si
+   * c'est une preuve (une facture payée) ou un simple rapprochement.
+   */
+  source_fournisseur?: 'facture' | 'reference' | 'fiche' | null
+  /** Identifiant du fournisseur, pour grouper un bon de commande. */
+  fournisseur_id?: string | null
+  /** L'ingrédient ou le produit visé — la clé du lien avec le catalogue. */
+  cible_id?: string | null
+  /**
+   * ⚠️ Le moins cher AILLEURS, quand le catalogue le dit ET que les unités
+   * concordent. Calculé par `comparer()`, jamais par un min/max brut :
+   * opposer un colis à une pièce annonce « −97 % » sur des serviettes.
+   */
+  ailleurs?: { fournisseur: string; ecartPct: number } | null
 }
 
 /**
@@ -267,4 +283,56 @@ export function lireFournisseur(brut: string | null | undefined): {
   const nom = brut.split(' — ')[0].trim()
   if (FOURNISSEURS_DEMO.has(nom)) return { nom: null, estime: false }
   return { nom, estime: false }
+}
+
+/**
+ * Regroupement par ÉTABLISSEMENT — le Fournil, le bar, la restauration.
+ *
+ * On ne commande pas au même moment, ni chez les mêmes gens, ni pour les
+ * mêmes cartes. Mélanger les trois rallonge une liste qu'on parcourt
+ * debout, et une liste qu'on abrège est une liste fausse (même règle que
+ * `(ops)/inventaire?poste=`).
+ */
+export function parEtablissement(lignes: LigneReassort[]): Array<{
+  etablissement: string | null; lignes: LigneReassort[]; aCommander: number; cout: number
+}> {
+  const m = new Map<string, LigneReassort[]>()
+  for (const l of lignes) {
+    const k = l.etablissement ?? '\u0000'
+    if (!m.has(k)) m.set(k, [])
+    m.get(k)!.push(l)
+  }
+  return [...m.entries()]
+    .map(([k, ls]) => ({
+      etablissement: k === '\u0000' ? null : k,
+      lignes: ls,
+      aCommander: ls.filter(l => etat(l) === 'a_commander').length,
+      cout: ls.reduce((a, l) => a + (coutReassort(l) ?? 0), 0),
+    }))
+    // ⚠️ « Non rattaché » en DERNIER, jamais masqué : ce sont les lignes
+    // qu'on oublierait, et un produit sans point de vente sort aussi de la
+    // ventilation par activité — le signaler ici le rend réparable.
+    .sort((a, b) => (a.etablissement === null ? 1 : b.etablissement === null ? -1 : b.cout - a.cout))
+}
+
+/**
+ * Ce qu'il faut commander, prêt à devenir des bons de commande.
+ *
+ * ⚠️ Une ligne SANS FOURNISSEUR CONNU est écartée et COMPTÉE à part : on
+ * ne peut pas écrire un bon à personne. La taire ferait croire la commande
+ * complète alors qu'il en manque un morceau.
+ */
+export function lignesCommandables(lignes: LigneReassort[]): {
+  prets: Array<LigneReassort & { quantite: number }>
+  sansFournisseur: LigneReassort[]
+} {
+  const prets: Array<LigneReassort & { quantite: number }> = []
+  const sansFournisseur: LigneReassort[] = []
+  for (const l of lignes) {
+    const q = aCommander(l)
+    if (q <= 0) continue
+    if (!l.fournisseur_id) { sansFournisseur.push(l); continue }
+    prets.push({ ...l, quantite: q })
+  }
+  return { prets, sansFournisseur }
 }

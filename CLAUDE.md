@@ -2711,7 +2711,63 @@ comptage.
 vue par fournisseur, et jamais masquées : ce sont celles qu'on oublierait de
 commander.
 
-Test : `PORT=3000 node scripts/test-reassort.mjs` — 21 assertions.
+**La coordination stock → commande → plateforme (27/09/2026).** L'écran
+calculait ce qu'il faut commander et **n'avait aucun bouton pour le
+commander** : il fallait tout retaper dans `/admin/fournisseurs`. Entre deux
+saisies on se trompe de quantité, et ça se découvre à la livraison. Il
+n'affichait pas non plus le « moins cher ailleurs » — zéro occurrence dans
+son code, alors que la plateforme d'achat le sait.
+
+**Trois branchements** :
+
+1. **« Créer les bons de commande »** — un brouillon PAR FOURNISSEUR, d'un
+   geste. ⚠️ Créer N'ENVOIE RIEN : l'envoi reste un second geste explicite
+   (0160). Un bouton qui commanderait depuis un écran de calcul ferait
+   partir des commandes qu'on croyait simuler.
+2. **Le « 💡 −30 % chez Félix Potin » sur la ligne**, calculé par
+   `comparer()` — jamais par un min/max brut. Un comptage naïf opposerait
+   notre colis de 3 000 serviettes au paquet de 200 de Promocash et
+   annoncerait « −97 % » **sur l'écran qui déclenche la commande**, c'est-à-dire
+   au pire endroit possible. Seuils : unités concordantes, deux fournisseurs
+   distincts, écart ≥ 10 %.
+3. **Une vue par ÉTABLISSEMENT** — on ne commande pas le bar et le Fournil au
+   même moment ni chez les mêmes gens.
+
+⚠️⚠️ **CHEZ QUI COMMANDE-T-ON ? Les PRODUITS VENDUS n'ont aucun champ
+fournisseur.** `ingredients.fournisseur_principal` répond pour les matières ;
+`recettes` n'a rien. Un écran qui dit « il faut 10 kg de beurre » sans dire à
+qui l'écrire ne fait pas commander. **On ne devine pas** — deux sources
+factuelles seulement, par ordre de force :
+
+| Source | Combien | Ce que ça vaut |
+|---|---|---|
+| une **ligne de facture** rattachée au produit | 45 groupes | une preuve d'achat |
+| la **référence fournisseur** retrouvée au catalogue (0142) | 21 groupes | un identifiant, donc exact — c'est elle qui couvre le bar, dont aucune facture n'est arrivée |
+| rien | 34 groupes | reste **SANS fournisseur**, affiché en dernier |
+
+L'origine est DITE sur la ligne (« déjà acheté ici » / « par référence ») :
+une facture est une preuve, une fiche saisie à la main peut être périmée, et
+un bon parti chez le mauvais interlocuteur se découvre à la livraison.
+
+⚠️ **Une ligne sans fournisseur est ÉCARTÉE du bon ET COMPTÉE**
+(`lignesCommandables()`). L'inclure écrirait un bon à personne ; la taire
+ferait croire la commande complète alors qu'il en manque un morceau.
+
+⚠️ **La commande se construit sur TOUTES les lignes, jamais sur les lignes
+FILTRÉES** : une recherche en cours amputerait le bon en silence.
+
+⚠️ La clé porte le préfixe `ing:` pour une matière : une ligne de bon vise
+SOIT `recette_id` SOIT `ingredient_id`, et se tromper de colonne écrirait la
+commande sur un objet qui n'existe pas. Quatre assertions le verrouillent.
+
+**Premier passage réel, le 27/09/2026** — 193 références, 2 637,58 € :
+**108 lignes prêtes chez 3 fournisseurs, 85 sans fournisseur connu.** Trois
+brouillons créés : Gineys 999,26 € (70 lignes), France Boissons 379,27 € (25),
+Promocash 63,15 € (13). Soit **1 441,68 € commandables aujourd'hui** sur
+2 637,58 € — l'écart, ce sont les 85 lignes sans interlocuteur, dont les
+52 ingrédients pizza/brasserie jamais achetés.
+
+Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 
 ### Les cibles de stock — posées, et chacune dit d'où elle vient (27/09/2026)
 

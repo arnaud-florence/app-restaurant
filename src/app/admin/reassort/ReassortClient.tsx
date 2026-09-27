@@ -4,13 +4,14 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import {
   etat, aCommander, coutReassort, bilan, parCategorie, parFournisseur,
+  parEtablissement, lignesCommandables,
   comptagePerime, stockAReconstituer, PEREMPTION_COMPTAGE_JOURS,
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
 import { fmtPrix } from '@/lib/foodCost'
-import { enregistrerParametres } from './actions'
+import { enregistrerParametres, creerBonsDepuisReassort } from './actions'
 
-type Vue = 'categories' | 'fournisseurs'
+type Vue = 'categories' | 'fournisseurs' | 'etablissements'
 
 const ETAT: Record<EtatReassort, { texte: string; classe: string }> = {
   a_commander:   { texte: 'à commander',   classe: 'bg-red-600 text-white' },
@@ -26,6 +27,8 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   const [brouillon, setBrouillon] = useState<Record<string, { seuil: string; cible: string }>>({})
   const [enCours, demarrer] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
+  const [bons, setBons] = useState<string | null>(null)
+  const [creation, creer] = useTransition()
 
   // Les saisies en cours priment sur ce qui vient du serveur.
   // ⚠️ Un comptage périmé est ramené à « inconnu » pour le CALCUL : sinon
@@ -51,6 +54,38 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   const b = useMemo(() => bilan(avecBrouillon), [avecBrouillon])
   const cats = useMemo(() => parCategorie(filtrees), [filtrees])
   const fours = useMemo(() => parFournisseur(filtrees), [filtrees])
+  const etabs = useMemo(() => parEtablissement(filtrees), [filtrees])
+
+  // ⚠️ La commande se construit sur TOUTES les lignes, jamais sur les
+  // lignes FILTRÉES : une recherche en cours ne doit pas amputer un bon de
+  // commande en silence — on partirait avec la moitié du réassort.
+  const commandables = useMemo(() => lignesCommandables(avecBrouillon), [avecBrouillon])
+  const nbFournisseurs = useMemo(
+    () => new Set(commandables.prets.map(l => l.fournisseur_id)).size, [commandables])
+
+  function creerLesBons() {
+    creer(async () => {
+      try {
+        const r = await creerBonsDepuisReassort({
+          lignes: commandables.prets.map(l => ({
+            fournisseur_id: l.fournisseur_id!,
+            // La clé porte le préfixe `ing:` pour une matière (0133).
+            recette_id: l.cle.startsWith('ing:') ? null : l.cle,
+            ingredient_id: l.cle.startsWith('ing:') ? l.cle.slice(4) : null,
+            libelle: l.nom,
+            quantite: l.quantite,
+            unite: l.unite ?? 'unité',
+            prix_unitaire_ht: l.cout_unitaire_ht,
+          })),
+        })
+        const n = r.crees.length
+        const sansPrix = r.crees.reduce((a, c) => a + c.sansPrix, 0)
+        setBons(`✓ ${n} bon(s) créé(s) en brouillon${sansPrix ? ` · ${sansPrix} ligne(s) sans prix connu` : ''}.`)
+      } catch (e) {
+        setBons(e instanceof Error ? e.message : 'Création impossible.')
+      }
+    })
+  }
 
   const saisir = (cle: string, champ: 'seuil' | 'cible', v: string) =>
     setBrouillon(x => ({ ...x, [cle]: { ...{ seuil: '', cible: '' }, ...(x[cle] ?? {}), [champ]: v } }))
@@ -113,6 +148,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
           className="h-11 flex-1 min-w-[200px] rounded-lg border border-zinc-300 px-3 outline-none focus:border-zinc-900" />
         <Bascule actif={vue === 'categories'} onClick={() => setVue('categories')}>Par catégorie</Bascule>
         <Bascule actif={vue === 'fournisseurs'} onClick={() => setVue('fournisseurs')}>Par fournisseur</Bascule>
+        <Bascule actif={vue === 'etablissements'} onClick={() => setVue('etablissements')}>Par établissement</Bascule>
         <Bascule actif={aParametrer} onClick={() => setAParametrer(!aParametrer)}>Sans cible ({b.nonParametres})</Bascule>
         <button onClick={enregistrer} disabled={enCours || !Object.keys(brouillon).length}
           className="ml-auto h-11 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-40">
@@ -122,7 +158,51 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
 
       {message && <p className="mb-3 text-sm text-emerald-700">{message}</p>}
 
-      {vue === 'categories'
+      {/* ─── Passer commande ────────────────────────────────────────
+          ⚠️ LE CHAÎNON QUI MANQUAIT. L'écran calculait ce qu'il faut
+          commander, et il fallait tout retaper ailleurs — entre deux
+          saisies on se trompe de quantité, et ça se découvre à la
+          livraison. Créer NE PART PAS : le bon naît en brouillon. */}
+      {commandables.prets.length > 0 && (
+        <div className="mb-4 rounded-lg border border-zinc-900 bg-zinc-50 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[240px]">
+              <p className="text-sm font-semibold text-zinc-900">
+                {commandables.prets.length} ligne(s) prêtes à commander chez {nbFournisseurs} fournisseur(s)
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-600">
+                Un bon de commande <strong>en brouillon</strong> par fournisseur. Rien ne part :
+                l&apos;envoi reste un second geste, dans Fournisseurs.
+              </p>
+            </div>
+            <button onClick={creerLesBons} disabled={creation}
+              className="min-h-[48px] rounded-lg bg-zinc-900 px-5 text-sm font-bold text-white disabled:opacity-40">
+              {creation ? 'Création…' : '🧾 Créer les bons de commande'}
+            </button>
+          </div>
+          {/* ⚠️ Ce qu'on NE PEUT PAS commander se dit ici, pas nulle part :
+              sinon on croit la commande complète. */}
+          {commandables.sansFournisseur.length > 0 && (
+            <p className="mt-2 text-xs text-amber-800">
+              ⚠️ {commandables.sansFournisseur.length} ligne(s) resteront dehors — aucun fournisseur connu.
+              Elles sont en bas de la vue « Par fournisseur ».
+            </p>
+          )}
+          {bons && <p className="mt-2 text-sm font-medium text-emerald-700">{bons}{' '}
+            <Link href="/admin/fournisseurs" className="underline">Relire et envoyer →</Link></p>}
+        </div>
+      )}
+
+      {vue === 'etablissements'
+        ? etabs.map(e => (
+            <Bloc key={e.etablissement ?? '—'}
+              titre={e.etablissement ?? '⚠️ Non rattaché à un point de vente'}
+              sous={`${e.lignes.length} référence(s)${e.aCommander ? ` · ${e.aCommander} à commander` : ''}`}
+              cout={e.cout}>
+              {e.lignes.map(l => <Ligne key={l.cle} l={l} brouillon={brouillon[l.cle]} saisir={saisir} />)}
+            </Bloc>
+          ))
+        : vue === 'categories'
         ? cats.map(c => (
             <Bloc key={c.categorie} titre={c.categorie}
               sous={`${c.lignes.length} référence(s)${c.aCommander ? ` · ${c.aCommander} à commander` : ''}`}
@@ -139,7 +219,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
             </Bloc>
           ))}
 
-      {(vue === 'categories' ? cats : fours).length === 0 && (
+      {(vue === 'categories' ? cats : vue === 'etablissements' ? etabs : fours).length === 0 && (
         <p className="py-12 text-center text-sm text-zinc-500">
           {vue === 'fournisseurs' ? 'Rien à commander — ou aucune cible définie.' : 'Aucune référence.'}
         </p>
@@ -166,10 +246,24 @@ function Ligne({
           {l.etablissement && <>{l.etablissement} · </>}
           {l.unite}
           {l.fournisseur && <> · {l.fournisseur}</>}
+          {/* ⚠️ D'OÙ VIENT CE NOM. Une facture est une preuve d'achat ; une
+              fiche saisie à la main peut être périmée. Un bon parti chez le
+              mauvais interlocuteur se découvre à la livraison. */}
+          {l.source_fournisseur === 'facture' && <span className="ml-1 text-emerald-700">(déjà acheté ici)</span>}
+          {l.source_fournisseur === 'reference' && <span className="ml-1 text-blue-700">(par référence)</span>}
           {/* ⚠️ Un prix ESTIMÉ n'est pas un prix relevé. Le montant affiché
               en face a l'air d'un devis ; il faut qu'on voie qu'il n'en est
               pas un AVANT d'engager la trésorerie d'une ouverture. */}
           {l.estime && <span className="ml-1 text-amber-700">prix estimé</span>}
+          {/* ⚠️ On SIGNALE, on ne bascule pas : changer de fournisseur engage
+              un délai, un minimum de commande et une relation — ce n'est pas
+              l'effet de bord d'un écran. Mais se taire ferait recommander au
+              prix fort avec l'écart sous les yeux. */}
+          {l.ailleurs && (
+            <span className="ml-1 font-medium text-violet-700">
+              💡 −{Math.round(l.ailleurs.ecartPct)} % chez {l.ailleurs.fournisseur}
+            </span>
+          )}
           {/* ⚠️ « jamais compté » ≠ « zéro » : le premier dit que personne
               n'a regardé. */}
           {l.tenu === null
