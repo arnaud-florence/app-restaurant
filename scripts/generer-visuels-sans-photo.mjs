@@ -51,8 +51,17 @@ const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Formule', 'Formule petit-dé
 //    C'est ce qui laisse passer la bière SANS alcool, qui a le droit d'y être ;
 //  · un produit du BAR ne se retire pas au comptoir : un sirop à l'eau ou un
 //    diabolo se servent au verre, ils n'ont rien à faire au click & collect.
+//
+// ⚠️ ET LA BRASSERIE NON PLUS (corrigé le 28/09/2026). Le défaut était déjà
+// documenté — « lancé après une création, il a remis la brasserie en ligne » —
+// mais seul le symptôme avait été réparé, pas la règle. Vérifié ce jour sur la
+// « Coupe de glace » : le script proposait de la mettre en click & collect,
+// alors qu'un dessert à l'assiette se sert à table. Une entrecôte ou une
+// tartiflette encore moins. Seule la PIZZA se précommande côté restaurant, et
+// c'est une décision du gérant, pas une propriété de sa famille.
 const jamaisEnLigne = (r) =>
-  JAMAIS_EN_LIGNE.has(r.categorie) || r.contient_alcool === true || r.tag_destination === 'BAR'
+  JAMAIS_EN_LIGNE.has(r.categorie) || r.contient_alcool === true
+  || r.tag_destination === 'BAR' || r.tag_destination === 'CUISINE'
 // Les composants de formule ne sont pas des produits autonomes : ils n'ont
 // rien à faire sur la vitrine, avec ou sans visuel.
 const EXCLUS = /^Formule\s*—/

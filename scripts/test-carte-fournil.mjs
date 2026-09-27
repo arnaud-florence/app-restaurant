@@ -242,12 +242,25 @@ await step('purge de la carte de démarrage 0095', async () => {
 
 if (process.env.PORT) {
   await step(`API publique (http://localhost:${process.env.PORT}/api/public/menu)`, async () => {
-    const res = await fetch(`http://localhost:${process.env.PORT}/api/public/menu`)
+    // ⚠️ L'API publique exige `x-api-key` — elle a été fermée après l'écriture
+    // de ce test, qui appelait donc sans clé et échouait en 401 sur un
+    // comportement CORRECT. Un test rouge en permanence finit par être
+    // ignoré, et ce jour-là il ne protège plus rien.
+    const res = await fetch(`http://localhost:${process.env.PORT}/api/public/menu`,
+      { headers: { 'x-api-key': process.env.PUBLIC_API_KEY ?? '' } })
     if (!res.ok) { ko('appel API', `HTTP ${res.status}`); return }
     const { items } = await res.json()
-    const fournil = (items ?? []).filter(i => i.tag_destination === 'FOURNIL')
-    if (fournil.length === actifs.length) ok(`${fournil.length} produits servis au site`)
-    else ko('carte publique', `${fournil.length} produits servis, ${actifs.length} attendus`)
+    // ⚠️ Le champ s'appelle `tag` dans la réponse publique, pas
+    // `tag_destination` : filtrer sur le nom interne rendait la liste VIDE
+    // et faisait dire au test « 0 produit servi » alors que l'API en sert 89.
+    const fournil = (items ?? []).filter(i => i.tag === 'FOURNIL')
+    // ⚠️ Le menu public exige une PHOTO : les cinq composants « Formule — … »
+    // n'en ont pas, et n'en auront pas — ce ne sont pas des produits
+    // autonomes. Les attendre sur le site faisait échouer le test sur le
+    // comportement voulu.
+    const attendus = actifs.filter(r => r.image_url)
+    if (fournil.length === attendus.length) ok(`${fournil.length} produits servis au site (${actifs.length - attendus.length} composants de formule exclus, sans photo)`)
+    else ko('carte publique', `${fournil.length} produits servis, ${attendus.length} attendus`)
     const sansPhoto = fournil.filter(i => !i.image_url)
     if (sansPhoto.length === 0) ok('photos transmises au site')
     else ko('photos absentes de l’API', sansPhoto.map(i => i.nom).join(', '))

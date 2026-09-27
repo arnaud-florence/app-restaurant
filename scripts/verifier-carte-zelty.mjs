@@ -23,7 +23,7 @@ const plats = (await rz.json()).dishes ?? []
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const sb = async p => (await fetch(`${U}/rest/v1/${p}`,
   { headers: { apikey: K, Authorization: `Bearer ${K}` } })).json()
-const nous = await sb('recettes?select=id,nom,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
+const nous = await sb('recettes?select=id,nom,nom_caisse,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
 
 // La TVA sur place suit la LOI, pas le panneau : un croissant mangé à table
 // est à 10 %, pas à 5,5 %. L'alcool reste à 20 %, la presse à 2,1 %.
@@ -50,7 +50,14 @@ for (const r of nous) {
   if (p.tax_takeaway !== Number(r.tva) * 100) { dire(r, 'TVA à emporter', `${r.tva} %`, `${(p.tax_takeaway ?? 0) / 100} %`); bon = false }
   if (p.tax !== tvaSurPlace(r) * 100) { dire(r, 'TVA sur place', `${tvaSurPlace(r)} %`, `${(p.tax ?? 0) / 100} %`); bon = false }
   if (r.image_url && !p.image) { dire(r, 'photo', 'une image', 'aucune'); bon = false }
-  if (p.name !== r.nom) { dire(r, 'nom', r.nom, p.name); bon = false }
+  // ⚠️ Le nom attendu en caisse est `nom_caisse` quand il existe, pas le nom
+  // de vitrine : c'est la règle que l'import applique depuis le 28/09/2026,
+  // pour que l'éclair du comptoir (3,20 €) et celui servi à table (5,50 €)
+  // ne fassent pas deux boutons du même nom. Comparer au nom de vitrine
+  // rendrait ce contrôle rouge en permanence sur un comportement correct —
+  // et un contrôle rouge en permanence finit par être ignoré.
+  const attendu = (r.nom_caisse?.trim() || r.nom)
+  if (p.name !== attendu) { dire(r, 'nom', attendu, p.name); bon = false }
   if (p.disable) { dire(r, 'état', 'actif', 'désactivé'); bon = false }
   if (bon) ok++
 }

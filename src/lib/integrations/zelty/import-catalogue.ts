@@ -20,6 +20,8 @@
 export type ProduitLocalComplet = {
   id: string
   nom: string
+  /** Libellé du bouton de caisse, quand il diffère du nom de vitrine. */
+  nom_caisse?: string | null
   description: string | null
   /** Prix de vente HT — celui du panneau, à emporter. */
   prix_vente_ht: number | null
@@ -118,7 +120,14 @@ export function construireImport(
     aCreer.push({
       // Le lien exact, écrit dès la création.
       remote_id: p.id,
-      name: p.nom.trim(),
+      // ⚠️ LE LIBELLÉ DE CAISSE PRIME SUR LE NOM DE VITRINE, quand il existe.
+      // Le même gâteau se vend deux fois : « Éclair au chocolat » à 3,20 € au
+      // comptoir et à 5,50 € servi à table. Poussés tous les deux sous leur
+      // nom de vitrine, ils font DEUX BOUTONS IDENTIQUES sur la caisse, à des
+      // prix différents — et l'équipe tape au jugé, exactement ce que les
+      // deux tarifs de café existent pour éviter. `nom_caisse` est le champ
+      // fait pour ça, et c'est aussi lui qui rattache le ticket qui revient.
+      name: (p.nom_caisse?.trim() || p.nom.trim()),
       ...(p.description?.trim() ? { description: p.description.trim() } : {}),
       // Zelty attend une URL : les nôtres sont absolues, elles fonctionnent.
       ...(p.image_url ? { image: p.image_url } : {}),
