@@ -256,6 +256,45 @@ t('⚠️ aucune trouvaille ne propose de basculer là où l’on est DÉJÀ',
 t('⚠️ il ne signale PAS l’huile d’olive (moins chère chez Gineys)',
   !trouvailles.some(f => /huile/i.test(String(f.titre))))
 
+titre('Les clés de comparaison — ce qui met deux fournisseurs face à face')
+// ⚠️⚠️ LE GARDE-FOU CENTRAL : `comparer()` exige que TOUTES les lignes d'un
+// groupe tombent sur la même base. Une ligne SANS prix, ou dont la base de
+// prix n'est pas tranchée (« base à confirmer » chez Euro-Cash), n'a aucun
+// prix de référence — et elle rend son groupe ENTIER incomparable. Poser une
+// clé dessus détruit un face-à-face qui marchait, sans lever la moindre
+// erreur. C'est le piège qui a écarté sept lignes Euro-Cash le 28/09/2026.
+const lignesCle = await sbTout('catalogue_fournisseur?actif=eq.true&select=cle_comparaison,prix_ht,unite,designation')
+const avecCle = lignesCle.filter(x => x.cle_comparaison)
+t('des clés de comparaison sont posées', avecCle.length > 200)
+t('⚠️ aucune ligne SANS PRIX ne porte de clé (elle casserait tout son groupe)',
+  avecCle.every(x => x.prix_ht !== null))
+t('⚠️ aucune ligne « base à confirmer » ne porte de clé, pour la même raison',
+  avecCle.every(x => x.unite !== 'base à confirmer'))
+// ⚠️ Une clé qui ne porte qu'UNE ligne est INVISIBLE : `comparer()` écarte
+// les groupes d'une seule ligne. Deux noms pour le MÊME produit, c'est donc
+// deux invisibilités là où il y avait un face-à-face — vécu sur « Sauce
+// moutarde » / « Sauce moutarde (kg) » et sur « Miel » / « Miel liquide ».
+//
+// ⚠️ Le contrôle porte sur la seule forme qu'on peut affirmer sans se
+// tromper : le même nom au suffixe d'unité près. Un rapprochement plus large
+// crie sur « Coca-Cola 33 cl » face à « Coca-Cola Zéro 33 cl », qui sont bien
+// deux produits — et un test rouge en permanence finit par être ignoré.
+const sansUnite = c => c.replace(/\s*\((kg|l|pi[eè]ce)\)\s*$/i, '').trim().toLowerCase()
+const parNom = new Map()
+for (const c of new Set(avecCle.map(x => x.cle_comparaison))) {
+  const n = sansUnite(c)
+  if (!parNom.has(n)) parNom.set(n, [])
+  parNom.get(n).push(c)
+}
+const jumelles = [...parNom.values()].filter(v => v.length > 1)
+t(`⚠️ pas deux clés pour le même nom à l’unité près${jumelles.length ? ' — ' + jumelles.map(v => v.join(' ⟷ ')).join(', ') : ''}`,
+  jumelles.length === 0)
+// ⚠️ « Pommes » désignait un JUS Pago, alors que c'est aussi le nom d'une de
+// nos matières. Le jour où un maraîcher chiffre des pommes, elles se seraient
+// retrouvées face à du jus de fruits.
+t('⚠️ aucune clé « Pommes » sur un jus de fruits',
+  !avecCle.some(x => x.cle_comparaison === 'Pommes'))
+
 titre('Un tarif n’est pas un prix payé')
 // La règle de la 0151 doit tenir MÊME ICI, où le tarif s'est révélé exact.
 const ings = await sb('ingredients?select=id,prix_achat_ht&stocke=eq.true&limit=500')
