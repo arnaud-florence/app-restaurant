@@ -2715,14 +2715,48 @@ pour une seule idée. ⚠️ Mais SEULEMENT la casse : « SECS » (Félix Potin)
 « Sauce » (La Frite Belge) viennent de deux taxonomies et ne se rapprochent
 pas.
 
-⚠️⚠️ **2 998 RÉFÉRENCES SUR 3 303 N'ONT PAS DE CATÉGORIE**, et l'écran le dit
-en toutes lettres plutôt que de faire semblant. Ce sont les lignes Gineys :
-leur portail a bien 22 rayons (ACCOMPAGNEMENT, B.O.F., ÉPICERIE, VIANDE,
-VIENNOISERIE…), mais le relevé du 26/09 n'a capté que le libellé et le prix.
-Il faut y retourner famille par famille — **et la session du portail avait
-expiré au moment de le faire** (fenêtre « Reconnexion »). ⚠️ On ne saisit
-jamais le mot de passe du gérant à sa place : c'est lui qui rouvre la
-session, puis on relève.
+⚠️⚠️ **LA MAJORITÉ DES RÉFÉRENCES N'A PAS ENCORE DE CATÉGORIE**, et l'écran
+le dit en toutes lettres plutôt que de faire semblant. Ce sont les lignes
+Gineys : leur portail les range en **21 rayons** (ACCOMPAGNEMENT, B.O.F.,
+ÉPICERIE, VIANDE, VIENNOISERIE…), mais le relevé du 26/09 n'avait capté que
+le libellé et le prix.
+
+`node scripts/familles-gineys.mjs [--ecrire]` pose les rayons relevés, depuis
+`data/gineys/gineys-familles.json` (gitignoré). **Quatre familles au
+27/09/2026 : ACCOMPAGNEMENT 118, B.O.F. 172, CREVETTE 24, CRUSTACE 17 — soit
+331 sur 2 974.** Le script est idempotent : chaque passage supplémentaire
+enrichit le fichier.
+
+⚠️⚠️ **CE PORTAIL N'EST PAS PILOTABLE DE FAÇON FIABLE DEPUIS UN ONGLET
+D'ARRIÈRE-PLAN**, et c'est ce qui a arrêté le relevé. Trois obstacles qui se
+cumulent :
+
+1. **le contexte JS retarde de plusieurs rendus** — `document` y montre une
+   page qu'on a quittée depuis longtemps, et une capture d'écran est ce qui
+   force la mise à jour. Toute position lue dans le DOM est donc suspecte :
+   on lit les coordonnées sur une CAPTURE, jamais sur le DOM ;
+2. **le sélecteur de familles BASCULE** à chaque clic, et la liste **exclut
+   la famille courante** — donc les positions se décalent d'une ligne à
+   chaque changement. Deux familles ont été manquées comme ça, avec le
+   risque d'étiqueter les articles de l'une sous le nom de l'autre ;
+3. `javascript_tool` **met ses résultats en cache sur le texte du script** :
+   deux appels identiques rendent la même réponse.
+
+D'où le garde-fou appliqué : on fixe `__famille` AVANT de cliquer, on
+VÉRIFIE le fil d'Ariane sur une capture juste après, et **on purge les
+lignes étiquetées d'une famille qu'on n'a pas confirmée**. Les quatre
+familles obtenues concordent au chiffre près avec le compteur du portail
+(118, 172, 24, 17).
+
+→ **LA VRAIE SOLUTION EST DE DEMANDER LE FICHIER À GINEYS** : un export de
+leur catalogue (code, libellé, rayon, colisage) réglerait catégories ET
+références d'un coup, se rejouerait à chaque mise à jour, et coûterait un
+e-mail au lieu d'une centaine d'allers-retours. Le mode tableau du portail
+n'offre aucune colonne « Famille », et il n'y a pas d'export.
+
+⚠️ La session du portail expire, et la fenêtre « Reconnexion » arrive avec
+l'identifiant pré-rempli. **On ne saisit ni ne valide jamais le mot de passe
+du gérant** : c'est lui qui rouvre la session, puis on relève.
 
 ⚠️⚠️ **LES PROMOTIONS FRANCE BOISSONS DÉPENDENT DE LA DATE DE LIVRAISON.**
 `eazle.france-boissons.fr/promotions` répond, le 27/09/2026 :
