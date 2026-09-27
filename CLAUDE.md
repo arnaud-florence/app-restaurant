@@ -69,7 +69,8 @@ Chaque écran (ops) affiche en haut un `<BriefingPoste />` personnalisé (`src/l
 /admin/formation               → Module 27 (guides, fiches poste, quiz)
 /admin/securite                → Module 28 (RBAC, 2FA, journal d'audit, sauvegardes)
 /admin/tarifs-fournisseurs     → comparaison des tarifs (0151)
-/admin/achats                  → plateforme d'achat, 3 303 références (0158, 0159)
+/admin/achats                  → plateforme d'achat, 3 392 références (0158, 0159)
+/admin/reassort                → stock, seuils, cibles, ce qu'il faut commander (0163)
 ```
 
 Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en service). Les routes `/print/*` sont en dehors et héritent uniquement du root layout (fond blanc pour impression). Les routes `/admin/*` sont en thème clair par défaut. `/equipes` (Module 10) sera neutre — accessible aux postes de service comme à l'admin.
@@ -164,8 +165,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Bon de commande envoyable | il ne partait rien, et une ligne ne portait qu'un ingrédient | 0160 |
 | Promotions fournisseurs | offres conditionnelles ET datées | 0161 |
 | Tarif de catalogue | le prix PUBLIC, en face du nôtre | 0162 |
+| Seuils et cibles de stock | ce qu'il FAUT avoir, pas seulement ce qu'on a | 0163 |
 
-**Migrations actuelles : 0001 → 0162.**
+**Migrations actuelles : 0001 → 0163.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2658,6 +2660,60 @@ Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 Promocash (sans adresse, donc refus garanti) : brouillon affiché, rien
 envoyé, rien marqué — puis supprimé.
 
+### Réassort — le chaînon entre le stock et la commande (0163)
+
+`/admin/reassort`. Trois choses existaient sans se parler : `(ops)/inventaire`
+(ce qu'on a compté), `/admin/achats` (chez qui, à quel prix) et les bons de
+commande. L'écran les réunit, par catégorie ou par fournisseur.
+
+**Deux paramètres, deux rôles qu'il ne faut pas confondre** : le **seuil**
+DÉCLENCHE (en dessous, il faut commander), la **cible** DIMENSIONNE (le
+niveau à retrouver). Les mélanger fait commander trop tôt ou trop peu. Une
+contrainte de base REFUSE une cible sous le seuil — on recommanderait
+aussitôt livré.
+
+⚠️ **ON N'AJOUTE PAS `stock_actuel` SUR `recettes`.** Le stock théorique se
+CALCULE (comptage + factures − ventes) : un compteur entretenu à chaque
+vente dérive au premier oubli, et la doctrine est posée depuis la 0135.
+Le test le verrouille.
+
+⚠️ **ET ON N'UTILISE PAS `ingredients.stock_actuel` NON PLUS**, pour la même
+raison. Le prendre pour un comptage faisait passer 46 références pour
+comptées alors que la maison est fermée et que le stock est à zéro. Seul un
+comptage fait foi.
+
+⚠️⚠️ **UN COMPTAGE VIEUX N'EST PAS UN STOCK.** Le dernier comptage du
+Fournil date du 24/08/2026 ; la maison a fermé depuis. Au-delà de
+**30 jours**, le comptage est signalé en rouge ET ramené à « inconnu » pour
+le calcul — sinon l'écran proposerait un complément sur un stock qui
+n'existe plus. La date reste affichée : on signale, on ne masque pas.
+
+✅ Quand AUCUNE référence n'a de comptage récent, l'écran le dit en tête :
+**« Aucun comptage récent : c'est une commande d'ouverture »**. Ce n'est pas
+un réassort, il n'y a rien à compléter — il y a tout à constituer, et les
+quantités valent la cible entière. C'est la situation au 27/09/2026 :
+191 références, 191 jamais comptées.
+
+⚠️ **SANS CIBLE, AUCUNE QUANTITÉ N'EST PROPOSÉE.** La ligne affiche « à
+paramétrer » et reste à zéro. Un nombre sorti de nulle part se fait valider
+par habitude, et on le découvre à la livraison.
+
+⚠️ **« Jamais compté » n'est pas « zéro »** : les deux appellent la même
+commande, mais le premier dit que personne n'a regardé. Piège rencontré en
+repliant les doublons — `(null ?? 0) + (null ?? 0)` vaut ZÉRO et
+transformait l'un en l'autre. On n'additionne que s'il y a au moins un
+comptage.
+
+⚠️ **Le total dit ce qu'il ignore** : une ligne sans prix d'achat est comptée
+À PART, jamais pour zéro.
+
+⚠️ Les lignes **sans fournisseur connu** sont affichées en DERNIER dans la
+vue par fournisseur, et jamais masquées : ce sont celles qu'on oublierait de
+commander.
+
+Test : `PORT=3000 node scripts/test-reassort.mjs` — 21 assertions.
+⚠️ Il RECOPIE les règles depuis le TS ; modifier les deux ensemble.
+
 ### Le catalogue du portail Gineys, et la plateforme d'achat (0158, 0159)
 
 `commande.gineys.com` (Infologic « Copilote ») expose tout ce que Gineys
@@ -4979,6 +5035,8 @@ PORT=3000 node scripts/test-matieres-bar.mjs   # correspondance vendu ↔ achet�
 node scripts/couts-france-boissons.mjs         # coûts réels du bar (remisé + droits), essai à blanc
 PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (0151)
 PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat (0158, 0159)
+PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
+node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
 node scripts/import-portail-gineys.mjs         # catalogue Gineys, essai à blanc
 node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, essai à blanc

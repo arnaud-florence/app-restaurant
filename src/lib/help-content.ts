@@ -686,6 +686,43 @@ Les produits qui partagent une même matière sont donc repliés en une seule li
     ],
   },
 
+  '/admin/reassort': {
+    title: 'Aide — Réassort',
+    intro: "Ce qu'on a, ce qu'il faut avoir, ce qu'il faut commander — et chez qui.",
+    shortcuts: [
+      { emoji: '🛒', label: "Plateforme d'achat", href: '/admin/achats' },
+      { emoji: '📑', label: 'Bons de commande', href: '/admin/fournisseurs' },
+    ],
+    sections: [
+      {
+        heading: 'Deux réglages, deux rôles',
+        emoji: '🎯',
+        markdown: `Le **seuil** déclenche : en dessous, il faut commander. La **cible** dimensionne : c'est le niveau à retrouver après la livraison.
+
+Les confondre fait soit commander trop tôt, soit commander trop peu. Une cible sous le seuil est refusée — on recommanderait aussitôt livré.`,
+      },
+      {
+        heading: 'Sans cible, aucune quantité n\'est proposée',
+        emoji: '⚠️',
+        markdown: `L'outil ne devine pas. Une référence sans cible affiche « à paramétrer » et reste à zéro.
+
+C'est volontaire : un nombre sorti de nulle part se fait valider par habitude, et on le découvre à la livraison.`,
+      },
+      {
+        heading: '« Jamais compté » n\'est pas « zéro »',
+        emoji: '🔍',
+        markdown: `Une référence jamais comptée et une référence comptée à zéro appellent la même commande, mais ne disent pas la même chose : la première veut dire que **personne n'a regardé**.
+
+Le comptage se fait sur l'écran d'inventaire du comptoir.`,
+      },
+      {
+        heading: 'Le total dit ce qu\'il ignore',
+        emoji: '💶',
+        markdown: `Une ligne dont on ne connaît pas le prix d'achat est comptée **à part**, jamais pour zéro. Un total qui saute des lignes devient une mauvaise surprise à la facture.`,
+      },
+    ],
+  },
+
   '/admin/achats': {
     title: "Aide — Plateforme d'achat",
     intro: "Tout ce que nos fournisseurs proposent, en un seul catalogue cherchable.",
