@@ -501,6 +501,48 @@ export type ArticleAchete = {
   dernier_achat: string | null
   /** Moins cher ailleurs, quand la comparaison tient. */
   ailleurs: { fournisseur: string; ecartPct: number } | null
+  /**
+   * Les offres concurrentes moins chères, triées du moins cher au plus
+   * cher. ⚠️ On les montre TOUTES, pas seulement la meilleure : le
+   * deuxième livre peut-être le lendemain, ou sans minimum de commande.
+   */
+  offres: OffreConcurrente[]
+}
+
+export type OffreConcurrente = {
+  fournisseur_id: string
+  fournisseur: string
+  designation: string
+  reference: string | null
+  prix_ref: number
+  unite_ref: string
+  prix: number | null
+  unite: string | null
+  nature: string
+  ecartPct: number
+}
+
+/**
+ * ⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE TEL QUEL ?
+ *
+ * Seulement si son unité de référence est la NÔTRE. Notre « Beurre doux »
+ * se compte au kg et l'offre est en €/kg : on peut. Mais notre « Pain
+ * burger » se compte à la pièce quand l'offre est un sachet de neuf — y
+ * recopier le prix du sachet multiplierait notre coût par neuf, sans que
+ * rien ne le signale. Dans le doute, on ne pré-remplit pas et on le dit.
+ */
+export function prixReprenable(
+  offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref'>,
+  uniteNotre: string | null,
+): number | null {
+  const n = (u: string | null | undefined) => {
+    const t = String(u ?? '').trim().toLowerCase()
+    if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
+    if (['l', 'litre', 'litres'].includes(t)) return 'litre'
+    if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
+    return t
+  }
+  return n(offre.unite_ref) === n(uniteNotre) ? offre.prix_ref : null
 }
 
 export type FiltresAchete = {

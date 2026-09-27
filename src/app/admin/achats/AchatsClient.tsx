@@ -5,10 +5,10 @@ import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
   offresTriees,
   filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
-  FILTRES_ACHETE_VIDES,
+  prixReprenable, FILTRES_ACHETE_VIDES,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
   type OffreFournisseur, type EtatPlateforme, type Manque,
-  type ArticleAchete, type FiltresAchete,
+  type ArticleAchete, type FiltresAchete, type OffreConcurrente,
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
@@ -937,7 +937,72 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
           pas de l&apos;unité vendue. Un coût atteignant 95 % du prix de vente est refusé —
           c&apos;est presque toujours le prix du colis saisi à la place de celui de la pièce.
         </p>
+
+        {/* ─── Les offres moins chères, prêtes à être reprises ──────────
+            ⚠️ Détecter un meilleur prix sans permettre de basculer oblige
+            à ressaisir ailleurs — donc personne ne le fait, et l'écart
+            reste. On les montre TOUTES : le deuxième livre peut-être le
+            lendemain, ou sans minimum de commande. */}
+        {a.offres.length > 0 && (
+          <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-violet-900">
+              {a.offres.length} offre(s) moins chère(s)
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {a.offres.map(o => (
+                <li key={o.fournisseur_id + o.designation} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-bold tabular-nums text-violet-800">−{Math.round(o.ecartPct)} %</span>
+                  <span className="font-medium text-zinc-900">{o.fournisseur}</span>
+                  <span className="tabular-nums text-zinc-700">
+                    {fmtPrix(o.prix_ref)}/{o.unite_ref}
+                  </span>
+                  {/* ⚠️ La NATURE change ce qu'on a le droit d'en conclure :
+                      un devis est une proposition, une facture une preuve. */}
+                  <NatureOffre nature={o.nature} />
+                  <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">{o.designation}</span>
+                  <button
+                    onClick={() => {
+                      setFid(o.fournisseur_id)
+                      // ⚠️⚠️ LA RÉFÉRENCE DE L'ANCIEN FOURNISSEUR NE SURVIT
+                      // PAS AU CHANGEMENT. Un code Gineys cité à Félix
+                      // Potin fait chiffrer autre chose, et l'écart se
+                      // découvre à la livraison — une référence fausse est
+                      // pire qu'une référence absente (0142).
+                      setRef(o.reference ?? '')
+                      const p = prixReprenable(o, a.unite)
+                      // ⚠️ On ne reprend le prix QUE si son unité est la
+                      // nôtre. Un sachet de neuf pains recopié sur une
+                      // ligne à la pièce multiplierait le coût par neuf.
+                      if (p != null) { setPrix(String(p)); setReleve(o.nature === 'facture') }
+                      else dire(`Fournisseur repris. ⚠️ Prix NON repris : l’offre est en ${o.unite_ref}, `
+                        + `notre ligne en ${a.unite ?? 'unité inconnue'} — à saisir à la main.`)
+                    }}
+                    className="rounded border border-violet-400 bg-white px-2 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100">
+                    Prendre celui-ci
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-violet-900">
+              ⚠️ Un devis est une <strong>proposition</strong>, pas un prix payé — et un écart
+              en pourcentage ne décide de rien tant qu&apos;il n&apos;est pas multiplié par les
+              quantités réelles. Vérifiez le minimum de commande et le délai avant de basculer.
+            </p>
+          </div>
+        )}
       </td>
     </tr>
   )
+}
+
+const NATURE_OFFRE: Record<string, { texte: string; classe: string }> = {
+  facture:   { texte: 'prix payé', classe: 'bg-emerald-100 text-emerald-800' },
+  devis:     { texte: 'devis',     classe: 'bg-blue-100 text-blue-800' },
+  portail:   { texte: 'portail',   classe: 'bg-violet-100 text-violet-800' },
+  catalogue: { texte: 'catalogue', classe: 'bg-zinc-100 text-zinc-700' },
+}
+
+function NatureOffre({ nature }: { nature: string }) {
+  const v = NATURE_OFFRE[nature] ?? { texte: nature, classe: 'bg-zinc-100 text-zinc-700' }
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${v.classe}`}>{v.texte}</span>
 }

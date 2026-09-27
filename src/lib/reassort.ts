@@ -51,6 +51,12 @@ export type LigneReassort = {
    * opposer un colis à une pièce annonce « −97 % » sur des serviettes.
    */
   ailleurs?: { fournisseur_id: string; fournisseur: string; ecartPct: number } | null
+  /**
+   * Les offres CONCURRENTES moins chères, quand la comparaison tient.
+   * ⚠️ Détecter un meilleur prix sans permettre de basculer oblige à
+   * ressaisir ailleurs — donc personne ne le fait, et l'écart reste.
+   */
+  offres?: OffreConcurrente[]
   /** La référence CHEZ LE FOURNISSEUR — ce qu'on lui cite pour commander. */
   reference?: string | null
   /** Date de la dernière facture où cette référence apparaît. */
@@ -65,6 +71,29 @@ export type LigneReassort = {
  * personne n'a regardé. Les confondre ferait croire l'inventaire fait.
  * `tenu === null` est donc conservé jusqu'à l'affichage.
  */
+/**
+ * Une offre d'un AUTRE fournisseur sur la même matière, moins chère.
+ *
+ * ⚠️ `prix_ref` est ramené à l'unité de référence par `comparer()` — c'est
+ * lui qui permet de comparer. `prix` est le prix de SON conditionnement :
+ * les deux sont montrés, parce que c'est le second qu'il facturera.
+ */
+export type OffreConcurrente = {
+  fournisseur_id: string
+  fournisseur: string
+  designation: string
+  reference: string | null
+  /** Prix ramené à l'unité de référence (€/kg, €/L, €/pièce). */
+  prix_ref: number
+  unite_ref: string
+  /** Prix tel qu'il est facturé, dans SON unité à lui. */
+  prix: number | null
+  unite: string | null
+  /** ⚠️ devis = proposition · facture = preuve · portail/catalogue = affiché. */
+  nature: string
+  ecartPct: number
+}
+
 export function tenuEffectif(l: Pick<LigneReassort, 'tenu'>): number {
   return l.tenu ?? 0
 }

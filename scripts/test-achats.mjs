@@ -455,5 +455,63 @@ titre('Modifier une ligne du catalogue d’achat')
     estime(null, true) === true)
 }
 
+titre('Basculer chez le moins cher, depuis la fiche')
+{
+  // ⚠️ RECOPIE de `prixReprenable()` (src/lib/catalogue-achats.ts) et de la
+  // construction des offres (src/lib/reassort-donnees.ts).
+  const nU = u => {
+    const t = String(u ?? '').trim().toLowerCase()
+    if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
+    if (['l', 'litre', 'litres'].includes(t)) return 'litre'
+    if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
+    return t
+  }
+  const prixReprenable = (o, notre) => (nU(o.unite_ref) === nU(notre) ? o.prix_ref : null)
+
+  t('⚠️ le prix se reprend quand l’unité est la NÔTRE',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 5.6 }, 'kg') === 5.6)
+  t('« Kg » et « kg » sont la même unité',
+    prixReprenable({ unite_ref: 'Kg', prix_ref: 5.6 }, 'kg') === 5.6)
+  t('⚠️⚠️ il ne se reprend PAS d’un sachet de neuf vers une pièce',
+    prixReprenable({ unite_ref: 'sachet', prix_ref: 5.776 }, 'pièce') === null)
+  t('ni d’un kilo vers une barquette de 500 g',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 9 }, 'barquette 500 g') === null)
+  t('une unité inconnue des deux côtés ne se reprend pas non plus',
+    prixReprenable({ unite_ref: 'BT', prix_ref: 3 }, null) === null)
+
+  // Construction des offres : strictement moins cher, et jamais chez soi.
+  const offres = (lignes, mien, monFournisseur) => lignes
+    .filter(o => o.fournisseur_id !== monFournisseur && o.prix_ref < mien)
+    .sort((a, b) => a.prix_ref - b.prix_ref)
+  const L = [
+    { fournisseur_id: 'f1', prix_ref: 8.0 },
+    { fournisseur_id: 'f2', prix_ref: 5.6 },
+    { fournisseur_id: 'f3', prix_ref: 6.9 },
+    { fournisseur_id: 'f4', prix_ref: 9.5 },
+  ]
+  const o = offres(L, 8.0, 'f1')
+  t('⚠️ seules les offres STRICTEMENT moins chères sont proposées',
+    o.length === 2 && o.every(x => x.prix_ref < 8))
+  t('⚠️ jamais le fournisseur chez qui on est déjà',
+    !o.some(x => x.fournisseur_id === 'f1'))
+  t('elles sont triées du moins cher au plus cher',
+    o[0].prix_ref === 5.6 && o[1].prix_ref === 6.9)
+  t('⚠️ on les montre TOUTES, pas seulement la meilleure — délai et minimum de commande comptent',
+    o.length === 2)
+  t('aucune offre si l’on est déjà le moins cher', offres(L, 5.6, 'f2').length === 0)
+
+  // ⚠️ La référence suit le fournisseur, elle ne lui survit pas.
+  const refApres = (ancienne, offre) => offre.reference ?? ''
+  t('⚠️⚠️ la référence de l’ancien fournisseur NE SURVIT PAS au changement',
+    refApres('0061024', { reference: null }) === '')
+  t('et celle du nouveau la remplace', refApres('0061024', { reference: '63470' }) === '63470')
+
+  // ⚠️ Un devis repris ne devient pas un prix relevé.
+  const releveApres = nature => nature === 'facture'
+  t('⚠️ reprendre un DEVIS laisse le prix marqué estimé', releveApres('devis') === false)
+  t('reprendre une FACTURE le marque relevé', releveApres('facture') === true)
+  t('un tarif de portail reste estimé — c’est un prix affiché', releveApres('portail') === false)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

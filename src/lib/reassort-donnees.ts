@@ -16,7 +16,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lireTout } from '@/lib/supabase/pagine'
-import { estStockable, cleMatiere, lireFournisseur, type LigneReassort } from '@/lib/reassort'
+import {
+  estStockable, cleMatiere, lireFournisseur,
+  type LigneReassort, type OffreConcurrente,
+} from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 
 export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
@@ -124,7 +127,9 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     colis_quantite: c.colis_quantite === null ? null : Number(c.colis_quantite),
     contenance_valeur: c.contenance_valeur === null ? null : Number(c.contenance_valeur),
   }))
-  const meilleurPour = new Map<string, { fournisseur_id: string; fournisseur: string; ecartPct: number }>()
+  // Le groupe COMPLET par cible ; le tri « moins cher que nous » se fait
+  // plus bas, à la construction de la ligne.
+  const groupePour = new Map<string, Array<LigneTarif & { ref: { prix: number; unite: string } | null }>>()
   for (const g of comparer(pourComparer)) {
     // Deux fournisseurs distincts, des unités qui concordent, et un écart
     // qui vaut la peine d'être dit. Sous 10 %, c'est du bruit d'emballage.
@@ -133,11 +138,54 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     if (!best) continue
     const nom = nomF.get(best.fournisseur_id)
     if (!nom) continue
+
+    // ⚠️ TOUTES les offres du groupe, pas seulement la meilleure. Proposer
+    // uniquement le moins cher, c'est décider à la place du gérant : le
+    // deuxième livre peut-être le lendemain, ou sans minimum de commande.
+    const classees = g.lignes.filter(l => l.ref != null).sort((a, b) => a.ref!.prix - b.ref!.prix)
+
     for (const l of g.lignes) {
       for (const cible of [l.ingredient_id, l.recette_id]) {
-        if (cible) meilleurPour.set(cible, { fournisseur_id: best.fournisseur_id, fournisseur: nom, ecartPct: g.ecartPct })
+        if (!cible) continue
+        groupePour.set(cible, classees)
       }
     }
+  }
+
+  /**
+   * Les offres moins chères QUE LA NÔTRE, pour une cible donnée.
+   *
+   * ⚠️⚠️ « MOINS CHER » SE MESURE CONTRE NOTRE LIGNE, identifiée par notre
+   * fournisseur. Une première version filtrait dans la boucle sur les
+   * lignes du groupe : chaque tour écrasait le précédent, et la DERNIÈRE
+   * ligne — souvent la moins chère — laissait une liste VIDE. Le beurre
+   * doux affichait « −30 % chez Félix Potin » dans la colonne et zéro
+   * offre dans le panneau, sans qu'aucune erreur ne le signale.
+   *
+   * ⚠️ Et si notre fournisseur n'est pas dans le groupe, on ne propose
+   * RIEN : on ne saurait pas dire de combien c'est moins cher, et un
+   * pourcentage inventé est pire qu'aucun pourcentage.
+   */
+  const offresMoinsCheres = (cible: string | null, notreFournisseur: string | null): OffreConcurrente[] => {
+    if (!cible || !notreFournisseur) return []
+    const groupe = groupePour.get(cible)
+    if (!groupe) return []
+    const mien = groupe.find(o => nomF.get(o.fournisseur_id) === notreFournisseur)?.ref?.prix
+    if (mien == null || mien <= 0) return []
+    return groupe
+      .filter(o => nomF.get(o.fournisseur_id) !== notreFournisseur && o.ref!.prix < mien)
+      .map(o => ({
+        fournisseur_id: o.fournisseur_id,
+        fournisseur: nomF.get(o.fournisseur_id) ?? '—',
+        designation: o.designation,
+        reference: o.reference ?? null,
+        prix_ref: o.ref!.prix,
+        unite_ref: o.ref!.unite,
+        prix: o.prix_ht,
+        unite: o.unite,
+        nature: o.nature,
+        ecartPct: (1 - o.ref!.prix / mien) * 100,
+      }))
   }
 
   // ⚠️ Le comptage qui fait foi est le PLUS RÉCENT. Les lignes arrivent
@@ -204,7 +252,17 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
         return { fournisseur: null, fournisseur_id: null, source_fournisseur: null }
       })(),
       cible_id: p.id as string,
-      ailleurs: membres.map(m => meilleurPour.get(m.id as string)).find(Boolean) ?? null,
+      ...(() => {
+        const fid = membres.map(m => m.fournisseur_id as string | null).find(Boolean)
+        const nomNotre = fid ? nomF.get(fid) ?? null : null
+        const o = membres.map(m => offresMoinsCheres(m.id as string, nomNotre)).find(x => x.length) ?? []
+        return {
+          offres: o,
+          ailleurs: o.length
+            ? { fournisseur_id: o[0].fournisseur_id, fournisseur: o[0].fournisseur, ecartPct: o[0].ecartPct }
+            : null,
+        }
+      })(),
       reference: (membres.map(m => m.reference_fournisseur as string | null).find(Boolean)) ?? null,
       dernier_achat: membres.map(m => dernierAchat.get(m.id as string)).find(Boolean) ?? null,
     })
@@ -213,6 +271,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   for (const m of matieres) {
     const d = dernier.get(m.id as string)
     const f = lireFournisseur(m.fournisseur_principal as string | null)
+    const offresMatiere = offresMoinsCheres(m.id as string, f.nom)
     lignes.push({
       cle: `ing:${m.id as string}`,
       nom: m.nom as string,
@@ -243,7 +302,16 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       source_fournisseur: f.nom ? ('fiche' as const) : null,
       fournisseur_id: f.nom ? (idFournisseur.get(f.nom) ?? null) : null,
       cible_id: m.id as string,
-      ailleurs: meilleurPour.get(m.id as string) ?? null,
+      // ⚠️ L'ÉCART DE LA COLONNE EST CELUI DE LA MEILLEURE OFFRE, pas
+      // l'amplitude du groupe. Les deux se ressemblent et ne disent pas la
+      // même chose : le groupe du beurre s'étale de 30 % entre nous et
+      // Félix Potin, mais de 43 % entre ses extrêmes. La colonne annonçait
+      // donc −43 % quand le panneau proposait −30 %, et c'est le genre
+      // d'écart qui fait douter des deux chiffres.
+      ailleurs: offresMatiere.length
+        ? { fournisseur_id: offresMatiere[0].fournisseur_id, fournisseur: offresMatiere[0].fournisseur, ecartPct: offresMatiere[0].ecartPct }
+        : null,
+      offres: offresMatiere,
       reference: (m.reference_fournisseur as string) ?? null,
       dernier_achat: dernierAchat.get(m.id as string) ?? null,
     })

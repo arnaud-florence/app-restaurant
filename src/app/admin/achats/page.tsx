@@ -147,6 +147,7 @@ export default async function AchatsPage() {
     estime: Boolean(l.estime),
     dernier_achat: l.dernier_achat ?? null,
     ailleurs: l.ailleurs ? { fournisseur: l.ailleurs.fournisseur, ecartPct: l.ailleurs.ecartPct } : null,
+    offres: l.offres ?? [],
   }))
 
   return (

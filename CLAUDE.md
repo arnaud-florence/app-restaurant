@@ -3661,6 +3661,48 @@ peut pas avoir relevé un prix qui n'existe pas.
 ⚠️ `ingredients.fournisseur_principal` est du TEXTE (module 3) : on y écrit
 le NOM. Y coller un uuid rendrait la ligne illisible partout ailleurs.
 
+**Basculer chez le moins cher, depuis la fiche (27/09/2026).** Détecter un
+meilleur prix sans permettre de basculer oblige à ressaisir ailleurs — donc
+personne ne le fait, et l'écart reste. Le panneau liste les offres
+concurrentes ; « Prendre celui-ci » reprend le fournisseur, sa référence et
+son prix.
+
+⚠️ **TOUTES les offres, pas seulement la meilleure** : le deuxième livre
+peut-être le lendemain, ou sans minimum de commande. Triées du moins cher au
+plus cher, et jamais celle du fournisseur où l'on est déjà.
+
+⚠️⚠️ **« MOINS CHER » SE MESURE CONTRE NOTRE LIGNE**, identifiée par notre
+fournisseur. Une première version filtrait dans la boucle sur les lignes du
+groupe : chaque tour écrasait le précédent, et la DERNIÈRE ligne — souvent
+la moins chère — laissait une liste VIDE. Le beurre doux affichait
+« −30 % chez Félix Potin » dans la colonne et **zéro offre dans le
+panneau**, sans qu'aucune erreur ne le signale.
+
+⚠️ **ET LES DEUX CHIFFRES DIVERGEAIENT** : la colonne montrait l'amplitude
+du GROUPE (−43 %, entre ses extrêmes) quand le panneau montrait l'écart
+avec NOUS (−30 %). Deux nombres proches pour deux idées différentes, au même
+endroit — on finit par ne croire ni l'un ni l'autre. `ailleurs` dérive
+désormais de la première offre : une seule source.
+
+⚠️ **Le prix n'est repris QUE si son unité est la nôtre**
+(`prixReprenable()`). Notre « Pain burger » se compte à la pièce quand
+l'offre est un sachet de neuf : y recopier le prix du sachet multiplierait
+notre coût par neuf. Sinon le fournisseur est repris, le prix non, et
+l'écran le DIT.
+
+⚠️ **Reprendre un DEVIS ne promeut pas le prix en « relevé »** : seule une
+ligne de nature facture coche la case. Un tarif de portail non plus — c'est
+un prix affiché.
+
+⚠️⚠️ **LA RÉFÉRENCE DE L'ANCIEN FOURNISSEUR NE SURVIT PAS AU CHANGEMENT.**
+Un code Gineys cité à Félix Potin fait chiffrer autre chose, et l'écart se
+découvre à la livraison : une référence fausse est pire qu'absente (0142).
+Si la nouvelle offre n'en porte pas, le champ est VIDÉ.
+
+Vérifié à l'écran sur le beurre doux : « 1 offre moins chère − 30 % Félix
+Potin 5,63 €/kg · devis », et « Prendre celui-ci » remplit Félix Potin,
+référence 63470, 5,625 €, case « relevé » DÉCOCHÉE — c'est un devis.
+
 ### « Inconnu » tranché en « tarif public » — décision du gérant (27/09/2026)
 
 **2 412 références étaient en remise INCONNUE, toutes du portail Gineys.**
