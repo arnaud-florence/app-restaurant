@@ -8,6 +8,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { lireTout } from '@/lib/supabase/pagine'
 import type { ArticleAchat } from '@/lib/catalogue-achats'
+import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import AchatsClient from './AchatsClient'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ export default async function AchatsPage() {
   // chercher un produit qui est pourtant au catalogue.
   const [lignes, { data: fournisseurs }] = await Promise.all([
     lireTout<Record<string, unknown>>(() => sb.from('catalogue_fournisseur')
-      .select('id, fournisseur_id, reference, designation, unite, prix_ht, remise_pct, tarif_negocie, achete, remise_demandee_le, date_tarif, nature')
+      .select('id, fournisseur_id, reference, designation, famille, unite, prix_ht, colis_quantite, colis_libelle, contenance_valeur, contenance_unite, cle_comparaison, remise_pct, tarif_negocie, achete, remise_demandee_le, date_tarif, nature')
       .eq('actif', true)
       .order('designation')),
     sb.from('fournisseurs').select('id, nom, email, actif').order('nom'),
@@ -30,12 +31,35 @@ export default async function AchatsPage() {
 
   const noms = new Map((fournisseurs ?? []).map(f => [f.id as string, f.nom as string]))
 
+  // ⚠️ La comparaison est calculée SERVEUR, par `comparer()` — la même
+  // fonction que /admin/tarifs-fournisseurs et que l'agent Stock. Une
+  // troisième implémentation finirait par colorer en vert un fournisseur que
+  // les deux autres écrans ne désignent pas.
+  const pourComparer: LigneTarif[] = lignes.map(l => ({
+    ...(l as unknown as LigneTarif),
+    prix_ht: l.prix_ht === null ? null : Number(l.prix_ht),
+    colis_quantite: l.colis_quantite === null ? null : Number(l.colis_quantite),
+    contenance_valeur: l.contenance_valeur === null ? null : Number(l.contenance_valeur),
+  }))
+  const refParLigne = new Map<string, { prix: number; unite: string }>()
+  const meilleurs = new Set<string>()
+  for (const g of comparer(pourComparer)) {
+    for (const l of g.lignes) if (l.ref) refParLigne.set(l.id, { prix: l.ref.prix, unite: l.ref.unite })
+    // ⚠️ On ne désigne un « moins cher » QUE si le groupe est comparable :
+    // sinon on couronnerait une poche de 600 g face à une d'un kilo.
+    if (g.comparable && g.meilleur) meilleurs.add(g.meilleur)
+  }
+
   const articles: ArticleAchat[] = lignes.map(l => ({
     id: l.id as string,
     fournisseur_id: l.fournisseur_id as string,
     fournisseur_nom: noms.get(l.fournisseur_id as string) ?? '—',
     reference: (l.reference as string) ?? '',
     designation: l.designation as string,
+    famille: (l.famille as string) ?? null,
+    cle: (l.cle_comparaison as string) ?? null,
+    ref: refParLigne.get(l.id as string) ?? null,
+    meilleur: meilleurs.has(l.id as string),
     unite: l.unite as string,
     // ⚠️ `Number(null)` vaut ZÉRO : un « prix sur demande » passerait pour
     // gratuit et sortirait en tête de tri. L'absence reste une absence.

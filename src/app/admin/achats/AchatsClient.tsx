@@ -2,25 +2,29 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import {
-  filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES,
-  type ArticleAchat, type Filtres, type EtatRemise,
+  filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
+  type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
 
 type Fournisseur = { id: string; nom: string; email: string | null; actif: boolean }
+type Onglet = 'promos' | 'catalogue'
 
-/** ⚠️ 3 300 lignes ne se rendent pas d'un bloc : le navigateur d'une tablette
- *  du comptoir y passerait plusieurs secondes à chaque frappe. On affiche une
- *  page à la fois, et le compteur dit toujours combien il y en a en tout. */
+/** ⚠️ 3 300 lignes ne se rendent pas d'un bloc : sur la tablette du comptoir,
+ *  chaque frappe coûterait plusieurs secondes. Une page à la fois, et le
+ *  compteur dit toujours combien il y en a en tout. */
 const PAR_PAGE = 60
 
 export default function AchatsClient({
   articles, fournisseurs,
 }: { articles: ArticleAchat[]; fournisseurs: Fournisseur[] }) {
+  const promos = useMemo(() => promotions(articles), [articles])
+  const [onglet, setOnglet] = useState<Onglet>(promos.length ? 'promos' : 'catalogue')
   const [f, setF] = useState<Filtres>(FILTRES_VIDES)
   const [limite, setLimite] = useState(PAR_PAGE)
   const [choisis, setChoisis] = useState<Set<string>>(new Set())
+  const [ouvert, setOuvert] = useState<string | null>(null)   // clé de comparaison dépliée
   const [res, setRes] = useState<ResultatDemande | null>(null)
   const [envoiEnCours, demarrer] = useTransition()
 
@@ -28,12 +32,22 @@ export default function AchatsClient({
 
   const trouves = useMemo(() => filtrer(articles, f), [articles, f])
   const visibles = trouves.slice(0, limite)
+  const lesFamilles = useMemo(() => familles(articles), [articles])
+
+  // Toutes les lignes d'une clé, pour la comparaison dépliée.
+  const parCle = useMemo(() => {
+    const m = new Map<string, ArticleAchat[]>()
+    for (const a of articles) {
+      if (!a.cle) continue
+      if (!m.has(a.cle)) m.set(a.cle, [])
+      m.get(a.cle)!.push(a)
+    }
+    for (const [, v] of m) v.sort((x, y) => (x.ref?.prix ?? Infinity) - (y.ref?.prix ?? Infinity))
+    return m
+  }, [articles])
 
   const parFournisseur = useMemo(() => new Map(fournisseurs.map(x => [x.id, x])), [fournisseurs])
-  const selection = useMemo(
-    () => articles.filter(a => choisis.has(a.id)),
-    [articles, choisis])
-  // Une demande part chez UN fournisseur : on ne mélange pas deux destinataires.
+  const selection = useMemo(() => articles.filter(a => choisis.has(a.id)), [articles, choisis])
   const fourSelection = useMemo(() => {
     const s = new Set(selection.map(a => a.fournisseur_id))
     return s.size === 1 ? parFournisseur.get([...s][0]) ?? null : null
@@ -46,10 +60,7 @@ export default function AchatsClient({
   const envoyer = () => {
     if (!fourSelection) return
     demarrer(async () => {
-      setRes(await demanderRemises({
-        fournisseur_id: fourSelection.id,
-        ids: selection.map(a => a.id),
-      }))
+      setRes(await demanderRemises({ fournisseur_id: fourSelection.id, ids: selection.map(a => a.id) }))
     })
   }
 
@@ -57,8 +68,8 @@ export default function AchatsClient({
     total: articles.length,
     negocie: articles.filter(a => etatRemise(a) === 'negocie').length,
     inconnu: articles.filter(a => etatRemise(a) === 'inconnu').length,
-    promos: articles.filter(a => a.remise_pct).length,
     sansPrix: articles.filter(a => a.prix_ht === null).length,
+    classes: articles.filter(a => a.famille).length,
   }), [articles])
 
   return (
@@ -66,187 +77,401 @@ export default function AchatsClient({
       <header className="mb-4">
         <h1 className="text-2xl font-semibold text-zinc-900">Plateforme d&apos;achat</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          {compteurs.total.toLocaleString('fr-FR')} références, tous fournisseurs.
-          {' '}<strong>{compteurs.negocie}</strong> à tarif négocié confirmé,
-          {' '}<strong>{compteurs.inconnu.toLocaleString('fr-FR')}</strong> dont la remise n&apos;a jamais été vérifiée,
-          {' '}<strong>{compteurs.promos}</strong> en promotion.
-        </p>
-        <p className="mt-1 text-[12px] text-amber-700">
-          « Remise inconnue » ne veut pas dire « pas de remise » : personne n&apos;a vérifié.
-          C&apos;est exactement ce qu&apos;il faut demander au fournisseur.
+          {compteurs.total.toLocaleString('fr-FR')} références, tous fournisseurs ·{' '}
+          <strong>{compteurs.negocie}</strong> à tarif négocié ·{' '}
+          <strong>{promos.length}</strong> en promotion
         </p>
       </header>
 
-      {/* ─── Recherche et filtres ─────────────────────────────── */}
-      <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
-        <input
-          type="search"
-          value={f.requete}
-          onChange={e => maj({ requete: e.target.value })}
-          placeholder="Rechercher un produit, une référence…"
-          className="h-12 w-full rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-900"
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-          <select
-            value={f.fournisseur_id ?? ''}
-            onChange={e => maj({ fournisseur_id: e.target.value || null })}
-            className="h-9 rounded-lg border border-zinc-300 px-2"
-          >
-            <option value="">Tous les fournisseurs</option>
-            {fournisseurs.filter(x => x.actif).map(x =>
-              <option key={x.id} value={x.id}>{x.nom}</option>)}
-          </select>
-
-          <select
-            value={f.remise ?? ''}
-            onChange={e => maj({ remise: (e.target.value || null) as EtatRemise | null })}
-            className="h-9 rounded-lg border border-zinc-300 px-2"
-          >
-            <option value="">Remise : tout</option>
-            <option value="negocie">Remisé (confirmé)</option>
-            <option value="inconnu">Remise inconnue</option>
-            <option value="public">Tarif public (confirmé)</option>
-          </select>
-
-          <Bascule actif={f.achetes} onClick={() => maj({ achetes: !f.achetes })}>On l&apos;achète</Bascule>
-          <Bascule actif={f.promos} onClick={() => maj({ promos: !f.promos })}>En promo</Bascule>
-          <Bascule actif={f.sansPrix} onClick={() => maj({ sansPrix: !f.sansPrix })}>
-            Prix sur demande ({compteurs.sansPrix})
-          </Bascule>
-
-          <span className="ml-auto tabular-nums text-zinc-500">
-            {trouves.length.toLocaleString('fr-FR')} résultat{trouves.length > 1 ? 's' : ''}
-          </span>
-        </div>
+      <div className="mb-4 flex gap-2">
+        <Onglets actif={onglet === 'promos'} onClick={() => setOnglet('promos')}>
+          🔥 Promos du moment <Compteur n={promos.length} />
+        </Onglets>
+        <Onglets actif={onglet === 'catalogue'} onClick={() => setOnglet('catalogue')}>
+          📚 Catalogue <Compteur n={articles.length} />
+        </Onglets>
       </div>
 
-      {/* ─── La sélection et la demande ───────────────────────── */}
-      {selection.length > 0 && (
-        <div className="mb-4 rounded-xl border border-zinc-900 bg-zinc-50 p-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <strong className="text-sm">{selection.length} référence(s) sélectionnée(s)</strong>
-            {fourSelection
-              ? <span className="text-sm text-zinc-600">
-                  chez {fourSelection.nom}
-                  {fourSelection.email
-                    ? <> · {fourSelection.email}</>
-                    : <span className="text-amber-700"> · pas d&apos;adresse enregistrée</span>}
-                </span>
-              : <span className="text-sm text-amber-700">
-                  Plusieurs fournisseurs sélectionnés — une demande part chez un seul.
-                </span>}
-            <button
-              onClick={envoyer}
-              disabled={!fourSelection || envoiEnCours}
-              className="ml-auto h-10 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-40"
-            >
-              {envoiEnCours ? 'Envoi…' : 'Demander les conditions'}
-            </button>
-            <button
-              onClick={() => { setChoisis(new Set()); setRes(null) }}
-              className="h-10 rounded-lg border border-zinc-300 px-3 text-sm"
-            >Vider</button>
-          </div>
+      {onglet === 'promos'
+        ? <Promos promos={promos} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
+        : (
+          <>
+            {/* ─── Recherche et filtres ───────────────────────── */}
+            <div className="sticky top-0 z-10 -mx-4 mb-4 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
+              <input
+                type="search" value={f.requete}
+                onChange={e => maj({ requete: e.target.value })}
+                placeholder="Rechercher un produit, une référence…"
+                className="h-12 w-full rounded-lg border border-zinc-300 px-3 text-base outline-none focus:border-zinc-900"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <select value={f.famille === undefined ? '' : f.famille === null ? '·' : f.famille}
+                  onChange={e => maj({ famille: e.target.value === '' ? undefined : e.target.value === '·' ? null : e.target.value })}
+                  className="h-9 rounded-lg border border-zinc-300 px-2">
+                  <option value="">Toutes les catégories</option>
+                  {lesFamilles.filter(x => x.nom).map(x =>
+                    <option key={x.nom} value={x.nom!}>{x.nom} ({x.n})</option>)}
+                  {lesFamilles.some(x => x.nom === null) &&
+                    <option value="·">Non classés ({lesFamilles.find(x => x.nom === null)!.n})</option>}
+                </select>
 
-          {res && (
-            <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
-              <p className={`text-sm ${res.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{res.message}</p>
-              {res.brouillon && (
-                <>
-                  <p className="mt-2 text-[12px] text-zinc-500">
-                    Objet : {res.brouillon.objet}
-                  </p>
-                  <textarea
-                    readOnly
-                    value={res.brouillon.texte}
-                    rows={12}
-                    className="mt-1 w-full rounded border border-zinc-200 bg-zinc-50 p-2 font-mono text-[12px]"
-                  />
-                </>
+                <select value={f.fournisseur_id ?? ''}
+                  onChange={e => maj({ fournisseur_id: e.target.value || null })}
+                  className="h-9 rounded-lg border border-zinc-300 px-2">
+                  <option value="">Tous les fournisseurs</option>
+                  {fournisseurs.filter(x => x.actif).map(x => <option key={x.id} value={x.id}>{x.nom}</option>)}
+                </select>
+
+                <select value={f.remise ?? ''}
+                  onChange={e => maj({ remise: (e.target.value || null) as EtatRemise | null })}
+                  className="h-9 rounded-lg border border-zinc-300 px-2">
+                  <option value="">Remise : tout</option>
+                  <option value="negocie">Remisé (confirmé)</option>
+                  <option value="inconnu">Remise inconnue</option>
+                </select>
+
+                <Bascule actif={f.achetes} onClick={() => maj({ achetes: !f.achetes })}>On l&apos;achète</Bascule>
+                <Bascule actif={f.promos} onClick={() => maj({ promos: !f.promos })}>En promo</Bascule>
+                <Bascule actif={f.sansPrix} onClick={() => maj({ sansPrix: !f.sansPrix })}>
+                  Prix sur demande ({compteurs.sansPrix})
+                </Bascule>
+                <span className="ml-auto tabular-nums text-zinc-500">
+                  {trouves.length.toLocaleString('fr-FR')} résultat{trouves.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              {compteurs.classes < articles.length && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  ⚠️ {(articles.length - compteurs.classes).toLocaleString('fr-FR')} références n&apos;ont pas encore
+                  de catégorie — les rayons du portail Gineys restent à relever.
+                </p>
               )}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ─── Le catalogue ─────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-200">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-left text-[12px] uppercase tracking-wide text-zinc-500">
-            <tr>
-              <th className="w-10 px-3 py-2"></th>
-              <th className="px-3 py-2">Article</th>
-              <th className="px-3 py-2">Remise</th>
-              <th className="px-3 py-2 text-right">Prix</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {visibles.map(a => {
-              const e = etatRemise(a)
-              return (
-                <tr key={a.id} className={choisis.has(a.id) ? 'bg-zinc-50' : ''}>
-                  <td className="px-3 py-2 align-top">
-                    <input
-                      type="checkbox"
-                      checked={choisis.has(a.id)}
-                      onChange={() => basculer(a.id)}
-                      className="h-5 w-5"
-                      aria-label={`Sélectionner ${a.designation}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-zinc-900">{a.designation}</p>
-                    <p className="text-[11px] text-zinc-400">
-                      {a.fournisseur_nom}
-                      {a.reference && <> · réf. {a.reference}</>}
-                      {' · '}{a.date_tarif}
-                      {a.achete && <span className="ml-1 rounded bg-emerald-50 px-1 text-emerald-700">on l&apos;achète</span>}
-                      {a.remise_demandee_le && <span className="ml-1 rounded bg-blue-50 px-1 text-blue-700">conditions demandées</span>}
-                    </p>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <Pastille etat={e} />
-                    {a.remise_pct != null && (
-                      <span className="ml-1 rounded bg-red-50 px-1 text-[11px] font-medium text-red-700">
-                        promo −{a.remise_pct.toFixed(1).replace('.', ',')} %
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right align-top tabular-nums">
-                    {a.prix_ht == null
-                      ? <span className="text-amber-700">sur demande</span>
-                      : <>{fmtPrix(a.prix_ht)}<span className="text-zinc-400">/{a.unite}</span></>}
-                  </td>
-                </tr>
-              )
-            })}
-            {visibles.length === 0 && (
-              <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">
-                Aucune référence ne correspond.
-              </td></tr>
+            <Selection
+              selection={selection} fourSelection={fourSelection} envoiEnCours={envoiEnCours}
+              res={res} onEnvoyer={envoyer} onVider={() => { setChoisis(new Set()); setRes(null) }}
+            />
+
+            <div className="overflow-hidden rounded-xl border border-zinc-200">
+              <table className="w-full text-sm">
+                <thead className="bg-zinc-50 text-left text-[12px] uppercase tracking-wide text-zinc-500">
+                  <tr>
+                    <th className="w-10 px-3 py-2"></th>
+                    <th className="px-3 py-2">Article</th>
+                    <th className="px-3 py-2">Remise</th>
+                    <th className="px-3 py-2 text-right">Prix</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {visibles.map(a => (
+                    <Ligne key={a.id} a={a} choisi={choisis.has(a.id)} onCocher={() => basculer(a.id)}
+                      parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
+                  ))}
+                  {visibles.length === 0 && (
+                    <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">
+                      Aucune référence ne correspond.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {limite < trouves.length && (
+              <button onClick={() => setLimite(l => l + PAR_PAGE * 4)}
+                className="mt-3 h-12 w-full rounded-lg border border-zinc-300 text-sm">
+                Afficher plus ({(trouves.length - limite).toLocaleString('fr-FR')} restantes)
+              </button>
             )}
-          </tbody>
-        </table>
+          </>
+        )}
+    </div>
+  )
+}
+
+// ─── Les promos ────────────────────────────────────────────────────
+
+const ETAT_FRAICHEUR: Record<Fraicheur, { texte: string; classe: string }> = {
+  fraiche: { texte: 'relevé récent', classe: 'bg-emerald-50 text-emerald-700' },
+  tiede:   { texte: 'à vérifier',    classe: 'bg-amber-50 text-amber-700' },
+  perimee: { texte: 'relevé ancien', classe: 'bg-red-50 text-red-700' },
+}
+
+function Promos({
+  promos, parCle, ouvert, setOuvert,
+}: {
+  promos: ReturnType<typeof promotions>
+  parCle: Map<string, ArticleAchat[]>
+  ouvert: string | null
+  setOuvert: (c: string | null) => void
+}) {
+  if (!promos.length) {
+    return <p className="py-12 text-center text-sm text-zinc-500">
+      Aucune promotion relevée. Elles arrivent au prochain relevé du portail fournisseur.
+    </p>
+  }
+  const interessantes = promos.filter(p => p.interessante)
+  const autres = promos.filter(p => !p.interessante)
+  const plusVieux = Math.max(...promos.map(p => p.age))
+
+  return (
+    <div>
+      {/* ⚠️ Une promo ne dit pas sa date de péremption. Affichée trois mois
+          plus tard, elle fait commander au tarif plein en croyant profiter
+          d'une affaire. On ne les masque pas — on dit leur âge. */}
+      <div className={`mb-4 rounded-xl border p-3 text-sm ${
+        plusVieux > 30 ? 'border-red-300 bg-red-50 text-red-800' : 'border-zinc-200 bg-zinc-50 text-zinc-700'}`}>
+        <strong>Ces remises datent du dernier relevé</strong>, il y a {plusVieux} jour{plusVieux > 1 ? 's' : ''}.
+        {plusVieux > 30
+          ? ' Une promotion ne dure pas un mois : à revérifier chez le fournisseur avant de commander.'
+          : ' Les fournisseurs n’ont pas d’API — elles se rafraîchissent au relevé suivant.'}
       </div>
 
-      {limite < trouves.length && (
-        <button
-          onClick={() => setLimite(l => l + PAR_PAGE * 4)}
-          className="mt-3 h-12 w-full rounded-lg border border-zinc-300 text-sm"
-        >
-          Afficher plus ({(trouves.length - limite).toLocaleString('fr-FR')} restantes)
+      {interessantes.length > 0 && (
+        <>
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            Sur ce que nous achetons ({interessantes.length})
+          </h2>
+          <div className="mb-6 grid gap-2 sm:grid-cols-2">
+            {interessantes.map(p => <CartePromo key={p.id} p={p} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />)}
+          </div>
+        </>
+      )}
+
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+        Le reste du catalogue ({autres.length})
+      </h2>
+      <p className="mb-2 text-[12px] text-zinc-500">
+        Une remise sur un article qu&apos;on n&apos;achète pas n&apos;est pas une affaire, c&apos;est une tentation.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {autres.slice(0, 40).map(p => <CartePromo key={p.id} p={p} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />)}
+      </div>
+    </div>
+  )
+}
+
+function CartePromo({
+  p, parCle, ouvert, setOuvert,
+}: {
+  p: ReturnType<typeof promotions>[number]
+  parCle: Map<string, ArticleAchat[]>
+  ouvert: string | null
+  setOuvert: (c: string | null) => void
+}) {
+  const fr = ETAT_FRAICHEUR[p.etat]
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-zinc-900">{p.designation}</p>
+        <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[12px] font-bold text-white">
+          −{p.remise_pct!.toFixed(1).replace('.', ',')} %
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-zinc-400">
+        {p.fournisseur_nom} · réf. {p.reference}
+        {p.achete && <span className="ml-1 rounded bg-emerald-50 px-1 text-emerald-700">on l&apos;achète</span>}
+      </p>
+      <div className="mt-2 flex items-baseline justify-between">
+        <span className="text-base font-semibold tabular-nums">
+          {p.prix_ht == null ? <span className="text-amber-700">sur demande</span> : <>{fmtPrix(p.prix_ht)}<span className="text-xs text-zinc-400">/{p.unite}</span></>}
+        </span>
+        <span className={`rounded px-1.5 py-0.5 text-[11px] ${fr.classe}`}>{fr.texte} · {p.age} j</span>
+      </div>
+      {p.cle && (
+        <button onClick={() => setOuvert(ouvert === p.cle ? null : p.cle)}
+          className="mt-2 text-[12px] font-medium underline underline-offset-2">
+          {ouvert === p.cle ? 'Masquer' : 'Comparer les fournisseurs'}
         </button>
+      )}
+      {ouvert === p.cle && p.cle && <Comparaison lignes={parCle.get(p.cle) ?? []} />}
+    </div>
+  )
+}
+
+// ─── Une ligne du catalogue, dépliable ─────────────────────────────
+
+function Ligne({
+  a, choisi, onCocher, parCle, ouvert, setOuvert,
+}: {
+  a: ArticleAchat; choisi: boolean; onCocher: () => void
+  parCle: Map<string, ArticleAchat[]>
+  ouvert: string | null; setOuvert: (c: string | null) => void
+}) {
+  const e = etatRemise(a)
+  const deplie = a.cle != null && ouvert === a.cle
+  const nb = a.cle ? (parCle.get(a.cle)?.length ?? 0) : 0
+  return (
+    <>
+      <tr className={choisi ? 'bg-zinc-50' : ''}>
+        <td className="px-3 py-2 align-top">
+          <input type="checkbox" checked={choisi} onChange={onCocher} className="h-5 w-5"
+            aria-label={`Sélectionner ${a.designation}`} />
+        </td>
+        <td className="px-3 py-2">
+          <p className="font-medium text-zinc-900">
+            {a.designation}
+            {a.meilleur && <span className="ml-2 rounded bg-emerald-600 px-1.5 text-[11px] font-bold text-white">le moins cher</span>}
+          </p>
+          <p className="text-[11px] text-zinc-400">
+            {a.fournisseur_nom}
+            {a.famille && <> · {a.famille}</>}
+            {a.reference && <> · réf. {a.reference}</>}
+            {' · '}{a.date_tarif}
+            {a.achete && <span className="ml-1 rounded bg-emerald-50 px-1 text-emerald-700">on l&apos;achète</span>}
+            {a.remise_demandee_le && <span className="ml-1 rounded bg-blue-50 px-1 text-blue-700">conditions demandées</span>}
+          </p>
+          {nb > 1 && (
+            <button onClick={() => setOuvert(deplie ? null : a.cle)}
+              className="mt-1 text-[12px] font-medium text-zinc-700 underline underline-offset-2">
+              {deplie ? 'Masquer' : `Comparer — ${nb} offres`}
+            </button>
+          )}
+        </td>
+        <td className="px-3 py-2 align-top">
+          <Pastille etat={e} />
+          {a.remise_pct != null && (
+            <span className="ml-1 rounded bg-red-50 px-1 text-[11px] font-medium text-red-700">
+              promo −{a.remise_pct.toFixed(1).replace('.', ',')} %
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right align-top tabular-nums">
+          {a.prix_ht == null
+            ? <span className="text-amber-700">sur demande</span>
+            : <>{fmtPrix(a.prix_ht)}<span className="text-zinc-400">/{a.unite}</span></>}
+          {a.ref && <p className="text-[11px] text-zinc-400">{fmtPrix(a.ref.prix)}/{a.ref.unite}</p>}
+        </td>
+      </tr>
+      {deplie && (
+        <tr><td colSpan={4} className="bg-zinc-50 px-3 pb-3"><Comparaison lignes={parCle.get(a.cle!) ?? []} /></td></tr>
+      )}
+    </>
+  )
+}
+
+/**
+ * Les offres d'un même produit, du moins cher au plus cher.
+ *
+ * ⚠️ LA COULEUR NE SE POSE QUE SUR CE QUI EST COMPARABLE. Une ligne dont le
+ * prix n'a pas pu être ramené à l'unité de référence reste GRISE et le dit :
+ * la colorer en rouge laisserait croire qu'elle est chère, alors qu'on ne
+ * sait simplement pas la comparer — une poche de 600 g face à une d'un kilo.
+ */
+function Comparaison({ lignes }: { lignes: ArticleAchat[] }) {
+  const chiffrees = lignes.filter(l => l.ref)
+  const bas = chiffrees.length ? Math.min(...chiffrees.map(l => l.ref!.prix)) : null
+  const haut = chiffrees.length ? Math.max(...chiffrees.map(l => l.ref!.prix)) : null
+  return (
+    <div className="mt-2 space-y-1">
+      {lignes.map(l => {
+        const incomparable = !l.ref
+        const estBas = !incomparable && l.ref!.prix === bas
+        const estHaut = !incomparable && l.ref!.prix === haut && haut !== bas
+        const couleur = incomparable ? 'border-zinc-200 bg-white text-zinc-500'
+          : estBas ? 'border-emerald-300 bg-emerald-50'
+          : estHaut ? 'border-red-200 bg-red-50'
+          : 'border-zinc-200 bg-white'
+        const ecart = !incomparable && bas && l.ref!.prix > bas
+          ? `+${(((l.ref!.prix - bas) / bas) * 100).toFixed(0)} %` : null
+        return (
+          <div key={l.id} className={`flex flex-wrap items-baseline gap-x-2 rounded-lg border px-2 py-1.5 text-[13px] ${couleur}`}>
+            <span className="font-medium">{l.fournisseur_nom}</span>
+            <span className="text-zinc-500">{l.designation}</span>
+            <span className="ml-auto tabular-nums">
+              {l.prix_ht == null ? 'sur demande' : <>{fmtPrix(l.prix_ht)}/{l.unite}</>}
+            </span>
+            <span className="w-28 text-right font-semibold tabular-nums">
+              {l.ref ? <>{fmtPrix(l.ref.prix)}/{l.ref.unite}</> : <span className="italic">non comparable</span>}
+            </span>
+            <span className="w-16 text-right text-[12px]">
+              {estBas ? <span className="font-bold text-emerald-700">le moins cher</span> : ecart}
+            </span>
+            <span className="w-24 text-right text-[11px] text-zinc-400">
+              {l.nature === 'facture' ? 'prix payé' : l.nature === 'portail' ? 'tarif portail' : 'devis'}
+            </span>
+          </div>
+        )
+      })}
+      {/* ⚠️ Un écart en pourcentage ne décide de rien : il se multiplie par
+          les quantités réelles avant de changer de fournisseur. */}
+      <p className="pt-1 text-[11px] text-zinc-500">
+        Un devis est une proposition, un prix payé une preuve. Et un écart ne décide de rien
+        tant qu&apos;il n&apos;est pas multiplié par les quantités que vous achetez vraiment.
+      </p>
+    </div>
+  )
+}
+
+// ─── Sélection et demande ──────────────────────────────────────────
+
+function Selection({
+  selection, fourSelection, envoiEnCours, res, onEnvoyer, onVider,
+}: {
+  selection: ArticleAchat[]
+  fourSelection: Fournisseur | null
+  envoiEnCours: boolean
+  res: ResultatDemande | null
+  onEnvoyer: () => void
+  onVider: () => void
+}) {
+  if (!selection.length) return null
+  return (
+    <div className="mb-4 rounded-xl border border-zinc-900 bg-zinc-50 p-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <strong className="text-sm">{selection.length} référence(s) sélectionnée(s)</strong>
+        {fourSelection
+          ? <span className="text-sm text-zinc-600">
+              chez {fourSelection.nom}
+              {fourSelection.email ? <> · {fourSelection.email}</>
+                : <span className="text-amber-700"> · pas d&apos;adresse enregistrée</span>}
+            </span>
+          : <span className="text-sm text-amber-700">
+              Plusieurs fournisseurs sélectionnés — une demande part chez un seul.
+            </span>}
+        <button onClick={onEnvoyer} disabled={!fourSelection || envoiEnCours}
+          className="ml-auto h-10 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-40">
+          {envoiEnCours ? 'Envoi…' : 'Demander les conditions'}
+        </button>
+        <button onClick={onVider} className="h-10 rounded-lg border border-zinc-300 px-3 text-sm">Vider</button>
+      </div>
+      {res && (
+        <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+          <p className={`text-sm ${res.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{res.message}</p>
+          {res.brouillon && (
+            <>
+              <p className="mt-2 text-[12px] text-zinc-500">Objet : {res.brouillon.objet}</p>
+              <textarea readOnly value={res.brouillon.texte} rows={12}
+                className="mt-1 w-full rounded border border-zinc-200 bg-zinc-50 p-2 font-mono text-[12px]" />
+            </>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
+// ─── Bricoles ──────────────────────────────────────────────────────
+
+function Onglets({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`h-11 rounded-lg border px-4 text-sm font-medium ${
+        actif ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 bg-white'}`}>
+      {children}
+    </button>
+  )
+}
+
+function Compteur({ n }: { n: number }) {
+  return <span className="ml-1 rounded-full bg-black/10 px-1.5 text-[11px] tabular-nums">{n.toLocaleString('fr-FR')}</span>
+}
+
 function Bascule({ actif, onClick, children }: { actif: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className={`h-9 rounded-lg border px-3 ${actif ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300'}`}
-    >{children}</button>
+    <button onClick={onClick}
+      className={`h-9 rounded-lg border px-3 ${actif ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300'}`}>
+      {children}
+    </button>
   )
 }
 
@@ -257,9 +482,5 @@ const COULEUR: Record<EtatRemise, string> = {
 }
 
 function Pastille({ etat }: { etat: EtatRemise }) {
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${COULEUR[etat]}`}>
-      {LIBELLE_REMISE[etat]}
-    </span>
-  )
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${COULEUR[etat]}`}>{LIBELLE_REMISE[etat]}</span>
 }

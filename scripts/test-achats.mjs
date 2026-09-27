@@ -48,6 +48,8 @@ const correspond = (a, q) => {
   return termes.every(x => ref.includes(x) || cibles.some(c => c.startsWith(x)))
 }
 
+const tousLesArticles = await sbTout('catalogue_fournisseur?actif=eq.true&select=famille,remise_pct,achete,cle_comparaison,date_tarif')
+
 titre('Trois états de remise, pas deux')
 t('un tarif vérifié est « négocié »',      etatRemise({ tarif_negocie: true }) === 'negocie')
 t('un tarif public confirmé est « public »', etatRemise({ tarif_negocie: false }) === 'public')
@@ -74,6 +76,40 @@ t('il porte la RÉFÉRENCE de l’article',  m1.includes('0061414'))
 t('il porte le prix affiché',            m1.includes('6,924'))
 const m2 = message([{ reference: '0053088', designation: 'HOMARD', prix_ht: null, unite: 'colis' }])
 t('⚠️ un prix absent se dit, il ne vaut pas 0', m2.includes('prix sur demande') && !m2.includes('0,000'))
+
+titre('Les promos du moment, et leur âge')
+// ⚠️ Recopie `fraicheur()` : une promo ne dit pas sa date de péremption.
+// Affichée trois mois plus tard, elle fait commander au tarif plein en
+// croyant profiter d'une affaire — la faute déjà payée sur Gel Var.
+const jours = (d, auj) => Math.max(0, Math.floor((auj - new Date(d + 'T00:00:00Z')) / 86400000))
+const fraicheur = (d, auj) => { const j = jours(d, auj); return j <= 7 ? 'fraiche' : j <= 30 ? 'tiede' : 'perimee' }
+const AUJ = new Date('2026-09-27T12:00:00Z')
+t('un relevé du jour est frais',        fraicheur('2026-09-27', AUJ) === 'fraiche')
+t('un relevé de trois semaines est tiède', fraicheur('2026-09-06', AUJ) === 'tiede')
+t('⚠️ un relevé de deux mois est PÉRIMÉ', fraicheur('2026-07-27', AUJ) === 'perimee')
+
+// « Intéressante » = sur un produit qu'on achète ou qu'on a rattaché.
+const interessante = a => a.achete || a.cle_comparaison != null
+const promos = tousLesArticles.filter(a => a.remise_pct != null && a.remise_pct > 0)
+t('des promotions existent', promos.length > 100)
+t('⚠️ celles qui portent sur nos achats sont identifiables',
+  promos.some(interessante) && promos.some(a => !interessante(a)))
+
+titre('Les catégories')
+// ⚠️ On ne fusionne QUE la casse : « SECS » et « Sauce » viennent de deux
+// taxonomies et ne se rapprochent pas.
+const fams = new Map()
+for (const a of tousLesArticles) {
+  if (!a.famille) continue
+  const k = a.famille.toLowerCase()
+  fams.set(k, (fams.get(k) ?? 0) + 1)
+}
+t('des familles existent', fams.size >= 10)
+t('⚠️ « Boissons » et « BOISSONS » ne font qu’une entrée',
+  [...new Set(tousLesArticles.filter(a=>a.famille).map(a=>a.famille.toLowerCase()))].length < 
+  [...new Set(tousLesArticles.filter(a=>a.famille).map(a=>a.famille))].length)
+t('⚠️ le non-classé est compté, pas caché',
+  tousLesArticles.filter(a => !a.famille).length > 0)
 
 titre('Le catalogue en base')
 const portail = await sbTout('catalogue_fournisseur?nature=eq.portail&select=id,prix_ht,tarif_negocie,achete,remise_pct,reference,colis_quantite,unite')

@@ -2602,7 +2602,7 @@ kilo.
 1 000 lignes sur 3 303 et annoncerait un « moins cher » choisi dedans.
 
 Test : `PORT=3000 node scripts/test-achats.mjs` couvre les trois filtres et
-vérifie le contrôle croisé — 39 assertions.
+vérifie le contrôle croisé — 47 assertions.
 
 Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 ⚠️ Il RECOPIE les règles depuis le TS, et n'envoie AUCUN e-mail.
@@ -2676,6 +2676,62 @@ la page et héritait du prix de la **première fiche**. Le homard sous glace
 sortait à 27,410 €/Col avec le colisage du pain. Le correctif borne la
 remontée au premier ancêtre contenant **un seul** titre d'article.
 
+**`/admin/achats` — deux onglets (27/09/2026).**
+
+**« Promos du moment »**, l'accueil : les remises relevées, triées, et
+séparées en deux — *sur ce que nous achetons* d'abord, *le reste du
+catalogue* ensuite. ⚠️ Une remise sur un article qu'on n'achète pas n'est
+pas une affaire, c'est une tentation.
+
+⚠️⚠️ **UNE PROMO NE DIT PAS SA DATE DE PÉREMPTION.** Les remises sont celles
+du jour du relevé. Affichées trois mois plus tard comme « promos du moment »,
+elles feraient commander au tarif plein en croyant profiter d'une affaire —
+exactement la faute évitée sur les 26 prix Gel Var, « promotions de
+septembre » qu'un comparateur aurait prises pour le tarif courant. On ne les
+masque donc PAS, on les DATE : bandeau d'âge en tête, pastille par carte
+(≤ 7 j frais, ≤ 30 j à vérifier, au-delà ancien), et le bandeau passe au
+rouge au-delà d'un mois.
+
+**La comparaison colorée** se déplie sur n'importe quelle ligne partageant
+une `cle_comparaison` : vert pour le moins cher, rouge pour le plus cher,
+l'écart en pourcentage, et la NATURE de chaque prix (payé / tarif portail /
+devis).
+
+⚠️ **LA COULEUR NE SE POSE QUE SUR CE QUI EST COMPARABLE.** Une ligne dont le
+prix n'a pas pu être ramené à l'unité de référence reste GRISE et porte
+« non comparable » : la colorer en rouge laisserait croire qu'elle est chère,
+alors qu'on ne sait simplement pas la comparer — une poche de 600 g face à
+une d'un kilo.
+
+⚠️ Le calcul est fait **côté serveur par `comparer()`**, la même fonction que
+`/admin/tarifs-fournisseurs` et que l'agent Stock. Une troisième
+implémentation finirait par colorer en vert un fournisseur que les deux
+autres écrans ne désignent pas.
+
+**Le filtre par catégorie** lit `catalogue_fournisseur.famille`.
+⚠️ Les variantes de CASSE sont fusionnées — chaque fournisseur écrit ses
+rayons à sa façon, et « Boissons » face à « BOISSONS » ferait deux entrées
+pour une seule idée. ⚠️ Mais SEULEMENT la casse : « SECS » (Félix Potin) et
+« Sauce » (La Frite Belge) viennent de deux taxonomies et ne se rapprochent
+pas.
+
+⚠️⚠️ **2 998 RÉFÉRENCES SUR 3 303 N'ONT PAS DE CATÉGORIE**, et l'écran le dit
+en toutes lettres plutôt que de faire semblant. Ce sont les lignes Gineys :
+leur portail a bien 22 rayons (ACCOMPAGNEMENT, B.O.F., ÉPICERIE, VIANDE,
+VIENNOISERIE…), mais le relevé du 26/09 n'a capté que le libellé et le prix.
+Il faut y retourner famille par famille — **et la session du portail avait
+expiré au moment de le faire** (fenêtre « Reconnexion »). ⚠️ On ne saisit
+jamais le mot de passe du gérant à sa place : c'est lui qui rouvre la
+session, puis on relève.
+
+⚠️ **AUCUN DE CES FOURNISSEURS N'A D'API**, et il ne faut pas le laisser
+croire. Le portail Gineys refuse les appels directs (« Illegal protocol ») ;
+Félix Potin, Gel Var, La Frite Belge et Euro-Cash n'ont envoyé que des PDF ;
+France Boissons (Eazle) se relève à la main. Les promos ne se rafraîchissent
+donc PAS toutes seules : elles datent du dernier relevé, et l'écran l'affiche
+à chaque ouverture. Promettre un flux quotidien serait promettre ce qui
+n'existe pas.
+
 **`/admin/achats` — la plateforme d'achat.** Recherche plein texte (tous les
 mots, en préfixe : « mozza » trouve MOZZARELLA ; un « ou » rendrait la moitié
 des 3 300 lignes et ne servirait à rien), filtres par fournisseur, par état
@@ -2729,7 +2785,7 @@ deux appels identiques rendent la même réponse, même si la page a changé
 entre-temps. Une heure perdue à croire que les clics ne passaient pas, alors
 qu'ils passaient tous. `get_page_text` et les captures, eux, sont frais.
 
-Test : `PORT=3000 node scripts/test-achats.mjs` — 32 assertions. ⚠️ Il
+Test : `PORT=3000 node scripts/test-achats.mjs` — 47 assertions. ⚠️ Il
 RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
 que la page est **fermée aux appels anonymes** : elle expose des conditions
 négociées.
