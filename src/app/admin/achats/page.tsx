@@ -7,7 +7,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { lireTout } from '@/lib/supabase/pagine'
-import type { ArticleAchat } from '@/lib/catalogue-achats'
+import type { ArticleAchat, OffreFournisseur } from '@/lib/catalogue-achats'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import AchatsClient from './AchatsClient'
 
@@ -28,6 +28,14 @@ export default async function AchatsPage() {
       .order('designation')),
     sb.from('fournisseurs').select('id, nom, email, actif').order('nom'),
   ])
+
+  // Les offres conditionnelles et datées (0161) — un autre objet que les
+  // remises du catalogue : l'avantage dépend d'une quantité achetée.
+  const { data: brutesOffres } = await sb
+    .from('promotions_fournisseur')
+    .select('id, fournisseur_id, libelle, type, seuil_quantite, seuil_unite, avantage, date_debut, date_fin, releve_le')
+    .eq('actif', true)
+    .order('date_fin')
 
   const noms = new Map((fournisseurs ?? []).map(f => [f.id as string, f.nom as string]))
 
@@ -72,9 +80,23 @@ export default async function AchatsPage() {
     nature: l.nature as string,
   }))
 
+  const offres: OffreFournisseur[] = (brutesOffres ?? []).map(o => ({
+    id: o.id as string,
+    fournisseur_nom: noms.get(o.fournisseur_id as string) ?? '—',
+    libelle: o.libelle as string,
+    type: o.type as OffreFournisseur['type'],
+    seuil_quantite: o.seuil_quantite === null ? null : Number(o.seuil_quantite),
+    seuil_unite: (o.seuil_unite as string) ?? null,
+    avantage: o.avantage === null ? null : Number(o.avantage),
+    date_debut: (o.date_debut as string) ?? null,
+    date_fin: (o.date_fin as string) ?? null,
+    releve_le: o.releve_le as string,
+  }))
+
   return (
     <AchatsClient
       articles={articles}
+      offres={offres}
       fournisseurs={(fournisseurs ?? []).map(f => ({
         id: f.id as string, nom: f.nom as string,
         email: (f.email as string) ?? null, actif: Boolean(f.actif),

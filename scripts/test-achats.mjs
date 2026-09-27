@@ -95,6 +95,28 @@ t('des promotions existent', promos.length > 100)
 t('⚠️ celles qui portent sur nos achats sont identifiables',
   promos.some(interessante) && promos.some(a => !interessante(a)))
 
+titre('Les offres conditionnelles des fournisseurs (0161)')
+// ⚠️ Recopie `joursRestants()`. Une offre « 2 achetés, 1 offert » ne se
+// convertit PAS en pourcentage : sous le seuil, l'avantage n'existe pas.
+const joursRestants = (fin, auj) => fin == null ? null
+  : Math.ceil((new Date(fin + 'T00:00:00Z') - auj) / 86400000)
+t('une offre qui finit demain reste 1 jour', joursRestants('2026-09-28', AUJ) === 1)
+t('⚠️ une offre finie rend un nombre NÉGATIF, pas null', joursRestants('2026-09-20', AUJ) < 0)
+t('une offre sans date de fin rend null', joursRestants(null, AUJ) === null)
+
+const offres = await sbTout('promotions_fournisseur?actif=eq.true&select=libelle,type,seuil_quantite,seuil_unite,avantage,date_fin,releve_le')
+t('des offres sont enregistrées', offres.length > 0)
+t('⚠️ chacune porte une DATE DE FIN — c’est ce qui manque aux badges Gineys',
+  offres.every(o => o.date_fin))
+t('⚠️ chacune porte sa CONDITION (seuil + unité)',
+  offres.every(o => o.seuil_quantite != null && o.seuil_unite))
+t('le type est explicite, jamais un pourcentage inventé',
+  offres.every(o => ['gratuite','remise_montant','remise_pct','prix_promo'].includes(o.type)))
+t('une gratuité n’a pas de montant de remise',
+  offres.filter(o => o.type === 'gratuite').every(o => o.avantage != null && o.avantage > 0))
+t('⚠️ `releve_le` dit quand NOUS avons regardé, pas la validité',
+  offres.every(o => o.releve_le && o.releve_le !== o.date_fin))
+
 titre('Les catégories')
 // ⚠️ On ne fusionne QUE la casse : « SECS » et « Sauce » viennent de deux
 // taxonomies et ne se rapprochent pas.

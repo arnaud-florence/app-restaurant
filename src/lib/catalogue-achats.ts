@@ -245,3 +245,43 @@ export function familles(articles: ArticleAchat[]): Array<{ nom: string | null; 
   if (sans) out.push({ nom: null, n: sans, variantes: [] })
   return out
 }
+
+
+// ─── Les offres conditionnelles d'un fournisseur (0161) ──────────────
+
+export type OffreFournisseur = {
+  id: string
+  fournisseur_nom: string
+  libelle: string
+  type: 'gratuite' | 'remise_montant' | 'remise_pct' | 'prix_promo'
+  seuil_quantite: number | null
+  seuil_unite: string | null
+  avantage: number | null
+  date_debut: string | null
+  date_fin: string | null
+  releve_le: string
+}
+
+/**
+ * Dans combien de jours l'offre se termine. NULL = elle ne le dit pas.
+ *
+ * ⚠️ NÉGATIF veut dire TERMINÉE. On ne masque pas une offre expirée — on
+ * l'affiche barrée : la faire disparaître laisserait croire qu'on n'a rien
+ * relevé, alors qu'on a relevé une offre qui a pris fin.
+ */
+export function joursRestants(o: Pick<OffreFournisseur, 'date_fin'>, aujourdhui = new Date()): number | null {
+  if (!o.date_fin) return null
+  return Math.ceil((new Date(o.date_fin + 'T00:00:00Z').getTime() - aujourdhui.getTime()) / 86_400_000)
+}
+
+/** Les offres, les plus urgentes d'abord ; les terminées à la fin. */
+export function offresTriees(offres: OffreFournisseur[], aujourdhui = new Date()): Array<OffreFournisseur & { restants: number | null; finie: boolean }> {
+  return offres
+    .map(o => {
+      const restants = joursRestants(o, aujourdhui)
+      return { ...o, restants, finie: restants !== null && restants < 0 }
+    })
+    .sort((a, b) =>
+      Number(a.finie) - Number(b.finie)
+      || (a.restants ?? 9999) - (b.restants ?? 9999))
+}

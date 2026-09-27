@@ -162,8 +162,9 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Catalogue du portail Gineys | 2 892 références, nos prix négociés vérifiés | 0158 |
 | Demander une remise | et savoir qu'on l'a déjà demandée | 0159 |
 | Bon de commande envoyable | il ne partait rien, et une ligne ne portait qu'un ingrédient | 0160 |
+| Promotions fournisseurs | offres conditionnelles ET datées | 0161 |
 
-**Migrations actuelles : 0001 → 0160.**
+**Migrations actuelles : 0001 → 0161.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2602,7 +2603,7 @@ kilo.
 1 000 lignes sur 3 303 et annoncerait un « moins cher » choisi dedans.
 
 Test : `PORT=3000 node scripts/test-achats.mjs` couvre les trois filtres et
-vérifie le contrôle croisé — 47 assertions.
+vérifie le contrôle croisé — 56 assertions.
 
 Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 ⚠️ Il RECOPIE les règles depuis le TS, et n'envoie AUCUN e-mail.
@@ -2758,6 +2759,51 @@ n'offre aucune colonne « Famille », et il n'y a pas d'export.
 l'identifiant pré-rempli. **On ne saisit ni ne valide jamais le mot de passe
 du gérant** : c'est lui qui rouvre la session, puis on relève.
 
+**Les offres conditionnelles des fournisseurs (0161).**
+`catalogue_fournisseur.remise_pct` décrit une remise sur le PRIX d'une
+référence — ce qu'affiche le portail Gineys. France Boissons fait autre
+chose, et ça ne rentre pas dans une colonne de pourcentage :
+
+> « Sprite — 2 caisses achetées, 1 caisse offerte »
+> « Schweppes Agrumes — pour 2 caisses achetées, 8 € HT de remise »
+> « Picon Bière — pour 1 bouteille achetée, 1,30 € HT de remise »
+> « Liqueur Menthe Pastille — 1,50 € HT de remise »
+
+⚠️ Ce sont des offres **CONDITIONNELLES** : l'avantage dépend d'une quantité
+achetée. Les écraser en « −x % » donnerait un prix unitaire faux pour qui
+n'atteint pas le seuil. D'où `promotions_fournisseur` (0161), qui garde le
+**type**, le **seuil** et l'**unité** tels qu'ils sont écrits chez eux.
+
+✅ **ET ELLES ONT UNE DATE DE FIN** — c'est ce qui manque cruellement aux
+badges du portail Gineys, qui ne disent jamais jusqu'à quand ils courent.
+L'écran affiche « encore 3 jours » ou « dernier jour », en rouge sous trois
+jours. Une offre terminée reste affichée, **barrée** : la faire disparaître
+laisserait croire qu'on n'a rien relevé, alors qu'on a relevé une offre qui
+a pris fin.
+
+⚠️ `releve_le` n'est PAS `date_debut` : c'est le jour où NOUS avons regardé.
+Une promotion parue depuis n'est pas dans la table, et rien dans les données
+ne le signalerait.
+
+⚠️⚠️ **ON NE TOUCHE PAS AU PANIER D'EAZLE.** Le 27/09/2026 il contenait
+**63 articles** préparés par le gérant. Les prix REMISÉS de France Boissons
+n'apparaissent qu'à la simulation du panier (cf. le relevé de coûts du
+21/09) — mais simuler suppose d'ajouter puis de retirer des lignes. Sur un
+panier préparé, c'est exclu : on relève les OFFRES telles qu'affichées, pas
+les prix. ⚠️ Et la pastille du panier se lit mal en vignette : à 0,5 de
+réduction, « 63 » ressemble à « 0 ». Vérifier en pleine résolution avant de
+conclure que le panier est vide.
+
+⚠️ **Toutes ces offres se terminent le 30/09/2026 alors que la première
+livraison est le JEUDI 1er OCTOBRE** (seuls jours proposés par Eazle). À
+confirmer avec eux qu'une commande passée avant le 30 en bénéficie — sinon
+aucune n'est utilisable, et c'est le genre de détail qui se découvre sur la
+facture.
+
+Relevé : `node scripts/promos-france-boissons.mjs [--ecrire]` — les offres y
+sont recopiées telles qu'affichées, avec leurs dates. Idempotent par
+(fournisseur, libellé, date de relevé).
+
 ⚠️⚠️ **LES PROMOTIONS FRANCE BOISSONS DÉPENDENT DE LA DATE DE LIVRAISON.**
 `eazle.france-boissons.fr/promotions` répond, le 27/09/2026 :
 « Aucune promotion à la date du 27 septembre 2026. Modifiez votre date de
@@ -2837,7 +2883,7 @@ deux appels identiques rendent la même réponse, même si la page a changé
 entre-temps. Une heure perdue à croire que les clics ne passaient pas, alors
 qu'ils passaient tous. `get_page_text` et les captures, eux, sont frais.
 
-Test : `PORT=3000 node scripts/test-achats.mjs` — 47 assertions. ⚠️ Il
+Test : `PORT=3000 node scripts/test-achats.mjs` — 56 assertions. ⚠️ Il
 RECOPIE les règles depuis le TS ; modifier les deux ensemble. Et il vérifie
 que la page est **fermée aux appels anonymes** : elle expose des conditions
 négociées.

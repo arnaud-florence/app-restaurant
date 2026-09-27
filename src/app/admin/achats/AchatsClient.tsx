@@ -3,7 +3,9 @@
 import { useMemo, useState, useTransition } from 'react'
 import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
+  offresTriees,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
+  type OffreFournisseur,
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
@@ -17,8 +19,8 @@ type Onglet = 'promos' | 'catalogue'
 const PAR_PAGE = 60
 
 export default function AchatsClient({
-  articles, fournisseurs,
-}: { articles: ArticleAchat[]; fournisseurs: Fournisseur[] }) {
+  articles, offres, fournisseurs,
+}: { articles: ArticleAchat[]; offres: OffreFournisseur[]; fournisseurs: Fournisseur[] }) {
   const promos = useMemo(() => promotions(articles), [articles])
   const [onglet, setOnglet] = useState<Onglet>(promos.length ? 'promos' : 'catalogue')
   const [f, setF] = useState<Filtres>(FILTRES_VIDES)
@@ -93,7 +95,7 @@ export default function AchatsClient({
       </div>
 
       {onglet === 'promos'
-        ? <Promos promos={promos} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
+        ? <Promos promos={promos} offres={offres} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
         : (
           <>
             {/* ─── Recherche et filtres ───────────────────────── */}
@@ -197,34 +199,38 @@ const ETAT_FRAICHEUR: Record<Fraicheur, { texte: string; classe: string }> = {
 }
 
 function Promos({
-  promos, parCle, ouvert, setOuvert,
+  promos, offres, parCle, ouvert, setOuvert,
 }: {
   promos: ReturnType<typeof promotions>
+  offres: OffreFournisseur[]
   parCle: Map<string, ArticleAchat[]>
   ouvert: string | null
   setOuvert: (c: string | null) => void
 }) {
-  if (!promos.length) {
+  const lesOffres = useMemo(() => offresTriees(offres), [offres])
+  if (!promos.length && !lesOffres.length) {
     return <p className="py-12 text-center text-sm text-zinc-500">
       Aucune promotion relevée. Elles arrivent au prochain relevé du portail fournisseur.
     </p>
   }
   const interessantes = promos.filter(p => p.interessante)
   const autres = promos.filter(p => !p.interessante)
-  const plusVieux = Math.max(...promos.map(p => p.age))
+  const plusVieux = promos.length ? Math.max(...promos.map(p => p.age)) : 0
 
   return (
     <div>
+      <Offres offres={lesOffres} />
+
       {/* ⚠️ Une promo ne dit pas sa date de péremption. Affichée trois mois
           plus tard, elle fait commander au tarif plein en croyant profiter
           d'une affaire. On ne les masque pas — on dit leur âge. */}
-      <div className={`mb-4 rounded-xl border p-3 text-sm ${
+      {promos.length > 0 && <div className={`mb-4 rounded-xl border p-3 text-sm ${
         plusVieux > 30 ? 'border-red-300 bg-red-50 text-red-800' : 'border-zinc-200 bg-zinc-50 text-zinc-700'}`}>
         <strong>Ces remises datent du dernier relevé</strong>, il y a {plusVieux} jour{plusVieux > 1 ? 's' : ''}.
         {plusVieux > 30
           ? ' Une promotion ne dure pas un mois : à revérifier chez le fournisseur avant de commander.'
           : ' Les fournisseurs n’ont pas d’API — elles se rafraîchissent au relevé suivant.'}
-      </div>
+      </div>}
 
       {interessantes.length > 0 && (
         <>
@@ -247,6 +253,53 @@ function Promos({
         {autres.slice(0, 40).map(p => <CartePromo key={p.id} p={p} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />)}
       </div>
     </div>
+  )
+}
+
+/**
+ * Les offres CONDITIONNELLES d'un fournisseur — « 2 achetés, 1 offert ».
+ *
+ * ⚠️ Elles ne se convertissent pas en pourcentage : sous le seuil,
+ * l'avantage n'existe pas. On affiche donc la CONDITION telle qu'elle est
+ * écrite chez le fournisseur.
+ *
+ * ⚠️ Une offre TERMINÉE reste affichée, barrée. La faire disparaître
+ * laisserait croire qu'on n'a rien relevé, alors qu'on a relevé une offre
+ * qui a pris fin — et c'est une information utile : elle reviendra peut-être.
+ */
+function Offres({ offres }: { offres: ReturnType<typeof offresTriees> }) {
+  if (!offres.length) return null
+  const releve = offres[0].releve_le
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+        Offres des fournisseurs ({offres.length})
+      </h2>
+      <p className="mb-2 text-[12px] text-zinc-500">
+        Conditionnelles : l&apos;avantage dépend d&apos;une quantité achetée.
+        Relevé du {releve.split('-').reverse().join('/')}.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {offres.map(o => (
+          <div key={o.id}
+            className={`rounded-xl border p-3 ${o.finie ? 'border-zinc-200 bg-zinc-50' : 'border-emerald-300 bg-emerald-50'}`}>
+            <p className={`text-sm font-medium ${o.finie ? 'text-zinc-400 line-through' : 'text-zinc-900'}`}>
+              {o.libelle}
+            </p>
+            <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-[11px]">
+              <span className="text-zinc-500">{o.fournisseur_nom}</span>
+              {o.restants === null
+                ? <span className="text-zinc-400">sans date de fin</span>
+                : o.finie
+                  ? <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-zinc-600">terminée le {o.date_fin!.split('-').reverse().join('/')}</span>
+                  : <span className={`rounded px-1.5 py-0.5 font-medium ${o.restants <= 3 ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
+                      {o.restants === 0 ? 'dernier jour' : `encore ${o.restants} jour${o.restants > 1 ? 's' : ''}`}
+                    </span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
