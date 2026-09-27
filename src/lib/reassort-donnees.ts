@@ -27,7 +27,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, fournisseur_id, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
-      .select('id, nom, unite, prix_achat_ht, prix_estime, fournisseur_principal, stock_minimum, stock_cible')
+      .select('id, nom, unite, prix_achat_ht, prix_estime, fournisseur_principal, reference_fournisseur, stock_minimum, stock_cible')
       .eq('actif', true).eq('stocke', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('inventaires')
       .select('cible_id, date_inventaire, quantite').order('date_inventaire', { ascending: false }).order('cible_id')),
@@ -79,6 +79,30 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     dateVue.set(rid, d)
     const nom = nomF.get(f.fournisseur_id as string)
     if (nom) fournisseurDeProduit.set(rid, { id: f.fournisseur_id as string, nom, source: 'facture' })
+  }
+
+  // ⚠️ LA DERNIÈRE FOIS QU'ON L'A ACHETÉ. Un prix sans date ne dit pas
+  // s'il vaut encore : celui du beurre de la semaine dernière et celui
+  // d'une facture de mai ne s'engagent pas de la même façon.
+  const dernierAchat = new Map<string, string>()
+  for (const l of lignesFacture) {
+    const fa = parId.get(l.facture_id as string)
+    if (!fa || fa.type_document === 'avoir') continue
+    const d = (fa.date_emission as string) ?? ''
+    const k = l.recette_id as string
+    if (!d || (dernierAchat.get(k) ?? '') > d) continue
+    dernierAchat.set(k, d)
+  }
+  const lignesFactureMatiere = await lireTout<Record<string, unknown>>(() => sb
+    .from('facture_lignes').select('ingredient_id, facture_id')
+    .not('ingredient_id', 'is', null).order('id'))
+  for (const l of lignesFactureMatiere) {
+    const fa = parId.get(l.facture_id as string)
+    if (!fa || fa.type_document === 'avoir') continue
+    const d = (fa.date_emission as string) ?? ''
+    const k = l.ingredient_id as string
+    if (!d || (dernierAchat.get(k) ?? '') > d) continue
+    dernierAchat.set(k, d)
   }
 
   const parReference = new Map<string, string>()
@@ -181,6 +205,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       })(),
       cible_id: p.id as string,
       ailleurs: membres.map(m => meilleurPour.get(m.id as string)).find(Boolean) ?? null,
+      reference: (membres.map(m => m.reference_fournisseur as string | null).find(Boolean)) ?? null,
+      dernier_achat: membres.map(m => dernierAchat.get(m.id as string)).find(Boolean) ?? null,
     })
   }
 
@@ -218,6 +244,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       fournisseur_id: f.nom ? (idFournisseur.get(f.nom) ?? null) : null,
       cible_id: m.id as string,
       ailleurs: meilleurPour.get(m.id as string) ?? null,
+      reference: (m.reference_fournisseur as string) ?? null,
+      dernier_achat: dernierAchat.get(m.id as string) ?? null,
     })
   }
 

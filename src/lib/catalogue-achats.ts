@@ -474,3 +474,114 @@ export function manques(e: EtatPlateforme, matieresSansOffre: number): Manque[] 
 
   return m
 }
+
+// ─── NOTRE CATALOGUE D'ACHAT ────────────────────────────────────────────
+//
+// `/admin/achats` répond à « qui vend ça, et à quel prix ». Il ne répondait
+// pas à la question la plus quotidienne : **qu'est-ce que NOUS achetons,
+// chez qui, à quel prix, sous quelle référence**. L'information existait —
+// éparpillée entre `/admin/ingredients`, `/admin/recettes`,
+// `/admin/reassort` et les factures — donc introuvable d'un coup d'œil.
+
+export type ArticleAchete = {
+  cle: string
+  nom: string
+  /** Matière première, ou famille du produit revendu. */
+  categorie: string | null
+  /** L'étage : Fournil, bar, restauration. */
+  etablissement: string | null
+  unite: string | null
+  fournisseur: string | null
+  /** Ce qu'on cite au fournisseur pour commander. */
+  reference: string | null
+  prix: number | null
+  /** ⚠️ Le prix est une HYPOTHÈSE, pas un relevé (0165). */
+  estime: boolean
+  /** Dernière facture où la référence apparaît. */
+  dernier_achat: string | null
+  /** Moins cher ailleurs, quand la comparaison tient. */
+  ailleurs: { fournisseur: string; ecartPct: number } | null
+}
+
+export type FiltresAchete = {
+  requete: string
+  fournisseur?: string | null
+  /** Ne montrer que ce dont le prix est une estimation. */
+  estimeSeul: boolean
+  /** Ne montrer que ce qui n'a ni prix ni fournisseur. */
+  incompletSeul: boolean
+}
+
+export const FILTRES_ACHETE_VIDES: FiltresAchete = {
+  requete: '', fournisseur: undefined, estimeSeul: false, incompletSeul: false,
+}
+
+/**
+ * ⚠️ Une ligne est INCOMPLÈTE s'il lui manque le prix OU le fournisseur.
+ * Ce sont les deux seules choses sans lesquelles on ne peut pas commander :
+ * l'une dit combien ça coûte, l'autre à qui écrire. La référence, elle,
+ * se retrouve — un commercial sait reconnaître son produit par son nom.
+ */
+export function acheteIncomplet(a: ArticleAchete): boolean {
+  return a.prix == null || !a.fournisseur
+}
+
+export function filtrerAchetes(articles: ArticleAchete[], f: FiltresAchete): ArticleAchete[] {
+  const mots = motsCles(f.requete)
+  return articles.filter(a => {
+    if (f.fournisseur !== undefined && (a.fournisseur ?? null) !== f.fournisseur) return false
+    if (f.estimeSeul && !a.estime) return false
+    if (f.incompletSeul && !acheteIncomplet(a)) return false
+    if (!mots.length) return true
+    // Tous les mots, en préfixe — un « ou » rendrait la moitié de la liste.
+    const foin = motsCles(`${a.nom} ${a.reference ?? ''} ${a.categorie ?? ''}`)
+    return mots.every(m => foin.some(h => h.startsWith(m)))
+  })
+}
+
+export type BilanAchats = {
+  references: number
+  avecPrix: number
+  sansPrix: number
+  avecReference: number
+  estimes: number
+  releves: number
+  incomplets: number
+  /** Ce que vaut une reconstitution complète, sur les prix CONNUS. */
+  valeurConnue: number
+}
+
+export function bilanAchats(articles: ArticleAchete[]): BilanAchats {
+  return {
+    references: articles.length,
+    avecPrix: articles.filter(a => a.prix != null).length,
+    sansPrix: articles.filter(a => a.prix == null).length,
+    avecReference: articles.filter(a => a.reference).length,
+    estimes: articles.filter(a => a.prix != null && a.estime).length,
+    releves: articles.filter(a => a.prix != null && !a.estime).length,
+    incomplets: articles.filter(acheteIncomplet).length,
+    valeurConnue: 0,   // sans quantité, un total n'aurait pas de sens
+  }
+}
+
+/** Regroupement par fournisseur — l'ordre dans lequel on passe commande. */
+export function achetesParFournisseur(articles: ArticleAchete[]): Array<{
+  fournisseur: string | null; articles: ArticleAchete[]; estimes: number
+}> {
+  const m = new Map<string, ArticleAchete[]>()
+  for (const a of articles) {
+    const k = a.fournisseur ?? '\u0000'
+    if (!m.has(k)) m.set(k, [])
+    m.get(k)!.push(a)
+  }
+  return [...m.entries()]
+    .map(([k, as]) => ({
+      fournisseur: k === '\u0000' ? null : k,
+      articles: as.sort((x, y) => (x.nom < y.nom ? -1 : 1)),
+      estimes: as.filter(a => a.estime && a.prix != null).length,
+    }))
+    // ⚠️ « Sans fournisseur » en DERNIER, jamais masqué : ce sont les
+    // références qu'on ne sait pas commander, donc celles à traiter.
+    .sort((a, b) => (a.fournisseur === null ? 1 : b.fournisseur === null ? -1
+      : b.articles.length - a.articles.length))
+}

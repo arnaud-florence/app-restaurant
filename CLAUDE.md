@@ -69,7 +69,7 @@ Chaque écran (ops) affiche en haut un `<BriefingPoste />` personnalisé (`src/l
 /admin/formation               → Module 27 (guides, fiches poste, quiz)
 /admin/securite                → Module 28 (RBAC, 2FA, journal d'audit, sauvegardes)
 /admin/tarifs-fournisseurs     → comparaison des tarifs (0151)
-/admin/achats                  → plateforme d'achat, 3 392 références (0158, 0159)
+/admin/achats                  → plateforme d'achat : 3 392 réfs fournisseurs + NOTRE catalogue d'achat (0158, 0159)
 /admin/reassort                → stock, seuils, cibles, ce qu'il faut commander (0163)
 ```
 
@@ -3582,6 +3582,59 @@ raccourci qui tenait tant qu'aucune matière « coppa » n'existait. La règle
 (« la coppa n'est pas du serrano ») n'a pas bougé ; c'est sa mesure qui
 était devenue trop large.
 
+### 🧺 Notre catalogue d'achat — l'onglet qui manquait (27/09/2026)
+
+`/admin/achats` répondait à « qui vend ça, et à quel prix ». Il ne répondait
+pas à la question la plus quotidienne : **qu'est-ce que NOUS achetons, chez
+qui, à quel prix, sous quelle référence**. L'information existait —
+éparpillée entre `/admin/ingredients`, `/admin/recettes`, `/admin/reassort`
+et les factures — donc introuvable d'un coup d'œil, donc jamais consultée
+avant de passer commande.
+
+**193 références d'achat** : 93 matières premières + 100 produits revendus
+regroupés par matière. Recherche par nom ou par référence, filtre par
+fournisseur, groupement par fournisseur — l'ordre dans lequel on commande.
+
+⚠️ **Les lignes viennent de `chargerLignesReassort()`**, la même
+construction que `/admin/reassort` et que l'agent Stock. Une deuxième
+finirait par afficher un autre prix, et c'est celui qu'on lit qui décide.
+
+⚠️ **UN PRIX ESTIMÉ EST COMPTÉ À PART, jamais fondu dans « avec un prix »**
+(0165) : **122 relevés, 55 estimés**. Un prix qui a servi à bâtir la carte
+n'a jamais été facturé ; le présenter comme mesuré fausse une négociation
+dans les deux sens.
+
+⚠️ **« Incomplet » = pas de prix OU pas de fournisseur** — les deux seules
+choses sans lesquelles on ne peut pas commander. La référence, elle, se
+retrouve : un commercial reconnaît son produit par son nom. **43
+incomplètes**, surlignées, jamais masquées.
+
+⚠️ « Sans fournisseur » passe en DERNIER et n'est jamais masqué : ce sont
+les références qu'on ne sait pas commander, donc celles à traiter.
+
+**Les codes article retrouvés au portail** — `node
+scripts/references-depuis-portail.mjs [--ecrire]`. La colonne « Référence »
+affichait « à relever » presque partout : `recettes.reference_fournisseur`
+était vide et **les 134 lignes de facture déjà scannées n'en portent
+aucune** (elle n'était pas extraite avant la 0142). Le portail, lui, en a
+2 885. **25 codes récupérés**, de 44 à **68 références renseignées**.
+
+⚠️ **Le rapprochement est EXACT, pas approchant** : on exige que le
+`libelle_achat` — le texte LITTÉRAL du fournisseur (0131) — soit identique à
+la désignation du portail, casse, accents et ponctuation neutralisés. Aucune
+racine de cinq lettres ici : une référence fausse passe AVANT le nom au
+rapprochement des factures (0142), donc elle se trompe en silence et pour
+toujours.
+
+⚠️ **UN VRAI CODE GINEYS EST NUMÉRIQUE.**
+`catalogue_fournisseur.reference` porte aussi des LIBELLÉS, utilisés comme
+clé d'upsert par les lignes tirées des factures (0152) : les prendre pour
+des codes écrirait un paragraphe entier là où un commercial attend sept
+chiffres.
+
+⚠️ Deux désignations qui se normalisent pareil pour deux codes différents
+sont ÉCARTÉES : on ne tire pas au sort un identifiant.
+
 ### « Inconnu » tranché en « tarif public » — décision du gérant (27/09/2026)
 
 **2 412 références étaient en remise INCONNUE, toutes du portail Gineys.**
@@ -5573,6 +5626,7 @@ node scripts/import-devis-felix-potin.mjs      # devis → catalogue tarifaire, 
 node scripts/rapprocher-tarifs-felix-potin.mjs # liens tarif ↔ nos matières, essai à blanc
 node scripts/rattacher-devis-matieres.mjs      # tarifs → fournisseur attitré (essai à blanc)
 node scripts/demande-tarif-frais.mjs           # ce que personne ne vend — à faire chiffrer
+node scripts/references-depuis-portail.mjs     # codes article Gineys (essai à blanc)
 node scripts/preciser-unites-matieres.mjs      # unités de stock : faire dire leur poids
 node scripts/catalogue-depuis-factures.mjs     # Gineys/Promocash depuis nos factures
 node scripts/catalogue-france-boissons.mjs     # tarif FB + Lavazza rattaché à son canal

@@ -51,6 +51,10 @@ export type LigneReassort = {
    * opposer un colis à une pièce annonce « −97 % » sur des serviettes.
    */
   ailleurs?: { fournisseur_id: string; fournisseur: string; ecartPct: number } | null
+  /** La référence CHEZ LE FOURNISSEUR — ce qu'on lui cite pour commander. */
+  reference?: string | null
+  /** Date de la dernière facture où cette référence apparaît. */
+  dernier_achat?: string | null
 }
 
 /**

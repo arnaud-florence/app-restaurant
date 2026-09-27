@@ -10,7 +10,9 @@ import { lireTout } from '@/lib/supabase/pagine'
 import {
   etatPlateforme, manques,
   type ArticleAchat, type OffreFournisseur, type GroupeComparaison,
+  type ArticleAchete,
 } from '@/lib/catalogue-achats'
+import { chargerLignesReassort } from '@/lib/reassort-donnees'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import AchatsClient from './AchatsClient'
 
@@ -128,9 +130,29 @@ export default async function AchatsPage() {
   }))
   const etat = etatPlateforme(articles, offres, fourns, groupes)
 
+  // ⚠️ NOTRE catalogue d'achat, celui des 193 références qu'on achète
+  // vraiment — à ne pas confondre avec les 3 392 que les fournisseurs
+  // proposent. Il vient de `chargerLignesReassort()`, la même construction
+  // que `/admin/reassort` et que l'agent Stock : une deuxième finirait par
+  // afficher un autre prix, et c'est celui qu'on lit qui décide.
+  const achetes: ArticleAchete[] = (await chargerLignesReassort(sb)).map(l => ({
+    cle: l.cle,
+    nom: l.nom,
+    categorie: l.categorie,
+    etablissement: l.etablissement,
+    unite: l.unite,
+    fournisseur: l.fournisseur,
+    reference: l.reference ?? null,
+    prix: l.cout_unitaire_ht,
+    estime: Boolean(l.estime),
+    dernier_achat: l.dernier_achat ?? null,
+    ailleurs: l.ailleurs ? { fournisseur: l.ailleurs.fournisseur, ecartPct: l.ailleurs.ecartPct } : null,
+  }))
+
   return (
     <AchatsClient
       etat={etat}
+      achetes={achetes}
       manques={manques(etat, matieresSansOffre)}
       matieresSuivies={(matieres ?? []).length}
       matieresCouvertes={(matieres ?? []).length - matieresSansOffre}

@@ -4,14 +4,17 @@ import { useMemo, useState, useTransition } from 'react'
 import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
   offresTriees,
+  filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
+  FILTRES_ACHETE_VIDES,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
   type OffreFournisseur, type EtatPlateforme, type Manque,
+  type ArticleAchete, type FiltresAchete,
 } from '@/lib/catalogue-achats'
 import { fmtPrix } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
 
 type Fournisseur = { id: string; nom: string; email: string | null; actif: boolean }
-type Onglet = 'promos' | 'catalogue' | 'etat'
+type Onglet = 'promos' | 'achetes' | 'catalogue' | 'etat'
 
 /** ⚠️ 3 300 lignes ne se rendent pas d'un bloc : sur la tablette du comptoir,
  *  chaque frappe coûterait plusieurs secondes. Une page à la fois, et le
@@ -19,11 +22,12 @@ type Onglet = 'promos' | 'catalogue' | 'etat'
 const PAR_PAGE = 60
 
 export default function AchatsClient({
-  articles, offres, fournisseurs, etat, manques, matieresSuivies, matieresCouvertes,
+  articles, offres, fournisseurs, etat, manques, matieresSuivies, matieresCouvertes, achetes,
 }: {
   articles: ArticleAchat[]; offres: OffreFournisseur[]; fournisseurs: Fournisseur[]
   etat: EtatPlateforme; manques: Manque[]
   matieresSuivies: number; matieresCouvertes: number
+  achetes: ArticleAchete[]
 }) {
   const promos = useMemo(() => promotions(articles), [articles])
   const [onglet, setOnglet] = useState<Onglet>(promos.length ? 'promos' : 'catalogue')
@@ -93,6 +97,9 @@ export default function AchatsClient({
         <Onglets actif={onglet === 'promos'} onClick={() => setOnglet('promos')}>
           🔥 Promos du moment <Compteur n={promos.length} />
         </Onglets>
+        <Onglets actif={onglet === 'achetes'} onClick={() => setOnglet('achetes')}>
+          🧺 Ce que nous achetons <Compteur n={achetes.length} />
+        </Onglets>
         <Onglets actif={onglet === 'catalogue'} onClick={() => setOnglet('catalogue')}>
           📚 Catalogue <Compteur n={articles.length} />
         </Onglets>
@@ -101,7 +108,9 @@ export default function AchatsClient({
         </Onglets>
       </div>
 
-      {onglet === 'etat'
+      {onglet === 'achetes'
+        ? <Achetes articles={achetes} />
+        : onglet === 'etat'
         ? <Etat etat={etat} manques={manques} suivies={matieresSuivies} couvertes={matieresCouvertes} />
         : onglet === 'promos'
         ? <Promos promos={promos} offres={offres} parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
@@ -707,5 +716,132 @@ function Nature({ nature, n }: { nature: string; n: number }) {
     <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${v.classe}`}>
       {v.texte} {n.toLocaleString('fr-FR')}
     </span>
+  )
+}
+
+/* ═══ NOTRE CATALOGUE D'ACHAT ════════════════════════════════════════════
+ *
+ * Les 193 références qu'on achète VRAIMENT — à ne pas confondre avec les
+ * 3 392 que les fournisseurs proposent. L'information existait, éparpillée
+ * entre quatre écrans : introuvable d'un coup d'œil, donc jamais consultée
+ * avant de passer commande.
+ */
+function Achetes({ articles }: { articles: ArticleAchete[] }) {
+  const [f, setF] = useState<FiltresAchete>(FILTRES_ACHETE_VIDES)
+  const trouves = useMemo(() => filtrerAchetes(articles, f), [articles, f])
+  const b = useMemo(() => bilanAchats(articles), [articles])
+  const groupes = useMemo(() => achetesParFournisseur(trouves), [trouves])
+  const fournisseurs = useMemo(
+    () => [...new Set(articles.map(a => a.fournisseur).filter(Boolean))].sort() as string[],
+    [articles])
+
+  return (
+    <div className="space-y-4 pb-16">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <Carte n={b.references} libelle="références achetées" />
+        <Carte n={b.releves} libelle="prix relevés" accent="text-emerald-700" sous="facture ou relevé" />
+        {/* ⚠️ Un prix estimé n'est pas un prix : il a servi à bâtir la carte,
+            il n'a jamais été facturé. Le fondre dans « avec un prix » ferait
+            passer une hypothèse pour une mesure (0165). */}
+        <Carte n={b.estimes} libelle="prix estimés" accent="text-amber-700" sous="jamais facturés" />
+        <Carte n={b.avecReference} libelle="avec référence" sous="à citer au fournisseur" />
+        <Carte n={b.incomplets} libelle="incomplètes"
+          accent={b.incomplets ? 'text-red-700' : 'text-zinc-400'} sous="ni prix, ni fournisseur" />
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="search" value={f.requete}
+          onChange={e => setF(x => ({ ...x, requete: e.target.value }))}
+          placeholder="Rechercher un produit, une référence…"
+          className="h-11 min-w-[220px] flex-1 rounded-lg border border-zinc-300 px-3 outline-none focus:border-zinc-900" />
+        <select
+          value={f.fournisseur === undefined ? '' : f.fournisseur === null ? '·' : f.fournisseur}
+          onChange={e => setF(x => ({
+            ...x,
+            fournisseur: e.target.value === '' ? undefined : e.target.value === '·' ? null : e.target.value,
+          }))}
+          className="h-11 rounded-lg border border-zinc-300 px-2 text-sm">
+          <option value="">Tous les fournisseurs</option>
+          {fournisseurs.map(n => <option key={n} value={n}>{n}</option>)}
+          <option value="·">— sans fournisseur</option>
+        </select>
+        <Onglets actif={f.estimeSeul} onClick={() => setF(x => ({ ...x, estimeSeul: !x.estimeSeul }))}>
+          Prix estimés ({b.estimes})
+        </Onglets>
+        <Onglets actif={f.incompletSeul} onClick={() => setF(x => ({ ...x, incompletSeul: !x.incompletSeul }))}>
+          Incomplètes ({b.incomplets})
+        </Onglets>
+      </div>
+
+      <p className="text-sm text-zinc-500">
+        {trouves.length.toLocaleString('fr-FR')} référence(s) affichée(s) sur {articles.length}
+      </p>
+
+      {groupes.map(g => (
+        <section key={g.fournisseur ?? '—'} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+          <h3 className="flex flex-wrap items-baseline gap-x-3 border-b border-zinc-200 bg-zinc-50 px-4 py-2">
+            <span className="font-bold text-zinc-900">
+              {g.fournisseur ?? '⚠️ Sans fournisseur connu'}
+            </span>
+            <span className="text-xs text-zinc-500">{g.articles.length} référence(s)</span>
+            {g.estimes > 0 && (
+              <span className="text-xs text-amber-700">{g.estimes} prix estimé(s)</span>
+            )}
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wider text-zinc-400">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">Produit</th>
+                  <th className="px-3 py-2 text-left font-medium">Référence</th>
+                  <th className="px-3 py-2 text-right font-medium">Prix d’achat</th>
+                  <th className="px-3 py-2 text-left font-medium">Unité</th>
+                  <th className="px-3 py-2 text-left font-medium">Dernier achat</th>
+                  <th className="px-4 py-2 text-left font-medium">Ailleurs</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {g.articles.map(a => (
+                  <tr key={a.cle} className={acheteIncomplet(a) ? 'bg-red-50/40' : undefined}>
+                    <td className="px-4 py-2">
+                      <span className="font-medium text-zinc-900">{a.nom}</span>
+                      {a.etablissement && <span className="ml-2 text-[11px] text-zinc-400">{a.etablissement}</span>}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-zinc-600">
+                      {/* ⚠️ Sans référence, le commercial cherche le produit
+                          par son nom — et peut en servir un autre. */}
+                      {a.reference ?? <span className="text-amber-700">à relever</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {a.prix == null
+                        ? <span className="font-medium text-red-700">inconnu</span>
+                        : <>
+                            <span className={a.estime ? 'text-amber-800' : 'text-zinc-900'}>{fmtPrix(a.prix)}</span>
+                            {a.estime && <span className="ml-1 text-[11px] text-amber-700">estimé</span>}
+                          </>}
+                    </td>
+                    <td className="px-3 py-2 text-zinc-500">{a.unite ?? '—'}</td>
+                    <td className="px-3 py-2 tabular-nums text-zinc-500">
+                      {a.dernier_achat ?? <span className="text-zinc-400">jamais</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {a.ailleurs
+                        ? <span className="font-medium text-violet-700">
+                            −{Math.round(a.ailleurs.ecartPct)} % chez {a.ailleurs.fournisseur}
+                          </span>
+                        : <span className="text-zinc-300">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+
+      {groupes.length === 0 && (
+        <p className="py-12 text-center text-sm text-zinc-500">Aucune référence ne correspond.</p>
+      )}
+    </div>
   )
 }

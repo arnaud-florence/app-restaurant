@@ -342,5 +342,85 @@ console.log('\n── Ce qui manque est DIT, avec sa conséquence ──')
   t('une plateforme sans trou ne liste que l\'absence d\'API', manques(parfait, 0).length === 1)
 }
 
+// ═══ NOTRE CATALOGUE D'ACHAT ═══════════════════════════════════════════
+// ⚠️ RECOPIE de `acheteIncomplet()` / `filtrerAchetes()` / `bilanAchats()` /
+// `achetesParFournisseur()` (src/lib/catalogue-achats.ts).
+const acheteIncomplet = a => a.prix == null || !a.fournisseur
+const filtrerAchetes = (arts, f) => {
+  const mots = motsCles(f.requete)
+  return arts.filter(a => {
+    if (f.fournisseur !== undefined && (a.fournisseur ?? null) !== f.fournisseur) return false
+    if (f.estimeSeul && !a.estime) return false
+    if (f.incompletSeul && !acheteIncomplet(a)) return false
+    if (!mots.length) return true
+    const foin = motsCles(`${a.nom} ${a.reference ?? ''} ${a.categorie ?? ''}`)
+    return mots.every(m => foin.some(h => h.startsWith(m)))
+  })
+}
+const bilanAchats = arts => ({
+  references: arts.length,
+  avecPrix: arts.filter(a => a.prix != null).length,
+  sansPrix: arts.filter(a => a.prix == null).length,
+  avecReference: arts.filter(a => a.reference).length,
+  estimes: arts.filter(a => a.prix != null && a.estime).length,
+  releves: arts.filter(a => a.prix != null && !a.estime).length,
+  incomplets: arts.filter(acheteIncomplet).length,
+})
+const achetesParFournisseur = arts => {
+  const m = new Map()
+  for (const a of arts) { const k = a.fournisseur ?? '\u0000'; if (!m.has(k)) m.set(k, []); m.get(k).push(a) }
+  return [...m.entries()].map(([k, as]) => ({
+    fournisseur: k === '\u0000' ? null : k,
+    articles: as.sort((x, y) => (x.nom < y.nom ? -1 : 1)),
+    estimes: as.filter(a => a.estime && a.prix != null).length,
+  })).sort((a, b) => (a.fournisseur === null ? 1 : b.fournisseur === null ? -1
+    : b.articles.length - a.articles.length))
+}
+
+const A = o => ({
+  cle: o.cle ?? 'k', nom: o.nom ?? 'X', categorie: o.cat ?? null, etablissement: null,
+  unite: o.unite ?? 'kg', fournisseur: o.f === undefined ? 'Gineys' : o.f,
+  reference: o.ref ?? null, prix: o.prix === undefined ? 5 : o.prix,
+  estime: Boolean(o.estime), dernier_achat: o.le ?? null, ailleurs: null,
+})
+
+const FV = { requete: '', fournisseur: undefined, estimeSeul: false, incompletSeul: false }
+
+titre('Notre catalogue d’achat')
+{
+  const arts = [
+    A({ cle: 'a', nom: 'Beurre doux', ref: '0067807', prix: 8, le: '2026-08-20' }),
+    A({ cle: 'b', nom: 'Burrata 125 g', f: 'Félix Potin', prix: 1.55, estime: true }),
+    A({ cle: 'c', nom: 'Tomates', f: null, prix: null }),
+    A({ cle: 'd', nom: 'Roquette', f: null, prix: 12, estime: true }),
+  ]
+  const b = bilanAchats(arts)
+  t('⚠️ un prix ESTIMÉ est compté à part d’un prix relevé', b.releves === 1 && b.estimes === 2)
+  t('un prix inconnu n’est ni l’un ni l’autre', b.sansPrix === 1 && b.releves + b.estimes === 3)
+  t('⚠️ incomplet = pas de prix OU pas de fournisseur',
+    b.incomplets === 2)
+  t('la référence est comptée séparément — elle se retrouve, un prix non',
+    b.avecReference === 1)
+
+  t('la recherche trouve par le NOM', filtrerAchetes(arts, { ...FV, requete: 'beurre' }).length === 1)
+  t('et par la RÉFÉRENCE — c’est ce qu’on lit sur la facture',
+    filtrerAchetes(arts, { ...FV, requete: '0067807' }).length === 1)
+  t('⚠️ TOUS les mots, pas un seul : « beurre tomate » ne rend rien',
+    filtrerAchetes(arts, { ...FV, requete: 'beurre tomate' }).length === 0)
+  t('le filtre « sans fournisseur » se distingue de « tous »',
+    filtrerAchetes(arts, { ...FV, fournisseur: null }).length === 2)
+  t('le filtre « estimés » ne garde que les hypothèses',
+    filtrerAchetes(arts, { ...FV, estimeSeul: true }).every(a => a.estime))
+
+  const g = achetesParFournisseur(arts)
+  t('⚠️ « sans fournisseur » passe en DERNIER, jamais masqué',
+    g[g.length - 1].fournisseur === null)
+  t('et il porte bien les deux références concernées',
+    g[g.length - 1].articles.length === 2)
+  t('le plus gros fournisseur d’abord', g[0].articles.length >= g[1].articles.length)
+  t('les articles sont triés par nom dans chaque groupe',
+    g[g.length - 1].articles[0].nom === 'Roquette' || g[g.length - 1].articles[0].nom === 'Tomates')
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)
