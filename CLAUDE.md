@@ -2722,6 +2722,71 @@ Gineys : leur portail les range en **21 rayons** (ACCOMPAGNEMENT, B.O.F.,
 ÉPICERIE, VIANDE, VIENNOISERIE…), mais le relevé du 26/09 n'avait capté que
 le libellé et le prix.
 
+✅ **RÉSOLU AUTREMENT : PAR LES CATALOGUES DES MARQUES (27/09/2026).**
+Le gérant a fourni dix catalogues PDF des marques que Gineys distribue —
+Arti'Pat, Carigel, ArtiLab, Suneo, EDT, HDG. `node
+scripts/indexer-catalogues-gineys.mjs [--ecrire]` en tire les familles :
+**2 225 références catégorisées sur 3 303**, contre 636 avant.
+
+✅ **LEURS RÉFÉRENCES SONT NOS CODES GINEYS**, et c'est vérifié avant
+d'écrire une ligne : 16 sur 16 du catalogue Snacking Carigel existent déjà
+dans `catalogue_fournisseur`, 7 sur 8 d'ArtiLab. Nos codes portent
+simplement un zéro de tête (`0067822` ↔ `67822`).
+
+⚠️ **ON N'EXTRAIT QUE LA FAMILLE — NI LE PRIX, NI LA DÉSIGNATION.**
+Les prix de ces catalogues sont INDICATIFS (Gineys consent 20 à 30 % de
+remise, déjà documenté pour Arti'Pat) : les importer écraserait des prix
+réellement payés par des tarifs publics. Et les pages sont des grilles à
+trois colonnes où trois références et trois libellés se concaténent sur la
+même ligne (« 677156783467822 ») — un libellé mal recollé décrirait un
+autre produit, alors qu'on a déjà les désignations par le portail.
+
+⚠️ **LA FAMILLE EST L'EN-TÊTE QUI SURPLOMBE LA RÉFÉRENCE, pas celui de la
+page.** Une page en porte souvent trois (« CHOCOLATS AU LAIT », puis
+« CHOCOLATS BLANCS », puis « BÂTONS DE CHOCOLAT ») : prendre le premier
+rangerait les bâtons sous les chocolats au lait.
+
+⚠️ Trois pièges de mise en page, tous rencontrés :
+1. **l'en-tête se lit sur la LIGNE RECOMPOSÉE**, pas sur l'item isolé —
+   « ÉPICERIE » arrive en deux morceaux et donnait la famille « PICERIE » ;
+2. **deux en-têtes partagent parfois une ligne** (colonne gauche et droite) :
+   recollés d'un bloc ils donnaient « INCONTOURNABLESDESSERTS PÂTISSIERS ».
+   On coupe dès que l'écart horizontal dépasse la largeur d'un caractère ;
+3. les titres composés en **lettres espacées** (« T A P A S ») se recollent —
+   même piège que le pied de page de Gel Var.
+
+⚠️ **L'ORDRE DES CATALOGUES COMPTE** : le premier qui connaît une référence
+donne sa famille. Les catalogues PRODUIT passent donc en tête, les livres
+d'INSPIRATION en dernier — leurs chapitres sont de la prose commerciale
+(« DANS LES BOIS », « LE VERGER », « P'TITS GOURMANDS »), et personne ne
+cherche un produit sous ce nom. Ils restent en repli : une famille
+approximative vaut mieux que « non classé ». Sur 278 familles, 46 n'ont
+qu'un seul article — le compteur affiché à côté de chaque entrée du menu le
+montre.
+
+⚠️ **Le catalogue GMS de Gineys est ÉCARTÉ** : ses références (32xxx, 36xxx)
+ne correspondent à AUCUNE de nos lignes — c'est l'assortiment grande
+distribution, pas celui du pro. Les indexer aurait rempli la base de
+familles fantômes.
+
+⚠️ **Ces catalogues sont aussi une pièce de CONTRÔLE**, et ça se voit tout
+de suite : notre ligne « SEL FIN SAC=25G » face au catalogue ArtiLab qui
+imprime « Sel Fin — Sac : 25 kg ». Un facteur mille. Le libellé vient de
+Gineys, donc la coquille est chez eux ; elle est sans conséquence ici (la
+ligne est facturée au kilo) mais elle aurait faussé toute contenance
+dérivée. Même chose sur la farine de pois chiches, 4 kg au catalogue contre
+5 kg chez nous.
+
+⚠️ Les PDF vivent dans `~/Downloads` et **ne sont pas copiés dans le dépôt**
+(760 Mo, documents commerciaux de tiers). `data/catalogues/` est gitignoré
+pour le jour où on les y rangera. L'extraction, elle, est en base : le
+script n'a pas à être rejoué tant que les catalogues ne changent pas.
+
+`node scripts/inventaire-catalogues.mjs` mesure ce que chaque PDF contient
+avant d'en tirer quoi que ce soit — texte extractible, densité de
+références, de prix, de colisages. C'est lui qui a montré que **seuls deux
+catalogues sur dix portent des prix**.
+
 `node scripts/familles-gineys.mjs [--ecrire]` pose les rayons relevés, depuis
 `data/gineys/gineys-familles.json` (gitignoré). **Quatre familles au
 27/09/2026 : ACCOMPAGNEMENT 118, B.O.F. 172, CREVETTE 24, CRUSTACE 17 — soit
