@@ -4384,6 +4384,25 @@ dans cette famille — il n'attrape que les erreurs grossières, pas la
 confusion entre deux sodas. La règle de la 0151 tient : la suggestion se
 calcule, la DÉCISION s'enregistre.
 
+⚠️⚠️ **UN FACE-À-FACE AU CATALOGUE NE SUFFIT PAS : IL FAUT QUE NOS
+PRODUITS Y SOIENT RATTACHÉS.** Le gérant l'a signalé — « Euro-Cash ne sort
+dans aucune boisson de notre catalogue » — alors que le face-à-face Perrier
+existait bel et bien. Deux causes distinctes, et il est utile de les
+séparer :
+
+1. **Le Perrier n'avait aucun `recette_id`.** `offresMoinsCheres()` cherche
+   les offres par la CIBLE (notre produit ou notre matière) : un groupe de
+   comparaison qui ne pointe sur rien de chez nous est invisible de
+   `/admin/reassort` et de l'onglet 🧺, même parfaitement constitué. Les
+   deux lignes ont été rattachées — le nom du groupe et celui de notre
+   produit sont identiques au caractère près.
+2. **Le Coca est à −9 %, sous le seuil de 10 %** qui écarte le bruit de
+   conditionnement. Il ne sort pas, et c'est voulu : un écart de cet ordre
+   ne justifie pas d'ouvrir un compte.
+
+Résultat à l'écran : « Perrier 33 cl · France Boissons · **−47 % Euro-Cash** »,
+et le panneau propose « Euro-Cash 1,52 €/L · devis · Prendre celui-ci ».
+
 **Les face-à-face réels au 28/09/2026** : Perrier **−47 %** (Euro-Cash
 1,52 €/L contre France Boissons 2,85), Coca-Cola −9 %, Coca-Cola Zéro
 −10 % (Promocash gagne).
