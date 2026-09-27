@@ -42,17 +42,36 @@ const CERTAINES = [
   ['Fanta 33 cl',            '53880', 'Fanta Orange'],
   // ⚠️ Le Perrier 33 cl est déjà chez Euro-Cash (réf. 57003, 0,50 €) — il
   // est rangé côté BAR, pas Fournil, et n'entre donc pas dans ce geste.
+  //
+  // ── LES JUS : « c'est l'autre marque, pas Pago » (gérant, 28/09/2026) ──
+  //
+  // Le catalogue Euro-Cash porte DEUX gammes de jus en 33 cl, et aucune ne
+  // dit sa marque : le nom est imprimé sur la photo de la bouteille, pas
+  // dans le texte du PDF. C'est la NOMENCLATURE qui les sépare.
+  //
+  //   · réf. 52140-52150, page 117 : « Orange Brésil 100 % », « Pomme
+  //     France 100 % », « Ananas Costa Rica 100 % », « Lichi Vietnam 20 % ».
+  //     Nommer le pays d'origine de chaque fruit est la signature de PAGO,
+  //     et la série se prolonge page 119 par ses parfums caractéristiques
+  //     (litchi, melon, mojito, pastèque, cerise).
+  //   · réf. 54012-54078, page 117 : « Orange », « Pomme », « Multifruits »,
+  //     à 0,90 €. Pas d'origine, pas de mention « 100 % » — c'est l'autre
+  //     gamme, donc la nôtre.
+  //
+  // ⚠️ C'est une DÉDUCTION sur une convention de nommage, pas une marque
+  // lue. Elle se dément d'un mot, et le code article est écrit en clair
+  // ci-dessous pour qu'on puisse le confronter au catalogue papier.
+  ['Jus d\'orange 33 cl',    '54078', 'Orange'],
+  ['Jus de pomme 33 cl',     '54012', 'Pomme'],
 ]
 
 // ─── Ce qu'on ne peut PAS trancher, et pourquoi ───────────────────────
 const A_CONFIRMER = [
-  ['Jus d\'orange 33 cl', 'deux gammes Euro-Cash s\'en approchent et ce ne sont pas les mêmes produits : « Orange » (réf. 54078, 0,90 €) et « Orange Brésil 100 % » (réf. 52140, 0,70 €). Un nectar et un pur jus ne se remplacent pas.'],
-  ['Jus de pomme 33 cl', 'même hésitation : « Pomme » (54012, 0,90 €), « Pomme » (52075, 0,65 €) et « Pomme France 100 % » (52142, 0,65 €).'],
   ['Pago orange 20 cl', 'Euro-Cash liste « Nectar Orange » mais SANS PRIX — le rayon jus n\'a pas été chiffré.'],
   ['Pago pomme 20 cl', 'idem : « Pomme Pressée 100 % » sans prix.'],
   ['Pago pomme 33 cl', 'idem.'],
   ['Red Bull 25 cl', '⚠️ LE FORMAT NE CONCORDE PAS : leur « Red Bull » est en 47,3 cl (réf. 52990, 2,25 €), le nôtre en 25 cl. Les huit lignes à 1,24 € / 25 cl (« Red Pastèque », « Sea Blue », « White Coco », « Zéro »…) sont des éditions Red Bull, mais aucune n\'est le Red Bull classique.'],
-  ['Ciao 33 cl', 'aucune ligne Euro-Cash ne porte ce nom. Reste chez Promocash (1,41 €).'],
+  ['Ciao 33 cl', '⚠️ IL Y EST — « San P Ciao Pêche / Citron / Orange Sanguine », réf. 56997 à 56999, page 118 du catalogue, 2,90 €. Mais la BASE de ce prix n\'est pas tranchée : le colisage est « c-6x4x33cl », donc 2,90 € peut être la bouteille (impossible, on la vend 2,50 € TTC), le pack de 4 (0,725 € la bouteille, la seule lecture tenable) ou le colis de 24 (0,12 €, invraisemblable). Une question à leur poser, pas un chiffre à deviner.'],
   ['Eau plate 50 cl', 'le rayon EAUX d\'Euro-Cash (53 références) est revenu SANS AUCUN PRIX.'],
   ['Eau gazeuse 50 cl', 'idem, rayon eaux non chiffré.'],
   ['Ice Tea 33 cl', '« Pêche » (réf. 53015, 0,55 €) est très probablement l\'Ice Tea pêche — la référence est voisine de « Liptonic » et d\'« Ice Tea Tropical » — mais c\'est une déduction sur un numéro, pas une certitude. Et Promocash le fait à 0,48 €.'],
@@ -95,8 +114,11 @@ for (const p of prix) {
 // Toutes les autres : le FOURNISSEUR change même quand le tarif manque.
 // Une boisson sans interlocuteur n'entre dans aucun bon de commande, et
 // c'est ce qui la fait oublier à la commande.
-const autres = rec.filter(r => !prix.some(p => p.r.id === r.id) && r.fournisseur_id !== EC.id)
-console.log(`\n── ${autres.length} boisson(s) : fournisseur désigné Euro-Cash, tarif à confirmer ──\n`)
+// ⚠️ La liste se construit sur l'ABSENCE de correspondance certaine, pas
+// sur le fournisseur : sinon, au deuxième passage, le rapport est vide et
+// on croit que tout est réglé alors que la moitié attend un tarif.
+const autres = rec.filter(r => !prix.some(p => p.r.id === r.id))
+console.log(`\n── ${autres.length} boisson(s) chez Euro-Cash, mais TARIF À CONFIRMER ──\n`)
 for (const r of autres) {
   const motif = A_CONFIRMER.find(([n]) => n === r.nom)?.[1] ?? 'pas de correspondance relevée'
   const cout = r.cout_achat_ht === null ? 'aucun coût connu' : `coût ${Number(r.cout_achat_ht).toFixed(3)} € — ⚠️ venu d'un AUTRE fournisseur, à confirmer à la première facture Euro-Cash`
@@ -122,5 +144,6 @@ for (const p of prix) {
   // de `/admin/achats` et du réassort : c'est par la CIBLE qu'on les cherche.
   if (!p.c.recette_id) await api(`catalogue_fournisseur?id=eq.${p.c.id}`, { method: 'PATCH', body: JSON.stringify({ recette_id: p.r.id }) })
 }
-for (const r of autres) await api(`recettes?id=eq.${r.id}`, { method: 'PATCH', body: JSON.stringify({ fournisseur_id: EC.id }) })
+for (const r of autres) if (r.fournisseur_id !== EC.id)
+  await api(`recettes?id=eq.${r.id}`, { method: 'PATCH', body: JSON.stringify({ fournisseur_id: EC.id }) })
 console.log(`\n✅ ${prix.length} tarif(s) posé(s), ${autres.length} fournisseur(s) désigné(s).`)
