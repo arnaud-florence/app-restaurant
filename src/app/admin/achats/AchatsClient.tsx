@@ -5,7 +5,7 @@ import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
   offresTriees,
   filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
-  prixReprenable, FILTRES_ACHETE_VIDES,
+  prixReprenable, parRayon, rayonDe, RAYONS, RAYON_AUTRES, FILTRES_ACHETE_VIDES,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
   type OffreFournisseur, type EtatPlateforme, type Manque,
   type ArticleAchete, type FiltresAchete, type OffreConcurrente,
@@ -733,27 +733,61 @@ function Achetes({ articles, fournisseurs: tousF }: {
   const [edite, setEdite] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [f, setF] = useState<FiltresAchete>(FILTRES_ACHETE_VIDES)
+  const [parFourn, setParFourn] = useState(false)
+  const [replies, setReplies] = useState<Set<string>>(new Set())
+
   const trouves = useMemo(() => filtrerAchetes(articles, f), [articles, f])
   const b = useMemo(() => bilanAchats(articles), [articles])
-  const groupes = useMemo(() => achetesParFournisseur(trouves), [trouves])
+  const rayons = useMemo(() => parRayon(trouves), [trouves])
+  const groupesF = useMemo(() => achetesParFournisseur(trouves), [trouves])
   const fournisseurs = useMemo(
     () => [...new Set(articles.map(a => a.fournisseur).filter(Boolean))].sort() as string[],
     [articles])
 
+  // Compteur par rayon sur TOUT le catalogue : une pastille qui bougerait
+  // avec la recherche ne dirait plus combien le rayon contient.
+  const parRayonTotal = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const a of articles) {
+      const k = rayonDe(a.categorie).cle
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [articles])
+
+  const basculer = (cle: string) => setReplies(s => {
+    const n = new Set(s); n.has(cle) ? n.delete(cle) : n.add(cle); return n
+  })
+
   return (
     <div className="space-y-4 pb-16">
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Carte n={b.references} libelle="références achetées" />
-        <Carte n={b.releves} libelle="prix relevés" accent="text-emerald-700" sous="facture ou relevé" />
-        {/* ⚠️ Un prix estimé n'est pas un prix : il a servi à bâtir la carte,
-            il n'a jamais été facturé. Le fondre dans « avec un prix » ferait
-            passer une hypothèse pour une mesure (0165). */}
-        <Carte n={b.estimes} libelle="prix estimés" accent="text-amber-700" sous="jamais facturés" />
-        <Carte n={b.avecReference} libelle="avec référence" sous="à citer au fournisseur" />
-        <Carte n={b.incomplets} libelle="incomplètes"
-          accent={b.incomplets ? 'text-red-700' : 'text-zinc-400'} sous="ni prix, ni fournisseur" />
+      {/* ─── Le bandeau : cinq nombres, pas un de plus ─────────────── */}
+      <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+        <Chiffre n={b.references} mot="références" />
+        <Chiffre n={b.releves} mot="prix relevés" teinte="text-emerald-700" />
+        {/* ⚠️ Un prix estimé n'est jamais fondu dans « avec un prix » : il
+            a servi à bâtir la carte, il n'a jamais été facturé (0165). */}
+        <Chiffre n={b.estimes} mot="estimés" teinte="text-amber-700" />
+        <Chiffre n={b.avecReference} mot="avec réf." />
+        <Chiffre n={b.incomplets} mot="incomplètes"
+          teinte={b.incomplets ? 'text-red-700' : 'text-zinc-400'} />
       </section>
 
+      {/* ─── Les rayons, en pastilles ──────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5">
+        <Filtre actif={f.rayon === undefined} onClick={() => setF(x => ({ ...x, rayon: undefined }))}>
+          Tous <span className="tabular-nums opacity-60">{articles.length}</span>
+        </Filtre>
+        {[...RAYONS, RAYON_AUTRES].filter(r => parRayonTotal.get(r.cle)).map(r => (
+          <Filtre key={r.cle} actif={f.rayon === r.cle}
+            onClick={() => setF(x => ({ ...x, rayon: x.rayon === r.cle ? undefined : r.cle }))}>
+            <span>{r.emoji}</span> {r.nom}{' '}
+            <span className="tabular-nums opacity-60">{parRayonTotal.get(r.cle)}</span>
+          </Filtre>
+        ))}
+      </div>
+
+      {/* ─── Recherche et affinages ────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <input type="search" value={f.requete}
           onChange={e => setF(x => ({ ...x, requete: e.target.value }))}
@@ -770,96 +804,153 @@ function Achetes({ articles, fournisseurs: tousF }: {
           {fournisseurs.map(n => <option key={n} value={n}>{n}</option>)}
           <option value="·">— sans fournisseur</option>
         </select>
-        <Onglets actif={f.estimeSeul} onClick={() => setF(x => ({ ...x, estimeSeul: !x.estimeSeul }))}>
-          Prix estimés ({b.estimes})
-        </Onglets>
-        <Onglets actif={f.incompletSeul} onClick={() => setF(x => ({ ...x, incompletSeul: !x.incompletSeul }))}>
-          Incomplètes ({b.incomplets})
-        </Onglets>
+        <Filtre actif={f.estimeSeul} onClick={() => setF(x => ({ ...x, estimeSeul: !x.estimeSeul }))}>
+          Prix estimés
+        </Filtre>
+        <Filtre actif={f.incompletSeul} onClick={() => setF(x => ({ ...x, incompletSeul: !x.incompletSeul }))}>
+          Incomplètes
+        </Filtre>
+        <Filtre actif={parFourn} onClick={() => setParFourn(!parFourn)}>
+          Par fournisseur
+        </Filtre>
       </div>
 
-      <p className="text-sm text-zinc-500">
-        {trouves.length.toLocaleString('fr-FR')} référence(s) affichée(s) sur {articles.length}
-      </p>
       {erreur && <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">{erreur}</p>}
 
-      {groupes.map(g => (
-        <section key={g.fournisseur ?? '—'} className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-          <h3 className="flex flex-wrap items-baseline gap-x-3 border-b border-zinc-200 bg-zinc-50 px-4 py-2">
-            <span className="font-bold text-zinc-900">
-              {g.fournisseur ?? '⚠️ Sans fournisseur connu'}
-            </span>
-            <span className="text-xs text-zinc-500">{g.articles.length} référence(s)</span>
-            {g.estimes > 0 && (
-              <span className="text-xs text-amber-700">{g.estimes} prix estimé(s)</span>
-            )}
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-zinc-400">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Produit</th>
-                  <th className="px-3 py-2 text-left font-medium">Référence</th>
-                  <th className="px-3 py-2 text-right font-medium">Prix d’achat</th>
-                  <th className="px-3 py-2 text-left font-medium">Unité</th>
-                  <th className="px-3 py-2 text-left font-medium">Dernier achat</th>
-                  <th className="px-4 py-2 text-left font-medium">Ailleurs</th>
-                  <th className="px-2 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
+      <p className="text-sm text-zinc-500">
+        {trouves.length.toLocaleString('fr-FR')} référence(s) sur {articles.length}
+      </p>
+
+      {(parFourn
+        ? groupesF.map(g => ({
+            cle: g.fournisseur ?? '—',
+            titre: g.fournisseur ?? '⚠️ Sans fournisseur connu',
+            emoji: '🚚', teinte: 'bg-zinc-400',
+            articles: g.articles, estimes: g.estimes,
+            incomplets: g.articles.filter(acheteIncomplet).length,
+          }))
+        : rayons.map(r => ({
+            cle: r.rayon.cle, titre: r.rayon.nom, emoji: r.rayon.emoji, teinte: r.rayon.teinte,
+            articles: r.articles, estimes: r.estimes, incomplets: r.incomplets,
+          }))
+      ).map(g => {
+        const replie = replies.has(g.cle)
+        return (
+          <section key={g.cle} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <button onClick={() => basculer(g.cle)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50">
+              <span className={`h-8 w-1.5 shrink-0 rounded-full ${g.teinte}`} />
+              <span className="text-lg">{g.emoji}</span>
+              <span className="font-bold text-zinc-900">{g.titre}</span>
+              <span className="text-sm text-zinc-500">{g.articles.length}</span>
+              {g.estimes > 0 && <Puce teinte="bg-amber-100 text-amber-800">{g.estimes} estimé(s)</Puce>}
+              {g.incomplets > 0 && <Puce teinte="bg-red-100 text-red-800">{g.incomplets} incomplète(s)</Puce>}
+              <span className="ml-auto text-zinc-400">{replie ? '▸' : '▾'}</span>
+            </button>
+            {!replie && (
+              <ul className="divide-y divide-zinc-100 border-t border-zinc-200">
                 {g.articles.map(a => (
                   edite === a.cle
-                  ? <EditionAchat key={a.cle} a={a} fournisseurs={tousF}
-                      fermer={() => setEdite(null)} dire={setErreur} />
-                  : <tr key={a.cle} className={acheteIncomplet(a) ? 'bg-red-50/40' : undefined}>
-                    <td className="px-4 py-2">
-                      <span className="font-medium text-zinc-900">{a.nom}</span>
-                      {a.etablissement && <span className="ml-2 text-[11px] text-zinc-400">{a.etablissement}</span>}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums text-zinc-600">
-                      {/* ⚠️ Sans référence, le commercial cherche le produit
-                          par son nom — et peut en servir un autre. */}
-                      {a.reference ?? <span className="text-amber-700">à relever</span>}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {a.prix == null
-                        ? <span className="font-medium text-red-700">inconnu</span>
-                        : <>
-                            <span className={a.estime ? 'text-amber-800' : 'text-zinc-900'}>{fmtPrix(a.prix)}</span>
-                            {a.estime && <span className="ml-1 text-[11px] text-amber-700">estimé</span>}
-                          </>}
-                    </td>
-                    <td className="px-3 py-2 text-zinc-500">{a.unite ?? '—'}</td>
-                    <td className="px-3 py-2 tabular-nums text-zinc-500">
-                      {a.dernier_achat ?? <span className="text-zinc-400">jamais</span>}
-                    </td>
-                    <td className="px-4 py-2">
-                      {a.ailleurs
-                        ? <span className="font-medium text-violet-700">
-                            −{Math.round(a.ailleurs.ecartPct)} % chez {a.ailleurs.fournisseur}
-                          </span>
-                        : <span className="text-zinc-300">—</span>}
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <button onClick={() => { setErreur(null); setEdite(a.cle) }}
-                        className="rounded border border-zinc-300 px-2 py-1 text-xs font-medium hover:border-zinc-900">
-                        Modifier
-                      </button>
-                    </td>
-                  </tr>
+                    ? <li key={a.cle} className="bg-zinc-50 px-4 py-3">
+                        <EditionAchat a={a} fournisseurs={tousF}
+                          fermer={() => setEdite(null)} dire={setErreur} />
+                      </li>
+                    : <LigneAchat key={a.cle} a={a} parFourn={parFourn}
+                        modifier={() => { setErreur(null); setEdite(a.cle) }} />
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
+              </ul>
+            )}
+          </section>
+        )
+      })}
 
-      {groupes.length === 0 && (
+      {rayons.length === 0 && (
         <p className="py-12 text-center text-sm text-zinc-500">Aucune référence ne correspond.</p>
       )}
     </div>
   )
+}
+
+/* Une ligne : le nom d'abord, le prix à droite, le reste en petit. */
+function LigneAchat({ a, parFourn, modifier }: {
+  a: ArticleAchete; parFourn: boolean; modifier: () => void
+}) {
+  return (
+    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 ${
+      acheteIncomplet(a) ? 'bg-red-50/50' : ''}`}>
+      <div className="min-w-[180px] flex-1">
+        {/* ⚠️ Le nom de VITRINE en titre quand il existe, le libellé d'achat
+            en dessous : c'est le second qu'on cite au fournisseur, mais
+            c'est le premier qu'on reconnaît. Quand plusieurs produits
+            partagent le libellé, `nom_vente` est nul et le libellé
+            redevient le titre — il fait alors foi. */}
+        <p className="font-medium leading-tight text-zinc-900">{a.nom_vente ?? a.nom}</p>
+        {a.nom_vente && (
+          <p className="truncate text-[11px] leading-tight text-zinc-500">{a.nom}</p>
+        )}
+        <p className="text-[11px] leading-tight text-zinc-400">
+          {/* En vue « par fournisseur » son nom est déjà dans l'en-tête :
+              le répéter sur chaque ligne encombre pour rien. */}
+          {!parFourn && a.fournisseur && <>{a.fournisseur} · </>}
+          {!parFourn && !a.fournisseur && <span className="text-red-600">sans fournisseur · </span>}
+          {a.reference ? `réf. ${a.reference}` : 'réf. à relever'}
+          {a.dernier_achat && <> · acheté le {a.dernier_achat}</>}
+        </p>
+      </div>
+
+      {a.ailleurs && (
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
+          −{Math.round(a.ailleurs.ecartPct)} % {a.ailleurs.fournisseur}
+        </span>
+      )}
+
+      <div className="w-32 text-right">
+        {a.prix == null
+          ? <span className="text-sm font-bold text-red-700">prix inconnu</span>
+          : <>
+              <span className={`text-base font-bold tabular-nums ${a.estime ? 'text-amber-800' : 'text-zinc-900'}`}>
+                {fmtPrix(a.prix)}
+              </span>
+              <span className="block text-[11px] leading-tight text-zinc-400">
+                /{a.unite ?? 'unité'}{a.estime && <span className="text-amber-700"> · estimé</span>}
+              </span>
+            </>}
+      </div>
+
+      <button onClick={modifier}
+        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:border-zinc-900">
+        Modifier
+      </button>
+    </li>
+  )
+}
+
+function Chiffre({ n, mot, teinte }: { n: number; mot: string; teinte?: string }) {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className={`text-xl font-black tabular-nums ${teinte ?? 'text-zinc-900'}`}>
+        {n.toLocaleString('fr-FR')}
+      </span>
+      <span className="text-xs text-zinc-500">{mot}</span>
+    </span>
+  )
+}
+
+/** Un filtre qui se voit : pastille pleine quand il est actif. */
+function Filtre({ actif, onClick, children }: {
+  actif: boolean; onClick: () => void; children: React.ReactNode
+}) {
+  return (
+    <button onClick={onClick}
+      className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition ${
+        actif ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 bg-white hover:border-zinc-500'}`}>
+      {children}
+    </button>
+  )
+}
+
+function Puce({ teinte, children }: { teinte: string; children: React.ReactNode }) {
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${teinte}`}>{children}</span>
 }
 
 /* ─── Modifier une ligne du catalogue d'achat ─────────────────────────────
@@ -898,9 +989,9 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
   }
 
   return (
-    <tr className="bg-zinc-50">
-      <td className="px-4 py-3 font-medium text-zinc-900">{a.nom}</td>
-      <td colSpan={5} className="px-3 py-3">
+    <div>
+      <p className="mb-2 font-bold text-zinc-900">{a.nom_vente ?? a.nom}</p>
+      <div>
         <div className="flex flex-wrap items-center gap-2">
           <select value={fid} onChange={e => setFid(e.target.value)}
             className="h-10 rounded border border-zinc-300 px-2 text-sm">
@@ -990,8 +1081,8 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
             </p>
           </div>
         )}
-      </td>
-    </tr>
+      </div>
+    </div>
   )
 }
 

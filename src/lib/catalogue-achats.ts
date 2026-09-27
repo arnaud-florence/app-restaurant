@@ -485,7 +485,10 @@ export function manques(e: EtatPlateforme, matieresSansOffre: number): Manque[] 
 
 export type ArticleAchete = {
   cle: string
+  /** Le libellé d'ACHAT — celui qu'on cite au fournisseur. */
   nom: string
+  /** Le nom de vitrine, quand il diffère et qu'il est sans ambiguïté. */
+  nom_vente: string | null
   /** Matière première, ou famille du produit revendu. */
   categorie: string | null
   /** L'étage : Fournil, bar, restauration. */
@@ -547,6 +550,8 @@ export function prixReprenable(
 
 export type FiltresAchete = {
   requete: string
+  /** Clé de rayon, ou `undefined` pour tous. */
+  rayon?: string
   fournisseur?: string | null
   /** Ne montrer que ce dont le prix est une estimation. */
   estimeSeul: boolean
@@ -555,7 +560,7 @@ export type FiltresAchete = {
 }
 
 export const FILTRES_ACHETE_VIDES: FiltresAchete = {
-  requete: '', fournisseur: undefined, estimeSeul: false, incompletSeul: false,
+  requete: '', rayon: undefined, fournisseur: undefined, estimeSeul: false, incompletSeul: false,
 }
 
 /**
@@ -572,6 +577,7 @@ export function filtrerAchetes(articles: ArticleAchete[], f: FiltresAchete): Art
   const mots = motsCles(f.requete)
   return articles.filter(a => {
     if (f.fournisseur !== undefined && (a.fournisseur ?? null) !== f.fournisseur) return false
+    if (f.rayon !== undefined && rayonDe(a.categorie).cle !== f.rayon) return false
     if (f.estimeSeul && !a.estime) return false
     if (f.incompletSeul && !acheteIncomplet(a)) return false
     if (!mots.length) return true
@@ -626,4 +632,88 @@ export function achetesParFournisseur(articles: ArticleAchete[]): Array<{
     // références qu'on ne sait pas commander, donc celles à traiter.
     .sort((a, b) => (a.fournisseur === null ? 1 : b.fournisseur === null ? -1
       : b.articles.length - a.articles.length))
+}
+
+// ─── LES RAYONS ─────────────────────────────────────────────────────────
+//
+// Les 193 références portent 21 catégories différentes — « Pain »,
+// « Viennoiserie », « Pâtisserie », « Gourmandise »… C'est la bonne
+// granularité pour une carte, pas pour une liste de courses : on ne
+// commande pas la viennoiserie séparément du pain, c'est le même camion.
+//
+// ⚠️ On REGROUPE pour l'affichage, on ne renomme RIEN en base. La
+// catégorie sert aussi à la caisse et au site ; la toucher casserait un
+// bouton au comptoir (leçon des familles, `verifier-carte-zelty`).
+
+export type Rayon = {
+  cle: string
+  nom: string
+  emoji: string
+  /** Classe Tailwind du filet de couleur, pour distinguer d'un coup d'œil. */
+  teinte: string
+  categories: string[]
+}
+
+export const RAYONS: Rayon[] = [
+  { cle: 'boulangerie', nom: 'Boulangerie', emoji: '🥖', teinte: 'bg-amber-400',
+    categories: ['Pain', 'Viennoiserie', 'Pâtisserie', 'Boulangerie', 'Gourmandise', 'Dessert'] },
+  { cle: 'pizzeria', nom: 'Pizzeria', emoji: '🍕', teinte: 'bg-red-500',
+    categories: ['Pizzeria', 'Pizza'] },
+  { cle: 'restaurant', nom: 'Restaurant', emoji: '🍽️', teinte: 'bg-orange-500',
+    categories: ['Restaurant'] },
+  { cle: 'charcuterie', nom: 'Charcuterie & marée', emoji: '🥩', teinte: 'bg-rose-400',
+    categories: ['Charcuterie', 'Poisson'] },
+  { cle: 'cremerie', nom: 'Crémerie', emoji: '🧀', teinte: 'bg-yellow-300',
+    categories: ['Crémerie'] },
+  { cle: 'epicerie', nom: 'Épicerie', emoji: '🧂', teinte: 'bg-lime-500',
+    categories: ['Épicerie'] },
+  { cle: 'boissons', nom: 'Boissons', emoji: '🥤', teinte: 'bg-sky-400',
+    categories: ['Boisson fraîche', 'Boisson chaude'] },
+  { cle: 'cave', nom: 'Cave & bar', emoji: '🍷', teinte: 'bg-violet-500',
+    categories: ['Alcool', 'Apéritif', 'Bière', 'Vin'] },
+  { cle: 'glaces', nom: 'Glaces', emoji: '🍦', teinte: 'bg-cyan-300',
+    categories: ['Glace'] },
+  { cle: 'emballages', nom: 'Emballages', emoji: '📦', teinte: 'bg-zinc-400',
+    categories: ['Emballage'] },
+]
+
+/**
+ * ⚠️ UNE CATÉGORIE INCONNUE N'EST PAS RANGÉE DE FORCE. Elle tombe dans
+ * « Autres », qui est AFFICHÉ : une catégorie créée demain (le tabac, la
+ * presse) apparaîtrait sinon dans un rayon qui n'est pas le sien, ou
+ * disparaîtrait de l'écran — et un produit qu'on ne voit pas ne se
+ * commande pas.
+ */
+export const RAYON_AUTRES: Rayon = {
+  cle: 'autres', nom: 'Autres', emoji: '•', teinte: 'bg-zinc-300', categories: [],
+}
+
+const PAR_CATEGORIE = new Map<string, Rayon>()
+for (const r of RAYONS) for (const c of r.categories) PAR_CATEGORIE.set(c, r)
+
+export function rayonDe(categorie: string | null): Rayon {
+  return (categorie && PAR_CATEGORIE.get(categorie)) || RAYON_AUTRES
+}
+
+export function parRayon(articles: ArticleAchete[]): Array<{
+  rayon: Rayon; articles: ArticleAchete[]; estimes: number; incomplets: number
+}> {
+  const m = new Map<string, ArticleAchete[]>()
+  for (const a of articles) {
+    const k = rayonDe(a.categorie).cle
+    if (!m.has(k)) m.set(k, [])
+    m.get(k)!.push(a)
+  }
+  const ordre = [...RAYONS, RAYON_AUTRES]
+  return ordre
+    .filter(r => m.has(r.cle))
+    .map(r => {
+      const as = m.get(r.cle)!.sort((x, y) => (x.nom < y.nom ? -1 : 1))
+      return {
+        rayon: r,
+        articles: as,
+        estimes: as.filter(a => a.estime && a.prix != null).length,
+        incomplets: as.filter(acheteIncomplet).length,
+      }
+    })
 }

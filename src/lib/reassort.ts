@@ -57,6 +57,17 @@ export type LigneReassort = {
    * ressaisir ailleurs — donc personne ne le fait, et l'écart reste.
    */
   offres?: OffreConcurrente[]
+  /**
+   * Le nom du produit tel qu'on le VEND, quand il diffère du libellé
+   * d'achat et qu'un seul produit porte ce libellé.
+   *
+   * ⚠️ NULL dès que PLUSIEURS produits partagent le libellé : « PLAQUE
+   * PIZZA CRUE » donne la margherita ET la jambon-fromage (0131), et
+   * n'afficher que la première ferait croire que la seconde n'existe pas.
+   * Dans ce cas c'est le libellé d'achat qui fait foi — c'est lui qu'on
+   * commande.
+   */
+  nom_vente?: string | null
   /** La référence CHEZ LE FOURNISSEUR — ce qu'on lui cite pour commander. */
   reference?: string | null
   /** Date de la dernière facture où cette référence apparaît. */

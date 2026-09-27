@@ -30,7 +30,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, fournisseur_id, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
-      .select('id, nom, unite, prix_achat_ht, prix_estime, fournisseur_principal, reference_fournisseur, stock_minimum, stock_cible')
+      .select('id, nom, unite, categorie, prix_achat_ht, prix_estime, fournisseur_principal, reference_fournisseur, stock_minimum, stock_cible')
       .eq('actif', true).eq('stocke', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('inventaires')
       .select('cible_id, date_inventaire, quantite').order('date_inventaire', { ascending: false }).order('cible_id')),
@@ -263,6 +263,9 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
             : null,
         }
       })(),
+      // ⚠️ Un seul produit sous ce libellé → on peut afficher son nom de
+      // vitrine. Plusieurs → c'est le libellé d'achat qui fait foi.
+      nom_vente: membres.length === 1 && (p.nom as string) !== nom ? (p.nom as string) : null,
       reference: (membres.map(m => m.reference_fournisseur as string | null).find(Boolean)) ?? null,
       dernier_achat: membres.map(m => dernierAchat.get(m.id as string)).find(Boolean) ?? null,
     })
@@ -275,7 +278,14 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     lignes.push({
       cle: `ing:${m.id as string}`,
       nom: m.nom as string,
-      categorie: 'Matières premières',
+      // ⚠️ LA VRAIE CATÉGORIE, pas un fourre-tout. « Matières premières »
+      // regroupait les 93 matières en un seul bloc : sur la plateforme
+      // d'achat, elles tombaient toutes dans le rayon « Autres » — 93 sur
+      // 193, c'est-à-dire la moitié du catalogue invisible au classement.
+      // Le fait qu'une ligne SOIT une matière se lit déjà au préfixe
+      // `ing:` de sa clé ; l'écrire une seconde fois dans la catégorie
+      // coûtait le rangement.
+      categorie: (m.categorie as string) ?? 'Matières premières',
       etablissement: null,
       unite: (m.unite as string) ?? null,
       // ⚠️⚠️ `stock_actuel` N'EST PAS UN COMPTAGE, et on ne s'en sert PAS.

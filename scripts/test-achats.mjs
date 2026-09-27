@@ -378,7 +378,7 @@ const achetesParFournisseur = arts => {
 }
 
 const A = o => ({
-  cle: o.cle ?? 'k', nom: o.nom ?? 'X', categorie: o.cat ?? null, etablissement: null,
+  cle: o.cle ?? 'k', nom: o.nom ?? 'X', nom_vente: o.vente ?? null, categorie: o.cat ?? null, etablissement: null,
   unite: o.unite ?? 'kg', fournisseur: o.f === undefined ? 'Gineys' : o.f,
   reference: o.ref ?? null, prix: o.prix === undefined ? 5 : o.prix,
   estime: Boolean(o.estime), dernier_achat: o.le ?? null, ailleurs: null,
@@ -511,6 +511,68 @@ titre('Basculer chez le moins cher, depuis la fiche')
   t('⚠️ reprendre un DEVIS laisse le prix marqué estimé', releveApres('devis') === false)
   t('reprendre une FACTURE le marque relevé', releveApres('facture') === true)
   t('un tarif de portail reste estimé — c’est un prix affiché', releveApres('portail') === false)
+}
+
+titre('Les rayons du catalogue')
+{
+  // ⚠️ RECOPIE de RAYONS / rayonDe() / parRayon() (catalogue-achats.ts).
+  const RAYONS = [
+    { cle: 'boulangerie', categories: ['Pain', 'Viennoiserie', 'Pâtisserie', 'Boulangerie', 'Gourmandise', 'Dessert'] },
+    { cle: 'pizzeria', categories: ['Pizzeria', 'Pizza'] },
+    { cle: 'restaurant', categories: ['Restaurant'] },
+    { cle: 'charcuterie', categories: ['Charcuterie', 'Poisson'] },
+    { cle: 'cremerie', categories: ['Crémerie'] },
+    { cle: 'epicerie', categories: ['Épicerie'] },
+    { cle: 'boissons', categories: ['Boisson fraîche', 'Boisson chaude'] },
+    { cle: 'cave', categories: ['Alcool', 'Apéritif', 'Bière', 'Vin'] },
+    { cle: 'glaces', categories: ['Glace'] },
+    { cle: 'emballages', categories: ['Emballage'] },
+  ]
+  const AUTRES = { cle: 'autres', categories: [] }
+  const M = new Map()
+  for (const r of RAYONS) for (const c of r.categories) M.set(c, r)
+  const rayonDe = c => (c && M.get(c)) || AUTRES
+
+  t('le pain et la viennoiserie tombent dans le MÊME rayon — même camion',
+    rayonDe('Pain').cle === rayonDe('Viennoiserie').cle)
+  t('la bière, le vin et les apéritifs aussi',
+    rayonDe('Bière').cle === 'cave' && rayonDe('Vin').cle === 'cave' && rayonDe('Apéritif').cle === 'cave')
+  t('⚠️ une catégorie INCONNUE tombe dans « Autres », pas dans un rayon au hasard',
+    rayonDe('Tabac').cle === 'autres')
+  t('⚠️ et une catégorie absente aussi — jamais masquée',
+    rayonDe(null).cle === 'autres')
+  t('aucune catégorie n’appartient à DEUX rayons',
+    RAYONS.flatMap(r => r.categories).length === new Set(RAYONS.flatMap(r => r.categories)).size)
+  t('les rayons couvrent les 21 catégories réelles du catalogue',
+    ['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise', 'Dessert', 'Boulangerie',
+     'Pizzeria', 'Pizza', 'Restaurant', 'Charcuterie', 'Poisson', 'Crémerie',
+     'Épicerie', 'Boisson fraîche', 'Boisson chaude', 'Alcool', 'Apéritif',
+     'Bière', 'Vin', 'Glace', 'Emballage'].every(c => rayonDe(c).cle !== 'autres'))
+
+  // Le filtre par rayon
+  const parRayonFiltre = (arts, cle) => arts.filter(a => rayonDe(a.categorie).cle === cle)
+  const arts = [A({ cle: '1', cat: 'Pain' }), A({ cle: '2', cat: 'Bière' }), A({ cle: '3', cat: 'Tabac' })]
+  t('filtrer sur un rayon ne garde que lui', parRayonFiltre(arts, 'cave').length === 1)
+  t('le rayon « Autres » est filtrable comme les autres', parRayonFiltre(arts, 'autres').length === 1)
+}
+
+titre('Le titre affiché : vitrine ou libellé d’achat')
+{
+  // ⚠️ RECOPIE de la règle de `reassort-donnees.ts` et de `LigneAchat`.
+  const nomVente = (membres, nomProduit, cle) =>
+    membres === 1 && nomProduit !== cle ? nomProduit : null
+  const titre = a => a.nom_vente ?? a.nom
+
+  t('un seul produit sous le libellé → son nom de vitrine s’affiche',
+    nomVente(1, 'Baguette campestre', 'BAGUETTE CAMPESTRE 51CM ARTIPAT C=25') === 'Baguette campestre')
+  t('⚠️⚠️ DEUX produits sous le même libellé → c’est le LIBELLÉ qui fait foi',
+    nomVente(2, 'Pizza à la plaque Margherita', 'PLAQUE PIZZA CRUE 1.25KG') === null)
+  t('un nom identique au libellé n’est pas répété',
+    nomVente(1, 'Croissant', 'Croissant') === null)
+  t('le titre retombe sur le libellé quand il n’y a pas de vitrine',
+    titre({ nom: 'PLAQUE PIZZA CRUE', nom_vente: null }) === 'PLAQUE PIZZA CRUE')
+  t('et sur la vitrine quand elle existe',
+    titre({ nom: 'BAGUETTE …', nom_vente: 'Baguette campestre' }) === 'Baguette campestre')
 }
 
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)

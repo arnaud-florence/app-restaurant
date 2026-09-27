@@ -138,6 +138,7 @@ export default async function AchatsPage() {
   const achetes: ArticleAchete[] = (await chargerLignesReassort(sb)).map(l => ({
     cle: l.cle,
     nom: l.nom,
+    nom_vente: l.nom_vente ?? null,
     categorie: l.categorie,
     etablissement: l.etablissement,
     unite: l.unite,

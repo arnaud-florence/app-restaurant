@@ -3635,6 +3635,37 @@ chiffres.
 ⚠️ Deux désignations qui se normalisent pareil pour deux codes différents
 sont ÉCARTÉES : on ne tire pas au sort un identifiant.
 
+**Rangé par RAYONS, et lisible (27/09/2026).** Les 193 références portent
+**21 catégories** — « Pain », « Viennoiserie », « Pâtisserie »,
+« Gourmandise »… C'est la bonne granularité pour une carte, pas pour une
+liste de courses : on ne commande pas la viennoiserie séparément du pain,
+c'est le même camion. `RAYONS` en regroupe **dix**, avec leur emoji et leur
+filet de couleur, en pastilles filtrantes.
+
+⚠️ **On REGROUPE pour l'affichage, on ne renomme RIEN en base.** La
+catégorie sert aussi à la caisse et au site : la toucher casserait un bouton
+au comptoir.
+
+⚠️ **Une catégorie inconnue tombe dans « Autres », qui est AFFICHÉ.** Le
+tabac ou la presse, créés demain, apparaîtraient sinon dans un rayon qui
+n'est pas le leur — ou disparaîtraient de l'écran, et un produit qu'on ne
+voit pas ne se commande pas.
+
+⚠️⚠️ **LA MOITIÉ DU CATALOGUE TOMBAIT DANS « AUTRES ».** Le chargeur donnait
+aux 93 matières la catégorie fourre-tout « Matières premières » : 93
+références sur 193 sans rangement. Le fait qu'une ligne SOIT une matière se
+lit déjà au préfixe `ing:` de sa clé ; l'écrire une seconde fois dans la
+catégorie coûtait le classement. Les dix rayons couvrent désormais **193 sur
+193**.
+
+⚠️ **Le titre est le nom de VITRINE, le libellé d'achat en dessous.**
+« BAGUETTE CAMPESTRE MULTICEREALE 51CM 295G ARTIPAT C=25 » est ce qu'on cite
+au fournisseur, « Campestre multicéréales » est ce qu'on reconnaît. Mais
+⚠️ **dès que PLUSIEURS produits partagent le libellé, `nom_vente` est NUL et
+le libellé redevient le titre** : « PLAQUE PIZZA CRUE » donne la margherita
+ET la jambon-fromage (0131), et n'afficher que la première ferait croire que
+la seconde n'existe pas.
+
 **Le catalogue est MODIFIABLE (27/09/2026).** « On prend ça ailleurs
 maintenant » est le geste le plus courant, et il se faisait dans trois
 écrans différents — ou pas du tout. Bouton « Modifier » sur chaque ligne :
