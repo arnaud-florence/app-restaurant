@@ -167,19 +167,18 @@ if (BASE) {
     catch { console.log('  ⚠ pas de dev server'); return }
     if (!serverUp) { console.log('  ⚠ injoignable'); return }
 
-    const r1 = await fetch(`${BASE}/admin/finances`, { signal: AbortSignal.timeout(60000) })
-    if (r1.status !== 200) { ko('GET /admin/finances', `HTTP ${r1.status}`); return }
-    const html1 = await r1.text()
-    ok(`GET /admin/finances → 200 (${html1.length} bytes)`)
-    if (html1.includes('Finances')) ok('contient titre Finances')
-    else ko('contenu', 'titre absent')
+    // ⚠️ RÉVISÉ le 28/09/2026 — même correction que `test-rh.mjs`. Ce bloc
+    // lisait le CONTENU de la page sans authentification ; depuis le module
+    // 28 le middleware redirige vers /login, donc l'assertion échouait EN
+    // PERMANENCE sur un comportement correct. On vérifie la propriété qui
+    // compte : ces deux écrans exposent le compte de résultat et la trésorerie ; les laisser répondre reviendrait à les publier.
+    const r1 = await fetch(`${BASE}/admin/finances`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    if ([307, 302, 401, 403].includes(r1.status)) ok(`/admin/finances — appel anonyme refusé (HTTP ${r1.status})`)
+    else ko(`/admin/finances sans session`, `HTTP ${r1.status} — la page a répondu`)
 
-    const r2 = await fetch(`${BASE}/admin/finances/rapport/print`, { signal: AbortSignal.timeout(60000) })
-    if (r2.status !== 200) { ko('GET /admin/finances/rapport/print', `HTTP ${r2.status}`); return }
-    const html2 = await r2.text()
-    ok(`GET rapport/print → 200 (${html2.length} bytes)`)
-    if (html2.includes('Compte de r')) ok('rapport contient "Compte de résultat"')
-    else ko('contenu rapport', 'titre absent')
+    const r2 = await fetch(`${BASE}/admin/finances/rapport/print`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    if ([307, 302, 401, 403].includes(r2.status)) ok(`/admin/finances/rapport/print — appel anonyme refusé (HTTP ${r2.status})`)
+    else ko('rapport/print sans session', `HTTP ${r2.status} — la page a répondu`)
   })
 } else {
   console.log('\n→ HTTP : skip (PORT non défini)')

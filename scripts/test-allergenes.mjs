@@ -167,12 +167,14 @@ if (BASE) {
     catch { console.log('  ⚠ pas de dev server'); return }
     if (!serverUp) { console.log('  ⚠ injoignable'); return }
 
-    const r1 = await fetch(`${BASE}/admin/allergenes`, { signal: AbortSignal.timeout(60000) })
-    if (r1.status !== 200) { ko('GET /admin/allergenes', `HTTP ${r1.status}`); return }
-    const html1 = await r1.text()
-    ok(`GET /admin/allergenes → 200 (${html1.length} bytes)`)
-    if (html1.includes('Allergènes')) ok('contient titre "Allergènes"')
-    else ko('contenu admin', 'titre absent')
+    // ⚠️ RÉVISÉ le 28/09/2026 — même correction que `test-rh.mjs`. Ce bloc
+    // lisait le CONTENU de la page sans authentification ; depuis le module
+    // 28 le middleware redirige vers /login, donc l'assertion échouait EN
+    // PERMANENCE sur un comportement correct. On vérifie la propriété qui
+    // compte : l'écran d'admin ne répond pas sans session — y valider une déclaration engage nominativement. La page PUBLIQUE du QR, elle, doit rester ouverte : c'est le contrôle juste en dessous.
+    const r1 = await fetch(`${BASE}/admin/allergenes`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    if ([307, 302, 401, 403].includes(r1.status)) ok(`/admin/allergenes — appel anonyme refusé (HTTP ${r1.status})`)
+    else ko(`/admin/allergenes sans session`, `HTTP ${r1.status} — la page a répondu`)
 
     const r2 = await fetch(`${BASE}/menu-allergenes`, { signal: AbortSignal.timeout(60000) })
     if (r2.status !== 200) { ko('GET /menu-allergenes', `HTTP ${r2.status}`); return }

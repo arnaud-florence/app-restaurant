@@ -50,9 +50,21 @@ t('chaque point de vente est rattaché à une activité',
   ets.every(e => ACTIVITE_PAR_SLUG[e.slug]),
   ets.filter(e => !ACTIVITE_PAR_SLUG[e.slug]).map(e => e.slug).join(', '))
 
-const depuis = new Date(Date.now() - 30 * 86_400_000).toISOString()
+// ⚠️ LA FENÊTRE PART DE LA DERNIÈRE VENTE, PAS D'AUJOURD'HUI. Une fenêtre
+// glissante de 30 jours calendaires devient VIDE dès que la maison ferme
+// plus d'un mois — et c'est arrivé : le dernier ticket date du 30/08/2026,
+// la réouverture est au 3 octobre, et ce test est passé au rouge le 30
+// septembre sans qu'aucune régression ait eu lieu. Un test qui s'éteint
+// avec le calendrier finit par être ignoré.
+//
+// C'est la même règle que la valeur de l'affaire : ce sont les JOURS AVEC
+// VENTE qui comptent, jamais les jours calendaires.
+const [derniere] = await q('commandes?select=created_at&statut=eq.encaisse&order=created_at.desc&limit=1')
+const fin = derniere ? new Date(derniere.created_at).getTime() : Date.now()
+const depuis = new Date(fin - 30 * 86_400_000).toISOString()
 const cmds = await q(`commandes?select=id,etablissement_id,montant_total_ttc&statut=eq.encaisse&created_at=gte.${depuis}`)
-t('des ventes encaissées sur 30 jours', cmds.length > 0, `${cmds.length} commandes`)
+t(`des ventes encaissées sur les 30 j précédant la dernière (${derniere ? derniere.created_at.slice(0, 10) : '—'})`,
+  cmds.length > 0, `${cmds.length} commandes`)
 
 const posDeCommande = new Map(cmds.map(c => [c.id, c.etablissement_id]))
 const ids = cmds.map(c => c.id)

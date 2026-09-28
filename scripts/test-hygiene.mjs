@@ -289,14 +289,16 @@ if (BASE) {
       console.log('  ⚠ pas de dev server'); return
     }
     if (!serverUp) { console.log('  ⚠ injoignable'); return }
-    const r = await fetch(`${BASE}/admin/hygiene`)
-    if (r.status !== 200) { ko('GET /admin/hygiene', `HTTP ${r.status}`); return }
-    const html = await r.text()
-    ok(`GET /admin/hygiene → 200 (${html.length} bytes)`)
-    if (html.includes('Hygiène')) ok('contient titre "Hygiène"')
-    else ko('contenu', 'titre absent')
-    if (html.includes('Quotidien') && html.includes('HACCP')) ok('onglets Quotidien + HACCP visibles')
-    else ko('onglets', 'absents')
+    // ⚠️ RÉVISÉ le 28/09/2026 — même correction que `test-rh.mjs`. Ce bloc
+    // lisait le CONTENU de la page sans authentification. Depuis le module 28
+    // le middleware redirige vers /login : l'assertion échouait donc EN
+    // PERMANENCE sur un comportement correct, et un test rouge en permanence
+    // finit par être ignoré. On vérifie désormais la propriété qui compte :
+    // cet écran ne répond pas à un appel non authentifié.
+    const r = await fetch(`${BASE}/admin/hygiene`, { redirect: 'manual' })
+    if (r.status === 307 || r.status === 302 || r.status === 401 || r.status === 403)
+      ok(`appel anonyme refusé (HTTP ${r.status}) — la page expose des relevés et des non-conformités`)
+    else ko('GET /admin/hygiene sans session', `HTTP ${r.status} — la page a répondu`)
   })
 } else {
   console.log('\n→ HTTP : skip (PORT non défini)')

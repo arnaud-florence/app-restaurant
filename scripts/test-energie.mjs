@@ -128,12 +128,14 @@ if (BASE) {
     catch { console.log('  ⚠ pas de dev server'); return }
     if (!serverUp) { console.log('  ⚠ injoignable'); return }
 
-    const r = await fetch(`${BASE}/admin/energie`, { signal: AbortSignal.timeout(60000) })
-    if (r.status !== 200) { ko('GET /admin/energie', `HTTP ${r.status}`); return }
-    const html = await r.text()
-    ok(`GET /admin/energie → 200 (${html.length} bytes)`)
-    if (html.includes('Énergie') || html.includes('Electricit')) ok('contient titre/contenu énergie')
-    else ko('contenu', 'titre absent')
+    // ⚠️ RÉVISÉ le 28/09/2026 — même correction que `test-rh.mjs`. Ce bloc
+    // lisait le CONTENU de la page sans authentification ; depuis le module
+    // 28 le middleware redirige vers /login, donc l'assertion échouait EN
+    // PERMANENCE sur un comportement correct. On vérifie la propriété qui
+    // compte : cet écran de consommations ne répond pas sans session.
+    const r = await fetch(`${BASE}/admin/energie`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    if ([307, 302, 401, 403].includes(r.status)) ok(`/admin/energie — appel anonyme refusé (HTTP ${r.status})`)
+    else ko(`/admin/energie sans session`, `HTTP ${r.status} — la page a répondu`)
   })
 } else {
   console.log('\n→ HTTP : skip (PORT non défini)')

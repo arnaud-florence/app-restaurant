@@ -72,18 +72,29 @@ await step('factures : détection en retard', async () => {
   else ko('en retard', `attendu ≥ 1, reçu ${data.length}`)
 })
 
-// ─── 4. Comparateur prix : Mozzarella avec 2 fournisseurs ───────────
-await step('comparateur : Mozzarella avec >= 2 fournisseurs', async () => {
-  const { data: ing } = await sb.from('ingredients').select('id').eq('nom', 'Mozzarella di Bufala').single()
-  if (!ing) { ko('mozza', 'introuvable'); return }
-  const { data: hist } = await sb
-    .from('historique_prix_ingredients')
-    .select('fournisseur_id, prix_achat_ht')
-    .eq('ingredient_id', ing.id)
-    .not('fournisseur_id', 'is', null)
-  const fournisseursUniques = new Set(hist.map(h => h.fournisseur_id))
-  if (fournisseursUniques.size >= 2) ok(`${fournisseursUniques.size} fournisseurs avec prix mozzarella`)
-  else ko('comparateur mozza', `${fournisseursUniques.size} fournisseur(s) seulement`)
+// ─── 4. Comparateur prix : au moins une matière mise en concurrence ──
+//
+// ⚠️ RÉVISÉ le 28/09/2026. Ce bloc cherchait « Mozzarella di Bufala » et son
+// historique de prix PAR FOURNISSEUR — un ingrédient du jeu de démonstration
+// purgé en septembre, et un mécanisme remplacé depuis : la comparaison vit
+// dans `catalogue_fournisseur` (0151/0152), pas dans l'historique des prix.
+// Le test réclamait donc une donnée morte sur une mécanique morte.
+//
+// L'intention reste la même — « sait-on mettre deux fournisseurs face à
+// face ? » — mais elle porte maintenant sur l'endroit où ça se joue.
+await step('comparateur : des matières mises en concurrence', async () => {
+  const { data: lignes } = await sb
+    .from('catalogue_fournisseur')
+    .select('ingredient_id, fournisseur_id, prix_ht')
+    .eq('actif', true).not('ingredient_id', 'is', null).not('prix_ht', 'is', null)
+  const parIng = new Map()
+  for (const l of (lignes ?? [])) {
+    if (!parIng.has(l.ingredient_id)) parIng.set(l.ingredient_id, new Set())
+    parIng.get(l.ingredient_id).add(l.fournisseur_id)
+  }
+  const duel = [...parIng.values()].filter(f => f.size >= 2).length
+  if (duel >= 1) ok(`${duel} matière(s) chiffrées par au moins deux fournisseurs`)
+  else ko('comparateur', 'aucune matière n’a deux offres chiffrées')
 })
 
 // ─── 5. CRUD fournisseur ────────────────────────────────────────────

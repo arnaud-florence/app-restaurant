@@ -42,10 +42,28 @@ t('le produit a déjà une référence → jamais écrasée',
   !apprend({ reference: '52055', parReference: false, nbTrouves: 1, dejaUneRef: true }))
 
 // ── Contrôle sur données réelles : rien ne doit être cassé ──────────
-const recs = await sb('recettes?select=id,reference_fournisseur&actif=eq.true')
-const refs = (recs ?? []).map(r => r.reference_fournisseur).filter(Boolean)
-const doublons = refs.filter((r, i) => refs.indexOf(r) !== i)
-t('aucune référence produit en double', doublons.length === 0, doublons.join(', '))
+// ⚠️ RÉVISÉ le 28/09/2026. Cette assertion exigeait qu'AUCUNE référence ne
+// soit partagée par deux produits. C'est faux par construction : un seul
+// achat nourrit souvent plusieurs produits vendus — le demi et la pinte
+// sortent du même fût, le shot et la dose de tequila de la même bouteille,
+// les deux pizzas à la plaque de la même plaque crue (le cas documenté du
+// `filter` plutôt que du `find`), et les quatre cafés de la même capsule.
+// Le test était rouge sur le modèle lui-même.
+//
+// Ce qui serait une VRAIE erreur, c'est une même référence chez DEUX
+// FOURNISSEURS DIFFÉRENTS : la ligne de facture ne saurait plus lequel elle
+// alimente, et le prix partirait sur le mauvais produit.
+const recs = await sb('recettes?select=id,nom,reference_fournisseur,fournisseur_id&actif=eq.true')
+const parRef = new Map()
+for (const r of (recs ?? [])) {
+  if (!r.reference_fournisseur) continue
+  if (!parRef.has(r.reference_fournisseur)) parRef.set(r.reference_fournisseur, new Set())
+  parRef.get(r.reference_fournisseur).add(r.fournisseur_id ?? null)
+}
+const ambigus = [...parRef].filter(([, f]) => [...f].filter(Boolean).length > 1)
+t('aucune référence partagée par DEUX fournisseurs différents',
+  ambigus.length === 0, ambigus.map(([r]) => r).join(', '))
+t(`${parRef.size} référence(s) produit posée(s)`, parRef.size > 0)
 
 const ings = await sb('ingredients?select=id,reference_fournisseur&actif=eq.true')
 const refsI = (ings ?? []).map(r => r.reference_fournisseur).filter(Boolean)
