@@ -110,10 +110,18 @@ try {
   etape('cohérence caisse ↔ base après ouverture')
   const zelty = env.ZELTY_API_KEY
   if (zelty) {
-    const plats = (await (await fetch('https://api.zelty.fr/2.11/catalog/dishes?show_all=true&lang=fr&limit=0',
+    const bruts = (await (await fetch('https://api.zelty.fr/2.11/catalog/dishes?show_all=true&lang=fr&limit=0',
       { headers: { Authorization: `Bearer ${zelty}` } })).json()).dishes ?? []
+    // ⚠️ `show_all=true` rend AUSSI les plats ÉTEINTS, et c'est voulu — un
+    // plat actif en caisse que nous ne connaissons pas est le cas dangereux.
+    // Mais un plat éteint est un produit RETIRÉ des deux côtés (les quatre
+    // Pago, 28/09/2026) : le compter ferait échouer ce contrôle sur une
+    // décision assumée, et il n'a plus ni bouton ni famille à avoir.
+    const plats = bruts.filter(p => p.disable !== true)
+    const eteints = bruts.length - plats.length
     t('la caisse contient autant de plats que la base a de produits',
-      plats.length === cartes.length, `caisse ${plats.length} / base ${cartes.length}`)
+      plats.length === cartes.length,
+      `caisse ${plats.length} / base ${cartes.length}${eteints ? ` (+${eteints} éteint(s))` : ''}`)
     t('aucun plat sans famille en caisse', plats.every(p => (p.tags ?? []).length > 0),
       `${plats.filter(p => !(p.tags ?? []).length).length} sans famille`)
   } else console.log('    (caisse ignorée — ZELTY_API_KEY absente)')
