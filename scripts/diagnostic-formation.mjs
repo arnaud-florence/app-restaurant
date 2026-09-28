@@ -1,5 +1,13 @@
-// Simule ce que /formation/page.tsx renvoie pour un user donné (par email).
-// node scripts/test-filter-formation.mjs <email>
+// Ce que /formation voit pour un compte donné — outil de DIAGNOSTIC.
+//
+//   node scripts/diagnostic-formation.mjs <email>
+//
+// ⚠️ RENOMMÉ le 28/09/2026. Il s'appelait `test-filter-formation.mjs` et
+// comptait donc dans la suite de tests, où il était ROUGE en permanence :
+// il visait par défaut `contact.winedesign@gmail.com`, un compte qui
+// n'existe plus. Ce n'est pas un test — il n'affirme rien, il montre. Un
+// outil de diagnostic rangé parmi les tests fait baisser le score pour
+// rien, et on finit par ne plus lire le score.
 
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
@@ -34,7 +42,12 @@ function guideAccessible(posteEmploye, posteGuide) {
   return aliases.includes(posteGuide)
 }
 
-const email = process.argv[2] ?? 'contact.winedesign@gmail.com'
+const email = process.argv[2]
+if (!email) {
+  console.error('Usage : node scripts/diagnostic-formation.mjs <email>\n'
+    + '  (sans adresse il n\'y a rien à montrer — pas de compte par défaut)')
+  process.exit(1)
+}
 console.log(`Test pour ${email}\n`)
 
 const { data: profil } = await sb.from('profils').select('*').eq('email', email).maybeSingle()

@@ -101,8 +101,19 @@ await step('l’équipe est prévenue, vers le bon écran', async () => {
     ? O(`${recentes.length} notification(s) pour ${emps.length} employé(s) actif(s)`)
     : K('destinataires', `${recentes.length} notif(s) pour ${emps?.length} employé(s)`)
   const n = recentes[0]
-  n?.url_action === '/comptoir/fournil'
-    ? O('lien → /comptoir/fournil (écran réellement ouvert)')
+  // ⚠️ RÉVISÉ le 28/09/2026. Le test attendait `/comptoir/fournil`, l'écran
+  // de PRISE DE COMMANDE. Une commande web n'a pas à être ressaisie : elle
+  // est déjà passée. Ce qu'il faut ouvrir, c'est l'écran de PRÉPARATION —
+  // et c'est vers lui que la notification a été redirigée le 25/09, quand
+  // elle pointait encore sur `/emporter`, un écran supprimé un mois plus
+  // tôt. Le test décrivait l'ancienne cible.
+  // ⚠️ Le point-virgule n'est pas décoratif : une ligne qui COMMENCE par un
+  // crochet est lue comme un accès d'index à l'expression précédente
+  // (`recentes[0][...]`), et le test échoue sur « Cannot read properties of
+  // undefined ». Piège d'insertion automatique de point-virgule.
+  const ECRANS_PREPA = ['/comptoir/fournil/kds', '/comptoir/fournil']
+  ECRANS_PREPA.includes(n?.url_action)
+    ? O(`lien → ${n.url_action} (écran de préparation, réellement ouvert)`)
     : K('url_action', `${n?.url_action} — mène à un écran en veille`)
   n?.message?.includes('2× Baguette classique')
     ? O(`contenu lisible sans ouvrir l’écran : « ${n.message} »`)
