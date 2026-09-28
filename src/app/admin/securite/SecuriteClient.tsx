@@ -29,7 +29,11 @@ export default function SecuriteClient({
   connexions: ConnexionRow[]
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'2fa' | 'profils' | 'audit' | 'connexions' | 'sauvegarde' | 'pin_borne'>('2fa')
+  // ⚠️ L'onglet « PIN Borne » a été retiré le 28/09/2026. La borne de
+  // commande a disparu le 25/09 avec la frontière des caisses — l'onglet
+  // décrivait encore un PIN pour « encaisser depuis /emporter », deux écrans
+  // qui n'existent plus, et son bouton menait sur un 404.
+  const [tab, setTab] = useState<'2fa' | 'profils' | 'audit' | 'connexions' | 'sauvegarde'>('2fa')
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -62,7 +66,6 @@ export default function SecuriteClient({
               <Lock className="h-4 w-4 inline mr-1" /> Connexions {connexions.some(c => c.inhabituelle) && <Badge className="ml-1 bg-amber-500">⚠</Badge>}
             </TabBtn>
             <TabBtn a={tab === 'sauvegarde'} on={() => setTab('sauvegarde')}><Download className="h-4 w-4 inline mr-1" /> Sauvegarde</TabBtn>
-            <TabBtn a={tab === 'pin_borne'}  on={() => setTab('pin_borne')}>🛍 PIN Borne</TabBtn>
           </div>
         </AdminPageHeader>
 
@@ -71,7 +74,6 @@ export default function SecuriteClient({
         {tab === 'audit'      && <PanelAudit audit={audit} />}
         {tab === 'connexions' && <PanelConnexions connexions={connexions} />}
         {tab === 'sauvegarde' && <PanelSauvegarde />}
-        {tab === 'pin_borne'  && <PanelPinBorne />}
       </main>
     </div>
   )
@@ -422,31 +424,3 @@ function PanelSauvegarde() {
   )
 }
 
-// ─── PIN Borne ──────────────────────────────────────────────────
-function PanelPinBorne() {
-  return (
-    <Card className="p-4">
-      <div className="flex items-start gap-3 mb-4">
-        <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-amber-100 text-amber-700 text-lg shrink-0">🛍</span>
-        <div>
-          <h2 className="font-semibold">PIN manager — Borne kiosk</h2>
-          <p className="text-sm text-zinc-600 mt-1">
-            Code à <strong>4-6 chiffres</strong> requis pour encaisser ou annuler une commande borne
-            depuis <code>/emporter</code>. Sécurise les actions sensibles sur tablette partagée
-            (un client ne peut pas se &laquo;&nbsp;auto-encaisser&nbsp;&raquo; en touchant l&apos;écran).
-          </p>
-          <ul className="text-xs text-zinc-500 mt-2 space-y-1">
-            <li>• PIN stocké hashé (SHA-256 + salt unique par manager).</li>
-            <li>• 3 essais ratés en 60 s → lock 60 s automatique.</li>
-            <li>• Pas besoin de connaître l&apos;ancien PIN pour le changer.</li>
-          </ul>
-        </div>
-      </div>
-      <Link href="/admin/borne-pin">
-        <Button className="gap-2">
-          <KeyRound className="h-4 w-4" /> Configurer le PIN
-        </Button>
-      </Link>
-    </Card>
-  )
-}

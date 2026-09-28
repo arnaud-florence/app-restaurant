@@ -53,8 +53,11 @@ step('manager : accès et écriture sur tout', () => {
     assert(canAccess('manager', path), `manager → ${path} = autorisé`, true, false)
     assert(!isReadOnly('manager', path), `manager → ${path} pas en lecture seule`, true, false)
   }
-  assert(getMainRoute('manager') === '/admin/pilotage', 'manager.main = /admin/pilotage',
-    '/admin/pilotage', getMainRoute('manager'))
+  // ⚠️ RÉVISÉ le 28/09/2026 : le manager atterrit sur `/admin/cat`, le Centre
+  // de contrôle — la carte des modules, filtrée par rôle. C'est l'écran conçu
+  // pour comprendre ce que l'outil contient ; le pilotage vient après.
+  assert(getMainRoute('manager') === '/admin/cat', 'manager.main = /admin/cat',
+    '/admin/cat', getMainRoute('manager'))
 })
 
 // ─── 2. Cuisinier : matrice de la spec ────────────────────────────
@@ -90,23 +93,35 @@ step('pizzaiolo : filtre tag PIZZA + lecture seule recettes', () => {
   assert(canAccess('pizzaiolo', '/admin/recettes'), 'pizzaiolo accède à /admin/recettes', true, false)
   assert(!canAccess('pizzaiolo', '/admin/finances'), 'pizzaiolo bloqué sur /admin/finances', false, true)
   assert(isReadOnly('pizzaiolo', '/admin/recettes'), 'pizzaiolo /admin/recettes en lecture seule', true, false)
-  assert(getMainRoute('pizzaiolo') === '/cuisine?role=pizzaiolo',
-    'pizzaiolo.main = /cuisine?role=pizzaiolo', '/cuisine?role=pizzaiolo', getMainRoute('pizzaiolo'))
+  // ⚠️ RÉVISÉ : tous les postes de service atterrissent sur `/mon-espace`,
+  // qui liste leurs écrans. Un lien direct vers `/cuisine?role=pizzaiolo`
+  // court-circuitait le briefing de poste affiché là.
+  assert(getMainRoute('pizzaiolo') === '/mon-espace',
+    'pizzaiolo.main = /mon-espace', '/mon-espace', getMainRoute('pizzaiolo'))
 })
 
-// ─── 4. Serveur : 4 lectures seules + accès /serveur /caisse ──────
+// ─── 4. Serveur : matrice service salle ───────────────────────────
+//
+// ⚠️ RÉVISÉ le 28/09/2026. Ce bloc exigeait l'accès à `/serveur` et
+// `/caisse` — deux écrans RETIRÉS le 24/08 avec la frontière des caisses.
+// Le code avait été corrigé (le commentaire de `permissions.ts` le dit :
+// « les laisser ici n'ouvre rien »), pas le test : il était rouge depuis
+// cinq semaines, sur un comportement voulu. Le serveur travaille au
+// comptoir, sur la caisse agréée.
 step('serveur : matrice service salle', () => {
-  const allowed = ['/serveur', '/caisse', '/admin/clients', '/admin/allergenes',
+  const allowed = ['/comptoir', '/admin/clients', '/admin/allergenes',
                    '/admin/boissons', '/admin/reservations', '/admin/hygiene']
   const denied = ['/cuisine', '/bar', '/admin/finances', '/admin/recettes', '/admin/ingredients']
-  const readonly = ['/admin/allergenes', '/admin/boissons', '/admin/reservations', '/admin/evenements']
+  // ⚠️ `/admin/evenements` retiré de la liste : cet écran n'existe pas —
+  // l'événementiel est un onglet de /admin/reservations.
+  const readonly = ['/admin/allergenes', '/admin/boissons', '/admin/reservations']
 
   for (const p of allowed)  assert(canAccess('serveur', p),  `serveur → ${p} autorisé`, true, false)
   for (const p of denied)   assert(!canAccess('serveur', p), `serveur → ${p} refusé`, false, true)
   for (const p of readonly) assert(isReadOnly('serveur', p), `serveur → ${p} lecture seule`, true, false)
 
   // L'alias 'salle' = serveur
-  assert(canAccess('salle', '/serveur'), 'alias salle ≡ serveur', true, false)
+  assert(canAccess('salle', '/comptoir'), 'alias salle ≡ serveur', true, false)
 })
 
 // ─── 5. Barman : filtre contenu BAR ───────────────────────────────
@@ -138,8 +153,10 @@ step('plonge : hygiene + dechets uniquement', () => {
   assert(canAccess('plonge', '/admin/hygiene'), 'plonge → /admin/hygiene', true, false)
   assert(canAccess('plonge', '/admin/dechets'), 'plonge → /admin/dechets', true, false)
   assert(!canAccess('plonge', '/admin/recettes'), 'plonge bloqué /admin/recettes', false, true)
-  assert(getMainRoute('plonge') === '/admin/hygiene', 'plonge.main = /admin/hygiene',
-    '/admin/hygiene', getMainRoute('plonge'))
+  // ⚠️ RÉVISÉ : comme tous les postes de service, le plongeur atterrit sur
+  // `/mon-espace`, qui lui liste ses écrans et son briefing.
+  assert(getMainRoute('plonge') === '/mon-espace', 'plonge.main = /mon-espace',
+    '/mon-espace', getMainRoute('plonge'))
   // Alias 'extra'
   assert(canAccess('extra', '/admin/hygiene'), 'alias extra ≡ plonge', true, false)
 })

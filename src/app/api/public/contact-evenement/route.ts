@@ -81,7 +81,10 @@ export async function POST(req: Request) {
           type: 'message_general',
           titre: '🎉 Nouvelle demande événement',
           message: `${p.type_evenement} · ${p.nombre_personnes} pers · ${p.date_souhaitee} · ${p.email}`,
-          url_action: '/admin/evenements',
+          // ⚠️ `/admin/evenements` n'existe plus : l'événementiel est un onglet de
+          // /admin/reservations. La notification d'une VRAIE demande client
+          // envoyait le manager sur un 404.
+          url_action: '/admin/reservations',
         }))
       )
     }

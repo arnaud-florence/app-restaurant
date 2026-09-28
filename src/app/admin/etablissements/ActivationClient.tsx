@@ -2,7 +2,7 @@
 
 // Tableau des interrupteurs par activité (migration 0110).
 //
-// C'est ici que se joue la réouverture du restaurant fin octobre 2026 :
+// C'est ici que se joue la réouverture du restaurant, le samedi 3 octobre 2026 :
 // un bouton « Ouvrir le restaurant » bascule les 7 modules d'un coup.
 // Aucun code à modifier, aucun redéploiement — le site public suit dans
 // la minute (TTL de 60 s sur /api/public/activation).
@@ -12,8 +12,12 @@ import type { ModuleActivation, ConfigLivraisonFournil } from '@/lib/activation/
 import { updateModule, basculerActivite, updateLivraisonFournil } from './actions'
 
 const GROUPES: { cle: 'fournil' | 'restaurant' | 'commun'; titre: string; emoji: string; pitch: string }[] = [
-  { cle: 'fournil',    emoji: '🥖', titre: 'Fournil',    pitch: 'Ouvert. C\'est la seule activité visible du public aujourd\'hui.' },
-  { cle: 'restaurant', emoji: '🍽', titre: 'Restaurant', pitch: 'Fermé jusqu\'à fin octobre 2026. Rien n\'est supprimé : tout se rallume ici.' },
+  // ⚠️ La date a été corrigée le 28/09/2026. Cet écran annonçait encore
+  // « fin octobre 2026 » alors que l'ouverture est arrêtée au SAMEDI
+  // 3 OCTOBRE depuis un mois — et c'est l'écran qu'on ouvre le matin même,
+  // pour appuyer sur le bouton. Une date fausse là est pire qu'ailleurs.
+  { cle: 'fournil',    emoji: '🥖', titre: 'Fournil',    pitch: 'Ouvert. Le bar, la brasserie et la pizzeria ouvrent le samedi 3 octobre.' },
+  { cle: 'restaurant', emoji: '🍽', titre: 'Restaurant', pitch: 'Ouverture le samedi 3 octobre 2026. Rien n\'est supprimé : tout se rallume ici.' },
   { cle: 'commun',     emoji: '⭐', titre: 'Transverse', pitch: 'Indépendant des deux activités.' },
 ]
 

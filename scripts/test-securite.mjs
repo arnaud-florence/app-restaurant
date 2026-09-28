@@ -110,11 +110,23 @@ if (BASE) {
     } else ko('middleware redirect', `HTTP ${r.status}`)
   })
 
-  await step('HTTP : pages opérationnelles non protégées (/, /caisse, /serveur)', async () => {
-    for (const path of ['/', '/caisse', '/serveur']) {
+  // ⚠️ RÉVISÉ le 28/09/2026. La racine `/` était attendue LIBRE, comme les
+  // écrans de service. Elle redirige vers /login, et c'est voulu : la
+  // landing publique n'a jamais été écrite ici — le site vitrine, c'est
+  // casatasia.fr, un autre projet. La racine de ce back-office doit donc
+  // mener à la connexion. Le test était rouge sur le bon comportement.
+  await step('HTTP : la racine mène au login, les écrans de service restent libres', async () => {
+    const r0 = await fetch(`${BASE}/`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    const loc0 = r0.headers.get('location') ?? ''
+    if ((r0.status === 307 || r0.status === 308) && loc0.includes('/login')) ok('/ → /login (back-office, pas de landing)')
+    else ko('/ devrait mener au login', `HTTP ${r0.status} ${loc0}`)
+
+    // Ces deux-là servent une page d'EXPLICATION depuis le retrait du
+    // 24/08 (« ça se fait sur la caisse »), pas un 404 : une tablette a pu
+    // rester dessus, un favori a pu être posé. Elles restent donc libres.
+    for (const path of ['/caisse', '/serveur']) {
       const r = await fetch(`${BASE}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
-      if (r.status === 200) ok(`${path} → 200 (libre)`)
-      else if (r.status === 307 || r.status === 308) ko(`${path} ne devrait pas rediriger`, `→ ${r.headers.get('location')}`)
+      if (r.status === 200) ok(`${path} → 200 (page d'explication, libre)`)
       else ko(path, `HTTP ${r.status}`)
     }
   })

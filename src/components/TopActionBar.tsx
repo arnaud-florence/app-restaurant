@@ -125,8 +125,6 @@ const ICON_BY_HREF: Record<string, LucideIcon> = {
   // Système
   '/admin/setup':             Settings,
   '/admin/securite':          Lock,
-  '/admin/borne':             Tablet,
-  '/admin/borne-pin':         Lock,
 }
 
 // Alias pour compat (utilisé dans le code ops chips)
@@ -273,7 +271,6 @@ const ALL_GROUPES: Group[] = [
     items: [
       { href: '/admin/setup',     label: 'Configuration',  emoji: '⚙️' },
       { href: '/admin/securite',  label: 'Sécurité',       emoji: '🔐' },
-      { href: '/admin/borne',     label: 'Borne kiosk',    emoji: '🛍' },
     ],
   },
 ]

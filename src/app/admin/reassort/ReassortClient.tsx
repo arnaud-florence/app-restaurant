@@ -122,7 +122,7 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
         <p className="mt-1 text-sm text-zinc-600">
           Ce qu&apos;on a, ce qu&apos;il faut avoir, ce qu&apos;il faut commander —
           et chez qui. <Link href="/admin/achats" className="underline">Plateforme d&apos;achat</Link>
-          {' · '}<Link href="/comptoir/fournil/inventaire" className="underline">Compter le stock</Link>
+          {' · '}<Link href="/inventaire" className="underline">Compter le stock</Link>
         </p>
       </header>
 
