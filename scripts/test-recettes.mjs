@@ -41,7 +41,11 @@ async function step(name, fn) {
 function coutTotal(lignes) { return lignes.reduce((s, l) => s + l.quantite * l.prix_achat_ht, 0) }
 function coutPortion(total, n) { return n > 0 ? total / n : 0 }
 function foodCostPct(coutPortion, prixHT) { return prixHT > 0 ? (coutPortion / prixHT) * 100 : 0 }
-function statutFC(pct) { if (pct < 28) return 'vert'; if (pct <= 32) return 'orange'; return 'rouge' }
+// ⚠️ « inconnu » est un STATUT, pas un mauvais résultat (0150). Un coût nul
+// n'existe pas en restauration : zéro veut dire « on ne sait pas », et
+// l'afficher en vert faisait passer le produit dont on savait le moins pour
+// le meilleur de la carte.
+function statutFC(pct) { if (pct <= 0) return 'inconnu'; if (pct < 28) return 'vert'; if (pct <= 32) return 'orange'; return 'rouge' }
 
 console.log(`╔══════════════════════════════════════════════════════════╗`)
 console.log(`║ Test recettes — tag : ${TAG}              ║`)
@@ -50,26 +54,39 @@ console.log(`╚═════════════════════�
 // ─── 1. Lecture des seeds + calcul food cost ────────────────────────
 await step('seed : 5 recettes avec ingrédients liés', async () => {
   const { data, error } = await sb.from('recettes')
-    .select('id, nom, nb_portions, prix_vente_ht, recette_ingredients(quantite, ingredient:ingredients(prix_achat_ht))')
+    .select('id, nom, nb_portions, prix_vente_ht, cout_achat_ht, recette_ingredients(quantite, ingredient:ingredients(prix_achat_ht))')
   if (error) throw new Error(error.message)
   if (data.length >= 5) ok(`${data.length} recettes en base`)
   else ko('count', `attendu ≥ 5, reçu ${data.length}`)
 
   // Pour chaque recette : food cost cohérent
+  const inconnus = []
   for (const r of data) {
     const lignes = (r.recette_ingredients ?? []).map(li => ({
       quantite: Number(li.quantite),
       prix_achat_ht: Number(li.ingredient?.prix_achat_ht ?? 0),
     }))
-    const total = coutTotal(lignes)
+    // ⚠️ RÉVISÉ le 28/09/2026. Ce calcul ne lisait QUE la composition, alors
+    // que `synthese()` ADDITIONNE composition et `cout_achat_ht` depuis la
+    // 0126 : le Fournil est en achat-revente, un croissant surgelé n'a pas de
+    // recette, il a un prix d'achat. Le test annonçait donc « valeur
+    // aberrante 0,0 % » sur une centaine de produits parfaitement chiffrés —
+    // 294 occurrences, un mur de rouge que plus personne ne lisait.
+    const total = coutTotal(lignes) + Number(r.cout_achat_ht ?? 0)
     const portion = coutPortion(total, Number(r.nb_portions))
     const fc = foodCostPct(portion, Number(r.prix_vente_ht))
     if (fc > 0 && fc < 200) {
       ok(`${r.nom} → food cost ${fc.toFixed(1)}% (${statutFC(fc)})`)
+    } else if (fc <= 0) {
+      // Ni composition ni prix d'achat : c'est « coût inconnu », l'état que
+      // la 0150 a rendu visible en gris. Ce n'est pas un échec du test, c'est
+      // un chantier de saisie — il se compte, il ne se signale pas en rouge.
+      inconnus.push(r.nom)
     } else {
       ko(`${r.nom} food cost`, `valeur aberrante ${fc.toFixed(1)}%`)
     }
-  }
+  }  if (inconnus.length) console.log(`    ⚠ ${inconnus.length} produit(s) sans coût connu — « coût inconnu », à saisir`)
+
 })
 
 // ─── 2. CRUD : créer une recette de test avec 2 ingrédients ─────────
