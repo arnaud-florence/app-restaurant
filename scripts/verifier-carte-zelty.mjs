@@ -62,7 +62,15 @@ for (const r of nous) {
   if (bon) ok++
 }
 
-const orphelins = plats.filter(p => !nous.some(r => String(r.id) === String(p.remote_id ?? '')))
+// ⚠️ `show_all=true` rend AUSSI les plats éteints — c'est voulu : un plat
+// actif en caisse que nous ne connaissons pas est le cas dangereux, celui
+// qui se vend sans rien derrière. Mais un plat ÉTEINT sans contrepartie
+// n'est pas un orphelin, c'est un retrait mené des deux côtés (les quatre
+// Pago, 28/09/2026). Le compter ferait rougir ce contrôle sur une décision
+// assumée, et un contrôle rouge en permanence finit par être ignoré.
+const orphelins = plats.filter(p =>
+  p.disable !== true && !nous.some(r => String(r.id) === String(p.remote_id ?? '')))
+const eteints = plats.filter(p => p.disable === true).length
 
 console.log(`\n── Carte Zelty vs notre base ──\n`)
 console.log(`  produits actifs chez nous : ${nous.length}`)
@@ -70,6 +78,7 @@ console.log(`  plats dans la caisse      : ${plats.length}`)
 console.log(`  conformes en tout point   : ${ok}`)
 console.log(`  écarts                    : ${pbs.length}`)
 console.log(`  plats sans contrepartie   : ${orphelins.length}`)
+console.log(`  plats éteints en caisse   : ${eteints}`)
 if (pbs.length) { console.log('\n  ── écarts ──'); pbs.slice(0, 30).forEach(l => console.log('   ' + l)) }
 if (orphelins.length) { console.log('\n  ── orphelins ──'); orphelins.slice(0, 10).forEach(p => console.log('   ' + p.name)) }
 console.log(`\n── ${pbs.length === 0 && orphelins.length === 0 ? '✓ carte conforme' : '✗ à corriger'} ──\n`)
