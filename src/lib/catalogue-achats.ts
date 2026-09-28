@@ -810,6 +810,14 @@ export const RAYON_NON_CLASSE: Rayon = {
 export function rayonFournisseur(famille: string | null): Rayon {
   if (!famille) return RAYON_NON_CLASSE
   const f = famille.toUpperCase()
+  // ⚠️ UN JUS EST UNE BOISSON, QUEL QUE SOIT LE FRUIT DONT IL EST FAIT.
+  // « Jus de fruits » — 67 références chez Euro-Cash — contient FRUIT, et
+  // `f-primeur` passant avant `f-boissons`, le rayon entier se rangeait
+  // dans « Fruits & légumes », à côté des tomates et de la salade. On ne
+  // cherche pas un jus d'orange au rayon primeur. C'est l'exception à la
+  // règle d'ordre voisine (« FRUITS SURGELÉS » va bien aux fruits) : là le
+  // fruit EST le produit, ici il n'est que la matière première.
+  if (f.includes('JUS')) return RAYONS_FOURNISSEUR.find(r => r.cle === 'f-boissons') ?? RAYON_NON_CLASSE
   for (const r of RAYONS_FOURNISSEUR) {
     if (r.mots.some(m => f.includes(m))) return r
   }

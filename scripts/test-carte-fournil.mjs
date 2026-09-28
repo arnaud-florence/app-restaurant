@@ -115,9 +115,15 @@ const HORS_LIGNE_VOULU = new Set([
 ])
 
 await step('périmètre de la carte', async () => {
-  // Les produits d'affiche retirés de la vente ne comptent plus dans l'actif.
-  const retires = Object.keys(AFFICHES).filter(n => carte.some(r => r.nom === n && !r.actif)).length
-  const attendu = Object.keys(AFFICHES).length - retires + HORS_AFFICHE.size
+  // Les produits retirés de la vente ne comptent plus dans l'actif — qu'ils
+  // viennent d'une affiche ou de la caisse. ⚠️ La règle ne valait que pour
+  // les affiches : le 28/09/2026, les quatre Pago sortis de la carte ont
+  // fait échouer ce test alors qu'ils avaient été retirés exprès. Un test
+  // rouge sur une décision assumée finit par être ignoré.
+  const retire = n => carte.some(r => r.nom === n && !r.actif)
+  const retires = Object.keys(AFFICHES).filter(retire).length
+  const retiresCaisse = [...HORS_AFFICHE].filter(retire).length
+  const attendu = Object.keys(AFFICHES).length - retires + HORS_AFFICHE.size - retiresCaisse
   if (actifs.length === attendu) ok(`${actifs.length} produits actifs (${Object.keys(AFFICHES).length} affichés + ${HORS_AFFICHE.size} connus de la caisse)`)
   else ko('nombre de produits', `${actifs.length} en base, ${attendu} attendus`)
 

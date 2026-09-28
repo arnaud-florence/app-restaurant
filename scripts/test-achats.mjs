@@ -671,6 +671,8 @@ titre('Les rayons du catalogue FOURNISSEUR')
   const rayonF = f => {
     if (!f) return 'f-autres'
     const u = f.toUpperCase()
+    // ⚠️ Recopie de l'exception : un JUS est une boisson avant d'être un fruit.
+    if (u.includes('JUS')) return 'f-boissons'
     for (const [cle, mots] of R) if (mots.some(m => u.includes(m))) return cle
     return 'f-autres'
   }
@@ -679,7 +681,20 @@ titre('Les rayons du catalogue FOURNISSEUR')
   t('« DESSERTS PÂTISSIERS » va en boulangerie', rayonF('DESSERTS PÂTISSIERS') === 'f-boulangerie')
   t('« SAUCES FROIDES » va en épicerie', rayonF('SAUCES FROIDES') === 'f-epicerie')
   t('« CRUSTACE » va à la marée', rayonF('CRUSTACE') === 'f-maree')
-  t('⚠️ « FRUITS SURGELÉS » va aux FRUITS, pas aux surgelés — c’est le produit qu’on cherche',
+  // ⚠️ UN JUS EST UNE BOISSON, quel que soit le fruit. « Jus de fruits » — les
+// 67 références du rayon Euro-Cash — contient FRUIT, et `f-primeur` passant
+// avant `f-boissons`, le rayon entier tombait dans « Fruits & légumes », à
+// côté des tomates. C'est l'exception à la règle d'ordre testée juste en
+// dessous : pour les fruits surgelés le fruit EST le produit, pour un jus il
+// n'est que la matière première.
+t('⚠️ « Jus de fruits » va aux BOISSONS, pas au rayon primeur',
+  rayonF('Jus de fruits') === 'f-boissons')
+t('« JUS EN BRIQUES 1L » et « JUS DE CITRON » aussi',
+  rayonF('JUS EN BRIQUES 1L') === 'f-boissons'
+  && rayonF('JUS DE CITRON') === 'f-boissons')
+t('mais « PURÉES DE FRUITS » reste aux fruits — ce n’est pas une boisson',
+  rayonF('PURÉES DE FRUITS') === 'f-primeur')
+t('⚠️ « FRUITS SURGELÉS » va aux FRUITS, pas aux surgelés — c’est le produit qu’on cherche',
     rayonF('FRUITS SURGELÉS') === 'f-primeur')
   t('mais « SURGELES » seul va bien aux surgelés', rayonF('SURGELES') === 'f-surgeles')
   t('⚠️ un chapitre de prose n’est PAS rangé de force',
