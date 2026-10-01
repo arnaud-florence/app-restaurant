@@ -67,14 +67,38 @@ async function reduirePhoto(file: File): Promise<string> {
   })
   const MAX = 1600
   const ratio = Math.min(1, MAX / Math.max(img.width, img.height))
-  // Déjà petite : on garde l'original (re-compresser dégraderait pour rien)
-  if (ratio === 1 && file.size < 1024 * 1024) return dataUrl
+  // Déjà petite ET légère : on garde l'original, re-compresser dégraderait
+  // pour rien. ⚠️ LES DEUX CONDITIONS COMPTENT : une capture d'écran de PDF
+  // fait souvent 1200×1600 — donc sous la limite de taille — et pèse
+  // plusieurs Mo en PNG. Gardée telle quelle, deux pages suffisaient à
+  // dépasser la limite de corps de requête, et le navigateur ne disait que
+  // « Load failed » : ni code, ni message, rien à comprendre.
+  if (ratio === 1 && file.size < 700 * 1024) return dataUrl
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(img.width * ratio)
   canvas.height = Math.round(img.height * ratio)
   canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.82)
+  // ⚠️ TOUJOURS EN JPEG, jamais au format d'origine : un PNG de capture pèse
+  // cinq à dix fois le même contenu en JPEG, pour un texte aussi lisible.
+  let out = canvas.toDataURL('image/jpeg', 0.82)
+  // Une page encore trop lourde après réduction (document très dense) :
+  // on baisse la qualité plutôt que de laisser l'envoi échouer sans mot dire.
+  for (const q of [0.7, 0.6, 0.5]) {
+    if (out.length <= 1_200_000) break
+    out = canvas.toDataURL('image/jpeg', q)
+  }
+  return out
 }
+
+/**
+ * ⚠️ VERCEL REFUSE UN CORPS DE REQUÊTE AU-DELÀ DE ~4,5 Mo, et il le fait
+ * AVANT que le code ne s'exécute : pas de JSON d'erreur, pas de code HTTP
+ * exploitable, juste un échec réseau que Safari nomme « Load failed ». Le
+ * garde-fou du serveur était calibré sur 6 Mo d'IMAGE, soit ~8 Mo de corps
+ * une fois en base64 — il ne pouvait donc jamais se déclencher à temps.
+ * On mesure ici ce qui part réellement, et on le dit en clair.
+ */
+const LIMITE_CORPS = 3_800_000   // marge sous les 4,5 Mo de Vercel
 
 export default function FactureScanner({
   onExtractionComplete,
@@ -132,6 +156,13 @@ export default function FactureScanner({
         if (!m) throw new Error('Format image non reconnu.')
         return { image_base64: m[2], media_type: m[1] }
       })
+      const poids = images.reduce((n, i) => n + i.image_base64.length, 0)
+      if (poids > LIMITE_CORPS) {
+        throw new Error(
+          `Les ${images.length} pages pèsent ${(poids / 1_048_576).toFixed(1)} Mo une fois encodées, `
+          + `au-delà de ce que le serveur accepte (3,6 Mo). Scanne-les en deux fois, `
+          + `ou reprends les photos de moins près.`)
+      }
       const r = await fetch('/api/agents/scanner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +177,13 @@ export default function FactureScanner({
         setErreur('Scan effectué mais Claude n\'a pas renvoyé de données structurées.')
       }
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : 'Erreur scan')
+      const m = e instanceof Error ? e.message : 'Erreur scan'
+      // ⚠️ « Load failed » / « Failed to fetch » : la requête n'a jamais
+      // atteint le serveur. Le message brut ne dit rien à personne.
+      setErreur(/load failed|failed to fetch|networkerror/i.test(m)
+        ? 'La requête n’a pas pu partir — pages trop lourdes, ou connexion interrompue. '
+          + 'Réessaie avec une page à la fois.'
+        : m)
     } finally {
       setLoading(false)
     }

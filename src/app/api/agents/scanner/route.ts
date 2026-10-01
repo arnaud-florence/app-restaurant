@@ -109,9 +109,14 @@ export async function POST(req: Request) {
   }
   // Taille TOTALE : le front réduit chaque page (~1600 px) avant envoi, la
   // limite serveur n'est qu'un garde-fou.
-  const tailleKo = Math.ceil(pages.reduce((s, pg) => s + pg.data.length, 0) / 1024 * 0.75)
-  if (tailleKo > 6000) {
-    return NextResponse.json({ error: `Pages trop volumineuses (${tailleKo}KB > 6MB au total). Réduis la résolution.` }, { status: 413 })
+  // ⚠️ On mesure la base64, pas l'image décodée : c'est elle qui transite, et
+  // Vercel coupe le CORPS au-delà de ~4,5 Mo — avant que ce code ne tourne.
+  // Mesurer les octets décodés laissait passer ~8 Mo de corps, donc ce
+  // garde-fou ne se déclenchait jamais à temps : l'appel mourait côté réseau
+  // et le navigateur n'affichait que « Load failed ».
+  const tailleKo = Math.ceil(pages.reduce((s, pg) => s + pg.data.length, 0) / 1024)
+  if (tailleKo > 4000) {
+    return NextResponse.json({ error: `Pages trop volumineuses (${tailleKo} Ko une fois encodées, maximum 4000). Scanne-les en deux fois.` }, { status: 413 })
   }
 
   // Lance l'agent (loggue dans agents_runs + agent_findings)
