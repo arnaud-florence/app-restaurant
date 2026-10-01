@@ -66,7 +66,10 @@ export type Facture = {
   montant_ttc: number
   statut: 'a_payer' | 'paye' | 'en_retard' | 'litige' | 'annule'
   /** 'avoir' = note de crédit du fournisseur, montants stockés en négatif */
-  type_document: 'facture' | 'avoir'
+  /** `bon_livraison` : ce qui est ARRIVÉ (0166). Sans montant, sans
+   *  propagation de prix, et il porte seul les entrées de stock — la facture
+   *  qui lui est rattachée n'en ajoute aucune. */
+  type_document: 'facture' | 'avoir' | 'bon_livraison'
   facture_liee_id: string | null
   paye_le: string | null
   notes: string | null

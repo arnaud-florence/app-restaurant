@@ -75,7 +75,7 @@ export default async function InventairePage({
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
     // Lignes de facture — entrées de stock (dates portées par la facture)
     supabase.from('facture_lignes')
-      .select('description, quantite, unite, facture:factures_fournisseurs(date_emission, type_document)'),
+      .select('description, quantite, unite, facture:factures_fournisseurs(date_emission, type_document, facture_liee_id)'),
   ])
 
   // ── On compte des MATIÈRES, pas des produits vendus ─────────────────
@@ -174,7 +174,7 @@ export default async function InventairePage({
   if (datePrecedente) {
     type FL = {
       description: string; quantite: number | string | null; unite: string | null
-      facture: { date_emission?: string; type_document?: string } | null
+      facture: { date_emission?: string; type_document?: string; facture_liee_id?: string | null } | null
     }
     const depuis = (flRes.data ?? []) as unknown as FL[]
     for (const g of groupes.values()) {
@@ -184,6 +184,12 @@ export default async function InventairePage({
       for (const l of depuis) {
         const f = l.facture
         if (!f?.date_emission || f.date_emission <= datePrecedente) continue
+        // ⚠️ PAS DE DOUBLE COMPTAGE (0166). Le bon de livraison dit ce qui est
+        // ARRIVÉ ; la facture dit ce qu'on DOIT. Compter les deux ferait
+        // entrer deux fois la même marchandise — sans qu'aucune erreur ne le
+        // signale, le stock théorique doublerait à chaque livraison. Une
+        // facture rattachée à son BL n'ajoute donc rien : le BL l'a déjà fait.
+        if (f.type_document === 'facture' && f.facture_liee_id) continue
         // Un avoir est une marchandise RENDUE : elle sort du stock.
         const signe = f.type_document === 'avoir' ? -1 : 1
         if (!normalise(l.description).includes(cible)) continue

@@ -60,7 +60,9 @@ const factureSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
   lignes: z.array(factureLigneSchema).max(200).optional().default([]),
   nb_pages: z.number().int().min(1).max(8).optional().default(1),
-  type_document: z.enum(['facture','avoir']).optional().default('facture'),
+  // ⚠️ `bon_livraison` : ce qui est ARRIVÉ, par opposition à ce qu'on DOIT.
+  // Il ne porte aucun montant et ne propage aucun prix — voir la 0166.
+  type_document: z.enum(['facture','avoir','bon_livraison']).optional().default('facture'),
   /** Passe outre l'alerte de doublon (numéro déjà saisi chez ce fournisseur). */
   forcer_doublon: z.boolean().optional().default(false),
   facture_liee_id: z.string().uuid().optional().nullable(),
@@ -168,7 +170,7 @@ export async function listFactures(): Promise<Facture[]> {
       date_echeance: (r.date_echeance as string) ?? null,
       montant_ht: Number(r.montant_ht ?? 0),
       montant_ttc: Number(r.montant_ttc ?? 0),
-      type_document: (r.type_document as 'facture' | 'avoir') ?? 'facture',
+      type_document: (r.type_document as 'facture' | 'avoir' | 'bon_livraison') ?? 'facture',
       facture_liee_id: (r.facture_liee_id as string) ?? null,
       statut: r.statut as Facture['statut'],
       paye_le: (r.paye_le as string) ?? null,
@@ -537,7 +539,8 @@ export async function createFacture(input: unknown) {
       .eq('type_document', p.type_document)
       .maybeSingle()
     if (deja) {
-      const quoi = p.type_document === 'avoir' ? 'Cet avoir' : 'Cette facture'
+      const quoi = p.type_document === 'avoir' ? 'Cet avoir'
+        : p.type_document === 'bon_livraison' ? 'Ce bon de livraison' : 'Cette facture'
       const montant = Math.abs(Number(deja.montant_ttc ?? 0)).toFixed(2).replace('.', ',')
       throw new Error(
         `${quoi} n° ${p.numero} est déjà enregistrée pour ce fournisseur `
@@ -552,15 +555,24 @@ export async function createFacture(input: unknown) {
   // sommes existantes — dettes à payer du pilotage, P&L, snapshot assistant —
   // restent ainsi justes sans modification : l'avoir vient en déduction.
   const signe = p.type_document === 'avoir' ? -1 : 1
+  // ⚠️ UN BON DE LIVRAISON NE PORTE AUCUN MONTANT, et c'est ce qui le rend
+  // sûr. Quatre lecteurs d'argent — le P&L, l'agent Financier, le pilotage et
+  // le snapshot de l'assistant — somment `factures_fournisseurs` SANS filtrer
+  // sur `type_document`. Même ruse que les avoirs en négatif (0127) : on fait
+  // porter l'invariant par la DONNÉE, pas par la mémoire de chaque lecteur.
+  // Un BL à 408 € aurait gonflé les achats et la dette de 408 €, puis encore
+  // autant quand la facture des mêmes marchandises arrive.
+  const bl = p.type_document === 'bon_livraison'
   const { data: facture, error } = await supabase.from('factures_fournisseurs').insert({
     fournisseur_id: p.fournisseur_id,
     bon_commande_id: p.bon_commande_id || null,
     numero: p.numero,
     date_emission: p.date_emission,
-    date_echeance: p.date_echeance || null,
-    montant_ht: signe * Math.abs(p.montant_ht),
-    montant_ttc: signe * Math.abs(p.montant_ttc),
-    statut: p.statut,
+    date_echeance: bl ? null : (p.date_echeance || null),
+    montant_ht: bl ? 0 : signe * Math.abs(p.montant_ht),
+    montant_ttc: bl ? 0 : signe * Math.abs(p.montant_ttc),
+    // Un BL ne se paie pas : il n'a ni échéance ni statut de règlement.
+    statut: bl ? 'paye' : p.statut,
     notes: p.notes || null,
     nb_pages: p.nb_pages,
     type_document: p.type_document,
@@ -578,7 +590,11 @@ export async function createFacture(input: unknown) {
   // Un avoir référence des marchandises rendues ou un geste commercial : ses
   // lignes sont conservées pour la traçabilité mais ne doivent JAMAIS écraser
   // un prix d'achat — ce n'est pas un nouveau tarif.
-  const propagerPrix = p.type_document !== 'avoir'
+  // ⚠️ Ni un avoir ni un BON DE LIVRAISON ne fixent un prix d'achat. L'avoir
+  // est de la marchandise rendue ; le BL porte des quantités, et des prix
+  // souvent absents ou indicatifs — celui du 01/10 n'en avait sur qu'une
+  // ligne sur deux. Le prix vient de la FACTURE, et d'elle seule.
+  const propagerPrix = p.type_document === 'facture'
 
   if (p.lignes.length > 0 && facture) {
     // Rapprochement en mémoire : ~100 ingrédients, inutile de requêter par ligne

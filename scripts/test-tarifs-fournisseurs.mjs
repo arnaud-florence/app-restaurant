@@ -62,6 +62,9 @@ function extraireContenance(designation, unite) {
   const contenant = unite ? CONTENANTS.has(unite.toUpperCase()) : false
   const mult = d.match(/(\d+(?:[.,]\d+)?)\s*(G|KG|ML|CL|L)\s*X\s*\d+/)
   if (mult) { if (contenant) return null; return conv(Number(mult[1].replace(',', '.')), mult[2]) }
+  // ⚠️ Un COMPTE nu après `=` à côté d'un poids isolé : « 70G BTE=20 ».
+  if (/(?:BTE|BOITE|BT|CAISSE|CARTON|COL|C)\s*=\s*\d+(?![\d.,]*\s*(?:KG|G|ML|CL|L)\b)/.test(d)
+      && /(?<![A-Z0-9])\d+(?:[.,]\d+)?\s*(?:KG|G|ML|CL|L)(?![A-Z])/.test(d)) return null
   const trouves = []
   for (const m of d.matchAll(/(?<![A-Z0-9])(\d+(?:[.,]\d+)?)\s*(KG|G|ML|CL|L)(?![A-Z])/g)) {
     const c = conv(Number(m[1].replace(',', '.')), m[2]); if (c) trouves.push(c)
@@ -79,6 +82,16 @@ console.log('── Lecture d’un format, ou silence ──')
 // Le cas qui a vraiment produit un faux chiffre : un sachet de 9 pains de
 // 90 g, dont le prix est celui du SACHET. Lu comme une pièce de 90 g, il
 // donnait 64 €/kg pour du pain à burger.
+// Le carpaccio Gineys sortait à 809 €/kg : le 70 g est celui d'UNE tranche,
+// la boîte en contient vingt. Trente fois le prix réel, sur l'écran qui
+// déclenche les commandes.
+T('un compte nu après « = » à côté d’un poids : on se tait',
+  extraireContenance('CARPACCIO DE BŒUF ASSAISONNE VBF 70G BTE=20', 'BT') === null)
+// ⚠️ Mais un poids APRÈS le « = » reste lisible : c'est le contenant lui-même.
+T('un poids après « = » reste lu',
+  extraireContenance('MOZZARELLA CERISE 8G BQT=1KG', 'PR') === null
+  || extraireContenance('MIEL BTE=1KG', 'BT')?.valeur === 1)
+
 T('sachet de 9 × 90 g : ambigu, donc rien',
   extraireContenance('PAIN BURGER BRIOCHE 90GX9 MAISON BUNS', 'SA') === null)
 T('pièce de 110 g dans un colis de 40 : 0,110 kg',

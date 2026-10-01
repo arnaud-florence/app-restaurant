@@ -36,7 +36,7 @@ export default function FactureFormModal({
       total_ht: number | null
     }>
     nb_pages?: number
-    type_document?: 'facture' | 'avoir'
+    type_document?: 'facture' | 'avoir' | 'bon_livraison'
   }
 }) {
   const [isPending, startTransition] = useTransition()
@@ -67,7 +67,7 @@ export default function FactureFormModal({
   const [montantTTC, setMontantTTC] = useState(initial?.montant_ttc != null ? String(initial.montant_ttc) : '0')
   const [statut, setStatut] = useState<Facture['statut']>('a_payer')
   const [notes, setNotes] = useState(initial?.notes ?? '')
-  const [typeDocument, setTypeDocument] = useState<'facture' | 'avoir'>(initial?.type_document ?? 'facture')
+  const [typeDocument, setTypeDocument] = useState<'facture' | 'avoir' | 'bon_livraison'>(initial?.type_document ?? 'facture')
   const [factureLieeId, setFactureLieeId] = useState('')
   // Apparaît UNIQUEMENT quand le serveur a détecté un doublon : une case
   // toujours visible finirait cochée par habitude, et le garde-fou ne
@@ -75,6 +75,11 @@ export default function FactureFormModal({
   const [doublonDetecte, setDoublonDetecte] = useState(false)
   const [forcerDoublon, setForcerDoublon] = useState(false)
   const estAvoir = typeDocument === 'avoir'
+  // ⚠️ Le BL dit ce qui est ARRIVÉ, la facture ce qu'on DOIT. Il ne porte
+  // aucun montant : ses totaux sont forcés à zéro à l'enregistrement, parce
+  // que le P&L, l'agent Financier, le pilotage et l'assistant somment les
+  // factures sans regarder leur type (0166).
+  const estBL = typeDocument === 'bon_livraison'
   const facturesDuFournisseur = factures.filter(f =>
     f.fournisseur_id === fournisseurId && f.type_document !== 'avoir')
 
@@ -135,16 +140,27 @@ export default function FactureFormModal({
       <DialogBody className="space-y-3">
         <div className="space-y-1.5">
           <Label>Type de document</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button type="button" onClick={() => setTypeDocument('facture')}
-              className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${!estAvoir ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 hover:border-zinc-500'}`}>
+              className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${typeDocument === 'facture' ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 hover:border-zinc-500'}`}>
               📄 Facture
+            </button>
+            <button type="button" onClick={() => setTypeDocument('bon_livraison')}
+              className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${estBL ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 hover:border-blue-500'}`}>
+              🚚 Bon de livraison
             </button>
             <button type="button" onClick={() => setTypeDocument('avoir')}
               className={`min-h-[48px] rounded-md border font-bold text-sm transition-colors ${estAvoir ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-zinc-300 hover:border-emerald-500'}`}>
-              ↩️ Avoir (le fournisseur nous doit)
+              ↩️ Avoir
             </button>
           </div>
+          {estBL && (
+            <p className="text-xs text-blue-700">
+              Ce qui est <strong>arrivé</strong>, pas ce qu&apos;on doit. Les montants sont ignorés — seules les
+              lignes comptent, pour vérifier la livraison contre la commande et faire entrer la marchandise
+              en stock. La facture se scanne séparément quand elle arrive, et se rattache à ce bon.
+            </p>
+          )}
           {estAvoir && (
             <p className="text-xs text-emerald-700">
               Saisis les montants en positif — l&apos;avoir viendra automatiquement en déduction des dettes fournisseur.

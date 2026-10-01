@@ -78,14 +78,29 @@ export async function envoyerBonAuFournisseur(input: z.infer<typeof Schema>): Pr
     .select('cle, valeur').in('cle', ['adresse', 'nom_etablissement'])
   const lu = new Map((param ?? []).map(p => [p.cle as string, p.valeur as string]))
 
+  // ⚠️ L'ADRESSE DE LIVRAISON NE SE MET PAS EN DUR. Le repli écrit ici disait
+  // « Parking des Ferrages » alors que l'établissement est au 23 rue Notre
+  // Dame — et le paramètre `adresse` n'existait pas, donc c'est le repli qui
+  // s'imprimait. Un repli FAUX est pire que pas de repli : il ne lève aucune
+  // erreur, il envoie simplement le camion ailleurs, et personne ne le voit
+  // avant la livraison. La source de vérité est `etablissements`.
+  const { data: etab } = await sb.from('etablissements')
+    .select('nom, adresse').eq('is_principal', true).not('adresse', 'is', null).limit(1).maybeSingle()
+  const adresse = lu.get('adresse') ?? (etab?.adresse as string | undefined)
+  if (!adresse) {
+    // Plutôt que d'inventer, on refuse — en rendant le brouillon pour qu'il
+    // soit complété à la main, comme pour un fournisseur sans e-mail.
+    return { ok: false, message: 'Aucune adresse de livraison : renseignez-la dans /admin/etablissements avant d’envoyer un bon.' }
+  }
+
   const { objet, texte } = messageBonCommande({
     fournisseur: four.nom as string,
     reference,
     lignes,
     dateLivraison: (bon.date_livraison_prevue as string) ?? null,
     notes: (bon.notes as string) ?? null,
-    etablissement: lu.get('nom_etablissement') ?? 'CASATASIA',
-    adresse: lu.get('adresse') ?? 'Parking des Ferrages, 83136 Sainte Anastasie sur Issole',
+    etablissement: lu.get('nom_etablissement') ?? (etab?.nom as string) ?? 'CASATASIA',
+    adresse,
   })
   const brouillon = { destinataire: (four.email as string) ?? null, objet, texte }
 

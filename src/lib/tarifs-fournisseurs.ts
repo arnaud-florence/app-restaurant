@@ -111,6 +111,17 @@ export function extraireContenance(
     return convertir(Number(mult[1].replace(',', '.')), mult[2])
   }
 
+  // ⚠️ « CARPACCIO DE BŒUF ASSAISONNE VBF 70G BTE=20 » : un COMPTE nu après
+  // `=` à côté d'un poids isolé. Le 70 g est celui d'UNE tranche, la boîte en
+  // contient vingt — lu tel quel, le carpaccio Gineys sortait à 809 €/kg, soit
+  // trente fois le prix de Gel Var, sur l'écran qui déclenche les commandes.
+  // On pourrait multiplier (20 × 70 g = 1,4 kg), mais rien ne garantit que le
+  // poids soit unitaire plutôt que total : c'est le cas « FEUILLETE COMTE
+  // 110GX40 » face à « ROSETTE 2X25TR 500G X8 », même forme, sens opposé.
+  // Donc on se tait, et un humain tranche depuis l'écran.
+  if (/(?:BTE|BOITE|BT|CAISSE|CARTON|COL|C)\s*=\s*\d+(?![\d.,]*\s*(?:KG|G|ML|CL|L)\b)/.test(d)
+      && /(?<![A-Z0-9])\d+(?:[.,]\d+)?\s*(?:KG|G|ML|CL|L)(?![A-Z])/.test(d)) return null
+
   // Sinon : tous les formats présents. S'il y en a plusieurs de DIFFÉRENTS,
   // on ne tranche pas.
   const trouves: { valeur: number; unite: UniteRef }[] = []

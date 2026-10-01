@@ -91,6 +91,17 @@ const LECTURE = [
   '/admin/ventes', '/admin/ventes-pdv', '/admin/finances', '/admin/patrimoine',
   '/admin/pilotage', '/admin/previsionnel', '/admin/commande-fournil',
   '/admin/integrations', '/admin/caisse-agreee',
+  // ⚠️ TOUT L'ONGLET FINANCES, décision du gérant le 01/10/2026. Il en
+  // manquait cinq écrans, dont LA PLATEFORME D'ACHAT elle-même — celle qui
+  // répond à « qui vend ça, à quel prix, et chez qui on l'achète ». Une
+  // manageuse qui lit les marges sans voir les tarifs d'achat ne peut que
+  // constater un food cost, jamais le corriger.
+  // La lecture seule tient toute seule ici : `demanderRemises`,
+  // `modifierArticleAchat` et les actions du réassort appellent
+  // `requireManager()` — un poste `polyvalent` est refusé côté serveur, pas
+  // seulement côté écran.
+  '/admin/achats', '/admin/tarifs-fournisseurs', '/admin/reassort',
+  '/admin/energie', '/admin/commissions',
   // Le métier, en lecture : comprendre avant de modifier.
   '/admin/recettes', '/admin/ingredients', '/admin/stock', '/admin/boissons',
   '/admin/fournisseurs', '/admin/allergenes', '/admin/hygiene', '/admin/legal',
@@ -99,6 +110,43 @@ const LECTURE = [
 ]
 
 const PERMS = { allowed: [...ECRITURE, ...LECTURE], readonly: LECTURE }
+
+// ── Passage en MANAGER (--manager) ───────────────────────────────────
+//
+// Décision du gérant, 01/10/2026 : « accès à tout dans l'appli », scanner de
+// factures et comparateur de prix compris.
+//
+// ⚠️ CE N'EST PAS UN RÉGLAGE DE PERMISSIONS, ET ÇA NE PEUT PAS L'ÊTRE.
+// Les actions de `/admin/fournisseurs` (scan de facture) et `/admin/achats`
+// (demande de conditions, modification d'un article) appellent
+// `requireManager()`, qui teste `profil.role === 'manager'` — et RIEN
+// d'autre. Ni `allowed`, ni `writable` ne le satisfont. Ouvrir ces écrans
+// sans le rôle donne des boutons qui échouent.
+//
+// ⚠️ Ce que le rôle emporte, et qu'un réglage « tout sauf » ne peut pas
+// retenir : `allowed: ['*']` COURT-CIRCUITE `isReadOnly()`, qui rend false
+// avant même de lire `custom_permissions`. Il n'existe pas de « manager en
+// lecture seule » — on efface donc les permissions sur mesure, qui seraient
+// ignorées et donneraient une fausse impression de garde-fou.
+//
+// ⚠️ Cela ouvre aussi `/admin/securite` : comptes, rôles, 2FA, journal
+// d'audit et sauvegardes. Elle pourra promouvoir, rétrograder, et lire le
+// journal. Ce qui protège désormais n'est plus la permission, c'est la
+// TRAÇABILITÉ : `audit_logs` enregistre chaque action sensible, nominative.
+if (process.argv.includes('--manager')) {
+  const email = (process.argv.find(a => a.startsWith('--email=')) ?? '').split('=')[1]
+  if (!email) { console.error('⛔ --manager exige --email=…'); process.exit(1) }
+  const [prof] = await sb(`profils?email=eq.${encodeURIComponent(email)}&select=id,email,role,poste`)
+  if (!prof) { console.error(`⛔ aucun profil pour ${email}`); process.exit(1) }
+  console.log(`\n  ${prof.email} : rôle ${prof.role} / poste ${prof.poste}  →  manager`)
+  if (!process.argv.includes('--ecrire')) { console.log('  (essai à blanc — ajouter --ecrire)\n'); process.exit(0) }
+  await sb(`profils?id=eq.${prof.id}`, { method: 'PATCH',
+    body: JSON.stringify({ role: 'manager', poste: 'manager', custom_permissions: null }) })
+  const [apres] = await sb(`profils?id=eq.${prof.id}&select=role,poste,custom_permissions`)
+  console.log(`  ✓ rôle ${apres.role}, poste ${apres.poste}, permissions sur mesure ${apres.custom_permissions === null ? 'effacées' : '⚠️ TOUJOURS LÀ'}`)
+  console.log('\n  Pour revenir en arrière : relancer ce script SANS --manager.\n')
+  process.exit(0)
+}
 
 console.log(`\n── ${ECRIRE ? 'ÉCRITURE' : 'ESSAI À BLANC'} ──\n`)
 

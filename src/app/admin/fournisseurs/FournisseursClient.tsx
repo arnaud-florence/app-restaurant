@@ -55,7 +55,7 @@ type ScannedFacture = {
     total_ht: number | null
   }>
   nb_pages?: number
-  type_document?: 'facture' | 'avoir'
+  type_document?: 'facture' | 'avoir' | 'bon_livraison'
 }
 
 type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
@@ -403,7 +403,7 @@ export default function FournisseursClient({
               montant_ttc: data.montant_ttc,
               lignes: data.lignes,
               nb_pages: data.nb_pages,
-              type_document: data.type === 'avoir' ? 'avoir' : 'facture',
+              type_document: data.type === 'avoir' ? 'avoir' : data.type === 'bon_livraison' ? 'bon_livraison' : 'facture',
               notes: data.notes
                 ? `Scanné par Agent IA. Notes : ${data.notes}`
                 : 'Scanné par Agent IA',
@@ -734,6 +734,7 @@ function FacturesTab({
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold truncate">{f.numero}</span>
                       {f.type_document === 'avoir' && <Badge variant="success">↩️ Avoir</Badge>}
+                      {f.type_document === 'bon_livraison' && <Badge variant="secondary">🚚 Bon de livraison</Badge>}
                       <Badge className={cn('border shrink-0', cfg.cls)}>{cfg.emoji} {cfg.label}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{f.fournisseur_nom ?? '—'}</p>
@@ -777,6 +778,7 @@ function FacturesTab({
                         <td className="py-2 px-3 font-semibold">
                           {f.numero}
                           {f.type_document === 'avoir' && <Badge variant="success" className="ml-2">↩️ Avoir</Badge>}
+                          {f.type_document === 'bon_livraison' && <Badge variant="secondary" className="ml-2">🚚 Bon de livraison</Badge>}
                         </td>
                         <td className="py-2 px-2 truncate max-w-40">{f.fournisseur_nom ?? '—'}</td>
                         <td className="py-2 px-2 text-xs text-muted-foreground whitespace-nowrap">
