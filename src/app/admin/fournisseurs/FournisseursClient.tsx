@@ -58,7 +58,12 @@ type ScannedFacture = {
   type_document?: 'facture' | 'avoir' | 'bon_livraison'
 }
 
-type Tab = 'fournisseurs' | 'bons' | 'factures' | 'comparateur'
+// ⚠️ `livraisons` est un onglet À PART, pas un filtre dans les factures. Un
+// BL et une facture ne répondent pas à la même question : le BL dit ce qui
+// est ARRIVÉ — on le lit le camion encore là, pour contester un manquant ;
+// la facture dit ce qu'on DOIT, et on la lit à l'échéance. Mélangés, on
+// cherche l'un dans la liste de l'autre, et on finit par ne plus regarder.
+type Tab = 'fournisseurs' | 'bons' | 'livraisons' | 'factures' | 'comparateur'
 
 export default function FournisseursClient({
   fournisseurs, bons, factures, ingredients, recettes, entreesPrix,
@@ -95,7 +100,13 @@ export default function FournisseursClient({
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
 
   // ─── Derived ──────────────────────────────────────────────────────
-  const alertesFac = useMemo(() => alertesFactures(factures, 7), [factures])
+  // ⚠️ Les deux listes sont DISJOINTES : un document ne doit apparaître qu'à
+  // un seul endroit, sinon on le traite deux fois.
+  const livraisons = useMemo(() => factures.filter(f => f.type_document === 'bon_livraison'), [factures])
+  const facturesSeules = useMemo(() => factures.filter(f => f.type_document !== 'bon_livraison'), [factures])
+  // ⚠️ Les alertes d'échéance ne portent que sur ce qui se PAIE : un BL n'a
+  // ni montant ni échéance, le compter ferait clignoter un badge pour rien.
+  const alertesFac = useMemo(() => alertesFactures(facturesSeules, 7), [facturesSeules])
   const haussesPrix = useMemo(() => detecterHaussesPrix(
     entreesPrix,
     ingredients.map(i => ({ id: i.id, nom: i.nom, unite: i.unite })),
@@ -175,6 +186,9 @@ export default function FournisseursClient({
             </PillTab>
             <PillTab active={tab === 'bons'} onClick={() => setTab('bons')}>
               📑 Bons de commande <PillCount n={bons.length} active={tab === 'bons'} />
+            </PillTab>
+            <PillTab active={tab === 'livraisons'} onClick={() => setTab('livraisons')}>
+              🚚 Bons de livraison <PillCount n={livraisons.length} active={tab === 'livraisons'} />
             </PillTab>
             {peutVoirPrix && (
               <PillTab active={tab === 'factures'} onClick={() => setTab('factures')}>
@@ -296,9 +310,31 @@ export default function FournisseursClient({
           />
         )}
 
+        {tab === 'livraisons' && (
+          <FacturesTab
+            livraisons
+            factures={livraisons}
+            alertes={alertesFac}
+            onCreate={() => setCreatingFacture(true)}
+            onScan={() => setScannerOpen(true)}
+            onChangerStatut={(id, statut) => startTransition(async () => {
+              try { await changerStatutFacture(id, statut); flashOk('Statut facture mis à jour'); router.refresh() }
+              catch (e) { flashKo(e) }
+            })}
+            onDelete={async f => {
+              if (await askConfirm({ title: 'Supprimer la facture', message: `Supprimer la facture ${f.numero} ?`, confirmLabel: 'Supprimer', danger: true })) {
+                startTransition(async () => {
+                  try { await deleteFacture(f.id); flashOk('Facture supprimée'); router.refresh() }
+                  catch (e) { flashKo(e) }
+                })
+              }
+            }}
+          />
+        )}
+
         {tab === 'factures' && (
           <FacturesTab
-            factures={factures}
+            factures={facturesSeules}
             alertes={alertesFac}
             onCreate={() => setCreatingFacture(true)}
             onScan={() => setScannerOpen(true)}
@@ -385,7 +421,12 @@ export default function FournisseursClient({
           fournisseurs={fournisseurs.filter(f => f.actif)}
           bons={bons}
           factures={factures}
-          initial={scannedData ?? undefined}
+          // ⚠️ Le type suit l'ONGLET d'où l'on vient. Ouvrir « Nouveau bon de
+          // livraison » sur un formulaire pré-réglé « Facture », c'est se
+          // tromper une fois sur deux — et c'est exactement l'erreur qui a
+          // fait entrer un BL comme une facture le 01/10.
+          // Un scan, lui, garde ce que le modèle a reconnu.
+          initial={scannedData ?? (tab === 'livraisons' ? { type_document: 'bon_livraison' as const } : undefined)}
           onClose={() => { setCreatingFacture(false); setScannedData(null) }}
           onSaved={() => { setCreatingFacture(false); setScannedData(null); router.refresh() }}
         />
@@ -679,8 +720,11 @@ function BonsTab({
 
 // ─── Onglet : Factures ───────────────────────────────────────────────
 function FacturesTab({
+  livraisons = false,
   factures, alertes, onCreate, onScan, onChangerStatut, onDelete,
 }: {
+  /** Mode bons de livraison : ce qui est ARRIVÉ, pas ce qu'on doit. */
+  livraisons?: boolean
   factures: Facture[]
   alertes: ReturnType<typeof alertesFactures>
   onCreate: () => void
@@ -690,11 +734,26 @@ function FacturesTab({
 }) {
   return (
     <>
+      {livraisons && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-3 sm:p-4 text-xs text-blue-900 space-y-1">
+            <p className="font-bold">🚚 Ce qui est arrivé, pas ce qu&apos;on doit.</p>
+            <p>
+              Le bon de livraison se lit <strong>pendant que le camion est encore là</strong> : c&apos;est le
+              seul moment où un manquant se conteste. Il porte les quantités, pas les montants — et c&apos;est
+              lui qui fait entrer la marchandise en stock. La facture arrive après, se scanne à part, et se
+              rattache à son bon.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex justify-end gap-2">
-        <Button onClick={onScan} variant="outline" title="Photographier ou uploader une facture — Claude Vision extrait les données">
-          📷 Scanner une facture
+        <Button onClick={onScan} variant="outline" title={livraisons
+          ? 'Photographier le bon de livraison — Claude Vision en extrait les lignes'
+          : 'Photographier ou uploader une facture — Claude Vision extrait les données'}>
+          📷 Scanner {livraisons ? 'un bon de livraison' : 'une facture'}
         </Button>
-        <Button onClick={onCreate}>+ Nouvelle facture</Button>
+        <Button onClick={onCreate}>+ {livraisons ? 'Nouveau bon de livraison' : 'Nouvelle facture'}</Button>
       </div>
 
       {alertes.length > 0 && (
@@ -721,7 +780,7 @@ function FacturesTab({
       )}
 
       {factures.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground italic">Aucune facture.</CardContent></Card>
+        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground italic">{livraisons ? "Aucun bon de livraison enregistré." : "Aucune facture."}</CardContent></Card>
       ) : (
         <Card>
           <CardContent className="p-0">
