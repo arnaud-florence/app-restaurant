@@ -131,9 +131,11 @@ export default function FactureFormModal({
   return (
     <Dialog open onClose={onClose} panelClassName="sm:max-w-lg">
       <DialogHeader onClose={onClose}>
-        <DialogTitle>{estAvoir ? '↩️ Nouvel avoir fournisseur' : '➕ Nouvelle facture fournisseur'}</DialogTitle>
+        <DialogTitle>{estAvoir ? '↩️ Nouvel avoir fournisseur' : estBL ? '🚚 Bon de livraison' : '➕ Nouvelle facture fournisseur'}</DialogTitle>
         <DialogDescription>
-          Date d&apos;échéance et statut servent aux alertes de paiement automatiques.
+          {estBL
+            ? 'Ce qui est arrivé : les quantités, pas les montants. Rattache-le à sa commande pour vérifier la livraison.'
+            : 'Date d’échéance et statut servent aux alertes de paiement automatiques.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -191,7 +193,7 @@ export default function FactureFormModal({
 
         {!estAvoir && bonsDuFournisseur.length > 0 && (
           <div className="space-y-1.5">
-            <Label>Lié à un bon de commande (optionnel)</Label>
+            <Label>{estBL ? 'Commande à vérifier — recommandé' : 'Lié à un bon de commande (optionnel)'}</Label>
             <Select value={bonId} onChange={e => selectBon(e.target.value)}>
               <option value="">— Aucun —</option>
               {bonsDuFournisseur.map(b => (
@@ -205,10 +207,13 @@ export default function FactureFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>N° facture *</Label>
-            <Input value={numero} onChange={e => setNumero(e.target.value)} placeholder="FA-2024-001" />
+            <Label>{estBL ? 'N° du bon de livraison *' : 'N° facture *'}</Label>
+            <Input value={numero} onChange={e => setNumero(e.target.value)} placeholder={estBL ? 'BL-…' : 'FA-2024-001'} />
           </div>
-          <div className="space-y-1.5">
+          {/* ⚠️ Un BL ne se paie pas : ni statut, ni échéance, ni montant. Les
+              demander, c'est faire saisir des chiffres qui n'existent pas sur
+              le document — et c'est ce qui a bloqué le premier scan. */}
+          <div className={`space-y-1.5${estBL ? ' hidden' : ''}`}>
             <Label>Statut</Label>
             <Select value={statut} onChange={e => setStatut(e.target.value as Facture['statut'])}>
               <option value="a_payer">À payer</option>
@@ -224,29 +229,32 @@ export default function FactureFormModal({
             <Label>Date émission</Label>
             <Input type="date" value={dateEmission} onChange={e => setDateEmission(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
+          <div className={`space-y-1.5${estBL ? ' hidden' : ''}`}>
             <Label>Date échéance</Label>
             <Input type="date" value={dateEcheance} onChange={e => setDateEcheance(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label>Montant HT (€)</Label>
-            <Input type="number" step="0.01" min={0} value={montantHT} onChange={e => setMontantHT(e.target.value)} />
+        {!estBL && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Montant HT (€)</Label>
+              <Input type="number" step="0.01" min={0} value={montantHT} onChange={e => setMontantHT(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Montant TTC (€)</Label>
+              <Input type="number" step="0.01" min={0} value={montantTTC} onChange={e => setMontantTTC(e.target.value)} />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Montant TTC (€)</Label>
-            <Input type="number" step="0.01" min={0} value={montantTTC} onChange={e => setMontantTTC(e.target.value)} />
-          </div>
-        </div>
+        )}
 
         {initial?.lignes && initial.lignes.length > 0 && (
           <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-900">
             📋 <b>{initial.lignes.length} ligne(s)</b> extraite(s)
-            {(initial.nb_pages ?? 1) > 1 ? ` sur ${initial.nb_pages} pages` : ''} seront enregistrées
-            avec la facture. Les prix reconnus mettront à jour le prix d&apos;achat des ingrédients
-            correspondants — c&apos;est ce qui alimente le calcul des marges.
+            {(initial.nb_pages ?? 1) > 1 ? ` sur ${initial.nb_pages} pages` : ''} seront enregistrées.
+            {estBL
+              ? ' Elles font entrer la marchandise en stock et servent à vérifier la livraison contre la commande. Aucun prix d’achat ne sera modifié : ça, c’est le rôle de la facture.'
+              : ' Les prix reconnus mettront à jour le prix d’achat des ingrédients correspondants — c’est ce qui alimente le calcul des marges.'}
           </div>
         )}
 
@@ -272,7 +280,7 @@ export default function FactureFormModal({
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={isPending}>Annuler</Button>
-        <Button onClick={valider} disabled={isPending}>{isPending ? 'Sauvegarde…' : '✓ Créer'}</Button>
+        <Button onClick={valider} disabled={isPending}>{isPending ? 'Sauvegarde…' : estBL ? '✓ Enregistrer la livraison' : '✓ Créer'}</Button>
       </DialogFooter>
     </Dialog>
   )
