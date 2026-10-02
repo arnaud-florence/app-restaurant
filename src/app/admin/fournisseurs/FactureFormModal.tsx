@@ -103,7 +103,7 @@ export default function FactureFormModal({
     setErreur('')
     startTransition(async () => {
       try {
-        await createFacture({
+        const res = await createFacture({
           fournisseur_id: fournisseurId,
           bon_commande_id: bonId || null,
           numero: numero.trim(),
@@ -119,6 +119,17 @@ export default function FactureFormModal({
           facture_liee_id: factureLieeId || null,
           forcer_doublon: forcerDoublon,
         })
+        // ⚠️ UN PRIX REFUSÉ QU'ON NE DIT PAS LAISSE CROIRE QUE TOUT EST PASSÉ.
+        // Le document est bien enregistré — on ferme donc — mais le gérant doit
+        // savoir qu'un coût d'achat n'a PAS été écrit, et pourquoi.
+        if (res?.prix_refuses?.length) {
+          setErreur('')
+          alert(
+            `Document enregistré.\n\n⚠️ ${res.prix_refuses.length} prix d'achat NON mis à jour, `
+            + `parce que le calcul donnait un chiffre invraisemblable :\n\n`
+            + res.prix_refuses.map(x => '• ' + x).join('\n\n')
+            + `\n\nÀ corriger à la main dans la fiche produit si le tarif a vraiment changé.`)
+        }
         onSaved()
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Erreur'

@@ -111,8 +111,27 @@ begin
   if exists (select 1 from cron.job where jobname = 'zelty-reservations') then
     perform cron.unschedule('zelty-reservations');
   end if;
-  perform cron.schedule('zelty-reservations', '*/15 6-22 * * *',
-    $q$select call_zelty('/api/cron/caisse/zelty/reservations', '?jours=14')$q$);
+  -- ⚠️⚠️ CADENCE RÉDUITE LE 02/10/2026. `*/15` × 14 jours faisait 952 appels
+  -- Zelty par jour — `GET /bookings` n'accepte qu'une date par appel. Mesuré
+  -- sur 24 h : 31 % de TOUS nos appels refusés en 429, dont 72 % des passages
+  -- de réservations et 13 % des poussées de ruptures.
+  --
+  -- ⚠️ Le vrai dégât n'était pas sur les réservations : c'était sur les
+  -- RUPTURES, qui tournent pendant le service. Un produit marqué épuisé au
+  -- comptoir n'atteignait pas la caisse parce que le quota avait été dépensé
+  -- à relire le carnet du 9 octobre.
+  --
+  -- Le temps réel vient du WEBHOOK (`booking.*` est déclaré) ; ce cron est le
+  -- filet. Toutes les heures sur 3 jours pendant le service, et un passage de
+  -- nuit sur la quinzaine complète.
+  perform cron.schedule('zelty-reservations', '40 6-22 * * *',
+    $q$select call_zelty('/api/cron/caisse/zelty/reservations', '?jours=3')$q$);
+
+  if exists (select 1 from cron.job where jobname = 'zelty-reservations-nuit') then
+    perform cron.unschedule('zelty-reservations-nuit');
+  end if;
+  perform cron.schedule('zelty-reservations-nuit', '50 3 * * *',
+    $q$select call_zelty('/api/cron/caisse/zelty/reservations', '?jours=21')$q$);
 
   -- ─── 5 bis. Ruptures déclarées SUR LA CAISSE, filet du webhook ──
   -- `dish.availability_update` couvre le temps réel, mais un webhook n'a pas

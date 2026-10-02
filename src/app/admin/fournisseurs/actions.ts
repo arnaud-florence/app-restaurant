@@ -586,6 +586,8 @@ export async function createFacture(input: unknown) {
 
   let apprises = 0
   let prixMisAJour = 0
+  /** Prix NON écrits parce qu'invraisemblables — remontés plutôt que tus. */
+  const refusesPrix: string[] = []
 
   // Un avoir référence des marchandises rendues ou un geste commercial : ses
   // lignes sont conservées pour la traçabilité mais ne doivent JAMAIS écraser
@@ -608,14 +610,14 @@ export async function createFacture(input: unknown) {
     // unitaire devient recettes.cout_achat_ht — la marge se met à jour toute
     // seule à chaque facture scannée. Même prudence que pour les ingrédients.
     const { data: recs } = await supabase.from('recettes')
-      .select('id, nom, nom_caisse, libelle_achat, unites_par_achat, prix_vente_ht, reference_fournisseur').eq('actif', true)
+      .select('id, nom, nom_caisse, libelle_achat, unites_par_achat, prix_vente_ht, cout_achat_ht, reference_fournisseur').eq('actif', true)
     // Un produit peut être reconnu par son nom, son libellé caisse OU son
     // libellé d'achat (0131) — « Panuozzi » ne ressemble pas à « PATON A
     // PIZZA », et les deux cafés sortent de la même capsule.
     // Index par RÉFÉRENCE (0142) : rapprochement exact, évalué AVANT le nom.
     // Une référence ne souffre ni des abréviations ni des accents, et ne
     // confond pas deux produits proches.
-    const produitsParRef = new Map<string, Array<{ id: string; pv: number; parAchat: number }>>()
+    const produitsParRef = new Map<string, Array<{ id: string; pv: number; parAchat: number; coutActuel: number | null }>>()
     for (const r of recs ?? []) {
       const ref = (r.reference_fournisseur as string | null)?.trim().toUpperCase()
       if (!ref) continue
@@ -624,6 +626,7 @@ export async function createFacture(input: unknown) {
         id: r.id as string,
         pv: Number(r.prix_vente_ht ?? 0),
         parAchat: Number(r.unites_par_achat ?? 1) || 1,
+        coutActuel: r.cout_achat_ht == null ? null : Number(r.cout_achat_ht),
       })
       produitsParRef.set(ref, l)
     }
@@ -633,6 +636,7 @@ export async function createFacture(input: unknown) {
         id: r.id as string,
         pv: Number(r.prix_vente_ht ?? 0),
         parAchat: Number(r.unites_par_achat ?? 1) || 1,
+        coutActuel: r.cout_achat_ht == null ? null : Number(r.cout_achat_ht),
       }
       const out = [{ ...base, nom: normaliserNom(r.nom as string) }]
       if (r.nom_caisse) out.push({ ...base, nom: normaliserNom(r.nom_caisse as string) })
@@ -727,10 +731,31 @@ export async function createFacture(input: unknown) {
             const prixAchat = estPiece ? prixLigne : (cond != null ? prixLigne / cond : null)
             // ÷ unites_par_achat : un flan entier donne 10 parts vendues.
             const prixPiece = prixAchat != null ? prixAchat / prod.parAchat : null
-            // Garde-fou final : en achat-revente, un coût ≥ 95 % du prix de
-            // vente HT est forcément une erreur de rapprochement — on n'écrit
-            // pas un chiffre qui rendrait la marge négative en silence.
-            if (prixPiece != null && (prod.pv <= 0 || prixPiece < prod.pv * 0.95)) {
+            // ⚠️⚠️ ET UN GARDE-FOU BAS, QUI MANQUAIT. Le seuil des 95 %
+            // n'attrape que les coûts TROP HAUTS — le croissant à 40 €. Un
+            // coût absurdement BAS ne déclenchait rien, et il est plus
+            // dangereux : il affiche une marge magnifique, donc personne ne le
+            // conteste. Même angle mort que `statutFoodCost(0)` rendu vert.
+            //
+            // Le cas trouvé par l'audit du 02/10 : « Kit complet café Lavazza
+            // blue (100 capsules…) » porte C=100, et le produit « Café
+            // expresso » porte `unites_par_achat = 125` (1 kg de grains ÷ 8 g).
+            // Diviser par les DEUX donnait un café à 0,42 CENTIME au lieu de
+            // 24 — food cost 0,3 %. Les deux nombres disent le rendement, pris
+            // à deux endroits : la DOUBLE DIVISION est le défaut.
+            //
+            // On refuse donc un prix qui divise par plus de QUATRE un coût
+            // déjà connu. Un tarif ne s'effondre pas d'un facteur quatre ; une
+            // division en double, si. Le refus est REMONTÉ, pas silencieux.
+            const effondrement = prod.coutActuel != null && prod.coutActuel > 0
+              && prixPiece != null && prixPiece < prod.coutActuel / 4
+            if (effondrement) {
+              refusesPrix.push(
+                `${p.lignes[idx].description.slice(0, 48)} : ${prixPiece!.toFixed(4)} € calculé contre `
+                + `${prod.coutActuel!.toFixed(4)} € connu — division par ${cond ?? 1} ET par ${prod.parAchat}, `
+                + `probable double comptage du conditionnement. Coût laissé tel quel.`)
+            }
+            if (!effondrement && prixPiece != null && (prod.pv <= 0 || prixPiece < prod.pv * 0.95)) {
               await supabase.from('recettes')
                 .update({ cout_achat_ht: Math.round(prixPiece * 10000) / 10000 })
                 .eq('id', prod.id)
@@ -798,7 +823,12 @@ export async function createFacture(input: unknown) {
 
   revalidatePath('/admin/fournisseurs')
   revalidatePath('/admin/ingredients')
-  return { ok: true as const, lignes: lignesInserees, prix_mis_a_jour: prixMisAJour, correspondances_apprises: apprises }
+  return {
+    ok: true as const, lignes: lignesInserees, prix_mis_a_jour: prixMisAJour,
+    correspondances_apprises: apprises,
+    // ⚠️ Un prix refusé qu'on ne dit pas laisse croire que tout est passé.
+    prix_refuses: refusesPrix,
+  }
 }
 
 export async function changerStatutFacture(id: string, statut: 'a_payer'|'paye'|'en_retard'|'litige'|'annule') {
