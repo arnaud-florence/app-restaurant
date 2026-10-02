@@ -115,7 +115,11 @@ const meilleur = (i) => {
   const gin = memeBase.filter(l => l.fournisseur_nom === 'Gineys').sort((a, b) => a.ref.prix - b.ref.prix)[0]
   return {
     prix: best.ref.prix, unite: best.ref.unite, nature: best.nature,
-    gineysEstLeMoinsCher: gin ? gin === best : false,
+    // ⚠️⚠️ VIENT-IL DE GINEYS ? Décision du gérant (02/10) : on ne lui renvoie
+    // PAS son propre prix. Un fournisseur qui constate qu'il est déjà le moins
+    // cher n'a aucune raison de descendre — alors qu'une ligne vide laisse la
+    // question ouverte.
+    deGineys: gin ? gin === best : false,
     ecartGineysPct: gin && gin !== best ? (gin.ref.prix - best.ref.prix) / best.ref.prix * 100 : null,
   }
 }
@@ -123,7 +127,7 @@ const meilleur = (i) => {
 const csv = [[
   'Famille', 'Notre produit', 'Notre unité', 'Plats concernés',
   'MEILLEUR TARIF QUE NOUS OBTENONS', 'Unité de ce tarif', 'Nature de ce tarif',
-  'Votre réf. (si on l’a trouvée)', 'Votre désignation', 'Votre prix PORTAIL HT',
+  'Votre réf. (si on l’a trouvée)', 'Votre désignation',
   'VOTRE PRIX NET HT', 'Colisage', 'Unité facturée',
 ]]
 let avecPiste = 0, avecTarif = 0, gineysDejaMoinsCher = 0, sansTarif = []
@@ -131,8 +135,12 @@ for (const l of lignes) {
   const ref = PISTES[l.nom]
   const c = ref ? cat.get(ref) : null
   if (c) avecPiste++
-  const m = meilleur(l)
-  if (m) { avecTarif++; if (m.gineysEstLeMoinsCher) gineysDejaMoinsCher++ } else sansTarif.push(l.nom)
+  const brut = meilleur(l)
+  // ⚠️ Un tarif qui vient de Gineys n'est PAS montré : ce serait lui apprendre
+  // qu'il est déjà au plancher. La ligne redevient vide, comme les 35 autres.
+  const m = brut && !brut.deGineys ? brut : null
+  if (brut?.deGineys) gineysDejaMoinsCher++
+  if (m) avecTarif++; else sansTarif.push(l.nom)
   csv.push([
     l.categorie ?? '', l.nom, l.unite,
     l.plats.length <= 3 ? l.plats.join(', ') : `${l.plats.length} plats`,
@@ -144,7 +152,10 @@ for (const l of lignes) {
     // ⚠️ La NATURE reste dite — elle ne révèle personne, et un devis n'est pas
     // un prix payé. La taire ferait passer une proposition pour un acquis.
     m ? (m.nature === 'facture' ? 'prix payé' : m.nature === 'portail' ? 'tarif affiché' : 'proposition reçue') : '',
-    c ? ref : '', c ? c.designation : '', c ? eur(c.prix_ht) : '',
+    // ⚠️ LEUR PRIX PORTAIL EST RETIRÉ (décision du gérant). On garde leur
+    // RÉFÉRENCE et leur DÉSIGNATION — elles servent à identifier le produit,
+    // pas à ancrer le prix. Le leur rappeler leur donnerait un plancher.
+    c ? ref : '', c ? c.designation : '',
     '', '', '',
   ])
 }
@@ -153,8 +164,9 @@ fs.writeFileSync(fichier, '﻿' + csv.map(r => r.map(v => `"${String(v).replace(
 
 console.log(`\n── ${lignes.length} références, ${resto.size} plats ──`)
 console.log(`   ${avecPiste} avec une référence Gineys identifiée · ${lignes.length - avecPiste} à chercher par eux`)
-console.log(`   ${avecTarif} avec un meilleur tarif chiffré, dont ${gineysDejaMoinsCher} où GINEYS est déjà le moins cher`)
-console.log(`   ${sansTarif.length} sans tarif comparable — colonne laissée VIDE`)
+console.log(`   ${avecTarif} avec un meilleur tarif chiffré`)
+console.log(`   ${gineysDejaMoinsCher} MASQUÉES : le meilleur tarif y vient de Gineys — on ne lui rend pas son propre prix`)
+console.log(`   ${sansTarif.length} lignes vides au total (dont ces ${gineysDejaMoinsCher})`)
 console.log(`   → ${fichier}`)
 console.log(`\n   ${Object.keys(ECARTEES).length} pistes ÉCARTÉES, à ne pas reproposer :`)
 for (const [k, v] of Object.entries(ECARTEES)) console.log(`      ${k.padEnd(28)} ${v}`)
@@ -175,11 +187,12 @@ mais il nous faut d'abord connaître vos conditions sur cette gamme.
 Vous trouverez le détail en pièce jointe. Nous avons rempli ce que nous
 savons :
 
-• notre produit, notre unité et les plats concernés, pour l'idée des volumes ;
-• pour ${avecTarif} d'entre eux, LE MEILLEUR TARIF QUE NOUS OBTENONS
-  aujourd'hui sur ce produit, dans l'unité où nous le comptons ;
-• pour ${avecPiste} d'entre eux, la référence de votre catalogue qui nous paraît
-  correspondre, avec le prix que votre portail nous affiche.
+• pour les 62 : notre produit, notre unité et les plats concernés, pour vous
+  donner l'idée des volumes ;
+• sur ${avecTarif} lignes : LE MEILLEUR TARIF QUE NOUS OBTENONS aujourd'hui sur ce
+  produit, dans l'unité où nous le comptons ;
+• sur ${avecPiste} lignes — ce ne sont pas les mêmes — la référence de votre
+  catalogue qui nous paraît correspondre, pour vous éviter de la chercher.
 
 Nous vous laissons trois colonnes : VOTRE PRIX NET, le colisage et l'unité
 facturée.
@@ -187,26 +200,29 @@ facturée.
 Quatre précisions pour que l'échange soit utile :
 
 • la colonne « meilleur tarif » est le prix le plus bas dont nous disposons sur
-  chaque référence, toutes sources confondues. Nous ne vous dirons pas d'où il
-  vient : ce n'est pas le sujet, et sur ${gineysDejaMoinsCher} de ces lignes c'est déjà le vôtre.
+  chaque référence. Nous ne vous dirons pas d'où il vient : ce qui nous
+  intéresse est votre prix, pas une comparaison publique.
 
 • chaque tarif porte sa NATURE : « prix payé » quand une facture le confirme,
   « proposition reçue » quand c'est un devis, « tarif affiché » quand c'est un
   prix de catalogue. Un devis n'est pas un prix payé, et nous ne voudrions pas
   vous faire courir après un chiffre que nous n'avons pas honoré.
 
-• ${sansTarif.length} lignes ont cette colonne VIDE : nous n'avons aucun tarif comparable
-  dessus. Votre prix y sera notre seule référence.
+• sur les ${sansTarif.length} lignes restantes, la colonne « meilleur tarif » est VIDE : nous
+  n'avons aucun tarif comparable dessus. Votre prix y sera notre seule
+  référence, et c'est sans arrière-pensée.
 
 • nous avons comparé votre portail au catalogue imprimé Arti'Pat, référence par
   référence. Sur les articles de notre contrat, la remise moyenne est de 22 % ;
   sur les autres, de 0,3 % — c'est-à-dire le tarif public. Nous le comprenons :
   ces lignes ne sont pas négociées. C'est précisément l'objet de ce courrier.
 
-Enfin, ${lignes.length - avecPiste} de nos besoins n'ont pas d'équivalent évident à votre catalogue — parmesan, reblochon, gorgonzola, burrata, roquette, mesclun,
-tomates, œufs, lardons, entrecôte, frites, gnocchis, câpres, cornichons. Si
-vous les référencez, nous sommes preneurs : nous les achetons aujourd'hui
-ailleurs faute de les avoir trouvés chez vous.
+Dernier point, et il vous concerne directement : nous n'avons pas trouvé
+d'équivalent évident à votre catalogue pour ${lignes.length - avecPiste} de ces besoins :
+parmesan, reblochon, gorgonzola, burrata, roquette, mesclun, tomates, œufs,
+lardons, entrecôte, frites, gnocchis, câpres, cornichons. Si vous les
+référencez, nous sommes preneurs — nous les achetons aujourd'hui ailleurs
+faute de les avoir trouvés chez vous.
 
 Deux questions pratiques : votre fréquence de livraison sur
 Sainte-Anastasie-sur-Issole peut-elle couvrir le frais, et y a-t-il un minimum
