@@ -22,6 +22,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getProfile } from '@/lib/auth'
 import { runAgent, emitFinding, type AgentContext } from '@/lib/agents/runner'
 
+import { journaliser } from '@/lib/integrations/journal'
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -51,13 +53,27 @@ type FactureExtraite = {
 }
 
 export async function POST(req: Request) {
+  // ⚠️ CHAQUE TENTATIVE LAISSE UNE TRACE, RÉUSSIE OU NON.
+  // Le gérant a signalé « Load failed » deux jours de suite et il n'existait
+  // AUCUN moyen de savoir où ça cassait : pas d'erreur serveur si la requête
+  // n'arrive pas, pas de journal si elle arrive. C'est exactement ce qui a
+  // résolu l'en-tête inconnu du webhook Zelty — le journal garde les faits,
+  // et le prochain inconnu se diagnostique en une requête.
+  const t0 = Date.now()
+  const tracer = (etat: string, detail: Record<string, unknown>) =>
+    journaliser({
+      sens: 'entrant', systeme: 'scanner', type: `scan.${etat}`,
+      statut: etat === 'ok' || etat === 'recu' ? 'succes' : 'echec',
+      duree_ms: Date.now() - t0, resultat: detail,
+    })
+
   // Auth : manager only (coût Anthropic)
   const profil = await getProfile()
-  if (!profil) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (profil.role !== 'manager') return NextResponse.json({ error: 'Accès manager requis' }, { status: 403 })
+  if (!profil) { await tracer('refus', { pourquoi: 'non authentifié' }); return NextResponse.json({ error: 'Non authentifié' }, { status: 401 }) }
+  if (profil.role !== 'manager') { await tracer('refus', { pourquoi: 'rôle', role: profil.role }); return NextResponse.json({ error: 'Accès manager requis — demande au gérant d’ouvrir le scan à ton profil.' }, { status: 403 }) }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 500 })
+  if (!apiKey) { await tracer('refus', { pourquoi: 'ANTHROPIC_API_KEY absente' }); return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante côté serveur' }, { status: 500 }) }
 
   // Lit les pages depuis le body. Une facture fournisseur fait souvent
   // plusieurs pages (Metro, Transgourmet…) : on accepte un tableau `images`
@@ -105,6 +121,7 @@ export async function POST(req: Request) {
   }
 
   if (pages.length > 8) {
+    await tracer('refus', { pourquoi: 'trop de pages', pages: pages.length })
     return NextResponse.json({ error: `${pages.length} pages : maximum 8 par facture.` }, { status: 413 })
   }
   // Taille TOTALE : le front réduit chaque page (~1600 px) avant envoi, la
@@ -116,8 +133,10 @@ export async function POST(req: Request) {
   // et le navigateur n'affichait que « Load failed ».
   const tailleKo = Math.ceil(pages.reduce((s, pg) => s + pg.data.length, 0) / 1024)
   if (tailleKo > 4000) {
+    await tracer('refus', { pourquoi: 'trop volumineux', pages: pages.length, ko: tailleKo })
     return NextResponse.json({ error: `Pages trop volumineuses (${tailleKo} Ko une fois encodées, maximum 4000). Scanne-les en deux fois.` }, { status: 413 })
   }
+  await tracer('recu', { pages: pages.length, ko: tailleKo })
 
   // Lance l'agent (loggue dans agents_runs + agent_findings)
   // On capture extracted+analyse pour les renvoyer au frontend via fermeture
@@ -138,7 +157,15 @@ export async function POST(req: Request) {
     }
   })
 
-  if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
+  if (!result.ok) {
+    await tracer('echec', { pourquoi: 'extraction', erreur: result.error, pages: pages.length, ko: tailleKo })
+    return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
+  }
+  await tracer('ok', {
+    pages: pages.length, ko: tailleKo,
+    type: captured.extracted?.type, numero: captured.extracted?.numero,
+    lignes: captured.extracted?.lignes?.length ?? 0,
+  })
   return NextResponse.json({
     ok: true,
     runId: result.runId,

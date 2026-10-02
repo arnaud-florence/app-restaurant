@@ -120,6 +120,10 @@ export default function FactureScanner({
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState('')
   const [dragging, setDragging] = useState(false)
+  /** Ce que fait le scan en ce moment — sans ça on attend dans le vide et on tape deux fois. */
+  const [etape, setEtape] = useState('')
+  /** Ce qu'il faut vérifier avant d'enregistrer (lecture page par page). */
+  const [avertissement, setAvertissement] = useState('')
 
   function reset() {
     setPages([]); setExtracted(null); setHausses([]); setErreur('')
@@ -148,6 +152,7 @@ export default function FactureScanner({
     if (pages.length === 0) return
     setLoading(true)
     setErreur('')
+    setAvertissement('')
     setExtracted(null)
     setHausses([])
     try {
@@ -163,13 +168,64 @@ export default function FactureScanner({
           + `au-delà de ce que le serveur accepte (3,6 Mo). Scanne-les en deux fois, `
           + `ou reprends les photos de moins près.`)
       }
-      const r = await fetch('/api/agents/scanner', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images }),
-      })
-      const json = await r.json()
-      if (!r.ok || !json.ok) throw new Error(json.error ?? `HTTP ${r.status}`)
+      // ⚠️ UN DÉLAI EXPLICITE, SINON SAFARI DIT « LOAD FAILED » ET RIEN D'AUTRE.
+      // La fonction serveur est plafonnée à 60 s ; sans borne côté client on
+      // attend dans le vide puis on reçoit un échec réseau sans cause.
+      const appel = async (lot: typeof images, ms = 75_000) => {
+        const ac = new AbortController()
+        const t = setTimeout(() => ac.abort(), ms)
+        try {
+          const r = await fetch('/api/agents/scanner', {
+            method: 'POST', signal: ac.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ images: lot }),
+          })
+          const txt = await r.text()
+          let j: Record<string, unknown> = {}
+          try { j = JSON.parse(txt) } catch {
+            // ⚠️ Une réponse qui n'est pas du JSON est presque toujours une
+            // page d'erreur de la plateforme (504, 413). Le dire.
+            throw new Error(`Réponse inattendue du serveur (HTTP ${r.status}) : ${txt.slice(0, 120)}`)
+          }
+          if (!r.ok || !j.ok) throw new Error(String(j.error ?? `HTTP ${r.status}`))
+          return j
+        } finally { clearTimeout(t) }
+      }
+
+      let json: Record<string, unknown>
+      try {
+        setEtape(`Lecture des ${images.length} page(s)…`)
+        json = await appel(images)
+      } catch (e1) {
+        // ⚠️⚠️ REPLI PAGE PAR PAGE. Un appel unique est PRÉFÉRABLE — c'est lui
+        // qui donne un total non dupliqué et évite de recoller des « reports »
+        // (0125). Mais un appel unique qui échoue ne donne RIEN, et c'est ce
+        // qui est arrivé deux jours de suite. Mieux vaut un résultat à
+        // vérifier qu'une page blanche.
+        if (images.length === 1) throw e1
+        setEtape('Trop long en une fois — reprise page par page…')
+        const morceaux: Record<string, unknown>[] = []
+        for (let i = 0; i < images.length; i++) {
+          setEtape(`Reprise page par page — ${i + 1}/${images.length}…`)
+          morceaux.push(await appel([images[i]]))
+        }
+        // ⚠️ LES TOTAUX NE S'ADDITIONNENT PAS : chaque page peut porter un
+        // sous-total ou un report. On prend ceux de la DERNIÈRE page qui en
+        // affiche, comme le fait l'appel unique, et on le DIT à l'écran.
+        const exs = morceaux.map(m => m.extracted as FactureExtraite).filter(Boolean)
+        const dernierAvecTotal = [...exs].reverse().find(x => x.montant_ttc != null || x.montant_ht != null)
+        json = {
+          ok: true,
+          extracted: {
+            ...(dernierAvecTotal ?? exs[0]),
+            lignes: exs.flatMap(x => x.lignes ?? []),
+            notes: [dernierAvecTotal?.notes, 'Lu page par page : les totaux viennent de la dernière page qui en affiche — à vérifier.']
+              .filter(Boolean).join(' · '),
+          },
+          haussesDetectees: morceaux.flatMap(m => (m.haussesDetectees ?? []) as HausseDetectee[]),
+        }
+        setAvertissement('Les pages ont été lues une par une : vérifie les montants totaux avant d’enregistrer.')
+      }
       if (json.extracted) {
         setExtracted({ ...(json.extracted as FactureExtraite), nb_pages: pages.length })
         setHausses((json.haussesDetectees ?? []) as HausseDetectee[])
@@ -180,12 +236,17 @@ export default function FactureScanner({
       const m = e instanceof Error ? e.message : 'Erreur scan'
       // ⚠️ « Load failed » / « Failed to fetch » : la requête n'a jamais
       // atteint le serveur. Le message brut ne dit rien à personne.
-      setErreur(/load failed|failed to fetch|networkerror/i.test(m)
-        ? 'La requête n’a pas pu partir — pages trop lourdes, ou connexion interrompue. '
-          + 'Réessaie avec une page à la fois.'
-        : m)
+      setErreur(
+        /abort/i.test(m)
+          ? 'Le serveur a mis plus de 75 secondes à répondre, même page par page. '
+            + 'Reprends les photos de plus loin, ou scanne une page à la fois.'
+        : /load failed|failed to fetch|networkerror/i.test(m)
+          ? 'La requête n’a pas pu partir — pages trop lourdes, ou connexion interrompue. '
+            + 'Réessaie avec une page à la fois.'
+          : m)
     } finally {
       setLoading(false)
+      setEtape('')
     }
   }
 
@@ -292,8 +353,19 @@ export default function FactureScanner({
               <div className="space-y-3">
                 {loading && (
                   <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm">
-                    <p className="font-semibold">⏳ Claude Vision lit {pages.length > 1 ? `les ${pages.length} pages` : 'la facture'}…</p>
-                    <p className="text-xs text-zinc-600 mt-1">Durée 5-15 sec selon le nombre de pages</p>
+                    <p className="font-semibold">
+                      ⏳ {etape || `Claude Vision lit ${pages.length > 1 ? `les ${pages.length} pages` : 'la facture'}…`}
+                    </p>
+                    <p className="text-xs text-zinc-600 mt-1">
+                      Compte 5 à 20 secondes par page. Si c&apos;est trop long en une fois,
+                      la lecture reprend automatiquement page par page.
+                    </p>
+                  </div>
+                )}
+
+                {avertissement && (
+                  <div className="rounded-md bg-amber-50 border border-amber-300 p-3 text-sm text-amber-900">
+                    ⚠️ {avertissement}
                   </div>
                 )}
 
