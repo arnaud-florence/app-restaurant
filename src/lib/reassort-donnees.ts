@@ -21,7 +21,7 @@ import {
   type LigneReassort, type OffreConcurrente,
 } from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
-import { extraireConditionnement } from '@/lib/commande-fournisseur'
+import { calculerEntrees, type DocEntree } from '@/lib/stock-entrees'
 
 export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
   const [produits, matieres, inventaires, etabs, lignesDoc] = await Promise.all([
@@ -221,33 +221,10 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   }
 
   // ══ Entrées depuis le dernier comptage ══════════════════════════════
-  // Même règle que `(ops)/inventaire`, au mot près : on cherche le libellé
-  // du fournisseur DANS la description de la ligne, le BL fait foi sur la
-  // facture qui lui est rattachée (0166), un avoir compte en négatif, et une
-  // ligne au colis se multiplie par son conditionnement.
-  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-  type Doc = { date_emission?: string; type_document?: string; facture_liee_id?: string | null }
-  const docs = lignesDoc as unknown as Array<{
-    description: string; quantite: number | string | null; unite: string | null; facture: Doc | null }>
-  const entreesDepuis = (cible: string, depuis: string | null) => {
-    // ⚠️ Pas de comptage, pas d'entrées : une livraison seule ne dit pas un
-    // stock, elle dit un mouvement. « Jamais compté » doit le rester (0163).
-    if (!depuis) return 0
-    const c = norm(cible)
-    if (c.length < 4) return 0
-    let recu = 0
-    for (const l of docs) {
-      const f = l.facture
-      if (!f?.date_emission || f.date_emission <= depuis) continue
-      if (f.type_document === 'facture' && f.facture_liee_id) continue
-      if (!norm(l.description).includes(c)) continue
-      const q = Number(l.quantite ?? 0)
-      const cond = extraireConditionnement(l.description)
-      const estPiece = /^(pce|pi[eè]ce|piece|p|u)s?$/.test(String(l.unite ?? '').toLowerCase())
-      recu += (f.type_document === 'avoir' ? -1 : 1) * (estPiece || cond == null ? q : q * cond)
-    }
-    return Math.round(recu * 100) / 100
-  }
+  // ⚠️ UNE SEULE IMPLÉMENTATION, partagée avec `(ops)/inventaire` : deux
+  // écrans qui calculent le stock chacun de leur côté finissent par afficher
+  // deux chiffres, et personne ne sait lequel croire.
+  const docs = lignesDoc as unknown as DocEntree[]
 
   const lignes: LigneReassort[] = []
 
@@ -265,6 +242,30 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     const k = cleMatiere(p as { nom: string; nom_matiere?: string | null; libelle_achat?: string | null })
     if (!groupes.has(k)) groupes.set(k, [])
     groupes.get(k)!.push(p)
+  }
+
+  // ⚠️ TOUTES LES CIBLES D'ABORD, UN SEUL CALCUL ENSUITE. Appeler le calcul
+  // par groupe ferait scanner chaque ligne autant de fois qu'il y a de
+  // groupes — et surtout, chacun gagnerait de son côté : c'est précisément
+  // ainsi que les 96 Fanta entraient dans trois stocks. Le plus long gagne,
+  // et il ne peut gagner que s'ils concourent ensemble.
+  const cibles: Array<{ cle: string; libelle: string }> = []
+  for (const [nom, membres] of groupes) {
+    const p = membres.slice().sort((a, b) => ((a.id as string) < (b.id as string) ? -1 : 1))[0]
+    cibles.push({ cle: p.id as string, libelle: ((p.libelle_achat as string) ?? '').trim() || nom })
+  }
+  for (const m of matieres) {
+    cibles.push({ cle: `ing:${m.id}`, libelle: ((m.libelle_achat as string) ?? '').trim() || (m.nom as string) })
+  }
+  // ⚠️ Le comptage de référence diffère par ligne : on calcule les entrées
+  // depuis la date la plus ANCIENNE des comptages retenus, puis on ne garde
+  // pour chaque cible que ce qui suit SON propre comptage. Un seul passage
+  // suffit parce que la date est filtrée cible par cible juste après.
+  const parDepuis = new Map<string, Map<string, number>>()
+  const entreesDe = (cle: string, depuis: string | null) => {
+    if (!depuis) return 0
+    if (!parDepuis.has(depuis)) parDepuis.set(depuis, calculerEntrees(docs, cibles, depuis))
+    return parDepuis.get(depuis)!.get(cle) ?? 0
   }
 
   for (const [nom, membres] of groupes) {
@@ -285,9 +286,9 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // déduites ici : elles le sont à l'inventaire, où la caisse les donne
       // produit par produit. En surestimer serait moins grave que l'inverse
       // pour une commande — mais c'est une limite, pas un choix de confort.
-      tenu: d ? d.q + entreesDepuis((p.libelle_achat as string) ?? nom, d.le) : null,
+      tenu: d ? d.q + entreesDe(p.id as string, d.le) : null,
       compte: d ? d.q : null,
-      entrees: d ? entreesDepuis((p.libelle_achat as string) ?? nom, d.le) : 0,
+      entrees: d ? entreesDe(p.id as string, d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: p.stock_minimum == null ? null : Number(p.stock_minimum),
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
@@ -355,9 +356,9 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // est fermée et que le stock est à zéro. Seul un comptage fait foi.
       // Les entrées s'y ajoutent comme pour les produits : une matière
       // livrée après le comptage est bien en réserve.
-      tenu: d ? d.q + entreesDepuis((m.libelle_achat as string) ?? (m.nom as string), d.le) : null,
+      tenu: d ? d.q + entreesDe(`ing:${m.id}`, d.le) : null,
       compte: d ? d.q : null,
-      entrees: d ? entreesDepuis((m.libelle_achat as string) ?? (m.nom as string), d.le) : 0,
+      entrees: d ? entreesDe(`ing:${m.id}`, d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: m.stock_minimum == null ? null : Number(m.stock_minimum),
       cible: m.stock_cible == null ? null : Number(m.stock_cible),

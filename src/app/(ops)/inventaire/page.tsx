@@ -4,7 +4,7 @@
 // la valeur du stock précédent, pour afficher l'évolution.
 
 import { createClient } from '@/lib/supabase/server'
-import { extraireConditionnement } from '@/lib/commande-fournisseur'
+import { calculerEntrees, type DocEntree } from '@/lib/stock-entrees'
 import InventaireClient from './InventaireClient'
 
 export const metadata = { title: 'Inventaire' }
@@ -167,41 +167,19 @@ export default async function InventairePage({
   // matière première — le jambon d'un sandwich — il faudrait une recette
   // chiffrée : hors modèle. On affiche alors les entrées seules, sans
   // prétendre à un théorique.
-  const normalise = (x: string) =>
-    x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-
-  const entrees = new Map<string, number>()
-  if (datePrecedente) {
-    type FL = {
-      description: string; quantite: number | string | null; unite: string | null
-      facture: { date_emission?: string; type_document?: string; facture_liee_id?: string | null } | null
-    }
-    const depuis = (flRes.data ?? []) as unknown as FL[]
-    for (const g of groupes.values()) {
-      const cible = normalise(g.libelleAchat ?? g.nom)
-      if (cible.length < 4) continue
-      let recu = 0
-      for (const l of depuis) {
-        const f = l.facture
-        if (!f?.date_emission || f.date_emission <= datePrecedente) continue
-        // ⚠️ PAS DE DOUBLE COMPTAGE (0166). Le bon de livraison dit ce qui est
-        // ARRIVÉ ; la facture dit ce qu'on DOIT. Compter les deux ferait
-        // entrer deux fois la même marchandise — sans qu'aucune erreur ne le
-        // signale, le stock théorique doublerait à chaque livraison. Une
-        // facture rattachée à son BL n'ajoute donc rien : le BL l'a déjà fait.
-        if (f.type_document === 'facture' && f.facture_liee_id) continue
-        // Un avoir est une marchandise RENDUE : elle sort du stock.
-        const signe = f.type_document === 'avoir' ? -1 : 1
-        if (!normalise(l.description).includes(cible)) continue
-        const q = Number(l.quantite ?? 0)
-        const cond = extraireConditionnement(l.description)
-        const estPiece = /^(pce|pi[eè]ce|piece|p|u)s?$/.test(String(l.unite ?? '').toLowerCase())
-        // Ligne au colis → × conditionnement pour retrouver des pièces.
-        recu += signe * (estPiece || cond == null ? q : q * cond)
-      }
-      if (recu !== 0) entrees.set(g.id, Math.round(recu * 100) / 100)
-    }
-  }
+  // ⚠️ MÊME IMPLÉMENTATION QUE LE RÉASSORT (`src/lib/stock-entrees.ts`).
+  // Cette page portait sa propre copie du calcul : identique, mais que rien
+  // ne tenait synchronisée. Le jour où l'une aurait bougé, l'inventaire et
+  // l'écran qui déclenche les commandes auraient donné deux stocks.
+  //
+  // ⚠️ C'est aussi ce qui apporte la règle du LIBELLÉ LE PLUS LONG : avec un
+  // simple « contient », « Orange » captait « Fanta Orange IVC 25cl » et les
+  // 96 canettes livrées entraient dans TROIS stocks à la fois.
+  const entrees = calculerEntrees(
+    (flRes.data ?? []) as unknown as DocEntree[],
+    Array.from(groupes.values(), g => ({ cle: g.id, libelle: g.libelleAchat ?? g.nom })),
+    datePrecedente ?? null,
+  )
 
   const sorties = new Map<string, number>()
   if (datePrecedente) {

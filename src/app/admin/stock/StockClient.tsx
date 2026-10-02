@@ -29,11 +29,14 @@ import ListeCoursesModal from './ListeCoursesModal'
 type ActionKind = 'entree' | 'perte' | 'inventaire' | 'courses' | null
 
 export default function StockClient({
-  ingredients, mouvements,
+  ingredients, mouvements, jamaisComptes = [],
 }: {
   ingredients: Ingredient[]
   mouvements: Mouvement[]
+  /** Ids dont le stock n'a JAMAIS été compté — différent d'un stock à zéro. */
+  jamaisComptes?: string[]
 }) {
+  const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
   const [tab, setTab] = useState<'stocks' | 'mouvements' | 'bilan'>('stocks')
   const [search, setSearch] = useState('')
@@ -223,6 +226,7 @@ export default function StockClient({
                 <IngredientStockCard
                   key={i.id}
                   i={i}
+                  inconnu={jamais.has(i.id)}
                   onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                   onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
                   onMoinsUn={() => deduire1Portion(i)}
@@ -251,6 +255,7 @@ export default function StockClient({
                         <IngredientStockRow
                           key={i.id}
                           i={i}
+                          inconnu={jamais.has(i.id)}
                           onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                           onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
                           onMoinsUn={() => deduire1Portion(i)}
@@ -462,9 +467,10 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
 
 // ─── Mobile : carte d'ingrédient ─────────────────────────────────────
 function IngredientStockCard({
-  i, onEntree, onPerte, onMoinsUn,
+  i, inconnu, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
+  inconnu?: boolean
   onEntree: () => void
   onPerte: () => void
   onMoinsUn: () => void
@@ -485,7 +491,7 @@ function IngredientStockCard({
           </span>
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs">
-          <Stat label="Stock"  value={`${fmtQte(i.stock_actuel)} ${i.unite}`} />
+          <Stat label="Stock"  value={inconnu ? '— jamais compté' : `${fmtQte(i.stock_actuel)} ${i.unite}`} />
           <Stat label="Min"    value={`${fmtQte(i.stock_minimum)}`} />
           <Stat label="Valeur" value={fmtPrix(valeur)} />
         </div>
@@ -510,9 +516,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 // ─── Desktop : ligne de table ────────────────────────────────────────
 function IngredientStockRow({
-  i, onEntree, onPerte, onMoinsUn,
+  i, inconnu, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
+  inconnu?: boolean
   onEntree: () => void
   onPerte: () => void
   onMoinsUn: () => void
@@ -527,9 +534,15 @@ function IngredientStockRow({
       </td>
       <td className="py-2.5 px-2 text-muted-foreground text-xs">{i.categorie}</td>
       <td className="py-2.5 px-2 text-right">
-        <span className={cn('inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-md border tabular-nums', sty.bg, sty.text, sty.border)}>
-          {fmtQte(i.stock_actuel)} {i.unite}
-        </span>
+        {inconnu ? (
+          <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-md border border-zinc-300 bg-zinc-50 text-zinc-500">
+            — jamais compté
+          </span>
+        ) : (
+          <span className={cn('inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-md border tabular-nums', sty.bg, sty.text, sty.border)}>
+            {fmtQte(i.stock_actuel)} {i.unite}
+          </span>
+        )}
       </td>
       <td className="py-2.5 px-2 text-right text-xs text-muted-foreground tabular-nums">
         {fmtQte(i.stock_minimum)} / {fmtQte(i.stock_maximum)}

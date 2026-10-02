@@ -4,15 +4,40 @@ import AlertesStockCard from './AlertesStockCard'
 import StockReelCard from './StockReelCard'
 import { listMouvements } from './actions'
 import { listIngredients } from '../ingredients/actions'
+import { createClient } from '@/lib/supabase/server'
+import { chargerLignesReassort } from '@/lib/reassort-donnees'
+import { sansComptagePerime } from '@/lib/reassort'
 
 export const metadata = { title: 'Stocks — Admin' }
 export const dynamic = 'force-dynamic'
 
 export default async function StockPage() {
-  const [ingredients, mouvements] = await Promise.all([
+  const [ingredients, mouvements, sb] = await Promise.all([
     listIngredients(),
     listMouvements(200),
+    createClient(),
   ])
+  // ⚠️⚠️ DEUX CHIFFRES POUR LE MÊME STOCK, SUR LA MÊME PAGE. Le tableau du
+  // module 7 lisait `ingredients.stock_actuel` — le compteur que le projet
+  // n'alimente plus depuis la 0135 — pendant que la carte du haut affichait
+  // le stock calculé. Le bar sortait à 0 juste sous une carte qui annonçait
+  // 801 unités livrées. Deux chiffres qui se contredisent, c'est pire qu'un
+  // seul chiffre faux : on ne sait plus lequel croire, donc on ne croit
+  // aucun des deux.
+  //
+  // On substitue donc le stock CALCULÉ (comptage + livraisons) partout où il
+  // existe. `stock_actuel` reste écrit par les mouvements manuels — ce n'est
+  // simplement plus lui qu'on affiche.
+  const reel = sansComptagePerime(await chargerLignesReassort(sb))
+  const parCle = new Map(reel.map(l => [l.cle, l]))
+  const jamais: string[] = []
+  const ingredientsReels = ingredients.map(i => {
+    const l = parCle.get(`ing:${i.id}`)
+    // ⚠️ « Jamais compté » n'est pas « zéro » : personne n'a regardé. On le
+    // marque au lieu d'afficher un 0 qui se lirait « il n'en reste plus ».
+    if (!l || l.tenu === null) { jamais.push(i.id); return i }
+    return { ...i, stock_actuel: l.tenu }
+  })
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
@@ -43,7 +68,7 @@ export default async function StockPage() {
         <StockReelCard />
         <AlertesStockCard />
       </div>
-      <StockClient ingredients={ingredients} mouvements={mouvements} />
+      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} />
     </>
   )
 }
