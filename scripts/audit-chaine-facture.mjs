@@ -82,24 +82,46 @@ for (const p of trop.slice(0, 6)) console.log(`        · ${p.nom} : ${Number(p.
 
 // ── 4. le garde-fou BAS — la double division ─────────────────────────
 console.log('\n── 4. Le garde-fou bas (double division du conditionnement)')
+// ⚠️⚠️ ON RECALCULE LE RAPPROCHEMENT, on ne lit PAS `facture_lignes.recette_id`.
+// Ce lien a été écrit au moment du scan ; la question posée ici est « que
+// ferait un scan AUJOURD'HUI ». Les deux divergent dès qu'un libellé d'achat
+// change — et c'est précisément ce qui vient d'arriver au café, passé des
+// capsules aux grains. Lire le lien historique faisait crier l'audit sur un
+// risque déjà supprimé.
+//
+// Règle recopiée de `createFacture` : la cible d'un produit est son NOM, son
+// `nom_caisse` ou son `libelle_achat`, et le rapprochement se fait par
+// inclusion dans les deux sens, avec un minimum de 4 caractères.
+const cibles = []
+for (const p of await lire('recettes?actif=is.true&select=id,nom,nom_caisse,libelle_achat,cout_achat_ht,unites_par_achat,prix_vente_ht')) {
+  for (const n of [p.nom, p.nom_caisse, p.libelle_achat]) {
+    const t = String(n ?? '').trim().toLowerCase()
+    if (t.length >= 4) cibles.push({ p, t })
+  }
+}
 const suspects = []
 for (const l of lignes) {
-  if (!l.recette_id || l.prix_unitaire_ht == null) continue
+  if (l.prix_unitaire_ht == null || l.ignoree) continue
   if (docs.get(l.facture_id)?.type_document !== 'facture') continue
-  const p = prods.get(l.recette_id); if (!p || p.cout_achat_ht == null) continue
-  const cond = extraireConditionnement(l.description)
-  const prixAchat = estPiece(l.unite) ? Number(l.prix_unitaire_ht) : (cond != null ? Number(l.prix_unitaire_ht) / cond : null)
-  if (prixAchat == null) continue
-  const par = Number(p.unites_par_achat ?? 1) || 1
-  const attendu = prixAchat / par
-  const reel = Number(p.cout_achat_ht)
-  if (reel / attendu > 3 || reel / attendu < 1 / 3) suspects.push({ p, l, attendu, reel, cond, par })
+  const desc = String(l.description).toLowerCase()
+  const vus = new Map()
+  for (const c of cibles) if (desc.includes(c.t) || c.t.includes(desc)) vus.set(c.p.id, c.p)
+  for (const p of vus.values()) {
+    if (p.cout_achat_ht == null) continue
+    const cond = extraireConditionnement(l.description)
+    const prixAchat = estPiece(l.unite) ? Number(l.prix_unitaire_ht) : (cond != null ? Number(l.prix_unitaire_ht) / cond : null)
+    if (prixAchat == null) continue
+    const par = Number(p.unites_par_achat ?? 1) || 1
+    const attendu = prixAchat / par
+    const reel = Number(p.cout_achat_ht)
+    if (reel / attendu > 3 || reel / attendu < 1 / 3) suspects.push({ p, l, attendu, reel, cond, par })
+  }
 }
 suspects.length === 0
-  ? P('aucun écart d’un facteur 3 entre le coût posé et ce qu’écrirait la propagation')
-  : E(`${suspects.length} ligne(s) où la propagation écrirait un chiffre d’un autre ordre de grandeur`)
+  ? P('aucune ligne de facture n’écrirait un coût d’un autre ordre de grandeur')
+  : E(`${suspects.length} ligne(s) où un scan AUJOURD'HUI écrirait un chiffre d’un autre ordre de grandeur`)
 for (const s of suspects) {
-  console.log(`        · ${s.p.nom} : posé ${s.reel.toFixed(4)} €, la propagation écrirait ${s.attendu.toFixed(4)} €`)
+  console.log(`        · ${s.p.nom} : posé ${s.reel.toFixed(4)} €, un scan écrirait ${s.attendu.toFixed(4)} €`)
   console.log(`          « ${s.l.description.slice(0, 54)} » — ÷ ${s.cond ?? 1} (C=N) puis ÷ ${s.par} (unités/achat)`)
   if (s.cond && s.par > 1) console.log(`          ⚠️ les deux nombres disent le MÊME rendement : division en double`)
 }

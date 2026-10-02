@@ -57,6 +57,19 @@ pct < 5
 const parType = {}
 for (const e of r429) parType[e.type] = (parType[e.type] ?? 0) + 1
 for (const [t, n] of Object.entries(parType).sort((a, b) => b[1] - a[1])) console.log(`        · ${t} : ${n}`)
+// ⚠️ UNE FENÊTRE DE 24 H NE PEUT PAS BOUGER LE JOUR OÙ ON CORRIGE LA CADENCE :
+// elle contient encore l'ancienne. Un indicateur qui met un jour à réagir fait
+// croire que le correctif n'a rien fait, et on le défait. On montre donc aussi
+// les deux dernières heures, qui reflètent la cadence EN COURS.
+const recentDepuis = new Date(Date.now() - 2 * 3600e3).toISOString()
+const recents = tous.filter(e => true)
+const rec = await sb(`integration_evenements?systeme=eq.zelty&traite_at=gte.${recentDepuis}&select=type,statut,erreur&limit=500`)
+const rec429 = rec.filter(e => /429/.test(e.erreur ?? ''))
+const pctRec = rec.length ? rec429.length / rec.length * 100 : 0
+console.log(`     sur les 2 DERNIÈRES heures : ${rec429.length} refus sur ${rec.length} appels (${pctRec.toFixed(0)} %)`
+  + `${rec.length === 0 ? ' — aucun appel, rien à conclure' : ''}`)
+if (rec.length > 0 && pctRec < 5 && pct >= 5)
+  console.log(`     → la cadence corrigée tient : les 24 h ci-dessus contiennent encore l'ancienne.`)
 
 // ── 3. ce qui est descendu porte-t-il ses LIGNES ? ───────────────────
 console.log('\n── 3. Les lignes, sans lesquelles stock et marges sont aveugles')
