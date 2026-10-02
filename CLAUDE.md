@@ -5895,6 +5895,40 @@ fmtPct(n)   // 12,3 %
 
 - **Module 28 — 2FA TOTP** : `otplib` génère le secret base32 + URI otpauth, lib `qrcode` affiche le QR. Codes de secours stockés en clair dans `profils.backup_codes` (text[]) — ils ne sont pas encore consommés à l'usage côté login (TODO si besoin). Si l'horloge du téléphone dérive, le code peut être rejeté — `authenticator.check()` accepte ±1 step (30s) par défaut.
 
+### Les quatre audits de chaîne (02/10/2026)
+
+⚠️⚠️ **« LES PAGES RÉPONDENT » N'EST PAS « L'APPLICATION FONCTIONNE ».** Les
+audits de disponibilité passaient tous au vert pendant que `/admin/reassort`
+ignorait les livraisons, que l'onglet Stock lisait un compteur abandonné depuis
+la 0135, que le libellé « Orange » aspirait les entrées du Fanta dans TROIS
+stocks, et qu'un café allait tomber à 0,42 centime au prochain scan. Aucun de
+ces défauts n'est visible tant que de vraies données n'ont pas traversé la
+chaîne — et aucune ne l'avait fait : aucune livraison enregistrée, le bar
+jamais compté, aucune facture scannée depuis la 0142.
+
+`node scripts/audit-complet.mjs` enchaîne les quatre. Chacun suit UN FAIT de
+bout en bout et dit ce qui NE marche pas.
+
+| # | Question | Ce qu'il a trouvé |
+|---|---|---|
+| 1 | une livraison entre-t-elle en stock ? | 12 lignes sur 47 n'entraient nulle part |
+| 2 | une vente redescend-elle, nourrit-elle la marge ? | 31 % des appels Zelty refusés en 429 |
+| 3 | une facture écrit-elle le bon prix ? | le garde-fou n'existait que vers le haut |
+| 4 | le food cost se recalcule-t-il à la main ? | juste au centième sur trois familles |
+
+⚠️ **Un audit au rouge n'est pas forcément une panne.** Plusieurs constats sont
+des manques CONNUS : aucune ligne de facture ne porte de référence (l'extraction
+existe depuis la 0142, aucune facture scannée depuis), aucune vente Zelty réelle
+n'a traversé le pont (mode école). Ce qui compte est que chacun soit NOMMÉ.
+
+⚠️ **Les deux tickets muets du 17/08** (11,40 €, montant libre tapé avant que la
+carte SumUp soit prête) sont comptés comme CONNUS dans l'audit 2, pas comme
+échec : une ligne rouge en permanence finit par être ignorée — leçon de
+`test-rh.mjs` et de `test-rbac-snack-livreur.mjs`.
+
+⚠️ Les audits 3 et 4 **RECOPIENT** les règles depuis le TS (`createFacture`,
+`foodCost.ts`) : modifier les deux ensemble.
+
 ## 9. Quick start
 
 ```sh
@@ -5903,6 +5937,14 @@ npm install
 
 # dev
 npm run dev          # http://localhost:3000
+
+# les quatre audits de chaîne (données réelles, lecture seule)
+node scripts/audit-complet.mjs                   # les quatre d'un coup
+node scripts/audit-chaine-livraison.mjs          # livraison → stock
+node scripts/audit-chaine-vente.mjs              # vente → marge
+node scripts/audit-chaine-facture.mjs            # facture → prix d'achat
+node scripts/audit-food-cost.mjs                 # food cost recalculé à la main
+node scripts/diagnostic-scanner.mjs              # pourquoi le scan a échoué
 
 # tests par module — livrés (le dev server doit tourner pour la partie HTTP)
 node scripts/verify-supabase.mjs
