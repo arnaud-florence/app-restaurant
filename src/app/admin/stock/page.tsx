@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import StockClient from './StockClient'
 import AlertesStockCard from './AlertesStockCard'
+import StockReelCard from './StockReelCard'
 import { listMouvements } from './actions'
 import { listIngredients } from '../ingredients/actions'
 
@@ -33,6 +34,13 @@ export default async function StockPage() {
             utile au restaurant à partir d&apos;octobre.
           </p>
         </Link>
+        {/* Le stock RÉEL, calculé — c'est lui qu'on vient chercher après une
+            livraison. Le tableau du module 7, plus bas, lit encore
+            `ingredients.stock_actuel` : un compteur que le projet n'alimente
+            plus depuis la 0135. Il garde son utilité pour les MOUVEMENTS
+            (entrées manuelles, pertes, inventaires ponctuels), pas pour dire
+            ce qu'il y a en réserve. */}
+        <StockReelCard />
         <AlertesStockCard />
       </div>
       <StockClient ingredients={ingredients} mouvements={mouvements} />

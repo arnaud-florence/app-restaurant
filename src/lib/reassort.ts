@@ -24,8 +24,20 @@ export type LigneReassort = {
   /** L'étage de la carte. */
   etablissement: string | null
   unite: string | null
-  /** Ce qu'on tient. NULL = jamais compté — différent de zéro. */
+  /**
+   * Ce qu'on tient : comptage + entrées depuis. NULL = jamais compté —
+   * différent de zéro.
+   */
   tenu: number | null
+  /** Le comptage seul, avant les entrées. Sert à montrer d'où vient `tenu`. */
+  compte: number | null
+  /**
+   * Ce qui est ENTRÉ depuis le comptage (bons de livraison et factures non
+   * rattachées, avoirs en négatif). Affiché à part : un stock qu'on ne sait
+   * pas décomposer n'est pas vérifiable, et c'est la première chose qu'on
+   * conteste quand il paraît faux.
+   */
+  entrees: number
   /** Date du comptage qui fait foi. */
   compte_le: string | null
   seuil: number | null

@@ -286,6 +286,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // produit par produit. En surestimer serait moins grave que l'inverse
       // pour une commande — mais c'est une limite, pas un choix de confort.
       tenu: d ? d.q + entreesDepuis((p.libelle_achat as string) ?? nom, d.le) : null,
+      compte: d ? d.q : null,
+      entrees: d ? entreesDepuis((p.libelle_achat as string) ?? nom, d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: p.stock_minimum == null ? null : Number(p.stock_minimum),
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
@@ -354,6 +356,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // Les entrées s'y ajoutent comme pour les produits : une matière
       // livrée après le comptage est bien en réserve.
       tenu: d ? d.q + entreesDepuis((m.libelle_achat as string) ?? (m.nom as string), d.le) : null,
+      compte: d ? d.q : null,
+      entrees: d ? entreesDepuis((m.libelle_achat as string) ?? (m.nom as string), d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: m.stock_minimum == null ? null : Number(m.stock_minimum),
       cible: m.stock_cible == null ? null : Number(m.stock_cible),
