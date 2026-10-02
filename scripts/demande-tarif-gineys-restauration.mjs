@@ -21,6 +21,7 @@
 //
 //   node scripts/demande-tarif-gineys-restauration.mjs
 import fs from 'node:fs'
+import { comparer } from '../.next/cache/tarifs-lib/tarifs-fournisseurs.js'
 const env = {}
 for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
   const i = l.indexOf('='); if (i < 0 || l.trim().startsWith('#')) continue
@@ -55,6 +56,21 @@ const ECARTEES = {
   'Sauce burger maison (kg)': '« TACOS BŒUF HALAL SAUCE BURGER » est un plat préparé',
 }
 
+// ── LE MEILLEUR TARIF QUE NOUS OBTENONS, SANS DIRE CHEZ QUI ──────────
+//
+// Demande du gérant : montrer le meilleur prix obtenu sur chaque référence,
+// sans nommer le fournisseur. Là où Gineys est déjà le moins cher, c'est son
+// prix qui s'affiche — il n'apprend rien qu'il ne sache.
+//
+// ⚠️ LE MEILLEUR PRIX SE CALCULE PAR `comparer()`, la même fonction que
+// `/admin/tarifs-fournisseurs` et l'agent Stock. Un min/max brut opposerait un
+// colis de 3 000 serviettes à un paquet de 200 et annoncerait « −97 % ».
+//
+// ⚠️ ET SON UNITÉ DOIT ÊTRE LA NÔTRE. Le comparateur a sorti les câpres et les
+// cornichons en « €/pièce » : c'est un prix de CONTENANT lu comme une pièce.
+// Envoyer « nous obtenons les câpres à 3,29 € la pièce » quand on les compte au
+// kilo, c'est demander un alignement sur un chiffre qui ne veut rien dire.
+const nomF = new Map((await lire('fournisseurs?select=id,nom')).map(x => [x.id, x.nom]))
 const [g] = await lire('fournisseurs?nom=eq.Gineys&select=id,nom,contact,email,telephone')
 const cat = new Map((await lire(`catalogue_fournisseur?fournisseur_id=eq.${g.id}&select=reference,designation,prix_ht,unite,famille`))
   .map(c => [String(c.reference), c]))
@@ -72,23 +88,62 @@ for (const c of comps) {
 const lignes = [...cible.values()].sort((a, b) =>
   (a.categorie ?? '').localeCompare(b.categorie ?? '', 'fr') || a.nom.localeCompare(b.nom, 'fr'))
 const eur = n => n == null || n <= 0 ? '' : String(n).replace('.', ',')
+const f3 = n => n.toFixed(3).replace('.', ',')
+
+// notre unité ramenée à sa base : « seau 1 L » → L, « boîte 1 kg » → kg
+const base = u => {
+  const t = String(u ?? '').toLowerCase()
+  if (/\bkg\b|\bg\b/.test(t)) return 'kg'
+  if (/\bl\b|litre|ml|cl/.test(t)) return 'L'
+  if (/pi[eè]ce|piece|unit/.test(t)) return 'piece'
+  return null
+}
+const tousLesTarifs = (await lire('catalogue_fournisseur?actif=is.true&select=id,fournisseur_id,reference,designation,unite,prix_ht,colis_quantite,colis_libelle,contenance_valeur,contenance_unite,cle_comparaison,ingredient_id,date_tarif,source,nature'))
+  .map(x => ({ ...x, fournisseur_nom: nomF.get(x.fournisseur_id) ?? '?' }))
+const groupes = comparer(tousLesTarifs)
+/** Le meilleur prix obtenu sur cette matière, dans NOTRE unité, sans dire d'où. */
+const meilleur = (i) => {
+  const grp = groupes.find(x => x.lignes.some(l => l.ingredient_id === i.id) || x.cle === i.nom)
+  if (!grp) return null
+  const comp = grp.lignes.filter(l => l.ref)
+  if (!comp.length) return null
+  const u = comp[0].ref.unite, fmt = comp[0].ref.format ?? null
+  const memeBase = comp.filter(l => l.ref.unite === u && (l.ref.format ?? null) === fmt)
+  // ⚠️ l'unité du meilleur prix doit être celle dans laquelle NOUS comptons
+  if (base(i.unite) && u !== base(i.unite)) return null
+  const best = memeBase.slice().sort((a, b) => a.ref.prix - b.ref.prix)[0]
+  const gin = memeBase.filter(l => l.fournisseur_nom === 'Gineys').sort((a, b) => a.ref.prix - b.ref.prix)[0]
+  return {
+    prix: best.ref.prix, unite: best.ref.unite, nature: best.nature,
+    gineysEstLeMoinsCher: gin ? gin === best : false,
+    ecartGineysPct: gin && gin !== best ? (gin.ref.prix - best.ref.prix) / best.ref.prix * 100 : null,
+  }
+}
 
 const csv = [[
-  'Famille', 'Notre produit', 'Notre unité', 'Notre prix HT', 'Base de notre prix', 'Plats concernés',
+  'Famille', 'Notre produit', 'Notre unité', 'Plats concernés',
+  'MEILLEUR TARIF QUE NOUS OBTENONS', 'Unité de ce tarif', 'Nature de ce tarif',
   'Votre réf. (si on l’a trouvée)', 'Votre désignation', 'Votre prix PORTAIL HT',
   'VOTRE PRIX NET HT', 'Colisage', 'Unité facturée',
 ]]
-let avecPiste = 0
+let avecPiste = 0, avecTarif = 0, gineysDejaMoinsCher = 0, sansTarif = []
 for (const l of lignes) {
   const ref = PISTES[l.nom]
   const c = ref ? cat.get(ref) : null
   if (c) avecPiste++
+  const m = meilleur(l)
+  if (m) { avecTarif++; if (m.gineysEstLeMoinsCher) gineysDejaMoinsCher++ } else sansTarif.push(l.nom)
   csv.push([
-    l.categorie ?? '', l.nom, l.unite, eur(l.prix_achat_ht),
-    // ⚠️ La base est répétée sur CHAQUE ligne : un commercial lit un tableau
-    // ligne à ligne, il ne remonte pas à l'en-tête.
-    l.prix_achat_ht > 0 ? (l.prix_estime ? 'ESTIMATION, à confirmer' : 'prix payé') : '',
+    l.categorie ?? '', l.nom, l.unite,
     l.plats.length <= 3 ? l.plats.join(', ') : `${l.plats.length} plats`,
+    // ⚠️ LE PRIX, JAMAIS SA PROVENANCE. Le gérant a tranché : on montre le
+    // meilleur tarif obtenu sans dire chez qui. Là où Gineys est déjà le moins
+    // cher, c'est son propre prix qui s'affiche — il n'apprend rien.
+    m ? f3(m.prix) : '',
+    m ? `€/${m.unite}` : '',
+    // ⚠️ La NATURE reste dite — elle ne révèle personne, et un devis n'est pas
+    // un prix payé. La taire ferait passer une proposition pour un acquis.
+    m ? (m.nature === 'facture' ? 'prix payé' : m.nature === 'portail' ? 'tarif affiché' : 'proposition reçue') : '',
     c ? ref : '', c ? c.designation : '', c ? eur(c.prix_ht) : '',
     '', '', '',
   ])
@@ -96,10 +151,10 @@ for (const l of lignes) {
 const fichier = 'data/demande-tarif-gineys-restauration.csv'
 fs.writeFileSync(fichier, '﻿' + csv.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n'))
 
-const releves = lignes.filter(l => !l.prix_estime && l.prix_achat_ht > 0).length
 console.log(`\n── ${lignes.length} références, ${resto.size} plats ──`)
 console.log(`   ${avecPiste} avec une référence Gineys identifiée · ${lignes.length - avecPiste} à chercher par eux`)
-console.log(`   ${releves} prix payés · ${lignes.length - releves} estimations`)
+console.log(`   ${avecTarif} avec un meilleur tarif chiffré, dont ${gineysDejaMoinsCher} où GINEYS est déjà le moins cher`)
+console.log(`   ${sansTarif.length} sans tarif comparable — colonne laissée VIDE`)
 console.log(`   → ${fichier}`)
 console.log(`\n   ${Object.keys(ECARTEES).length} pistes ÉCARTÉES, à ne pas reproposer :`)
 for (const [k, v] of Object.entries(ECARTEES)) console.log(`      ${k.padEnd(28)} ${v}`)
@@ -120,28 +175,35 @@ mais il nous faut d'abord connaître vos conditions sur cette gamme.
 Vous trouverez le détail en pièce jointe. Nous avons rempli ce que nous
 savons :
 
-• notre produit, notre unité et le prix auquel nous l'avons budgété ;
+• notre produit, notre unité et les plats concernés, pour l'idée des volumes ;
+• pour ${avecTarif} d'entre eux, LE MEILLEUR TARIF QUE NOUS OBTENONS
+  aujourd'hui sur ce produit, dans l'unité où nous le comptons ;
 • pour ${avecPiste} d'entre eux, la référence de votre catalogue qui nous paraît
-  correspondre, avec le prix que votre portail nous affiche aujourd'hui ;
-• les plats concernés, pour vous donner une idée des volumes.
+  correspondre, avec le prix que votre portail nous affiche.
 
-Nous vous laissons deux colonnes : VOTRE PRIX NET et le colisage.
+Nous vous laissons trois colonnes : VOTRE PRIX NET, le colisage et l'unité
+facturée.
 
-Deux précisions pour que l'échange soit utile :
+Quatre précisions pour que l'échange soit utile :
 
-• sur ces 62 prix, ${releves} seulement sont des prix réellement payés. Les
-  ${lignes.length - releves} autres sont des ESTIMATIONS, marquées comme telles dans le tableau :
-  la pizzeria n'a pas encore ouvert, aucune facture ne les a confirmés. Nous
-  préférons vous le dire plutôt que de vous laisser vous aligner sur un chiffre
-  que nous n'avons pas payé.
+• la colonne « meilleur tarif » est le prix le plus bas dont nous disposons sur
+  chaque référence, toutes sources confondues. Nous ne vous dirons pas d'où il
+  vient : ce n'est pas le sujet, et sur ${gineysDejaMoinsCher} de ces lignes c'est déjà le vôtre.
+
+• chaque tarif porte sa NATURE : « prix payé » quand une facture le confirme,
+  « proposition reçue » quand c'est un devis, « tarif affiché » quand c'est un
+  prix de catalogue. Un devis n'est pas un prix payé, et nous ne voudrions pas
+  vous faire courir après un chiffre que nous n'avons pas honoré.
+
+• ${sansTarif.length} lignes ont cette colonne VIDE : nous n'avons aucun tarif comparable
+  dessus. Votre prix y sera notre seule référence.
 
 • nous avons comparé votre portail au catalogue imprimé Arti'Pat, référence par
   référence. Sur les articles de notre contrat, la remise moyenne est de 22 % ;
   sur les autres, de 0,3 % — c'est-à-dire le tarif public. Nous le comprenons :
   ces lignes ne sont pas négociées. C'est précisément l'objet de ce courrier.
 
-Enfin, ${lignes.length - avecPiste} de nos besoins n'ont pas d'équivalent évident à votre
-catalogue — parmesan, reblochon, gorgonzola, burrata, roquette, mesclun,
+Enfin, ${lignes.length - avecPiste} de nos besoins n'ont pas d'équivalent évident à votre catalogue — parmesan, reblochon, gorgonzola, burrata, roquette, mesclun,
 tomates, œufs, lardons, entrecôte, frites, gnocchis, câpres, cornichons. Si
 vous les référencez, nous sommes preneurs : nous les achetons aujourd'hui
 ailleurs faute de les avoir trouvés chez vous.
