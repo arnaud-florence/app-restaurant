@@ -50,7 +50,22 @@ async function traiter(req: Request) {
 
   const url = new URL(req.url)
   const dry = url.searchParams.get('dry') === '1'
-  const jours = Math.min(60, Math.max(1, Number(url.searchParams.get('jours') ?? '14') || 14))
+  // ⚠️⚠️ LA FENÊTRE PAR DÉFAUT EST PASSÉE DE 14 À 3 JOURS (02/10/2026).
+  // `GET /bookings` n'accepte aucun filtre de période : une fenêtre de N
+  // jours coûte N appels. À `*/15 6-22` × 14 jours, cette seule tâche
+  // produisait 952 appels Zelty par JOUR — et Zelty plafonne son débit.
+  // Mesuré sur 24 h : 31 % de TOUS nos appels refusés en 429, dont 49 des
+  // 68 passages de réservations (72 %) et 10 poussées de ruptures.
+  //
+  // ⚠️ Ce ne sont pas les réservations qui souffrent le plus de ce gâchis :
+  // c'est la POUSSÉE DES RUPTURES, qui tourne pendant le service. Un produit
+  // marqué épuisé au comptoir n'atteignait pas la caisse parce que le quota
+  // était déjà consommé à lire le carnet du 9 octobre.
+  //
+  // Le temps réel est porté par le WEBHOOK (`booking.*` est déclaré) ; ce
+  // cron est son filet, pas son doublon. Trois jours couvrent le service du
+  // soir et le lendemain ; un passage de nuit relit la quinzaine complète.
+  const jours = Math.min(60, Math.max(1, Number(url.searchParams.get('jours') ?? '3') || 3))
 
   // Une caisse pas encore branchée n'est pas une panne : le monitoring compte
   // tout code ≠ 200 comme une erreur.
@@ -64,7 +79,14 @@ async function traiter(req: Request) {
   const emission = { candidates: 0, envoyees: 0, refusees: 0 }
 
   // ─── 1. MIROIR : la caisse vers nous ────────────────────────────────────
+  // ⚠️ UNE PAUSE ENTRE LES JOURS. Quatorze appels tirés à la file déclenchent
+  // le plafond de débit au cinquième — c'est exactement ce qui est arrivé aux
+  // treize créations de familles (0113). Ici on ne peut pas grouper : l'API
+  // n'accepte qu'une date par appel. On étale donc.
+  let premier = true
   for (const date of joursAVenir(jours)) {
+    if (!premier) await new Promise(r => setTimeout(r, 400))
+    premier = false
     const rep = await appelZelty(`/bookings?date=${date}`)
     if (!rep.ok) { avertissements.push(`lecture du ${date} : ${rep.erreur}`); continue }
 
