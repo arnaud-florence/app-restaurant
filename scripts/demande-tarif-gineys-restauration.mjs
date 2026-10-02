@@ -5,12 +5,13 @@
 // nouvelles références — et la question n'est PAS « avez-vous ces produits »,
 // c'est « à quel prix nous les faites-vous ».
 //
-// ⚠️⚠️ CE QUI DONNE SA FORCE À CE MESSAGE EST MESURÉ, PAS SUPPOSÉ (0162) : en
-// confrontant leur portail au catalogue IMPRIMÉ d'Arti'Pat, on a trouvé
-// 22,0 % de remise moyenne sur les 41 articles de notre contrat et 0,3 % sur
-// les 404 autres. Leur portail nous montre donc le TARIF PUBLIC hors contrat —
-// 2 889 de leurs 3 066 lignes chez nous. Ce n'est pas un reproche, c'est le
-// point de départ de la discussion.
+// ⚠️⚠️ CE QU'ON SAIT ET QU'ON NE DIT PAS. La mesure de la 0162 — 22,0 % de
+// remise sur les 41 articles du contrat, 0,3 % sur les 404 autres, soit le
+// tarif public — a été RETIRÉE du message sur décision du gérant (02/10).
+// Elle reste vraie et elle reste notre meilleur argument, mais la dire
+// apprendrait à Gineys qu'on a relevé ses 2 892 prix : c'est un arbitrage de
+// relation, pas un calcul. Même raison que le retrait de leur prix portail du
+// tableau — on ne donne aucun plancher.
 //
 // ⚠️ ON NE CITE QUE LES PISTES VÉRIFIÉES À L'ŒIL. Le rapprochement
 // automatique proposait « KIT COUVERT 3 PIÈCES EN BOIS C=250 » pour un
@@ -197,7 +198,7 @@ savons :
 Nous vous laissons trois colonnes : VOTRE PRIX NET, le colisage et l'unité
 facturée.
 
-Quatre précisions pour que l'échange soit utile :
+Trois précisions pour que l'échange soit utile :
 
 • la colonne « meilleur tarif » est le prix le plus bas dont nous disposons sur
   chaque référence. Nous ne vous dirons pas d'où il vient : ce qui nous
@@ -211,11 +212,6 @@ Quatre précisions pour que l'échange soit utile :
 • sur les ${sansTarif.length} lignes restantes, la colonne « meilleur tarif » est VIDE : nous
   n'avons aucun tarif comparable dessus. Votre prix y sera notre seule
   référence, et c'est sans arrière-pensée.
-
-• nous avons comparé votre portail au catalogue imprimé Arti'Pat, référence par
-  référence. Sur les articles de notre contrat, la remise moyenne est de 22 % ;
-  sur les autres, de 0,3 % — c'est-à-dire le tarif public. Nous le comprenons :
-  ces lignes ne sont pas négociées. C'est précisément l'objet de ce courrier.
 
 Dernier point, et il vous concerne directement : nous n'avons pas trouvé
 d'équivalent évident à votre catalogue pour ${lignes.length - avecPiste} de ces besoins :
