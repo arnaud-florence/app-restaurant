@@ -5840,6 +5840,23 @@ fmtPct(n)   // 12,3 %
 
 - **Vercel logs en CLI** : `npx vercel logs --since 30m --level error --expand --no-follow` permet de voir les erreurs runtime de la prod sans passer par le dashboard. L'auth se fait automatiquement via `VERCEL_OIDC_TOKEN` (dans `.env.local`). Très utile pour diagnostiquer un "Oups une erreur" générique côté utilisateur.
 
+  ⚠️⚠️ **CE JETON EST EXPIRÉ DEPUIS LE 27 MAI 2026** (constaté le 02/10/2026,
+  soit 127 jours). `npx vercel logs` retombe donc sur une connexion par code
+  d'appareil, attend, et sort sans rien afficher — **l'outil de diagnostic
+  documenté ici ne fonctionne plus depuis quatre mois**, et personne ne s'en
+  était aperçu parce que son échec est muet.
+
+  C'est ce qui a empêché de diagnostiquer le « Load failed » du scanner le
+  01/10 : aucune trace côté serveur, aucun log accessible. D'où le journal
+  applicatif ajouté à la route (`integration_evenements`, systeme =
+  `scanner`), qui ne dépend d'aucun jeton — même raisonnement que pour le
+  webhook Zelty.
+
+  **À restaurer par le gérant** : `npx vercel login` puis `npx vercel link`.
+  ⚠️ Une connexion Vercel s'ouvre avec SES identifiants : elle ne se fait pas
+  à sa place. Vérification du jeton sans le divulguer : décoder la charge du
+  JWT et lire `exp`.
+
 - **Agents cron** : déclenchés par pg_cron dans Supabase (`sql/setup-pgcron-agents.sql`, gitignored). Si on régénère `CRON_SECRET`, regénérer ce fichier et relancer le SQL. Monitoring : `select status_code, count(*) from net._http_response where created > now() - interval '1 day' group by 1` — toute valeur ≠ 200 = agent qui plante.
 
 - **Endpoint exec-sql** : `POST /api/admin/exec-sql` permet à un script (ou à l'AI) d'exécuter du SQL arbitraire sans passer par le SQL Editor Supabase, auth Bearer `CRON_SECRET`. Utilise la fonction PG `exec_sql()` créée par migration 0086, EXECUTE granté uniquement à `service_role`.
