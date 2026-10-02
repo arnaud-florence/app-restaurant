@@ -21,20 +21,31 @@ import {
   type LigneReassort, type OffreConcurrente,
 } from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
+import { extraireConditionnement } from '@/lib/commande-fournisseur'
 
 export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
-  const [produits, matieres, inventaires, etabs] = await Promise.all([
+  const [produits, matieres, inventaires, etabs, lignesDoc] = await Promise.all([
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
     lireTout<Record<string, unknown>>(() => sb.from('recettes')
       .select('id, nom, categorie, tag_destination, etablissement_id, cout_achat_ht, unites_par_achat, nom_matiere, libelle_achat, reference_fournisseur, fournisseur_id, stock_minimum, stock_cible')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
-      .select('id, nom, unite, categorie, prix_achat_ht, prix_estime, fournisseur_principal, reference_fournisseur, stock_minimum, stock_cible')
+      .select('id, nom, unite, categorie, prix_achat_ht, prix_estime, fournisseur_principal, reference_fournisseur, stock_minimum, stock_cible, libelle_achat')
       .eq('actif', true).eq('stocke', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('inventaires')
       .select('cible_id, date_inventaire, quantite').order('date_inventaire', { ascending: false }).order('cible_id')),
     sb.from('etablissements').select('id, nom'),
+    // ⚠️ LES ENTRÉES. Sans elles, `tenu` restait le COMPTAGE BRUT : après la
+    // livraison France Boissons du 01/10 — 2 262 € et 801 unités — l'écran
+    // affichait encore le zéro du comptage d'ouverture et proposait de tout
+    // recommander. Le stock théorique se CALCULE (0135), et cet écran est
+    // celui qui déclenche les commandes : il doit lire la même chose que
+    // `(ops)/inventaire`, sinon les deux donnent deux stocks et c'est celui
+    // qu'on regarde en commandant qui fait la faute.
+    lireTout<Record<string, unknown>>(() => sb.from('facture_lignes')
+      .select('description, quantite, unite, facture:factures_fournisseurs(date_emission, type_document, facture_liee_id)')
+      .order('id')),
   ])
 
   const nomE = new Map((etabs.data ?? []).map(e => [e.id as string, e.nom as string]))
@@ -209,6 +220,35 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     if (!dernier.has(k)) dernier.set(k, { q: Number(i.quantite), le: i.date_inventaire as string })
   }
 
+  // ══ Entrées depuis le dernier comptage ══════════════════════════════
+  // Même règle que `(ops)/inventaire`, au mot près : on cherche le libellé
+  // du fournisseur DANS la description de la ligne, le BL fait foi sur la
+  // facture qui lui est rattachée (0166), un avoir compte en négatif, et une
+  // ligne au colis se multiplie par son conditionnement.
+  const norm = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+  type Doc = { date_emission?: string; type_document?: string; facture_liee_id?: string | null }
+  const docs = lignesDoc as unknown as Array<{
+    description: string; quantite: number | string | null; unite: string | null; facture: Doc | null }>
+  const entreesDepuis = (cible: string, depuis: string | null) => {
+    // ⚠️ Pas de comptage, pas d'entrées : une livraison seule ne dit pas un
+    // stock, elle dit un mouvement. « Jamais compté » doit le rester (0163).
+    if (!depuis) return 0
+    const c = norm(cible)
+    if (c.length < 4) return 0
+    let recu = 0
+    for (const l of docs) {
+      const f = l.facture
+      if (!f?.date_emission || f.date_emission <= depuis) continue
+      if (f.type_document === 'facture' && f.facture_liee_id) continue
+      if (!norm(l.description).includes(c)) continue
+      const q = Number(l.quantite ?? 0)
+      const cond = extraireConditionnement(l.description)
+      const estPiece = /^(pce|pi[eè]ce|piece|p|u)s?$/.test(String(l.unite ?? '').toLowerCase())
+      recu += (f.type_document === 'avoir' ? -1 : 1) * (estPiece || cond == null ? q : q * cond)
+    }
+    return Math.round(recu * 100) / 100
+  }
+
   const lignes: LigneReassort[] = []
 
   // ⚠️ On COMPTE la matière, pas le produit vendu : le congélateur contient
@@ -241,7 +281,11 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       categorie: (p.categorie as string) ?? null,
       etablissement: nomE.get(p.etablissement_id as string) ?? null,
       unite: 'unité d’achat',
-      tenu: d ? d.q : null,
+      // stock théorique = comptage + entrées. Les SORTIES ne sont pas
+      // déduites ici : elles le sont à l'inventaire, où la caisse les donne
+      // produit par produit. En surestimer serait moins grave que l'inverse
+      // pour une commande — mais c'est une limite, pas un choix de confort.
+      tenu: d ? d.q + entreesDepuis((p.libelle_achat as string) ?? nom, d.le) : null,
       compte_le: d ? d.le : null,
       seuil: p.stock_minimum == null ? null : Number(p.stock_minimum),
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
@@ -307,7 +351,9 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // — « un stock auquel personne ne croit ne sert à rien ». L'afficher
       // ici ferait passer 46 références pour comptées alors que la maison
       // est fermée et que le stock est à zéro. Seul un comptage fait foi.
-      tenu: d ? d.q : null,
+      // Les entrées s'y ajoutent comme pour les produits : une matière
+      // livrée après le comptage est bien en réserve.
+      tenu: d ? d.q + entreesDepuis((m.libelle_achat as string) ?? (m.nom as string), d.le) : null,
       compte_le: d ? d.le : null,
       seuil: m.stock_minimum == null ? null : Number(m.stock_minimum),
       cible: m.stock_cible == null ? null : Number(m.stock_cible),
