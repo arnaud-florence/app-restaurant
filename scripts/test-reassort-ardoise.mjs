@@ -110,6 +110,15 @@ try {
   t('⚠️ un titre vide EFFACE le plat du jour de cette date', /if \(!titre\)/.test(srcAct))
   t('⚠️ la composition du jour est REMPLACÉE, pas modifiée ligne à ligne',
     /plat_du_jour_ingredients'\)\.delete\(\)\.eq\('plat_du_jour_id'/.test(srcAct))
+  // ⚠️⚠️ UNE ARDOISE SANS DATE DE FIN. L'ancien écran /admin/plats-du-jour
+  // l'autorise, et le réassort la traite comme OUVERTE. Un `.gte('date_fin')`
+  // sur l'écran de composition l'excluait : elle aurait fait commander sans
+  // jamais s'afficher. Deux lecteurs de la même table qui divergent.
+  t('⚠️⚠️ l’écran inclut les ardoises SANS date de fin, comme le réassort',
+    /date_fin\.is\.null,date_fin\.gte\./.test(srcPage))
+  t('⚠️ … et le réassort les traite bien comme ouvertes',
+    /!a\.date_fin \|\| \(a\.date_fin as string\) >= aujourdhui/.test(
+      fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')))
   t('⚠️ les deux sources de menu connaissent l’écran (piège documenté)',
     /\/admin\/ardoise/.test(fs.readFileSync('src/lib/navigation.ts', 'utf8'))
     && /\/admin\/ardoise/.test(fs.readFileSync('src/app/admin/AdminNav.tsx', 'utf8')))

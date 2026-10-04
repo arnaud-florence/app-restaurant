@@ -2911,10 +2911,18 @@ naturel pour « finalement, rien lundi » — sans lui, on commanderait pour un
 plat qu'on ne sert pas. Et la composition est **remplacée**, jamais modifiée
 ligne à ligne : les ingrédients retirés resteraient en base.
 
+⚠️⚠️ **`date_fin` PEUT ÊTRE NULLE, et les deux lecteurs en disaient le
+contraire.** L'ancien écran `/admin/plats-du-jour` autorise une ligne sans
+fin (« jusqu'à nouvel ordre ») ; le réassort la traite comme OUVERTE, mais
+l'écran de composition l'excluait par un `.gte('date_fin', …)`. Une telle
+ardoise aurait donc fait commander **sans jamais s'afficher**. Deux lecteurs
+de la même table qui divergent, et rien pour le signaler — trouvé en
+vérifiant les requêtes contre la base, pas à la lecture du code.
+
 ⚠️ L'écran est déclaré dans **les DEUX sources de menu** (`navigation.ts` et
 `AdminNav.tsx`) — 47 contre 47, zéro écart. Le test le vérifie.
 
-Test : `PORT=3000 node scripts/test-reassort-ardoise.mjs` — 22 assertions.
+Test : `PORT=3000 node scripts/test-reassort-ardoise.mjs` — 24 assertions.
 ⚠️ Il CRÉE une vraie ardoise et la retire dans un `finally` : une ardoise de
 test laissée en place ferait commander la semaine entière sur deux pizzas.
 

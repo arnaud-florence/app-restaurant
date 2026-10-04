@@ -38,9 +38,17 @@ export default async function ArdoisePage({
       .select('id, nom, unite, prix_achat_ht, prix_estime').eq('actif', true).order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('recette_ingredients')
       .select('recette_id, ingredient_id, quantite, unite').order('recette_id').order('ingredient_id')),
+    // ⚠️⚠️ `date_fin` PEUT ÊTRE NULLE — l'ancien écran `/admin/plats-du-jour`
+    // l'autorise (`p.date_fin || null`), et une ligne sans fin veut dire
+    // « jusqu'à nouvel ordre ». Un `.gte('date_fin', …)` l'EXCLUT : elle
+    // ferait commander par le réassort — qui, lui, traite la nulle comme
+    // ouverte — sans jamais s'afficher ici. Deux lecteurs de la même table
+    // qui ne disent pas la même chose, et rien pour le signaler.
     sb.from('plats_du_jour')
       .select('id, recette_id, titre, date_debut, date_fin, actif')
-      .eq('actif', true).gte('date_fin', debut).lte('date_debut', fin),
+      .eq('actif', true)
+      .or(`date_fin.is.null,date_fin.gte.${debut}`)
+      .lte('date_debut', fin),
     lireTout<Record<string, unknown>>(() => sb.from('plat_du_jour_ingredients')
       .select('id, plat_du_jour_id, ingredient_id, quantite, unite').order('id')),
     sb.from('etablissements').select('id, nom'),
