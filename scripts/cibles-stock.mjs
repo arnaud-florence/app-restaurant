@@ -111,7 +111,7 @@ const arrondi = (n, unite) =>
 
 async function main() {
   const [rec, ing, ri, cmd, art, inv, etabs, cat, fourn] = await Promise.all([
-    T('recettes?select=id,nom,categorie,actif,tag_destination,etablissement_id,nom_matiere,libelle_achat,unites_par_achat,cout_achat_ht,stock_minimum,stock_cible'),
+    T('recettes?select=id,nom,categorie,actif,tag_destination,etablissement_id,nom_matiere,libelle_achat,unites_par_achat,cout_achat_ht,stock_minimum,stock_cible,fournisseur_id'),
     T('ingredients?select=id,nom,unite,categorie,actif,stocke,prix_achat_ht,fournisseur_principal,stock_minimum,stock_cible'),
     T('recette_ingredients?select=recette_id,ingredient_id,quantite,unite'),
     T('commandes?select=id,created_at,statut'),
@@ -289,7 +289,18 @@ async function main() {
       table: 'recettes', id: chef.id, nom,
       categorie: chef.categorie, etage: nomE.get(chef.etablissement_id) ?? null,
       unite: 'unité d’achat', origine, cible, seuil, note,
-      cout: coutUnite, fournisseur: null, tag: chef.tag_destination,
+      // ⚠️⚠️ `fournisseur: null` ÉTAIT ÉCRIT EN DUR ICI, et ça faussait le
+      // chiffre le plus important du script. La 0164 a ajouté
+      // `recettes.fournisseur_id` précisément pour qu'un PRODUIT VENDU sache
+      // chez qui il s'achète ; `reassort-donnees.ts` le lit depuis, pas ce
+      // script. Résultat le 04/10/2026 : la commande d'ouverture annonçait
+      // « 504 € BAR · 308 € FOURNIL · 27 € CUISINE — fournisseur à désigner »
+      // alors que ZÉRO produit du bar était réellement sans fournisseur.
+      // 1 020 € présentés comme non commandables, soit 37 % du total.
+      // ⚠️ Deux lecteurs de la même question qui répondent différemment :
+      // c'est celui qu'on lit en commandant qui fait la faute.
+      cout: coutUnite, fournisseur: nomF.get(chef.fournisseur_id) ?? null,
+      tag: chef.tag_destination,
       tenu: d ? d.q : null,
       ancien: { seuil: chef.stock_minimum, cible: chef.stock_cible },
       produits: rs.length,
