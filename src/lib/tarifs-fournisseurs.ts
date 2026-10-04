@@ -174,6 +174,17 @@ export function prixReference(l: LigneTarif): PrixRef | null {
   // sortirait « le moins cher » de sa comparaison. Un « prix sur demande »
   // ne se compare à rien tant que le fournisseur n'a pas répondu.
   if (l.prix_ht == null) return null
+  // ⚠️⚠️ UNE BASE DE PRIX NON TRANCHÉE NE SE COMPARE À RIEN. Le fichier
+  // Euro-Cash mélange trois bases dans le même rayon — le colis, l'unité et
+  // le pack intérieur — et rien dans la ligne ne dit laquelle s'applique
+  // (0158). 195 de ses lignes portent donc `unite = 'base à confirmer'`.
+  // La règle vivait jusqu'ici dans l'ABSENCE de clé de comparaison sur ces
+  // lignes, c'est-à-dire dans une discipline que personne n'applique à
+  // la main indéfiniment : il suffisait de poser une contenance pour que la
+  // première branche ci-dessous les fasse entrer dans la comparaison, sur
+  // une base inconnue, et désigne peut-être le « moins cher ». Elle est
+  // désormais ici, où elle ne se contourne pas.
+  if (/base\s*à\s*confirmer/i.test(l.unite ?? '')) return null
   // Une contenance saisie à la main l'emporte : c'est quelqu'un qui a lu
   // l'étiquette, contre un motif lu dans un libellé.
   if (l.contenance_valeur && l.contenance_unite) {
@@ -316,8 +327,23 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
       }
     }
     const chiffrees = avecRef.filter(l => l.ref)
-    const bases = new Set(avecRef.map(l => l.ref ? `${l.ref.unite}|${l.ref.format ?? ''}` : null).filter(Boolean))
-    const comparable = bases.size === 1 && chiffrees.length === avecRef.length && avecRef.length > 1
+    const bases = new Set(chiffrees.map(l => `${l.ref!.unite}|${l.ref!.format ?? ''}`))
+    // ⚠️ UNE LIGNE SANS PRIX NE DOIT PAS ÉTEINDRE LE GROUPE. La règle exigeait
+    // auparavant que TOUTES les lignes soient chiffrées : la seule présence
+    // d'un « prix sur demande » — c'est-à-dire d'une relance en cours, donc
+    // précisément ce qu'on a entrepris d'obtenir — rendait muette la
+    // comparaison entre les fournisseurs qui avaient, eux, répondu.
+    // Mesuré le 04/10/2026 : 3 groupes éteints pour cette seule raison, dont
+    // « Mozzarella cerise », qui opposait deux fournisseurs sur trois prix
+    // relevés. Aucune erreur ne le signalait — l'écran affichait sobrement
+    // « non comparable », ce qui se lit « on ne sait pas comparer » alors
+    // qu'on savait très bien.
+    // C'est la faute récurrente de ce projet : une absence rendue comme une
+    // conclusion. `statutFoodCost(0)` en vert, « rien déclaré » lu « aucun
+    // allergène », « jamais compté » lu « zéro ».
+    // Les lignes sans prix RESTENT dans `lignes` : l'écran doit les montrer,
+    // c'est la relance à faire. Elles ne participent simplement pas au calcul.
+    const comparable = bases.size === 1 && chiffrees.length > 1
     let meilleur: string | null = null, ecartPct: number | null = null
     if (comparable) {
       const tri = [...chiffrees].sort((a, b) => a.ref!.prix - b.ref!.prix)
@@ -330,8 +356,12 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
     // sous quatre-vingt-dix lignes sans rien en face — et un écran illisible
     // n'est pas consulté.
     if (avecRef.length < 2) continue
+    // ⚠️ On compte les fournisseurs qui ont CHIFFRÉ, pas ceux qui figurent au
+    // groupe : un fournisseur à qui on vient d'envoyer une demande de tarif
+    // n'est pas un participant au face-à-face, et le compter gonflerait le
+    // nombre de comparaisons réelles annoncé par `/admin/achats`.
     groupes.push({ cle, lignes: avecRef, meilleur, ecartPct, comparable,
-      fournisseurs: new Set(avecRef.map(l => l.fournisseur_id)).size })
+      fournisseurs: new Set((chiffrees.length ? chiffrees : avecRef).map(l => l.fournisseur_id)).size })
   }
   // Les duels entre fournisseurs d'abord, puis le plus gros écart : c'est
   // là qu'il y a de l'argent à aller chercher.

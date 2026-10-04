@@ -2731,6 +2731,96 @@ Test : `PORT=3000 node scripts/test-bon-commande.mjs` — 14 assertions.
 Promocash (sans adresse, donc refus garanti) : brouillon affiché, rien
 envoyé, rien marqué — puis supprimé.
 
+### Les sacs à croissants ont un NUMÉRO, et il décide (04/10/2026)
+
+⚠️⚠️ **CORRECTION D'UN CHIFFRE ANNONCÉ FAUX.** J'avais écrit « Plaza −39 % sur
+les sacs à croissants » en opposant son sac à 8,39 € à nos 13,73 €. C'était
+comparer **deux formats différents** — exactement la faute que la 0151 avait
+déjà écartée chez Euro-Cash (« sacs croissants N°101 au lieu du N°104 »).
+
+La preuve était dans notre propre libellé : **« 1000SAC CROIS KBR104 CLAS
+CERT »** — K-B-R-104, kraft brun N°104. Et le catalogue Plaza donne la
+correspondance : 101 = 12+5×15 (2 croissants), 102 = 12+5×20, 103 = 14+6×20
+(6 croissants), 104 = 14+6×27. Les deux références achetées chez Plaza (S01KN,
+S03KN) sont un 101 et un 103 : des sacs **plus petits**, pas le même article
+moins cher. À format égal, Plaza est à **13,90 € contre nos 13,73 € — 1 % plus
+cher**, et Gineys à 19,63 €, soit +43 %.
+
+`node scripts/sacs-croissants-formats.mjs [--ecrire]` — trois matières, trois
+clés, chacune ancrée sur les DIMENSIONS imprimées dans la désignation.
+
+⚠️ **LA COULEUR EST TARIFÉE, donc elle sépare les groupes.** Gineys imprime le
+103 brun à 16,76 € et le 103 **BLANC** à 18,72 € : les mélanger afficherait un
+« +12 % » qui ne compare pas le même sac.
+
+⚠️ **La désignation s'écrit tantôt `14+6x20`, tantôt `14+6×20`** (signe
+multiplier). Un regex sur le seul `x` a manqué le sac payé — en silence : la
+ligne est simplement restée sans clé, donc invisible du comparateur.
+
+⚠️ **Et `dim()` qui retire les espaces DÉTRUIT les frontières de mots** : dans
+« BRUN104 », `\b104\b` ne matche plus. Le numéro se cherche sur la désignation
+d'ORIGINE, les dimensions sur la normalisée. Deux tests, deux chaînes.
+
+⚠️ Le script s'ancre sur `libelle_achat`, pas sur le nom — **il renomme la
+matière**, donc une recherche par nom ne la retrouverait pas au second
+passage, et un script qu'on ne peut pas rejouer n'est pas un script.
+
+⚠️ La contenance « 1000 pièces » n'est posée que **là où la désignation la
+prouve** (« carton de 1000 », « SAC=1000 », « 1000SAC CROIS »), jamais par
+analogie avec les voisins. Les trois lignes Euro-Cash (« Sacs Croissants
+N°104 14x7x27cm ») ne disent aucune quantité : elles restent hors comparaison.
+
+### ⚠️⚠️ Une ligne sans prix éteignait son groupe entier (04/10/2026)
+
+C'est le défaut trouvé en posant les sacs, et il dépassait largement les sacs.
+`comparer()` portait :
+
+    const comparable = bases.size === 1 && chiffrees.length === avecRef.length
+
+**Il fallait que TOUTES les lignes du groupe soient chiffrées.** La seule
+présence d'un « prix sur demande » — c'est-à-dire d'une **relance en cours**,
+donc précisément ce qu'on cherche à obtenir — éteignait la comparaison entre
+les fournisseurs qui avaient, eux, répondu.
+
+Mesuré : **3 groupes muets pour cette seule raison**, dont **« Mozzarella
+cerise » et ses 46 % d'écart** entre deux fournisseurs sur trois prix relevés.
+Aucune erreur ne le signalait ; l'écran affichait sobrement « non
+comparable », ce qui se lit « on ne sait pas comparer » alors qu'on savait
+très bien. Encore une absence rendue comme une conclusion — la famille de
+`statutFoodCost(0)` en vert, de « rien déclaré » lu « aucun allergène », de
+« jamais compté » lu « zéro ».
+
+`comparer()` ne retient plus que les lignes CHIFFRÉES, et les lignes sans prix
+**restent dans `lignes`** : l'écran doit les montrer, c'est la relance à
+faire. **75 → 81 groupes comparables.**
+
+⚠️ **`fournisseurs` compte désormais ceux qui ont CHIFFRÉ**, pas ceux qui
+figurent au groupe : un fournisseur à qui on vient d'envoyer une demande de
+tarif n'est pas un participant au face-à-face, et le compter gonflerait le
+nombre de comparaisons réelles annoncé par `/admin/achats`.
+
+⚠️⚠️ **LA RÈGLE N'A PAS ÉTÉ ASSOUPLIE, ELLE A CHANGÉ DE PLACE — et il fallait
+qu'elle change de place.** Ce qu'il faut interdire, c'est une **base de prix
+non tranchée** : le fichier Euro-Cash mélange le colis, l'unité et le pack
+intérieur sans le dire (0158), et 195 de ses lignes portent
+`unite = 'base à confirmer'`. Cette interdiction vivait dans l'**absence de
+clé de comparaison** sur ces lignes, c'est-à-dire dans une discipline tenue à
+la main — qu'un seul script distrait suffisait à briser. Pire : il suffisait
+de poser une **contenance** pour qu'une telle ligne entre dans la
+comparaison, la première branche de `prixReference()` faisant primer la
+contenance sur tout le reste. Le refus est désormais **dans
+`prixReference()`**, avant la lecture de la contenance, où il ne se contourne
+pas.
+
+⚠️ Deux assertions de `test-achats.mjs` ont été **révisées, pas forcées**, et
+le commentaire dit laquelle et pourquoi. Elles exigeaient qu'aucune ligne sans
+prix ne porte de clé — « elle casserait tout son groupe » : la parenthèse
+décrivait le défaut, pas une règle de gestion. Ce qui est contrôlé est
+maintenant la propriété qui compte — ces lignes ne produisent **aucun** prix
+de référence et ne peuvent jamais être couronnées « meilleur » — plus le fait
+que les deux garde-fous sont **présents dans la lib**. Vérifié en retirant le
+garde-fou : le test rougit (158 ✓ 1 ✗).
+
 ### Réassort — le chaînon entre le stock et la commande (0163)
 
 `/admin/reassort`. Trois choses existaient sans se parler : `(ops)/inventaire`
@@ -6003,6 +6093,7 @@ PORT=3000 node scripts/test-tarifs-fournisseurs.mjs # comparaison des tarifs (01
 PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat + son état (0158, 0159)
 PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
 node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vient chaque cible
+node scripts/sacs-croissants-formats.mjs       # sacs à croissants : 101/103/104 (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)

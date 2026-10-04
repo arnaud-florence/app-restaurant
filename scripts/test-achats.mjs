@@ -257,19 +257,75 @@ t('⚠️ il ne signale PAS l’huile d’olive (moins chère chez Gineys)',
   !trouvailles.some(f => /huile/i.test(String(f.titre))))
 
 titre('Les clés de comparaison — ce qui met deux fournisseurs face à face')
-// ⚠️⚠️ LE GARDE-FOU CENTRAL : `comparer()` exige que TOUTES les lignes d'un
-// groupe tombent sur la même base. Une ligne SANS prix, ou dont la base de
-// prix n'est pas tranchée (« base à confirmer » chez Euro-Cash), n'a aucun
-// prix de référence — et elle rend son groupe ENTIER incomparable. Poser une
-// clé dessus détruit un face-à-face qui marchait, sans lever la moindre
-// erreur. C'est le piège qui a écarté sept lignes Euro-Cash le 28/09/2026.
-const lignesCle = await sbTout('catalogue_fournisseur?actif=eq.true&select=cle_comparaison,prix_ht,unite,designation')
+// ⚠️⚠️ LE GARDE-FOU CENTRAL : une ligne dont la BASE DE PRIX n'est pas
+// tranchée ne doit jamais peser dans une comparaison. Le fichier Euro-Cash
+// mélange le colis, l'unité et le pack intérieur sans le dire (0158) : une
+// telle ligne comparée à l'aveugle se trompe d'un facteur 10 à 40, et
+// désigne un « moins cher » qui n'en est pas un.
+//
+// ⚠️ DEUX ASSERTIONS RÉVISÉES LE 04/10/2026, et il faut dire laquelle et
+// pourquoi. Elles exigeaient qu'aucune ligne sans prix, et aucune ligne
+// « base à confirmer », ne porte de clé de comparaison — « elle casserait
+// tout son groupe ». C'était vrai, et c'était un DÉFAUT de `comparer()`, pas
+// une règle de gestion : il exigeait que TOUTES les lignes d'un groupe
+// soient chiffrées, donc la seule présence d'un « prix sur demande » — c'est-
+// à-dire d'une relance en cours, exactement ce qu'on cherche à obtenir —
+// éteignait la comparaison entre les fournisseurs qui avaient répondu.
+// Mesuré : 3 groupes muets pour cette seule raison, dont « Mozzarella
+// cerise » et ses 46 % d'écart entre deux fournisseurs, sans qu'aucune
+// erreur ne le signale.
+//
+// La règle n'a pas été assouplie, elle a CHANGÉ DE PLACE : elle vit
+// maintenant dans `prixReference()`, qui refuse une base non tranchée, et
+// dans `comparer()`, qui ignore les lignes sans référence au lieu de se
+// taire. Une discipline tenue par l'absence de clé est une discipline
+// qu'un seul script distrait suffit à briser — en silence.
+//
+// Ce qui est contrôlé ici est donc la propriété qui compte vraiment : ces
+// lignes ne produisent AUCUN prix de référence, et elles ne peuvent donc
+// jamais être couronnées « meilleur ».
+const lignesCle = await sbTout('catalogue_fournisseur?actif=eq.true&select=id,cle_comparaison,prix_ht,unite,designation,contenance_valeur,contenance_unite')
 const avecCle = lignesCle.filter(x => x.cle_comparaison)
 t('des clés de comparaison sont posées', avecCle.length > 200)
-t('⚠️ aucune ligne SANS PRIX ne porte de clé (elle casserait tout son groupe)',
-  avecCle.every(x => x.prix_ht !== null))
-t('⚠️ aucune ligne « base à confirmer » ne porte de clé, pour la même raison',
-  avecCle.every(x => x.unite !== 'base à confirmer'))
+
+// ⚠️ RECOPIE des deux REFUS de `prixReference()` (src/lib/tarifs-fournisseurs.ts).
+const refuseReference = l =>
+  l.prix_ht == null || /base\s*à\s*confirmer/i.test(l.unite ?? '')
+
+// Le test ne doit pas être vide de sens : il faut que de telles lignes
+// EXISTENT dans les données, sinon il passerait sur un catalogue parfait.
+const sansPrix = lignesCle.filter(x => x.prix_ht === null)
+const baseFloue = lignesCle.filter(x => /base\s*à\s*confirmer/i.test(x.unite ?? ''))
+t('⚠️ des lignes « prix sur demande » existent bel et bien', sansPrix.length > 20)
+t('⚠️ des lignes « base à confirmer » aussi', baseFloue.length > 100)
+t('⚠️ toutes sont refusées par la règle du prix de référence',
+  [...sansPrix, ...baseFloue].every(refuseReference))
+
+// ⚠️⚠️ ET LE REFUS VIT DANS LA LIB, pas dans la discipline de qui pose les
+// clés. C'est le fond de la correction du 04/10/2026 : ces deux assertions
+// exigeaient qu'aucune telle ligne ne porte de CLÉ — « elle casserait tout
+// son groupe ». C'était vrai, et c'était un DÉFAUT de `comparer()`, qui
+// exigeait que TOUTES les lignes d'un groupe soient chiffrées : la seule
+// présence d'un « prix sur demande » — donc d'une relance en cours, ce qu'on
+// cherche précisément à obtenir — éteignait la comparaison entre les
+// fournisseurs qui avaient répondu. Mesuré : 3 groupes muets pour cette
+// seule raison, dont « Mozzarella cerise » et ses 46 % entre deux
+// fournisseurs. Aucune erreur ne le disait ; l'écran affichait sobrement
+// « non comparable », ce qui se lit « on ne sait pas comparer ».
+//
+// La règle n'a pas été assouplie, elle a CHANGÉ DE PLACE. Et il fallait
+// qu'elle change de place : tenue par l'absence de clé, il suffisait de
+// poser une CONTENANCE sur une ligne « base à confirmer » pour qu'elle
+// entre dans la comparaison — la première branche de `prixReference()`
+// fait primer la contenance sur tout le reste.
+const libSrc = fs.readFileSync('src/lib/tarifs-fournisseurs.ts', 'utf8')
+t('⚠️⚠️ `prixReference()` refuse une base non tranchée (garde-fou dans la lib)',
+  /base\\s\*à\\s\*confirmer/.test(libSrc) && /return null/.test(libSrc))
+t('⚠️ … et ce refus passe AVANT la lecture de la contenance',
+  libSrc.indexOf('base\\s*à\\s*confirmer') < libSrc.indexOf('l.contenance_valeur && l.contenance_unite'))
+t('⚠️ `comparer()` ne compare plus que les lignes CHIFFRÉES',
+  /chiffrees\.length > 1/.test(libSrc) && !/chiffrees\.length === avecRef\.length/.test(libSrc))
+
 // ⚠️ Une clé qui ne porte qu'UNE ligne est INVISIBLE : `comparer()` écarte
 // les groupes d'une seule ligne. Deux noms pour le MÊME produit, c'est donc
 // deux invisibilités là où il y avait un face-à-face — vécu sur « Sauce
