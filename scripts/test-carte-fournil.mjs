@@ -31,34 +31,51 @@ const step = async (n, fn) => {
   try { await fn() } catch (e) { ko(`${n} (exception)`, e.message) }
 }
 
-// Prix TTC des affiches — la source de vérité de ce test.
-// ⚠️ Prix RELEVÉS SUR LES AFFICHES, sauf décision explicite du gérant.
-// 28/08/2026 : le café passe à 1,40 € partout (comptoir, bar, salle) et les
-// quatre formules petit-déjeuner suivent de 20 centimes, pour que l'écart
-// entre la formule et les produits séparés reste intact.
+// LES PRIX DE LA CARTE — la référence de ce test.
+//
+// ⚠️⚠️ CE NE SONT PLUS « LES AFFICHES DE SEPTEMBRE ». Le 04/10/2026 ce test
+// sortait rouge sur 31 écarts, tous vers le haut (croissant 1,20 → 1,40 €,
+// part de flan 2,50 → 3,80 €, tropézienne 2,50 → 3,80 €). Vérification faite
+// auprès du gérant : **les nouvelles affiches sont les bonnes, les anciens
+// prix ne le sont plus.** C'était donc la référence qui était périmée, pas la
+// base.
+//
+// ⚠️ CE QUE CE TEST PROTÈGE A CHANGÉ DE NATURE, et il faut le dire : il ne
+// contrôle plus « la base colle aux affiches » — on n'a aucune copie
+// numérique des affiches — mais **« aucun prix ne bouge sans que quelqu'un
+// mette cette liste à jour »**. C'est un garde-fou contre la DÉRIVE
+// SILENCIEUSE : le miroir du catalogue Zelty, la propagation des factures et
+// les scripts d'amorçage écrivent tous des prix, et aucun ne demande
+// l'autorisation.
+//
+// ⚠️ Donc quand ce test rougit : on regarde D'ABORD si le changement était
+// voulu. S'il l'était, on met cette liste à jour EN MÊME TEMPS que le prix —
+// jamais après coup, sinon elle redevient un décor.
+//
+// Dernière confirmation par le gérant : 04/10/2026.
 const AFFICHES = {
-  'Baguette classique': 1.20, 'Baguette Victoire': 1.40, 'Campestre multicéréales': 1.80,
-  'Pain complet': 2.30, 'Bâtard céréales': 2.80, 'Bâtard maïs et graines': 2.80,
-  'Pain lin-tournesol': 3.50, 'Pavé multicéréales': 3.50,
-  'Croissant': 1.20, 'Pain au chocolat': 1.30, 'Pain aux raisins': 1.60, 'Chausson aux pommes': 1.50,
-  'Part de flan pâtissier': 2.50, 'Tropézienne individuelle': 2.50, 'Tartelette citron meringuée': 2.90,
-  'Éclair au chocolat': 3.20, 'Tiramisu individuel': 3.20,
-  'Cannelé': 1.50, 'Madeleine chocolat-noisette': 1.50, 'Cookie chocolat': 2.40,
-  'Sacristain': 2.50, 'Muffin chocolat-noisette': 2.80, 'Muffin citron': 2.80,
-  'Le Parisien': 4.50, 'Le Poulet': 4.90, 'Le Rosette': 4.50, 'Le Nordique': 5.50,
-  'Panini jambon-fromage': 4.50, 'Panini poulet-pesto': 4.90, 'Panini chèvre-miel': 4.90,
-  'Salade poulet-feta': 4.50, 'Salade italienne': 4.90, 'Salade saumon': 5.50,
-  'Pizza à la plaque Margherita': 2.90, 'Pizza à la plaque jambon-fromage': 2.90,
-  'Pizza ronde Reine': 3.90, 'Pizza ronde poulet-pesto': 3.90, 'Pizza ronde chèvre-miel': 3.90,
-  'Eau plate 50 cl': 1.00, 'Eau gazeuse 50 cl': 1.50, 'Coca-Cola 33 cl': 1.80,
-  'Coca-Cola Zéro 33 cl': 1.80, 'Ice Tea 33 cl': 1.80, 'Orangina 33 cl': 1.80,
-  "Jus d'orange 33 cl": 1.80, 'Jus de pomme 33 cl': 1.80,
-  'Café expresso': 1.40, 'Café allongé': 1.40, 'Café noisette': 1.50,
-  'Cappuccino': 2.50, 'Chocolat chaud': 2.50, 'Thé': 2.00,
-  'Formule salade + boisson': 5.80, 'Formule sandwich ou panini + boisson': 6.20,
-  'Formule salade + boisson + dessert': 8.10, 'Formule sandwich ou panini + boisson + dessert': 8.50,
-  'Formule Express': 2.40, 'Formule Douceur chaude': 3.60,
-  'Formule Petit-déjeuner complet': 4.00, 'Formule Tartine': 4.40,
+  'Baguette classique': 1.2, 'Baguette Victoire': 1.5, 'Bâtard céréales': 3.2,
+  'Bâtard maïs et graines': 3.2, 'Café allongé': 1.4, 'Café expresso': 1.4,
+  'Café noisette': 1.5, 'Campestre multicéréales': 2, 'Cannelé': 1.5,
+  'Cappuccino': 2.5, 'Chausson aux pommes': 1.5, 'Chocolat chaud': 2.5,
+  'Coca-Cola 1,5 L': 3.5, 'Coca-Cola 33 cl': 2, 'Coca-Cola Zéro 1,5 L': 3.5,
+  'Coca-Cola Zéro 33 cl': 2, 'Cookie chocolat': 2.9, 'Croissant': 1.4,
+  'Eau gazeuse 50 cl': 2, 'Eau plate 50 cl': 1, 'Éclair au chocolat': 3.6,
+  'Fondant au chocolat': 3.8, 'Formule Petit-déjeuner complet': 4.3, 'Formule salade + boisson': 5.8,
+  'Formule salade + boisson + dessert': 8.1, 'Formule sandwich ou panini + boisson': 6.2, 'Formule sandwich ou panini + boisson + dessert': 8.5,
+  'Formule Tartine': 4.4, 'Ice Tea 33 cl': 2, 'Ice Tea pêche 1,5 L': 3.5,
+  'Jus d\'orange 33 cl': 2.2, 'Jus de pomme 33 cl': 2.2, 'Le Nordique': 5.5,
+  'Le Parisien': 4.5, 'Le Poulet': 4.9, 'Le Rosette': 4.5,
+  'Madeleine chocolat-noisette': 1.9, 'Muffin chocolat-noisette': 3.5, 'Muffin citron': 3.5,
+  'Oasis tropical 1,5 L': 3.5, 'Orangina 1,5 L': 3.5, 'Orangina 33 cl': 2,
+  'Pain au chocolat': 1.4, 'Pain aux raisins': 1.8, 'Pain complet': 2.6,
+  'Pain lin-tournesol': 4.2, 'Panini chèvre-miel': 4.9, 'Panini jambon-fromage': 4.5,
+  'Panini poulet-pesto': 4.9, 'Part de flan pâtissier': 3.8, 'Pavé multicéréales': 4.2,
+  'Perrier 33 cl': 2, 'Pizza à la plaque jambon-fromage': 2.9, 'Pizza à la plaque Margherita': 2.9,
+  'Pizza ronde chèvre-miel': 3.9, 'Pizza ronde poulet-pesto': 3.9, 'Pizza ronde Reine': 3.9,
+  'Sacristain': 3.2, 'Salade italienne': 5.4, 'Salade poulet-feta': 5.2,
+  'Salade saumon': 6, 'Tarte aux pommes': 3.8, 'Tartelette citron meringuée': 3.8,
+  'Thé': 2, 'Tiramisu individuel': 3.8, 'Tropézienne individuelle': 3.8,
 }
 // « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
 // SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent
@@ -120,12 +137,20 @@ await step('périmètre de la carte', async () => {
   // les affiches : le 28/09/2026, les quatre Pago sortis de la carte ont
   // fait échouer ce test alors qu'ils avaient été retirés exprès. Un test
   // rouge sur une décision assumée finit par être ignoré.
-  const retire = n => carte.some(r => r.nom === n && !r.actif)
-  const retires = Object.keys(AFFICHES).filter(retire).length
-  const retiresCaisse = [...HORS_AFFICHE].filter(retire).length
-  const attendu = Object.keys(AFFICHES).length - retires + HORS_AFFICHE.size - retiresCaisse
-  if (actifs.length === attendu) ok(`${actifs.length} produits actifs (${Object.keys(AFFICHES).length} affichés + ${HORS_AFFICHE.size} connus de la caisse)`)
-  else ko('nombre de produits', `${actifs.length} en base, ${attendu} attendus`)
+  // ⚠️⚠️ LE COMPTE SE DÉDUIT DE LA BASE, PAS D'UNE SOUSTRACTION À LA MAIN.
+  // L'ancienne formule faisait « AFFICHES − retirés + HORS_AFFICHE − retirés
+  // caisse » : elle supposait que chaque nom des deux listes correspond à un
+  // produit FOURNIL. Faux — « Moelleux au chocolat » y figure et appartient à
+  // la CUISINE, ce qui décalait le total de un sans qu'on sache pourquoi.
+  // Une assertion qu'on ne sait pas expliquer finit par être « ajustée »
+  // jusqu'à passer, et elle ne protège plus de rien.
+  //
+  // Ce qui compte vraiment : AUCUN produit actif ne doit être hors des deux
+  // listes. C'est ça qu'on vérifie, et le nombre en découle.
+  const connus = new Set([...Object.keys(AFFICHES), ...HORS_AFFICHE])
+  const inconnus = actifs.filter(r => !connus.has(r.nom)).map(r => r.nom)
+  if (inconnus.length === 0) ok(`${actifs.length} produits actifs, tous connus de la référence`)
+  else ko('produits hors référence', `${inconnus.length} inconnu(s) : ${inconnus.join(', ')}`)
 
   const enBase = new Set(actifs.map(r => r.nom))
   // Un produit d'affiche DÉSACTIVÉ n'est pas manquant : il a été retiré de la

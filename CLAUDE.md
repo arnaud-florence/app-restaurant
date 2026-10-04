@@ -6489,13 +6489,28 @@ tirées au hasard. Corrigé par `!inner` sur la composition et un tri sur `id`.
 est vrai PAR DÉFINITION (gluten sur la farine, sulfites sur le vin), il ne
 signe jamais. **105 produits restent à lire sur l'emballage.**
 
-⚠️⚠️ **31 PRIX DU FOURNIL DIFFÈRENT DES AFFICHES, TOUJOURS VERS LE HAUT** —
-croissant 1,20 → 1,40 €, part de flan 2,50 → 3,80 €, tropézienne 2,50 →
-3,80 €. `test-carte-fournil.mjs` compare la base aux affiches de septembre et
-sort rouge. Deux lectures possibles, et **une seule personne peut trancher** :
-soit les affiches de la boutique ont été refaites et c'est le test qui est
-périmé, soit la base a pris de l'avance et **le client est en droit de payer
-le prix affiché**. Ne pas « réparer » le test avant d'avoir regardé le mur.
+✅ **LES 31 ÉCARTS DE PRIX DU FOURNIL SONT TRANCHÉS (gérant, 04/10/2026) :
+« les nouvelles affiches sont bonnes, les anciens prix ne le sont plus ».**
+C'était donc la RÉFÉRENCE du test qui était périmée, pas la base — croissant
+1,20 → 1,40 €, part de flan 2,50 → 3,80 €, tropézienne 2,50 → 3,80 €.
+
+⚠️⚠️ **ET CE TEST A CHANGÉ DE NATURE, il faut le dire.** `AFFICHES` ne
+contrôle plus « la base colle aux affiches » — on n'a aucune copie numérique
+des affiches — mais **« aucun prix ne bouge sans que quelqu'un mette cette
+liste à jour »**. C'est un garde-fou contre la DÉRIVE SILENCIEUSE : le miroir
+du catalogue Zelty, la propagation des factures et les scripts d'amorçage
+écrivent tous des prix, et aucun ne demande l'autorisation. Quand il rougit,
+on regarde d'abord si le changement était voulu ; s'il l'était, on met la
+liste à jour **en même temps** que le prix, jamais après coup — sinon elle
+redevient un décor.
+
+⚠️ **Le comptage de ce test se DÉDUIT de la base, il ne se soustrait plus à
+la main.** L'ancienne formule (`AFFICHES − retirés + HORS_AFFICHE − retirés
+caisse`) supposait que chaque nom des deux listes désigne un produit
+FOURNIL : faux, « Moelleux au chocolat » y figure et appartient à la CUISINE,
+ce qui décalait le total de un sans qu'on sache pourquoi. Une assertion qu'on
+ne sait pas expliquer finit par être « ajustée » jusqu'à passer. Ce qui est
+vérifié désormais : **aucun produit actif n'est hors des deux listes**.
 
 ### Les quatre audits de chaîne (02/10/2026)
 
