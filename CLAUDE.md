@@ -169,7 +169,7 @@ Les routes `(ops)` partagent un layout sombre `bg-[#0D0D0D]` (tablette en servic
 | Fournisseur d'un produit vendu | un croissant dit chez qui il s'achète | 0164 |
 | Prix estimé, dit comme tel | une hypothèse ne ressemble plus à un relevé | 0165 |
 
-**Migrations actuelles : 0001 → 0165.**
+**Migrations actuelles : 0001 → 0167.**
 
 ### Réouverture de septembre — un seul geste, et une carte à saisir
 
@@ -2820,6 +2820,80 @@ maintenant la propriété qui compte — ces lignes ne produisent **aucun** prix
 de référence et ne peuvent jamais être couronnées « meilleur » — plus le fait
 que les deux garde-fous sont **présents dans la lib**. Vérifié en retirant le
 garde-fou : le test rougit (158 ✓ 1 ✗).
+
+### L'ardoise de la semaine — ce qu'on sert décide ce qu'on achète (0167)
+
+Décision du gérant, 04/10/2026 : la restauration tourne sur une **ardoise**.
+**Toutes les pizzas** restent en permanence ; la brasserie change chaque
+semaine ; un **plat du jour, hors carte**, change chaque jour — mais se décide
+**une semaine à l'avance**.
+
+⚠️⚠️ **LE RÉASSORT COMMANDAIT POUR 48 PLATS DONT DEUX OU TROIS SONT SERVIS.**
+Mesuré sur les fiches réelles et 230 couverts/semaine :
+
+| périmètre | ingrédients | commande | **casse** |
+|---|---|---|---|
+| carte entière (19 + 12) | 62 | 780 €/sem | **152 €/sem** |
+| ardoise 8 + 10 | 49 | 769 € | **97 €** |
+| ardoise 4 + 6 | 36 | 748 € | **97 €** |
+
+⚠️⚠️ **RACCOURCIR L'ARDOISE NE FAIT PAS BAISSER LA FACTURE**, et c'est
+contre-intuitif : 230 couverts mangent 230 plats, que la carte en propose
+trente ou dix. Ça CONCENTRE la matière sur moins de références. Le gain est
+dans la **casse** — ~55 €/semaine, ~2 850 €/an.
+
+⚠️⚠️ **ET IL PLAFONNE VERS DIX PLATS.** Le vrai levier n'est donc pas la
+LONGUEUR de l'ardoise mais **quels plats on met ensemble** : dix plats qui
+puisent dans le socle gaspillent deux fois moins que dix plats réclamant
+chacun leur référence. La crème de balsamique d'un seul plat se jette à 97 %
+que l'ardoise fasse dix plats ou trente. D'où `coutMarginal()` : l'écran doit
+dire ce qu'un plat AJOUTE au moment où on le choisit, pas à la poubelle du
+dimanche.
+
+**La structure des 62 ingrédients :** 20 **socle** (≥ 4 plats, présents quoi
+qu'il arrive), 18 intermédiaires, 24 **spécifiques** (1 seul plat, ils
+disparaissent avec lui).
+
+**`src/lib/ardoise.ts`** porte les règles, PURES : `portionsSemaine()`,
+`besoinSemaine()`, `listeAchat()`, `socle()` / `specifiques()`,
+`coutMarginal()`. Test : `node scripts/test-ardoise.mjs` — 26 assertions,
+sans base ni réseau.
+
+⚠️ **Les portions se répartissent UNIFORMÉMENT** sur les plats de l'ardoise.
+C'est faux, mais c'est la seule hypothèse neutre tant qu'aucune vente n'existe
+— une pondération inventée aurait l'air d'un savoir (même doctrine que 0163).
+
+⚠️ **Le volume est un PARAMÈTRE explicite, pas une constante enfouie** : midi
+20 (7 j), soir week-end 20, soir semaine 10 — décision du gérant, aucune
+mesure derrière. Les **pizzas à emporter** s'ajoutent et ne sont pas des
+couverts assis ; à zéro, le socle pizzeria est sous-dimensionné en silence.
+
+**Ce que la 0167 débloque, et pourquoi il fallait une migration :**
+
+⚠️ **Un plat du jour hors carte n'a pas de `recette_id`**, et la colonne est
+NOT NULL. Or il doit exister en caisse — **on ne vend pas ce que la caisse ne
+connaît pas**. La réponse n'est pas 365 produits par an (ils partiraient vers
+Zelty et casatasia.fr) mais UN produit permanent « Plat du jour », dont le
+libellé du ticket ne bouge pas : d'où `plats_du_jour.titre`.
+
+⚠️⚠️ **Sa COMPOSITION change chaque jour**, et `recette_ingredients` n'en
+porte qu'une par produit. D'où `plat_du_jour_ingredients`, attachée à
+l'OCCURRENCE. Sans elle, **les 140 couverts du midi se commandent à
+l'aveugle** — le plus gros volume de la semaine.
+
+⚠️ `plats_du_jour.modele_de` : un plat qui revient ne se resaisit pas. Sans
+ça la saisie du dimanche reste entière chaque semaine, et une corvée
+hebdomadaire finit par ne plus être faite — le réassort redeviendrait aveugle
+sans que rien ne le signale.
+
+⚠️ `on delete restrict` sur l'ingrédient : supprimer une matière ne doit pas
+effacer la composition d'un plat déjà servi.
+
+⚠️⚠️ **`dlc_moyenne_jours` EST RENSEIGNÉE SUR 4 INGRÉDIENTS SUR 117**, et les
+quatre sont des rescapés du jeu de démonstration. La distinction périssable /
+de garde n'a donc **aucune donnée** : classer sur le NOM produit des faux
+positifs (la crème de balsamique n'est pas un périssable). 62 nombres à
+saisir avant que cette distinction serve à quelque chose.
 
 ### Réassort — le chaînon entre le stock et la commande (0163)
 
@@ -6346,6 +6420,7 @@ PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
 node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vient chaque cible
 node scripts/sacs-croissants-formats.mjs       # sacs à croissants : 101/103/104 (essai à blanc)
 node scripts/corriger-stocks-negatifs.mjs      # un stock négatif n'existe pas (essai à blanc)
+node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, sans base)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
