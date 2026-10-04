@@ -197,7 +197,29 @@ export async function GET(req: Request) {
     // ⚠️ Ce qu'on n'a PAS créé se dit : sans ça on croit cinq bons créés et on
     // n'en trouve que trois, sans savoir pourquoi.
     const bonsIgnores: string[] = []
+
+    // ⚠️⚠️ L'AGENT NE CRÉE PLUS DE BONS DE COMMANDE — décision du gérant,
+    // 04/10/2026 : « enlève-moi toutes ces estimations de BDC, elles servent
+    // à rien ». 153 brouillons s'étaient accumulés, bâtis sur des prix
+    // ESTIMÉS : 56 des 62 références restauration n'ont jamais été facturées.
+    // Un bon chiffré sur une hypothèse n'est pas une commande, c'est un
+    // brouillon de plus à trier.
+    //
+    // ⚠️ CE QUI RESTE EST L'ESSENTIEL : l'agent compte toujours ce qu'il faut
+    // commander et le DIT. C'est l'alerte qui a de la valeur, pas le document
+    // — et le document se crée en un clic depuis `/admin/reassort`, où le
+    // gérant voit les quantités, les prix et chez qui basculer avant de
+    // s'engager. La commande redevient un geste délibéré, comme l'envoi l'est
+    // déjà depuis la 0160.
+    //
+    // Pour rétablir la création automatique : repasser AGENT_CREE_LES_BONS à
+    // true. Rien d'autre n'a été retiré.
+    const AGENT_CREE_LES_BONS = false
+    // ⚠️ On garde le type de `besoinsParFournisseur` en vidant la boucle
+    // plutôt qu'en la remplaçant par une Map nue : un `new Map()` sans type
+    // fait perdre l'inférence et casse la compilation plus bas.
     for (const [fournId, lignes] of besoinsParFournisseur) {
+      if (!AGENT_CREE_LES_BONS) break
       const fournInfo = [...fournisseurParNom.values()].find(f => f.id === fournId)
       if (!fournInfo) continue
 
