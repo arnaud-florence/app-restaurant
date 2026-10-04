@@ -5985,6 +5985,95 @@ fmtPct(n)   // 12,3 %
 
 - **Module 28 — 2FA TOTP** : `otplib` génère le secret base32 + URI otpauth, lib `qrcode` affiche le QR. Codes de secours stockés en clair dans `profils.backup_codes` (text[]) — ils ne sont pas encore consommés à l'usage côté login (TODO si besoin). Si l'horloge du téléphone dérive, le code peut être rejeté — `authenticator.check()` accepte ±1 step (30s) par défaut.
 
+### « Stock à jour » mais sept lignes vides, et des valeurs négatives (04/10/2026)
+
+Le gérant : « il y a marqué stock à jour avec tous les produits de la première
+livraison, mais le stock est bas et encore pas bon, avec encore des produits à
+0 qui n'ont rien à faire là ». Trois choses distinctes derrière cette phrase,
+et une seule était un défaut d'affichage.
+
+**1. ⚠️⚠️ UNE MATIÈRE QUE PERSONNE NE COMPTE N'A RIEN À AFFICHER SUR UN ÉCRAN
+DE STOCK.** Sept lignes restaient visibles à « — jamais compté » :
+baguette sandwich, huile de friture, miel, poivre noir, pommes, saumon fumé,
+sel fin. Toutes à **`stocke = false`** (0133) — elles ne figurent dans AUCUN
+inventaire, donc rien ne peut jamais leur donner un stock : elles seraient
+restées « jamais compté » pour toujours, sur l'écran censé dire ce qu'on a en
+réserve. Ce sont les cinq rescapées du jeu de démonstration et deux
+ingrédients de fiches techniques jamais achetés.
+
+⚠️ **La distinction « jamais compté » ≠ « zéro » (0163) n'est PAS abandonnée** :
+elle vaut pour une matière SUIVIE que personne n'a encore comptée, et la
+mention reste. Ce qui disparaît, c'est la matière qu'aucun inventaire ne
+regarde — là il n'y a pas une information manquante, il n'y a rien à mesurer.
+Le nombre retiré est DIT, avec la façon de le corriger (la marquer suivie).
+
+**2. ⚠️⚠️ CINQUANTE-HUIT STOCKS NÉGATIFS, ET DES VALEURS NÉGATIVES À L'ÉCRAN.**
+`/admin/stock` affichait « Poivre noir moulu −0,34 € » et « Sel fin −0,03 € ».
+Mesuré en base : **58 matières sous zéro, −120,75 € de valeur** — basilic
+−11,08 bottes, steak haché −1,65 kg, pain burger −11 pièces.
+
+L'origine : les **sorties automatiques de mai-juin 2026**, quand le trigger du
+module 7 déduisait les ingrédients à chaque article passé à « servi ». Ces
+commandes étaient celles du jeu de démonstration, purgé en août — les produits
+ont disparu, leurs `mouvements_stock` sont restés, et le compteur est descendu
+sous zéro sur des stocks qui n'avaient jamais rien contenu.
+
+⚠️ Un stock négatif ne se lit pas comme une erreur, il se lit comme une dette,
+et il entre dans toutes les sommes qui le croisent — briefing de poste,
+snapshot de l'assistant, chantiers du co-gérant. Et il n'est PAS visible depuis
+que la page affiche le stock calculé : seules les matières hors suivi, qui
+gardaient leur `stock_actuel` brut, le montraient.
+
+`node scripts/corriger-stocks-negatifs.mjs [--ecrire]` — essai à blanc par
+défaut. ⚠️ Il écrit un **mouvement d'`inventaire`** avant de corriger le
+compteur : une remise à zéro sans trace serait indistinguable d'une saisie.
+La trace passe AVANT — et c'est ce qui a sauvé l'état quand la contrainte a
+refusé le type `ajustement` (`type` n'admet que entree / sortie / perte /
+inventaire, 0001) : rien n'avait été écrit.
+
+**3. « Le stock est bas » — c'est FACTUEL, pas un défaut.** Mesuré le jour même :
+
+| point de vente | produits actifs | comptés | livré |
+|---|---|---|---|
+| Fournil | 88 | 60 | **rien** |
+| Bar | 49 | 36 | France Boissons, BL-47231850 |
+| Restauration | 48 | 0 | **rien** |
+
+**Une seule livraison est entrée.** Le Fournil n'a rien commandé pour le
+12 octobre, la pizzeria et la brasserie non plus, et le bon Plaza (emballages,
+137,49 €) est **payé mais en attente de retrait** à Brignoles — donc hors
+stock, ce qui est juste.
+
+⚠️⚠️ **DEUX DOCUMENTS POUR LA MÊME LIVRAISON, et le garde-fou de la 0166
+tient.** Le BL-47231850 (47 lignes, 47 rattachées, fûts convertis litre→fût :
+Affligem 2, Moretti 3) ET la facture 4136964411 (55 lignes, 0 rattachée,
+Affligem 40, Moretti 60 — des LITRES) sont tous deux enregistrés.
+`facture_liee_id` est posé sur la facture, donc `calculerEntrees()` l'ignore et
+le stock n'est pas doublé. **Sans ce lien, rattacher un jour les 55 lignes de
+la facture aurait ajouté 40 fûts d'Affligem et 60 de Moretti** — et rien ne
+l'aurait signalé. Vérifier ce lien à chaque fois qu'un BL et sa facture
+coexistent.
+
+**4. ⚠️ DEUX CHIFFRES DE STOCK SUR LA MÊME PAGE, tous les deux justes.** La
+carte du haut annonçait **2 229,31 €** (tout le stock calculé, produits
+revendus + matières), le KPI du bas **503,73 €** (les seules matières de la
+liste). Deux questions différentes sous le même mot « stock » — donc lus comme
+une contradiction, et on finit par ne croire ni l'un ni l'autre. Le KPI est
+renommé **« Valeur des matières »**. On ne supprime pas : ce chiffre est utile,
+c'est son libellé qui mentait.
+
+**5. ⚠️⚠️ `test-stock.mjs` ÉTAIT ROUGE DEPUIS LA PURGE D'AOÛT.** Il affirmait
+« attendu ≥ 1 (saumon DLC J+2) » sur les mouvements du jeu de démonstration :
+il restait **zéro** mouvement portant une DLC dans toute la base. Troisième
+occurrence du même motif après `test-rh.mjs` et
+`test-rbac-snack-livreur.mjs` — un test rouge en permanence finit par être
+ignoré, et ce jour-là il ne protège plus rien.
+
+Il FABRIQUE désormais son témoin, vérifie qu'il est vu, **et contrôle le sens
+inverse** (une DLC à J+40 ne doit pas alerter — sinon l'écran crierait sur tout
+le stock), puis nettoie. Un test ne doit pas dépendre d'une donnée qu'il n'a
+pas créée. 18/18.
+
 ### Les quatre audits de chaîne (02/10/2026)
 
 ⚠️⚠️ **« LES PAGES RÉPONDENT » N'EST PAS « L'APPLICATION FONCTIONNE ».** Les
@@ -6094,6 +6183,7 @@ PORT=3000 node scripts/test-achats.mjs         # plateforme d'achat + son état 
 PORT=3000 node scripts/test-reassort.mjs       # stock, seuils, cibles (0163)
 node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vient chaque cible
 node scripts/sacs-croissants-formats.mjs       # sacs à croissants : 101/103/104 (essai à blanc)
+node scripts/corriger-stocks-negatifs.mjs      # un stock négatif n'existe pas (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)

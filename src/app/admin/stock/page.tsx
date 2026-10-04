@@ -28,6 +28,23 @@ export default async function StockPage() {
   // simplement plus lui qu'on affiche.
   const reel = sansComptagePerime(await chargerLignesReassort(sb))
   const parCle = new Map(reel.map(l => [l.cle, l]))
+  // ⚠️⚠️ UNE MATIÈRE QUE PERSONNE NE COMPTE N'A RIEN À AFFICHER ICI.
+  // `ingredients.stocke` (0133) marque les matières réellement suivies à
+  // l'inventaire. Les autres — les six rescapées du jeu de démonstration
+  // (miel, pommes, sel fin, poivre, saumon fumé) et les ingrédients de
+  // fiches techniques jamais achetés (baguette sandwich, huile de friture) —
+  // ne figurent dans AUCUN inventaire : rien ne peut leur donner un stock,
+  // donc elles s'affichaient éternellement « — jamais compté », sur l'écran
+  // qui est censé dire ce qu'on a en réserve.
+  //
+  // ⚠️ La distinction « jamais compté » ≠ « zéro » (0163) n'est PAS abandonnée :
+  // elle vaut pour une matière SUIVIE que personne n'a encore comptée, et
+  // cette mention reste. Ce qui disparaît, c'est la matière qu'aucun
+  // inventaire ne regarde — là il n'y a pas d'information manquante, il n'y a
+  // rien à mesurer.
+  const suivies = new Set(
+    ((await sb.from('ingredients').select('id').eq('stocke', true)).data ?? []).map(r => r.id as string),
+  )
   const jamais: string[] = []
   const tous = ingredients.map(i => {
     const l = parCle.get(`ing:${i.id}`)
@@ -47,8 +64,11 @@ export default async function StockPage() {
   // qu'une livraison la fait entrer. Le nombre de masquées est DIT — une
   // liste qui cache sans le dire est pire qu'une liste longue.
   const inconnus = new Set(jamais)
-  const ingredientsReels = tous.filter(i => Number(i.stock_actuel) > 0 || inconnus.has(i.id))
-  const masques = tous.length - ingredientsReels.length
+  const horsSuivi = tous.filter(i => !suivies.has(i.id)).length
+  const ingredientsReels = tous.filter(
+    i => suivies.has(i.id) && (Number(i.stock_actuel) > 0 || inconnus.has(i.id)),
+  )
+  const masques = tous.length - ingredientsReels.length - horsSuivi
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
@@ -77,7 +97,7 @@ export default async function StockPage() {
             dépôt : il n'est plus monté nulle part. */}
         <StockReelCard />
       </div>
-      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} masques={masques} />
+      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} masques={masques} horsSuivi={horsSuivi} />
     </>
   )
 }

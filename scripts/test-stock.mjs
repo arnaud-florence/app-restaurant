@@ -55,10 +55,29 @@ await step('mouvements seedés', async () => {
   else ko('colonne fournisseur', 'manquante')
 })
 
-// ─── 2. Alertes DLC (seed magret J+5, saumon J+2) ───────────────────
+// ─── 2. Alertes DLC ──────────────────────────────────────────────────
+// ⚠️⚠️ CE TEST ÉTAIT ROUGE DEPUIS LA PURGE D'AOÛT 2026, et personne ne l'avait
+// vu. Il affirmait « attendu ≥ 1 (saumon DLC J+2) » en s'appuyant sur les
+// mouvements du jeu de DÉMONSTRATION, supprimés avec leurs produits — il
+// restait ZÉRO mouvement portant une DLC dans toute la base. Même symptôme
+// que `test-rh.mjs` et `test-rbac-snack-livreur.mjs` : un test rouge en
+// permanence finit par être ignoré, et ce jour-là il ne protège plus rien.
+//
+// ⚠️ Un test ne doit pas dépendre d'une donnée qu'il n'a pas créée. Il
+// FABRIQUE donc son alerte, vérifie qu'elle est vue, et la retire — un
+// contrôle qui ne dit jamais « alerte » ne prouve rien.
 await step('alertes DLC', async () => {
   const today = new Date().toISOString().slice(0, 10)
   const cutoff = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10)
+  const dlc = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10)
+  const { data: ing } = await sb.from('ingredients').select('id, nom').eq('actif', true).limit(1)
+  if (!ing?.length) { ko('alertes DLC', 'aucun ingrédient actif pour fabriquer le témoin'); return }
+  const { data: mv, error: eIns } = await sb.from('mouvements_stock').insert({
+    ingredient_id: ing[0].id, type: 'entree', quantite: 1,
+    motif: `${TAG} témoin DLC`, date_peremption: dlc,
+  }).select('id').single()
+  if (eIns) { ko('alertes DLC', `insertion du témoin refusée : ${eIns.message}`); return }
+  cleanup.mouvementIds.push(mv.id)
   const { data, error } = await sb
     .from('mouvements_stock')
     .select('ingredient_id, date_peremption, ingredient:ingredients(nom)')
@@ -67,12 +86,22 @@ await step('alertes DLC', async () => {
     .gte('date_peremption', today)
     .lte('date_peremption', cutoff)
   if (error) throw new Error(error.message)
-  if (data.length >= 1) {
-    const noms = data.map(d => d.ingredient?.nom).filter(Boolean).join(', ')
-    ok(`${data.length} alerte(s) DLC ≤ 3j : ${noms}`)
-  } else {
-    ko('alertes', `attendu ≥ 1 (saumon DLC J+2), reçu ${data.length}`)
-  }
+  if (data.some(d => d.date_peremption === dlc)) ok(`le témoin à J+2 est bien vu (${data.length} alerte(s) ≤ 3 j)`)
+  else ko('alertes DLC', `le témoin à ${dlc} n'est pas remonté — la requête d'alerte ne le voit pas`)
+  // ⚠️ Et le contrôle inverse : une DLC HORS fenêtre ne doit PAS alerter,
+  // sinon l'écran crierait sur tout le stock et on cesserait de le lire.
+  const loin = new Date(Date.now() + 40 * 86400000).toISOString().slice(0, 10)
+  const { data: mv2 } = await sb.from('mouvements_stock').insert({
+    ingredient_id: ing[0].id, type: 'entree', quantite: 1,
+    motif: `${TAG} témoin DLC lointaine`, date_peremption: loin,
+  }).select('id').single()
+  if (mv2) cleanup.mouvementIds.push(mv2.id)
+  const { data: apres } = await sb
+    .from('mouvements_stock').select('date_peremption')
+    .eq('type', 'entree').not('date_peremption', 'is', null)
+    .gte('date_peremption', today).lte('date_peremption', cutoff)
+  if (!apres?.some(d => d.date_peremption === loin)) ok('une DLC à J+40 n’alerte pas')
+  else ko('alertes DLC', 'une DLC à J+40 est remontée dans la fenêtre de 3 jours')
 })
 
 // ─── 3. Trigger sortie automatique ──────────────────────────────────

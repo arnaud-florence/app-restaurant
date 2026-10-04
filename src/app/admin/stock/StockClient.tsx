@@ -29,7 +29,7 @@ import ListeCoursesModal from './ListeCoursesModal'
 type ActionKind = 'entree' | 'perte' | 'inventaire' | 'courses' | null
 
 export default function StockClient({
-  ingredients, mouvements, jamaisComptes = [], masques = 0,
+  ingredients, mouvements, jamaisComptes = [], masques = 0, horsSuivi = 0,
 }: {
   ingredients: Ingredient[]
   mouvements: Mouvement[]
@@ -37,6 +37,9 @@ export default function StockClient({
   jamaisComptes?: string[]
   /** Combien de matières à zéro ne sont pas affichées. Dit, jamais tu. */
   masques?: number
+  /** Matières qu'aucun inventaire ne suit (`stocke = false`) : rien ne peut
+   *  leur donner un stock, donc elles ne figurent pas dans cette liste. */
+  horsSuivi?: number
 }) {
   const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
@@ -147,7 +150,13 @@ export default function StockClient({
           <KPI label="Stock OK"     value={String(stats.totalActifs - stats.rouge - stats.orange)} icon="✓" tone="green" />
           <KPI label="Stock faible" value={String(stats.orange)} icon="⚠" tone={stats.orange > 0 ? 'orange' : 'default'} />
           <KPI label="Épuisés"      value={String(stats.rouge)}  icon="🔴" tone={stats.rouge > 0 ? 'red' : 'default'} pulse={stats.rouge > 0} />
-          <KPI label="Valeur stock" value={fmtPrix(valeur)} icon="💰" />
+          {/* ⚠️⚠️ DEUX CHIFFRES, DEUX QUESTIONS — et c'est le LIBELLÉ qui les
+              séparait mal. La carte du haut annonce la valeur de TOUT le stock
+              calculé (produits revendus + matières) : 2 229 € le 04/10. Ce
+              KPI-ci ne somme que les MATIÈRES de la liste ci-dessous : 504 €.
+              Tous deux justes, tous deux nommés « stock » — donc lus comme une
+              contradiction, et on finit par ne croire ni l'un ni l'autre. */}
+          <KPI label="Valeur des matières" value={fmtPrix(valeur)} icon="💰" />
         </div>
 
         {/* Sélecteur d'onglets sticky */}
@@ -168,6 +177,15 @@ export default function StockClient({
             seul ce qu’on a en réserve apparaît ici. {masques > 1 ? 'Elles réapparaissent' : 'Elle réapparaît'} dès
             qu’une livraison enregistrée {masques > 1 ? 'les' : 'la'} fait entrer — rien n’a été supprimé,
             {masques > 1 ? ' elles gardent' : ' elle garde'} fournisseur, prix et cible.
+            {horsSuivi > 0 && (
+              <>
+                {' '}
+                <b>{horsSuivi} autre{horsSuivi > 1 ? 's' : ''}</b> {horsSuivi > 1 ? 'ne sont suivies' : 'n’est suivie'} par
+                aucun inventaire : {horsSuivi > 1 ? 'elles n’ont' : 'elle n’a'} donc pas de stock à afficher.
+                Pour {horsSuivi > 1 ? 'les' : 'la'} compter, {horsSuivi > 1 ? 'il faut les marquer' : 'il faut la marquer'} comme
+                suivie{horsSuivi > 1 ? 's' : ''} dans la fiche matière.
+              </>
+            )}
           </div>
         )}
 
