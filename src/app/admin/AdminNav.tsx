@@ -12,6 +12,7 @@ import {
   AlertTriangle, FileText, Trash2, Zap, NotebookPen, CloudSun, Wrench,
   Store, BookOpen, Trophy, Calculator, ChevronDown, ChevronRight, Home, Star,
   ShoppingCart, Scale, TrendingUp, Landmark, Link2, Plug, Percent, PackageCheck,
+  CalendarDays,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { logoutAction } from '@/app/login/actions'
@@ -53,6 +54,7 @@ const GROUPES: Group[] = [
       // ⚠️ Ces deux écrans existaient sans être atteignables d'ici : la barre
       // latérale a sa PROPRE liste, indépendante de `lib/navigation.ts`, et on
       // oublie de la nourrir. Un écran livré qu'on ne trouve pas n'existe pas.
+      { href: '/admin/ardoise',     label: 'Ardoise semaine',    icon: CalendarDays },
       { href: '/admin/reassort',    label: 'Réassort',           icon: PackageCheck },
       { href: '/admin/achats',      label: "Plateforme d'achat", icon: ShoppingCart },
       { href: '/admin/tarifs-fournisseurs', label: 'Tarifs fournisseurs', icon: Scale },

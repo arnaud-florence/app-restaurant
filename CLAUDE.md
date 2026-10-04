@@ -2880,7 +2880,41 @@ surtout pas zéro — un réassort muet empêcherait de commander.
 elle est attachée à l'occurrence (`plat_du_jour_ingredients`), et le produit
 « Plat du jour » n'a volontairement aucune fiche.
 
-Test : `PORT=3000 node scripts/test-reassort-ardoise.mjs` — 15 assertions.
+**`/admin/ardoise` — composer la carte, et voir ce qu'elle coûte.**
+Navigation par semaine (← →), pizzas et brasserie séparées, et le bilan se
+recalcule à chaque case cochée : portions, références, commande, **casse
+prévue**.
+
+⚠️⚠️ **LE COÛT MARGINAL SE CALCULE SUR L'ARDOISE *SANS* LE PLAT.** Calculé
+sur l'ardoise courante, un plat déjà coché afficherait zéro — la question
+« qu'est-ce que ça coûte de l'ajouter ? » doit avoir la même réponse qu'il
+soit coché ou non. Il affiche les **références nouvelles** et le **delta de
+casse**, jamais un simple compteur de plats.
+
+⚠️ **L'écran DIT que la commande ne baisse pas en raccourcissant l'ardoise.**
+230 couverts mangent 230 plats dans tous les cas : sans cette phrase, on
+chercherait une économie là où il n'y en a pas, et on conclurait que l'écran
+ment.
+
+⚠️ **Seuls les plats à COMPOSITION CHIFFRÉE sont proposés** : cocher un plat
+sans fiche ne changerait rien au réassort, et l'écran mentirait sur ce qu'il
+calcule.
+
+⚠️ **Poser l'ardoise REMPLACE la semaine**, elle ne cumule pas — sinon
+décocher un plat ne le retirerait jamais et le réassort continuerait à
+commander ses ingrédients. Mais elle **ne touche pas les plats du jour**
+(`date_debut = date_fin`) : les emporter effacerait la semaine déjà
+planifiée.
+
+⚠️ **Un titre vide EFFACE le plat du jour de cette date.** C'est le geste
+naturel pour « finalement, rien lundi » — sans lui, on commanderait pour un
+plat qu'on ne sert pas. Et la composition est **remplacée**, jamais modifiée
+ligne à ligne : les ingrédients retirés resteraient en base.
+
+⚠️ L'écran est déclaré dans **les DEUX sources de menu** (`navigation.ts` et
+`AdminNav.tsx`) — 47 contre 47, zéro écart. Le test le vérifie.
+
+Test : `PORT=3000 node scripts/test-reassort-ardoise.mjs` — 22 assertions.
 ⚠️ Il CRÉE une vraie ardoise et la retire dans un `finally` : une ardoise de
 test laissée en place ferait commander la semaine entière sur deux pizzas.
 

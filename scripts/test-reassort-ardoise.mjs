@@ -95,6 +95,25 @@ try {
     t('⚠️ le produit « Plat du jour » n’a AUCUNE fiche — c’est voulu', !fiche)
   }
 
+  titre('L’écran de composition')
+  const srcPage = fs.readFileSync('src/app/admin/ardoise/page.tsx', 'utf8')
+  const srcCli = fs.readFileSync('src/app/admin/ardoise/ArdoiseClient.tsx', 'utf8')
+  const srcAct = fs.readFileSync('src/app/admin/ardoise/actions.ts', 'utf8')
+  t('⚠️ seuls les plats à COMPOSITION CHIFFRÉE sont proposés — cocher un plat sans fiche ne changerait rien',
+    /compo\.get\(r\.id as string\)\?\.length \?\? 0\) > 0/.test(srcPage))
+  t('⚠️⚠️ le coût marginal se calcule sur l’ardoise SANS le plat, sinon un plat coché afficherait zéro',
+    /ardoise\.filter\(x => x\.id !== c\.id\)/.test(srcCli))
+  t('⚠️ poser l’ardoise REMPLACE la semaine — sinon décocher ne retire jamais rien',
+    /aRetirer/.test(srcAct) && /\.delete\(\)/.test(srcAct))
+  t('⚠️ … mais ne touche PAS les plats du jour (date_debut = date_fin)',
+    /eq\('date_debut', debut\)\.eq\('date_fin', fin\)/.test(srcAct))
+  t('⚠️ un titre vide EFFACE le plat du jour de cette date', /if \(!titre\)/.test(srcAct))
+  t('⚠️ la composition du jour est REMPLACÉE, pas modifiée ligne à ligne',
+    /plat_du_jour_ingredients'\)\.delete\(\)\.eq\('plat_du_jour_id'/.test(srcAct))
+  t('⚠️ les deux sources de menu connaissent l’écran (piège documenté)',
+    /\/admin\/ardoise/.test(fs.readFileSync('src/lib/navigation.ts', 'utf8'))
+    && /\/admin\/ardoise/.test(fs.readFileSync('src/app/admin/AdminNav.tsx', 'utf8')))
+
   titre('Le garde-fou vit dans la lib, pas dans la discipline')
   const src = fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')
   t('⚠️ `reassort-donnees.ts` lit bien `plats_du_jour`', /from\('plats_du_jour'\)/.test(src))

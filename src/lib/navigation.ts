@@ -151,6 +151,7 @@ export const CATEGORIES: Category[] = [
       { href: '/admin/ventes', emoji: '📈', label: 'Statistiques de vente', description: 'CA, heures de pointe, meilleures ventes, comparaisons.', imageUrl: u('1543286386-713bdd548da4') },
       { href: '/admin/correspondances', emoji: '🔗', label: 'Correspondances d\'achat', description: 'Les lignes de facture que rien n\'a reconnu — chacune est un prix d\'achat perdu.', imageUrl: u('1554224155-6726b3ff858f') },
       { href: '/admin/tarifs-fournisseurs', emoji: '⚖️', label: 'Tarifs fournisseurs', description: 'Ce qu\'ils proposent face à ce qu\'on paie, ramené au kilo — qui est le moins cher, et sur quoi.', imageUrl: u('1543286386-713bdd548da4') },
+      { href: '/admin/ardoise', emoji: '🗓️', label: 'Ardoise de la semaine', description: 'Ce qu\'on sert cette semaine — et ce que ça coûte en commande et en casse.', imageUrl: u('1414235077428-338989a2e8c0') },
       { href: '/admin/reassort', emoji: '📦', label: 'Réassort', description: 'Ce qu\'on a, ce qu\'il faut avoir, ce qu\'il faut commander — et chez qui.', imageUrl: u('1553413077-190dd305871c') },
       { href: '/admin/achats', emoji: '🛒', label: 'Plateforme d\'achat', description: 'Tout ce que nos fournisseurs proposent, cherchable — remisé, tarif public, ou remise jamais vérifiée.', imageUrl: u('1578916171728-46686eac8d58') },
       { href: '/admin/patrimoine', emoji: '🏛', label: 'Valeur de l\'affaire', description: 'EBE récurrent, valeur du fonds, plus-value latente — ce qui se construit, pas ce qui entre.', imageUrl: u('1554224155-6726b3ff858f') },
