@@ -54,9 +54,16 @@ for (const r of nos.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))) {
     continue
   }
   if (p.name == null || p.price == null || p.tax == null) { refus.push(`${r.nom} : champ obligatoire manquant côté caisse`); continue }
-  if (p.price === salle && p.price_togo === emporter) continue
-  majs.push({ id: p.id, name: p.name, price: salle, price_togo: emporter, tax: p.tax, tax_takeaway: p.tax_takeaway })
-  console.log(`  ~ ${r.nom.padEnd(30)} ${f2((p.price_togo ?? 0) / 100).padStart(6)} → ${f2(emporter / 100).padStart(6)} € emporter`)
+  // ⚠️ LA TVA SE CORRIGE AUSSI, mais SEULEMENT pour l'alcool. Les trois vins
+  // ont été créés avant que `contient_alcool` ne soit posé : la caisse les
+  // porte à 10 % sur place au lieu de 20 %. Hors alcool on RECOPIE `p.tax`
+  // tel quel — notre règle ignore le taux presse à 2,1 % (0136), et un calcul
+  // partiel écraserait un taux juste par un taux approché.
+  const taxVoulue = r.contient_alcool ? 2000 : p.tax
+  if (p.price === salle && p.price_togo === emporter && p.tax === taxVoulue) continue
+  majs.push({ id: p.id, name: p.name, price: salle, price_togo: emporter, tax: taxVoulue, tax_takeaway: p.tax_takeaway })
+  const quoi = p.tax !== taxVoulue ? `TVA salle ${(p.tax ?? 0) / 100} → ${taxVoulue / 100} %` : `${f2((p.price_togo ?? 0) / 100)} → ${f2(emporter / 100)} € emporter`
+  console.log(`  ~ ${r.nom.padEnd(30)} ${quoi}`)
 }
 if (refus.length) { console.log('\n  refusés :'); refus.forEach(l => console.log('   ' + l)) }
 console.log(`\n  ${majs.length} mise(s) à jour · ${creas.length} création(s)`)
