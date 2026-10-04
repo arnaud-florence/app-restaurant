@@ -1,11 +1,10 @@
 import StockClient from './StockClient'
-import StockReelCard from './StockReelCard'
 import { listMouvements } from './actions'
 import { listIngredients } from '../ingredients/actions'
 import { createClient } from '@/lib/supabase/server'
 import { chargerLignesReassort } from '@/lib/reassort-donnees'
 import { sansComptagePerime } from '@/lib/reassort'
-import type { ProduitEnStock } from './types'
+import type { ProduitEnStock, Origine } from './types'
 
 export const metadata = { title: 'Stocks — Admin' }
 export const dynamic = 'force-dynamic'
@@ -104,6 +103,27 @@ export default async function StockPage() {
       produit: true as const,
       poste: l.etablissement === 'Bar' ? 'bar' : 'fournil',
     }))
+  // D'où vient chaque chiffre : le comptage, les entrées depuis, et la date.
+  const origines: Record<string, Origine> = {}
+  for (const l of reel) {
+    const id = l.cle.startsWith('ing:') ? l.cle.slice(4) : l.cle
+    origines[id] = { compte: l.compte, entrees: l.entrees, compte_le: l.compte_le }
+  }
+  // ⚠️ Les dates de comptage par poste, et la règle des 30 jours : un stock
+  // calculé sur un comptage périmé est un chiffre auquel personne ne doit
+  // croire (0163). La carte retirée le 04/10/2026 les portait ; sans elles,
+  // l'écran afficherait un stock sans dire sur quoi il repose.
+  const comptages: Array<{ poste: string; le: string }> = []
+  const parPoste = new Map<string, string>()
+  for (const l of reel) {
+    if (!l.compte_le) continue
+    const k = l.etablissement ?? 'Matières premières'
+    const d = parPoste.get(k)
+    if (!d || l.compte_le > d) parPoste.set(k, l.compte_le)
+  }
+  for (const [poste, le] of parPoste) comptages.push({ poste, le })
+  comptages.sort((a, b) => a.poste.localeCompare(b.poste, 'fr'))
+  const sansPrix = reel.filter(l => l.tenu !== null && l.tenu > 0 && l.cout_unitaire_ht == null).length
   const inconnus = new Set(jamais)
   const horsSuivi = tous.filter(i => !suivies.has(i.id)).length
   const ingredientsReels = tous.filter(
@@ -117,35 +137,42 @@ export default async function StockPage() {
     l => !l.cle.startsWith('ing:') && (l.tenu === null || l.tenu <= 0),
   ).length
   const masques = tous.length - ingredientsReels.length - horsSuivi + produitsAZero
+  // ⚠️⚠️ DEUX CARTES ONT ÉTÉ RETIRÉES DU HAUT DE CETTE PAGE le 04/10/2026,
+  // et les deux pour la même raison de fond : elles s'interposaient entre le
+  // gérant et son stock.
+  //
+  // `StockReelCard` listait les 45 références par poste au-dessus d'un
+  // tableau qui, depuis ce même jour, les liste TOUTES — deux fois la même
+  // liste, précédées d'un paragraphe d'explications. Demande du gérant :
+  // « quand je rentre sur la page stock je veux voir mon stock direct ».
+  // ⚠️ Ce qu'elle portait EN PLUS n'est pas perdu, et c'eût été le vrai
+  // défaut : la décomposition « comptage + livraisons » est passée sur chaque
+  // ligne, les dates de comptage par poste en UNE ligne au-dessus du tableau,
+  // et le nombre de références sans prix à côté de la valeur.
+  //
+  // `AlertesStockCard` annonçait « 115 ingrédients sous seuil minimum » et
+  // proposait de créer les bons en un clic. Elle lisait `stock_actuel`, le
+  // compteur abandonné depuis la 0135 — après l'incendie il vaut zéro
+  // partout, donc les 115 « alertes » n'étaient que le catalogue entier, à
+  // commander pour 0,00 €. Elle prenait aussi `fournisseur_principal`, un
+  // champ de TEXTE LIBRE, pour un destinataire de commande (« ESTIMATION
+  // 21/09/2026 », « Metro France »). Ce qu'il faut commander se lit sur
+  // `/admin/reassort`, qui part des COMPTAGES.
+  //
+  // Les deux composants restent dans le dépôt, montés nulle part.
   return (
     <>
-      <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
-        {/* ⚠️⚠️ `AlertesStockCard` A ÉTÉ RETIRÉE D'ICI — 04/10/2026.
-            Elle affichait « 115 ingrédients sous seuil minimum » et proposait
-            de créer les bons de commande en un clic. Trois raisons, et
-            chacune suffirait :
-
-            1. ELLE LISAIT `ingredients.stock_actuel`, le compteur que le
-               projet n'alimente plus depuis la 0135. Après l'incendie il vaut
-               zéro partout : les 115 « alertes » n'étaient que le catalogue
-               entier, et les quantités à commander sortaient à 0,00 kg pour
-               0,00 € — un écran qui crie sur tout ne protège de rien.
-            2. ELLE CRÉAIT DES BONS DE COMMANDE, ce que le gérant vient
-               d'interdire deux fois. L'agent a été coupé le même jour ; laisser
-               le bouton l'aurait contredit.
-            3. ELLE PRENAIT `fournisseur_principal` POUR UN FOURNISSEUR. C'est
-               un champ de TEXTE LIBRE : il affichait « ESTIMATION 21/09/2026 —
-               à remplacer par la première facture » et « Metro France » (du jeu
-               de démonstration purgé en septembre) comme des destinataires de
-               commande. Et il annonçait 191,43 € de poivre et 210,04 € de
-               saumon sur des stocks nuls.
-
-            Ce qu'il faut commander se lit sur `/admin/reassort`, qui part des
-            COMPTAGES et non d'un compteur mort. Le composant reste dans le
-            dépôt : il n'est plus monté nulle part. */}
-        <StockReelCard />
-      </div>
-      <StockClient ingredients={ingredientsReels} produits={produits} mouvements={mouvements} jamaisComptes={jamais} masques={masques} horsSuivi={horsSuivi} />
+      <StockClient
+        ingredients={ingredientsReels}
+        produits={produits}
+        origines={origines}
+        comptages={comptages}
+        sansPrix={sansPrix}
+        mouvements={mouvements}
+        jamaisComptes={jamais}
+        masques={masques}
+        horsSuivi={horsSuivi}
+      />
     </>
   )
 }

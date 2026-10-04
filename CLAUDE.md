@@ -6119,6 +6119,36 @@ une liste à compléter. Les deux disent maintenant le même nombre.
 le bandeau annonçait « 101 matières » en cachant aussi une centaine de
 produits, et un écran qui cache sans le dire est pire qu'un écran long.
 
+**La carte du haut est retirée (04/10/2026).** Demande du gérant : « quand je
+rentre sur la page stock je veux voir mon stock direct ». `StockReelCard`
+listait les 45 références par poste **au-dessus d'un tableau qui les liste
+maintenant toutes** — deux fois la même liste, précédées d'un paragraphe
+d'explications à franchir avant d'atteindre son stock. Retirer la carte
+n'était possible qu'APRÈS avoir complété le tableau : l'ordre des deux
+corrections compte.
+
+⚠️ **Ce qu'elle portait EN PLUS n'est pas perdu, et c'eût été le vrai défaut** —
+supprimer un écran emporte toujours des informations que lui seul affichait :
+
+| ce qu'elle disait | où c'est passé |
+|---|---|
+| la décomposition « 0 + 32 » | sur CHAQUE ligne, sous la quantité |
+| les dates de comptage par poste, et les 30 jours | **une** ligne au-dessus du tableau, « périmé » en rouge |
+| « + 7 réf. sans prix connu » | une note sous la valeur du stock |
+
+⚠️ La décomposition n'est pas un ornement : « un stock qu'on ne sait pas
+décomposer n'est pas vérifiable, et c'est la première chose qu'on conteste
+quand il paraît faux » (0163). Et la date de comptage non plus — un stock
+calculé sur un comptage de plus de 30 jours est écarté, donc afficher le
+chiffre sans sa date le ferait passer pour une mesure du jour.
+
+⚠️ **UNE LIGNE, PAS UN PARAGRAPHE.** Un avertissement qu'il faut traverser
+pour atteindre son stock n'est plus lu au bout de trois jours — même leçon que
+l'alerte groupée de l'agent Stock, qui émettait 193 lignes rouges.
+
+⚠️ `AlertesStockCard` et `StockReelCard` restent dans le dépôt, **montées
+nulle part** : leur code documente ce qui a été essayé.
+
 **Assertion ajoutée à `test-stock.mjs`** (22 ✓) : la réserve doit faire plus
 de références que les seules matières. ⚠️ Elle RECOPIE la règle de `page.tsx`
 et de `chargerLignesReassort()` — modifier les deux ensemble. Et elle vérifie

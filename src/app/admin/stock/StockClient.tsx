@@ -20,7 +20,7 @@ import {
   TYPE_MOUVEMENT_LABEL, fmtPrix, fmtQte,
 } from '@/lib/stock'
 import { sortieManuelle } from './actions'
-import type { ProduitEnStock } from './types'
+import type { ProduitEnStock, Origine } from './types'
 
 
 import EntreeModal from './EntreeModal'
@@ -31,7 +31,8 @@ import ListeCoursesModal from './ListeCoursesModal'
 type ActionKind = 'entree' | 'perte' | 'inventaire' | 'courses' | null
 
 export default function StockClient({
-  ingredients, produits = [], mouvements, jamaisComptes = [], masques = 0, horsSuivi = 0,
+  ingredients, produits = [], origines = {}, comptages = [], sansPrix = 0,
+  mouvements, jamaisComptes = [], masques = 0, horsSuivi = 0,
 }: {
   ingredients: Ingredient[]
   mouvements: Mouvement[]
@@ -47,6 +48,12 @@ export default function StockClient({
    *  `recettes` : sans eux cet écran montrait 9 références sur 45. Lecture
    *  seule — les trois gestes du module 7 visent `ingredient_id`. */
   produits?: ProduitEnStock[]
+  /** D'où vient le chiffre de chaque ligne : comptage + livraisons depuis. */
+  origines?: Record<string, Origine>
+  /** Dernier comptage par poste — la carte retirée le 04/10/2026 les portait. */
+  comptages?: Array<{ poste: string; le: string }>
+  /** Références en réserve dont on ignore le prix : non chiffrées au total. */
+  sansPrix?: number
 }) {
   const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
@@ -172,7 +179,8 @@ export default function StockClient({
               revendus du bar. Ce n'était donc pas un libellé à préciser,
               c'était une liste à compléter : les deux dérivent maintenant de
               `chargerLignesReassort()` et disent le même nombre. */}
-          <KPI label="Valeur du stock" value={fmtPrix(valeur)} icon="💰" />
+          <KPI label="Valeur du stock" value={fmtPrix(valeur)} icon="💰"
+               note={sansPrix > 0 ? `+ ${sansPrix} réf. sans prix connu` : undefined} />
         </div>
 
         {/* Sélecteur d'onglets sticky */}
@@ -184,6 +192,32 @@ export default function StockClient({
 
         {tab === 'stocks' && (
         <>
+        {/* ⚠️⚠️ SUR QUOI CE STOCK REPOSE, EN UNE LIGNE. Le tenu est un CALCUL
+            — comptage + livraisons depuis — et un comptage de plus de 30 jours
+            ne décrit plus rien : il est écarté, le chiffre devient « jamais
+            compté » (0163). Afficher un stock sans dire de quand date son
+            comptage, c'est le faire passer pour une mesure du jour.
+            ⚠️ Une LIGNE, pas le paragraphe de la carte retirée : un
+            avertissement qu'il faut traverser pour atteindre son stock n'est
+            plus lu au bout de trois jours. */}
+        {comptages.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Comptage + livraisons enregistrées depuis. Dernier comptage —{' '}
+            {comptages.map((c, n) => {
+              const j = Math.round((Date.now() - Date.parse(c.le)) / 864e5)
+              return (
+                <span key={c.poste}>
+                  {n > 0 && ' · '}
+                  <b className="font-semibold text-zinc-700">{c.poste}</b>{' '}
+                  <span className={j > 30 ? 'text-red-600 font-semibold' : ''}>
+                    {j === 0 ? 'aujourd’hui' : j === 1 ? 'hier' : `il y a ${j} j`}
+                    {j > 30 && ' — périmé'}
+                  </span>
+                </span>
+              )
+            })}
+          </p>
+        )}
         {/* ⚠️ CE QU'ON NE MONTRE PAS SE DIT. Une liste filtrée sans mention
             fait croire que la base est vide, et on finit par ressaisir ce qui
             existe déjà. */}
@@ -275,6 +309,7 @@ export default function StockClient({
                   key={i.id}
                   i={i}
                   produit={estProduit(i) ? (i as ProduitEnStock).poste : null}
+                  origine={origines[i.id]}
                   inconnu={jamais.has(i.id)}
                   onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                   onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
@@ -305,6 +340,7 @@ export default function StockClient({
                           key={i.id}
                           i={i}
                           produit={estProduit(i) ? (i as ProduitEnStock).poste : null}
+                          origine={origines[i.id]}
                           inconnu={jamais.has(i.id)}
                           onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                           onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
@@ -489,12 +525,15 @@ export default function StockClient({
 }
 
 // ─── KPI ─────────────────────────────────────────────────────────────
-function KPI({ label, value, tone = 'default', icon, pulse }: {
+function KPI({ label, value, tone = 'default', icon, pulse, note }: {
   label: string
   value: string
   tone?: 'default' | 'green' | 'orange' | 'red'
   icon: string
   pulse?: boolean
+  /** ⚠️ CE QUE LE TOTAL IGNORE. Un total présenté comme ferme alors qu'il
+   *  saute des lignes devient une contestation de facture (0160). */
+  note?: string
 }) {
   const cls = {
     default: 'bg-background',
@@ -510,6 +549,7 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
           <span className={cn('text-lg', pulse && 'animate-pulse')}>{icon}</span>
         </div>
         <p className="text-lg sm:text-2xl font-bold mt-1 tabular-nums">{value}</p>
+        {note && <p className="text-[10px] text-muted-foreground mt-0.5">{note}</p>}
       </CardContent>
     </Card>
   )
@@ -517,10 +557,14 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
 
 // ─── Mobile : carte d'ingrédient ─────────────────────────────────────
 function IngredientStockCard({
-  i, inconnu, produit = null, onEntree, onPerte, onMoinsUn,
+  i, inconnu, produit = null, origine, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
   inconnu?: boolean
+  /** ⚠️ D'où vient le chiffre : « 0 + 32 ». Un stock qu'on ne sait pas
+   *  décomposer n'est pas vérifiable, et c'est la première chose qu'on
+   *  conteste quand il paraît faux (0163). */
+  origine?: Origine
   /** Poste où ce PRODUIT REVENDU se compte, ou `null` pour une matière. */
   produit?: 'bar' | 'fournil' | null
   onEntree: () => void
@@ -543,7 +587,10 @@ function IngredientStockCard({
           </span>
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs">
-          <Stat label="Stock"  value={inconnu ? '— jamais compté' : `${fmtQte(i.stock_actuel)} ${i.unite}`} />
+          <Stat label="Stock"  value={inconnu ? '— jamais compté' : `${fmtQte(i.stock_actuel)} ${i.unite}`}
+                sous={origine && origine.entrees !== 0
+                  ? `${fmtQte(origine.compte ?? 0)} + ${fmtQte(origine.entrees)} livré`
+                  : undefined} />
           <Stat label="Min"    value={`${fmtQte(i.stock_minimum)}`} />
           <Stat label="Valeur" value={fmtPrix(valeur)} />
         </div>
@@ -568,21 +615,26 @@ function IngredientStockCard({
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, sous }: { label: string; value: string; sous?: string }) {
   return (
     <div className="rounded bg-muted/40 px-1.5 py-1 text-center">
       <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="font-bold tabular-nums truncate">{value}</p>
+      {sous && <p className="text-[9px] text-muted-foreground tabular-nums truncate">{sous}</p>}
     </div>
   )
 }
 
 // ─── Desktop : ligne de table ────────────────────────────────────────
 function IngredientStockRow({
-  i, inconnu, produit = null, onEntree, onPerte, onMoinsUn,
+  i, inconnu, produit = null, origine, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
   inconnu?: boolean
+  /** ⚠️ D'où vient le chiffre : « 0 + 32 ». Un stock qu'on ne sait pas
+   *  décomposer n'est pas vérifiable, et c'est la première chose qu'on
+   *  conteste quand il paraît faux (0163). */
+  origine?: Origine
   /** Poste où ce PRODUIT REVENDU se compte, ou `null` pour une matière. */
   produit?: 'bar' | 'fournil' | null
   onEntree: () => void
@@ -607,6 +659,12 @@ function IngredientStockRow({
           <span className={cn('inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-md border tabular-nums', sty.bg, sty.text, sty.border)}>
             {fmtQte(i.stock_actuel)} {i.unite}
           </span>
+        )}
+        {origine && origine.entrees !== 0 && (
+          <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">
+            {fmtQte(origine.compte ?? 0)} compté{origine.entrees > 0 ? ' + ' : ' − '}
+            {fmtQte(Math.abs(origine.entrees))} livré
+          </p>
         )}
       </td>
       <td className="py-2.5 px-2 text-right text-xs text-muted-foreground tabular-nums">

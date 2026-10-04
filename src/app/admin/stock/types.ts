@@ -18,3 +18,21 @@ export type ProduitEnStock = Ingredient & {
   /** Où ce produit se compte vraiment — `(ops)/inventaire?poste=…`. */
   poste: 'bar' | 'fournil'
 }
+
+/**
+ * D'OÙ VIENT LE CHIFFRE DE STOCK, ligne par ligne.
+ *
+ * ⚠️ « Un stock qu'on ne sait pas décomposer n'est pas vérifiable, et c'est la
+ * première chose qu'on conteste quand il paraît faux » (0163). Le tenu est un
+ * CALCUL — comptage + livraisons enregistrées depuis — et ces deux termes
+ * étaient affichés par la carte retirée le 04/10/2026. Ils vivent donc
+ * maintenant sur la ligne elle-même.
+ */
+export type Origine = {
+  /** Le comptage seul, avant les entrées. */
+  compte: number | null
+  /** Ce qui est entré depuis (livraisons ; un avoir compte en négatif). */
+  entrees: number
+  /** Date du comptage qui fait foi — un comptage vieux ne décrit plus rien. */
+  compte_le: string | null
+}
