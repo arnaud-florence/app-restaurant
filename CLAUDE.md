@@ -6548,6 +6548,46 @@ poireaux, échalotes, persil, citron confit, épices à tajine. Aucune n'a de
 fournisseur — ce sont du frais, et **personne ne nous en vend** (constat du
 27/09). Chaque prix porte son repère dans `notes`.
 
+### Mettre en pause ce qui n'est pas à l'ardoise (04/10/2026)
+
+Précision du gérant : la semaine 1 est une ardoise **RÉDUITE** — « rien
+d'autre en brasserie sera proposé ». `node scripts/ardoise-pause.mjs
+[--ecrire] [--reprendre]`.
+
+⚠️⚠️ **UN PLAT QU'ON NE SERT PAS DOIT DISPARAÎTRE DE LA CAISSE, pas seulement
+du réassort.** Le réassort l'écarte déjà tout seul (la cible d'une matière
+hors ardoise tombe à zéro), mais laissé actif le plat reste **un bouton au
+comptoir** : un serveur l'encaisse, la cuisine ne peut pas le faire, et c'est
+le client qui l'apprend.
+
+⚠️⚠️ **LE RETRAIT SE MÈNE DES DEUX CÔTÉS, JAMAIS D'UN SEUL.**
+`recettes.actif = false` chez nous **ET** `disable` en caisse. Poser `disable`
+seul ferait relire « produit inactif » par le miroir du catalogue, qui
+éteindrait notre fiche — le produit disparaîtrait sans que personne sache
+pourquoi (0141). Les deux ensemble, le miroir relit ce qu'il a déjà : aucune
+boucle. C'est le « retrait mené des deux côtés » que
+`verifier-carte-zelty.mjs` décrit depuis les quatre Pago.
+
+⚠️ **La caisse est écrite AVANT notre base** : si elle refuse, on n'a rien
+désynchronisé. Et le script REFUSE de construire si la caisse rend moins de
+100 plats — c'est une lecture ratée, pas un catalogue vide.
+
+⚠️ **LES DESSERTS ET LE CAFÉ À TABLE NE SONT PAS TOUCHÉS**, et c'est une
+décision : « brasserie » désigne la carte SALÉE, et un dessert se vend à
+quelqu'un qui prend un café. L'erreur n'est pas symétrique — laisser un
+dessert actif coûte une commande de trop (que le réassort exclut déjà), le
+mettre en pause à tort coûte une vente qu'on ne peut pas encaisser le jour de
+l'ouverture.
+
+**Résultat : 15 plats salés en pause, 16 références actives en cuisine** —
+5 plats, 9 desserts, le café à table. Carte conforme 172/172, 48 éteints en
+caisse.
+
+⚠️ Les chiffres de la commande **ne bougent pas** (1 439 €, 56 références) :
+l'ardoise définissait déjà le périmètre d'achat. La mise en pause corrige la
+CAISSE, pas la commande — deux problèmes distincts qu'il ne faut pas
+confondre.
+
 ### ⚠️⚠️ « Casse prévue » était un mot faux — c'est un RELIQUAT
 
 Sur les 171 € annoncés pour la semaine 1, les **épices à tajine (16,56 €)**,
@@ -6683,6 +6723,7 @@ node scripts/corriger-stocks-negatifs.mjs      # un stock négatif n'existe pas 
 node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, sans base)
 PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
+node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
