@@ -1,3 +1,4 @@
+import { mots, MOTS_COMMUNS_MINIMUM } from '@/lib/tarifs-fournisseurs'
 // La plateforme d'achat — un seul catalogue, tous fournisseurs.
 //
 // L'outil savait comparer ce qu'on achète DÉJÀ (`/admin/tarifs-fournisseurs`,
@@ -825,3 +826,67 @@ export function rayonFournisseur(famille: string | null): Rayon {
 }
 
 export const RAYONS_FOURNISSEUR_LISTE: Rayon[] = RAYONS_FOURNISSEUR
+
+/**
+ * CE QUE LES AUTRES FOURNISSEURS ONT DE SEMBLABLE — une PISTE, pas un verdict.
+ *
+ * ⚠️⚠️ CE N'EST PAS `comparer()`, ET LA DISTINCTION EST TOUTE LA PRUDENCE DE
+ * CE PROJET. `comparer()` travaille sur des `cle_comparaison` posées À LA
+ * MAIN — un humain a regardé les deux produits et dit « c'est le même ». Il
+ * y en a 305 sur 4 888 au 04/10/2026, donc la comparaison ne répondait
+ * presque jamais à « et chez les autres ? ».
+ *
+ * Ici on CALCULE un rapprochement probable. La 0151 a montré ce que ça donne
+ * livré à soi-même : « Roquette » rapproché de « ROQUEFORT », « Citron » de
+ * « GATEAU CITRON ROND », « Glace » de « SUCRE GLACE 25KG ». Donc : on
+ * propose, **on n'écrit jamais de clé**, et l'écran dit que c'est une piste.
+ *
+ * ⚠️⚠️ ET ON NE DONNE UN POURCENTAGE QUE SI LES DEUX PRIX TOMBENT SUR LA MÊME
+ * BASE. Mesuré le 04/10/2026 sur les desserts : l'éclair Krill à 0,89 € face
+ * au nôtre à 1,296 € annonce « −31 % », alors que l'un fait 80 g et l'autre
+ * 120 g — au gramme, Krill est 3 % PLUS cher. Sans cette retenue, l'écran
+ * ferait changer de fournisseur sur un chiffre faux.
+ */
+export type PisteAchat = {
+  article: ArticleAchat
+  /** Les deux prix se ramènent-ils à la même unité ? */
+  comparable: boolean
+  /** Écart en %, UNIQUEMENT si comparable. Négatif = moins cher qu'elle. */
+  ecartPct: number | null
+  /** Les mots partagés — pour que l'œil juge du rapprochement. */
+  communs: string[]
+}
+
+export function pistesAchat(
+  origine: ArticleAchat,
+  catalogue: ArticleAchat[],
+  max = 5,
+): PisteAchat[] {
+  const ma = mots(origine.designation)
+  if (ma.length === 0) return []
+  const out: Array<PisteAchat & { s: number }> = []
+  for (const a of catalogue) {
+    // ⚠️ Un AUTRE fournisseur : deux références du même vendeur ne sont pas
+    // une alternative, et les opposer annonce un « moins cher » qui n'en
+    // est pas un.
+    if (a.fournisseur_id === origine.fournisseur_id || a.id === origine.id) continue
+    const communs = ma.filter(m => mots(a.designation).includes(m))
+    if (communs.length < MOTS_COMMUNS_MINIMUM) continue
+    // ⚠️ `ref` est calculé côté serveur par `prixReference()`. Deux `null`
+    // ne sont PAS « la même base » — c'est deux fois « on ne sait pas ».
+    const comparable = !!(origine.ref && a.ref && origine.ref.unite === a.ref.unite)
+    out.push({
+      article: a, comparable, communs,
+      ecartPct: comparable && origine.ref!.prix > 0
+        ? Math.round(((a.ref!.prix - origine.ref!.prix) / origine.ref!.prix) * 1000) / 10
+        : null,
+      // La couverture prime, le nombre de mots départage — même règle que
+      // `score()`, pour que les écrans classent pareil.
+      s: (communs.length / ma.length) * 100 + communs.length,
+    })
+  }
+  return out
+    .sort((a, b) => (b.s - a.s) || ((a.ecartPct ?? 0) - (b.ecartPct ?? 0)))
+    .slice(0, max)
+    .map(({ s: _s, ...p }) => p)
+}

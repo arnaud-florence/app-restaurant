@@ -6141,6 +6141,19 @@ fmtPct(n)   // 12,3 %
 
 - **Endpoint exec-sql** : `POST /api/admin/exec-sql` permet à un script (ou à l'AI) d'exécuter du SQL arbitraire sans passer par le SQL Editor Supabase, auth Bearer `CRON_SECRET`. Utilise la fonction PG `exec_sql()` créée par migration 0086, EXECUTE granté uniquement à `service_role`.
 
+- ⚠️⚠️ **`next build` ET `npm run dev` SE DISPUTENT `.next` — ET C'EST LA
+  VRAIE CAUSE des échecs « mystérieux » de build.** Symptômes vus le
+  04/10/2026 : `Cannot find module './1682.js'` depuis `webpack-runtime.js`,
+  `Failed to collect page data for /api/…` sur une route différente à chaque
+  exécution, `ENOENT pages-manifest.json`. J'ai d'abord attribué ça à la
+  fragilité jest-worker documentée ci-dessous — **c'était faux** : la route
+  fautive se DÉPLAÇAIT d'une exécution à l'autre, ce qu'un défaut de code ne
+  fait pas, et le build passe du premier coup dès que le serveur de dev est
+  arrêté. C'est une COURSE, donc intermittente : un build peut réussir
+  malgré le serveur, ce qui rend le diagnostic trompeur.
+  **Avant un build de vérification : arrêter le serveur de dev** (`preview_stop`),
+  et `rm -rf .next/server .next/static` si un échec a déjà eu lieu.
+
 - **Jest worker crash sur Windows** : Next dev en local plante régulièrement avec `Jest worker encountered child process exceptions, exceeding retry limit` sur les routes dynamiques `[id]`. Symptôme : 500 sur `/caisse/[id]/print`, `/print/bons/[id]`, etc. Toutes les routes statiques marchent. **Fix : redémarrer `npm run dev`**, ce n'est pas le code.
 
 - **Supabase RLS** : à chaque nouvelle table créée via SQL Editor, RLS est ré-activée automatiquement. Toujours `alter table X disable row level security` à la fin de la migration, et créer un patch `00XX_disable_rls_<nom>.sql` si on l'oublie.
@@ -6609,6 +6622,57 @@ son passage.** Vrai tant qu'aucune ardoise n'existait, faux le jour où le
 gérant pose la sienne — 26 lignes. Il vérifie désormais que SES lignes sont
 parties, pas que la production est vide. Même famille d'erreur que
 `test-zelty-webhook.mjs`, qui effaçait tous les événements au lieu des siens.
+
+### Comparer un fournisseur à tous les autres (04/10/2026)
+
+Demande du gérant : « prendre un fournisseur, une catégorie de produits de
+chez lui, et comparer avec ce qu'ont les autres et leur prix à côté ».
+
+⚠️⚠️ **LA COMPARAISON VALIDÉE NE COUVRE QUE 6 % DU CATALOGUE** — 305
+`cle_comparaison` posées à la main sur 4 888 références. Sur les 94 %
+restants, la question « et chez les autres ? » n'avait **aucune réponse** :
+on ouvrait le catalogue d'un fournisseur sans jamais savoir ce qu'il valait.
+
+**`pistesAchat()`** (`catalogue-achats.ts`) répond, en PROPOSANT. Bouton
+« Chercher chez les autres » sur chaque ligne sans clé.
+
+⚠️ **UNE PISTE N'EST PAS UNE COMPARAISON, et les deux ne doivent jamais se
+confondre.** `comparer()` repose sur une clé qu'un humain a posée après avoir
+regardé les deux produits ; `pistesAchat()` CALCULE. La 0151 a montré ce que
+ça donne livré à soi-même : « Roquette » → « ROQUEFORT », « Citron » →
+« GATEAU CITRON ROND », « Glace » → « SUCRE GLACE 25KG ». Donc : deux mots
+communs minimum, un autre fournisseur obligatoire, **aucune clé n'est jamais
+écrite**, et le panneau dit que c'est à vérifier.
+
+⚠️⚠️ **UN POURCENTAGE N'EST DONNÉ QUE SI LES DEUX PRIX TOMBENT SUR LA MÊME
+BASE.** Démonstration sur les desserts, le jour même : l'éclair Krill à
+0,89 € face au nôtre à 1,296 € annonce **« −31 % »** — mais l'un fait 80 g et
+l'autre 120 g, et **au gramme Krill est 3 % PLUS cher**. Hors même base,
+l'écran affiche « formats différents » et les deux libellés, jamais un écart.
+
+**Le verdict Krill sur les desserts**, puisque c'était la question :
+
+| notre produit | nous payons | Krill | au gramme |
+|---|---|---|---|
+| Éclair chocolat | 1,296 € (120 g) | 0,89 € (80 g) | **Krill +3 %** |
+| Tartelette citron | 1,486 € (120 g) | 1,94 € (97 g) | **plus cher et plus petit** |
+| Flan pâtissier | 1,079 € la part | 8,98 € le flan de 2 kg | ~0,80 €/part, **mais à découper** |
+
+Et le moteur le retrouve seul : sur l'éclair, il désigne **Félix Potin à
+10,85 €/kg contre Krill à 11,13 €/kg, −2,5 %**.
+
+**Les familles manquantes posées** — `node
+scripts/familles-krill-promocash.mjs [--ecrire]`. Krill arrivait avec 35
+références et **zéro famille**, Promocash 18 : le filtre par catégorie ne
+rendait rien chez eux. 53 rangées, couverture **76 %** du catalogue.
+
+⚠️ Les familles employées sont **celles déjà en usage** (DESSERTS
+PÂTISSIERS, SAUCES FROIDES, MARÉE…), pas des noms neufs :
+`rayonFournisseur()` range par MOTS-CLÉS, et un nom inédit tomberait en
+« Non classé ». On ne crée pas une taxonomie par fournisseur.
+
+⚠️ L'ordre des règles compte : le PRODUIT avant le contenant, sinon « TARTE
+SAUMON » tombe à la marée et « ECLAIR … BOITE » aux emballages.
 
 ### Les quatre audits de chaîne (02/10/2026)
 

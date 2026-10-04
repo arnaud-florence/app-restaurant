@@ -368,3 +368,12 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
   return groupes.sort((a, b) =>
     (b.fournisseurs - a.fournisseurs) || ((b.ecartPct ?? -1) - (a.ecartPct ?? -1)))
 }
+
+/**
+ * LE SEUIL DE RAPPROCHEMENT — deux mots communs, jamais un.
+ *
+ * ⚠️ Un seul mot rapproche « Tomate » de « Tartinade de tomate olive » et
+ * « Bœuf pour carpaccio » de « Truffe été carpaccio » : deux rapprochements
+ * ridicules qui allaient partir chez un commercial (0151).
+ */
+export const MOTS_COMMUNS_MINIMUM = 2

@@ -1,5 +1,6 @@
 'use client'
 
+import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
 import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
@@ -7,6 +8,7 @@ import {
   filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
   prixReprenable, parRayon, rayonDe, RAYONS, RAYON_AUTRES, FILTRES_ACHETE_VIDES,
   rayonFournisseur, RAYONS_FOURNISSEUR_LISTE, RAYON_NON_CLASSE,
+  pistesAchat,
   type ArticleAchat, type Filtres, type EtatRemise, type Fraicheur,
   type OffreFournisseur, type EtatPlateforme, type Manque,
   type ArticleAchete, type FiltresAchete, type OffreConcurrente,
@@ -38,6 +40,9 @@ export default function AchatsClient({
   const [rayonF, setRayonF] = useState<string | undefined>(undefined)
   const [choisis, setChoisis] = useState<Set<string>>(new Set())
   const [ouvert, setOuvert] = useState<string | null>(null)   // clé de comparaison dépliée
+  // ⚠️ La ligne dont les PISTES sont dépliées — distinct de `ouvert` : une
+  // comparaison validée et un rapprochement calculé ne se confondent pas.
+  const [piste, setPiste] = useState<string | null>(null)
   const [res, setRes] = useState<ResultatDemande | null>(null)
   const [envoiEnCours, demarrer] = useTransition()
 
@@ -221,7 +226,8 @@ export default function AchatsClient({
                 <tbody className="divide-y divide-zinc-100">
                   {visibles.map(a => (
                     <Ligne key={a.id} a={a} choisi={choisis.has(a.id)} onCocher={() => basculer(a.id)}
-                      parCle={parCle} ouvert={ouvert} setOuvert={setOuvert} />
+                      parCle={parCle} ouvert={ouvert} setOuvert={setOuvert}
+                      piste={piste} setPiste={setPiste} catalogue={articles} />
                   ))}
                   {visibles.length === 0 && (
                     <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-500">
@@ -398,11 +404,15 @@ function CartePromo({
 // ─── Une ligne du catalogue, dépliable ─────────────────────────────
 
 function Ligne({
-  a, choisi, onCocher, parCle, ouvert, setOuvert,
+  a, choisi, onCocher, parCle, ouvert, setOuvert, piste, setPiste, catalogue,
 }: {
   a: ArticleAchat; choisi: boolean; onCocher: () => void
   parCle: Map<string, ArticleAchat[]>
   ouvert: string | null; setOuvert: (c: string | null) => void
+  /** Id de la ligne dont les PISTES sont dépliées. */
+  piste: string | null; setPiste: (id: string | null) => void
+  /** Tout le catalogue — les pistes se cherchent dedans, à la demande. */
+  catalogue: ArticleAchat[]
 }) {
   const e = etatRemise(a)
   const deplie = a.cle != null && ouvert === a.cle
@@ -433,6 +443,21 @@ function Ligne({
               {deplie ? 'Masquer' : `Comparer — ${nb} offres`}
             </button>
           )}
+          {/* ⚠️⚠️ « CHERCHER CHEZ LES AUTRES » EXISTE PARCE QUE LA
+              COMPARAISON VALIDÉE NE COUVRE QUE 6 % DU CATALOGUE — 305 clés
+              posées à la main sur 4 888 références. Sans ce bouton, la
+              question « et chez les autres ? » n'avait pas de réponse sur
+              les 94 % restants : on ouvrait le catalogue d'un fournisseur
+              sans jamais savoir ce qu'il valait.
+              ⚠️ Mais c'est une PISTE, pas un verdict, et le panneau le dit :
+              le rapprochement est CALCULÉ, et la 0151 a montré ce que ça
+              donne livré à soi-même (« Roquette » → « ROQUEFORT »). */}
+          {nb <= 1 && (
+            <button onClick={() => setPiste(piste === a.id ? null : a.id)}
+              className="mt-1 text-[12px] font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-800">
+              {piste === a.id ? 'Masquer' : 'Chercher chez les autres'}
+            </button>
+          )}
         </td>
         <td className="px-3 py-2 align-top">
           <Pastille etat={e} />
@@ -449,6 +474,9 @@ function Ligne({
           {a.ref && <p className="text-[11px] text-zinc-400">{fmtPrix(a.ref.prix)}/{a.ref.unite}</p>}
         </td>
       </tr>
+      {piste === a.id && (
+        <tr><td colSpan={4} className="bg-zinc-50 px-3 pb-3"><Pistes origine={a} catalogue={catalogue} /></td></tr>
+      )}
       {deplie && (
         <tr><td colSpan={4} className="bg-zinc-50 px-3 pb-3"><Comparaison lignes={parCle.get(a.cle!) ?? []} /></td></tr>
       )}
@@ -1147,4 +1175,75 @@ const NATURE_OFFRE: Record<string, { texte: string; classe: string }> = {
 function NatureOffre({ nature }: { nature: string }) {
   const v = NATURE_OFFRE[nature] ?? { texte: nature, classe: 'bg-zinc-100 text-zinc-700' }
   return <span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${v.classe}`}>{v.texte}</span>
+}
+
+// ─── Les PISTES chez les autres fournisseurs ───────────────────────
+//
+// ⚠️⚠️ CE PANNEAU AFFICHE UN RAPPROCHEMENT CALCULÉ, PAS VALIDÉ. Il répond à
+// « et chez les autres ? » sur les 94 % du catalogue qui n'ont pas de clé de
+// comparaison — mais il ne doit jamais se faire passer pour `Comparaison`,
+// qui repose sur une clé qu'un humain a posée.
+function Pistes({ origine, catalogue }: { origine: ArticleAchat; catalogue: ArticleAchat[] }) {
+  const p = useMemo(() => pistesAchat(origine, catalogue, 6), [origine, catalogue])
+  const eur = (n: number | null) => n == null ? 'prix sur demande'
+    : n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) + ' €'
+  if (p.length === 0) {
+    return (
+      <p className="pt-2 text-[12px] text-zinc-500">
+        Aucune piste : <b>aucun autre fournisseur</b> n’a de référence partageant au moins
+        deux mots avec celle-ci. Un seul mot commun suffirait à rapprocher « Tomate » de
+        « Tartinade de tomate olive » — on préfère ne rien dire.
+      </p>
+    )
+  }
+  return (
+    <div className="pt-2">
+      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+        Pistes chez les autres — rapprochement calculé, à vérifier
+      </p>
+      <table className="w-full text-[12px]">
+        <tbody className="divide-y divide-zinc-200">
+          {p.map(x => (
+            <tr key={x.article.id}>
+              <td className="py-1.5 pr-3">
+                <p className="text-zinc-800">{x.article.designation}</p>
+                <p className="text-[11px] text-zinc-400">
+                  {x.article.fournisseur_nom} · {x.article.nature}
+                  {x.article.reference && <> · réf. {x.article.reference}</>}
+                </p>
+              </td>
+              <td className="py-1.5 pr-3 text-right tabular-nums whitespace-nowrap">
+                {eur(x.article.prix_ht)}
+                {x.article.ref && (
+                  <span className="block text-[11px] text-zinc-500">
+                    {x.article.ref.prix.toLocaleString('fr-FR', { maximumFractionDigits: 3 })} €/{x.article.ref.unite}
+                  </span>
+                )}
+              </td>
+              <td className="py-1.5 text-right whitespace-nowrap">
+                {/* ⚠️ Un pourcentage UNIQUEMENT si les deux prix tombent sur
+                    la même base. Sinon on montre les deux libellés et on se
+                    tait : l'éclair de 80 g face à celui de 120 g annoncerait
+                    « −31 % » là où c'est « +3 % » au gramme. */}
+                {x.comparable && x.ecartPct != null ? (
+                  <span className={cn('rounded px-1.5 py-0.5 font-bold',
+                    x.ecartPct < 0 ? 'bg-emerald-600 text-white' : 'bg-zinc-200 text-zinc-700')}>
+                    {x.ecartPct > 0 ? '+' : ''}{x.ecartPct} %
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-amber-700">formats différents</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[11px] text-zinc-500">
+        ⚠️ Ces rapprochements sont <b>calculés sur les mots</b>, pas validés. Un écart ne
+        s’affiche que si les deux prix se ramènent à la même unité — sinon les deux libellés
+        sont là pour juger. Quand une paire est sûre, elle se fige dans
+        <b> /admin/tarifs-fournisseurs</b>.
+      </p>
+    </div>
+  )
 }
