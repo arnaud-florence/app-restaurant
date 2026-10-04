@@ -6149,6 +6149,35 @@ l'alerte groupée de l'agent Stock, qui émettait 193 lignes rouges.
 ⚠️ `AlertesStockCard` et `StockReelCard` restent dans le dépôt, **montées
 nulle part** : leur code documente ce qui a été essayé.
 
+**⚠️⚠️ « Pourquoi des fois inventaire et des fois −1 ? »** — question du
+gérant, le 04/10/2026, et le fait qu'il ait dû la poser était le défaut. La
+colonne « Actions » changeait d'une ligne à l'autre et **rien à l'écran ne
+disait pourquoi** :
+
+| ligne | boutons | nature |
+|---|---|---|
+| Get 31 70 cl | `📥 ⚠ −1` | matière |
+| Prosecco Scalini 75 cl | `📥 ⚠ −1` | matière |
+| Digestif 4 cl | `📊 Inventaire` | produit vendu |
+| Bière bouteille 33 cl | `📊 Inventaire` | produit vendu |
+
+Des bouteilles sur la même étagère, deux jeux de gestes — et la distinction
+est **contre-intuitive** : l'Aperol et le prosecco sont des matières parce
+qu'ils n'entrent que dans des composites (spritz, kir royal), le whisky est un
+produit parce qu'il se vend à la dose. La colonne « Catégorie » ne distinguait
+rien (« Bar » d'un côté, « Alcool » de l'autre).
+
+⚠️ **Une interface dont la logique est juste mais illisible est une interface
+fausse.** Chaque ligne DIT désormais sa nature (« matière première » /
+« produit vendu ») sous sa catégorie, et une phrase donne la règle au-dessus
+du tableau. Affichée **seulement quand les deux familles sont présentes** :
+expliquer une différence qu'on ne voit pas est du bruit.
+
+⚠️ La vraie réponse de fond reste une limite du modèle :
+`mouvements_stock` ne porte que `ingredient_id`, pas `recette_id`. Ajouter la
+colonne ouvrirait les trois gestes aux produits vendus — à faire un jour, mais
+pas à huit jours de l'ouverture, et `(ops)/inventaire` les traite déjà.
+
 **Assertion ajoutée à `test-stock.mjs`** (22 ✓) : la réserve doit faire plus
 de références que les seules matières. ⚠️ Elle RECOPIE la règle de `page.tsx`
 et de `chargerLignesReassort()` — modifier les deux ensemble. Et elle vérifie

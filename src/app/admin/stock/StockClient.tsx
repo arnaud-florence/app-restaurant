@@ -218,6 +218,22 @@ export default function StockClient({
             })}
           </p>
         )}
+        {/* ⚠️⚠️ POURQUOI DEUX JEUX DE GESTES — et il faut le dire, parce que
+            la colonne « Actions » change d'une ligne à l'autre sans raison
+            visible. Les trois gestes du module 7 écrivent dans
+            `mouvements_stock.ingredient_id` : ils ne peuvent viser qu'une
+            MATIÈRE. Un produit vendu se compte à l'inventaire du poste, où la
+            caisse donne aussi ses sorties produit par produit.
+            ⚠️ Affichée seulement quand les DEUX familles sont présentes :
+            expliquer une différence qu'on ne voit pas est du bruit. */}
+        {produits.length > 0 && ingredients.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Une <b className="font-semibold text-zinc-700">matière première</b> s’ajuste ici
+            (<span className="whitespace-nowrap">📥 livraison, ⚠ perte, −1</span>).
+            Un <b className="font-semibold text-zinc-700">produit vendu</b> se compte
+            à l’inventaire du poste — c’est là que la caisse donne ses sorties.
+          </p>
+        )}
         {/* ⚠️ CE QU'ON NE MONTRE PAS SE DIT. Une liste filtrée sans mention
             fait croire que la base est vide, et on finit par ressaisir ce qui
             existe déjà. */}
@@ -580,7 +596,9 @@ function IngredientStockCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="font-bold text-sm truncate">{i.nom}</p>
-            <p className="text-[11px] text-muted-foreground">{i.categorie} · {i.unite}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {i.categorie} · {i.unite} · {produit ? 'produit vendu' : 'matière première'}
+            </p>
           </div>
           <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', sty.bg, sty.text, sty.border)}>
             {sty.label}
@@ -649,7 +667,19 @@ function IngredientStockRow({
       <td className="py-2.5 px-4">
         <p className="font-semibold">{i.nom}</p>
       </td>
-      <td className="py-2.5 px-2 text-muted-foreground text-xs">{i.categorie}</td>
+      {/* ⚠️⚠️ LA NATURE DE LA LIGNE DÉCIDE DES GESTES DISPONIBLES, donc elle
+          doit se LIRE. Le gérant a demandé le 04/10/2026 « pourquoi des fois
+          en face des produits il y a marqué inventaire et des fois −1 » : la
+          réponse était dans la table d'origine, et rien à l'écran ne la
+          donnait. Pire, la distinction est contre-intuitive — « Get 31
+          70 cl » est une matière, « Digestif 4 cl » un produit vendu, et ce
+          sont deux bouteilles sur la même étagère. */}
+      <td className="py-2.5 px-2 text-muted-foreground text-xs">
+        {i.categorie}
+        <span className="block text-[10px] opacity-70">
+          {produit ? 'produit vendu' : 'matière première'}
+        </span>
+      </td>
       <td className="py-2.5 px-2 text-right">
         {inconnu ? (
           <span className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-md border border-zinc-300 bg-zinc-50 text-zinc-500">
