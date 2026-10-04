@@ -18,25 +18,10 @@ import { lireTout } from '@/lib/supabase/pagine'
 import { VOLUME_CASATASIA } from '@/lib/ardoise'
 import ArdoiseClient from './ArdoiseClient'
 import type { PlatCandidat, MatiereVue, OccurrenceVue } from './types'
+import { lundi, dimanche } from './semaine'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Ardoise de la semaine' }
-
-/** Le lundi de la semaine qui contient `d`. */
-export function lundi(d = new Date()): string {
-  const x = new Date(d)
-  // ⚠️ `getDay()` rend 0 pour DIMANCHE : sans le décalage, on poserait
-  // l'ardoise du dimanche sur la semaine suivante, et le gérant la compose
-  // justement le dimanche soir.
-  const j = (x.getDay() + 6) % 7
-  x.setDate(x.getDate() - j)
-  return x.toISOString().slice(0, 10)
-}
-export function dimanche(lundiISO: string): string {
-  const x = new Date(`${lundiISO}T12:00:00Z`)
-  x.setDate(x.getDate() + 6)
-  return x.toISOString().slice(0, 10)
-}
 
 export default async function ArdoisePage({
   searchParams,
