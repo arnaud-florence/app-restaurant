@@ -78,7 +78,11 @@ const slug = nom => nom.toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').
 
 /** Sépare « Pago pomme 33 cl » en titre et format. */
 function titreEtFormat(nom, categorie) {
-  const m = nom.match(/^(.*?)[\s,]*(\d+\s?(?:cl|ml|l|g|kg))\s*$/i)
+  // ⚠️ LA VIRGULE DÉCIMALE N'EST PAS UN SÉPARATEUR. « Orangina 1,5 L » coupé
+  // sur la virgule donnait la plaque « Orangina 1 · 5 l » — un format inventé,
+  // affiché au client sur la vitrine du site. Le nombre peut porter une
+  // décimale, et l'unité garde sa casse d'origine.
+  const m = nom.match(/^(.*?)[\s,]*(\d+(?:[.,]\d+)?\s?(?:cl|ml|L|l|g|kg))\s*$/)
   if (m) return [m[1].trim(), m[2].replace(/(\d)([a-z])/i, '$1 $2').toLowerCase()]
   // « Salade · salade » : quand la famille répète le nom, la seconde ligne
   // n'apprend rien. On la remplace par la maison plutôt que de bégayer.
