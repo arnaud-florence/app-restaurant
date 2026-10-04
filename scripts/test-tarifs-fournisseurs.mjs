@@ -109,13 +109,36 @@ T('un format de conserve est reconnu', formatConserve('SAUCE PIZZA AROMATISEE 5/
 T('… et n’est pas confondu avec un poids',
   extraireContenance('CAPRE FINE VINAIGRE 4/4 VITAL', 'BT') === null)
 
-console.log('\n── Nos unités disent leur contenance ──')
+console.log('\n── Nos unités se ramènent à une référence ──')
 // Une matière enregistrée en « barquette » tout court ne se compare à rien :
 // deux prix justes, et l'écran qui affiche « unités différentes ». Les
 // contenances sont relues sur NOS factures (« BQT=500G »), jamais devinées.
+//
+// ⚠️⚠️ L'ASSERTION A CHANGÉ D'OBJET, PAS DE SÉVÉRITÉ — et elle est plus
+// STRICTE. Elle cherchait « un chiffre dans l'unité », ce qui est le SYMPTÔME
+// de la règle, pas la règle : une unité peut porter un chiffre et rester
+// illisible pour le comparateur. Ce qui compte est que `prixReferenceMatiere()`
+// sache la RAMENER à une référence — c'est exactement ce dont dépendent le
+// « moins cher ailleurs » et la bascule de fournisseur.
+const prixReferenceMatiere = (unite) => {
+  const u = norm(unite).trim()
+  if (/^(KG|KILO|KILOS?)$/.test(u)) return 'kg'
+  if (/^(L|LITRE|LITRES?)$/.test(u)) return 'L'
+  if (/^(PIECE|PI|UNITE|U)$/.test(u)) return 'piece'
+  if (formatConserve(u)) return 'piece'
+  // ⚠️ Une BOTTE n'a pas de poids, et on ne lui en invente pas un : le persil
+  // se vend, se commande et se compte à la botte. Même mécanique que le format
+  // de conserve — aucun poids déduit, mais deux bottes se comparent entre
+  // elles, et jamais à un kilo.
+  if (/^(BOTTE|BOUQUET|BRIN)S?$/.test(u)) return 'piece'
+  if (extraireContenance(u)) return 'ref'
+  if (/^(?:COLIS|SAC|SACHET|CARTON|BOITE|LOT)\s+(\d+)$/.test(u)) return 'piece'
+  return null
+}
 const stockees = await sb('ingredients?select=nom,unite&stocke=eq.true&actif=eq.true')
-const flou = stockees.filter(i => !/\d/.test(i.unite) && !/^(kg|litre|l|pi[eè]ce|unit[eé])$/i.test(i.unite.trim()))
-T('aucune unité de stock sans contenance', flou.length === 0, flou.map(i => `${i.nom} (${i.unite})`).join(', '))
+const flou = stockees.filter(i => !prixReferenceMatiere(i.unite))
+T('aucune unité de stock que le comparateur ne sait ramener',
+  flou.length === 0, flou.map(i => `${i.nom} (${i.unite})`).join(', '))
 // ⚠️ Préciser, ce n'est pas changer : « barquette » reste une barquette.
 // La passer en « kg » diviserait par cinq cents les quantités déjà saisies.
 const barq = stockees.find(i => i.nom === 'Rosette de Lyon')

@@ -225,6 +225,20 @@ export function prixReferenceMatiere(unite: string, prix: number): PrixRef | nul
   const fmt = formatConserve(u)
   if (fmt) return { prix, unite: 'piece', derive: false, format: fmt }
 
+  // ⚠️ Une BOTTE n'a pas de poids, et il ne faut surtout pas lui en inventer
+  // un. Le persil se vend à la botte, se commande à la botte et se compte à
+  // la botte ; son poids varie d'un maraîcher à l'autre et d'une saison à
+  // l'autre. Écrire « botte 100 g » pour satisfaire la règle des contenances
+  // donnerait un €/kg faux, affiché comme les autres — exactement la faute
+  // que la règle existe pour empêcher.
+  //
+  // C'est le même cas que le format de conserve juste au-dessus : aucun poids
+  // déductible, mais deux bottes se comparent PARFAITEMENT l'une à l'autre.
+  // Le format les enferme entre elles — une botte ne se confrontera jamais à
+  // un kilo ni à une pièce nue.
+  const atome = u.match(/^(BOTTE|BOUQUET|BRIN)S?$/)
+  if (atome) return { prix, unite: 'piece', derive: false, format: atome[1].toLowerCase() }
+
   const c = extraireContenance(u)
   if (c) return { prix: prix / c.valeur, unite: c.unite, derive: true }
 
