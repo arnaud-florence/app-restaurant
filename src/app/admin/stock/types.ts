@@ -35,4 +35,13 @@ export type Origine = {
   entrees: number
   /** Date du comptage qui fait foi — un comptage vieux ne décrit plus rien. */
   compte_le: string | null
+  /**
+   * L'ÉTAGE DE LA MAISON — Bar, Fournil, Restauration, Matières premières.
+   *
+   * ⚠️ C'est la seule ventilation du stock qui porte du sens et qui VARIE :
+   * les trois indicateurs « Stock OK / faible / épuisés » étaient constants
+   * (46 verts sur 46, parce que les seuils sont tous à zéro), donc ils
+   * n'apprenaient rien et occupaient trois cases sur cinq.
+   */
+  poste: string
 }

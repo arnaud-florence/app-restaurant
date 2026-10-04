@@ -6173,6 +6173,59 @@ fausse.** Chaque ligne DIT désormais sa nature (« matière première » /
 du tableau. Affichée **seulement quand les deux familles sont présentes** :
 expliquer une différence qu'on ne voit pas est du bruit.
 
+### L'écran de stock, refait sur ce que les données disent (04/10/2026)
+
+« Améliore la visibilité du stock, fais-en quelque chose de beaucoup mieux
+visuellement, simple et fluide de compréhension ». La mesure a dicté le
+dessin, pas l'inverse :
+
+| mesuré le 04/10/2026 | conséquence |
+|---|---|
+| **seuil à 0 sur 46 références sur 46** | la colonne « Min » affichait « 0 » partout |
+| cible absente sur 20 sur 46 | « Max » à moitié vide |
+| **statuts : 46 verts, 0 orange, 0 rouge** | trois KPI sur cinq étaient CONSTANTS |
+
+⚠️⚠️ **UN INDICATEUR QUI NE VARIE PAS N'EST PAS LU — et il fait douter de ceux
+qui restent.** « Stock OK / Stock faible / Épuisés » ne diront jamais rien
+tant que les seuils valent zéro, et ils occupaient trois cases sur cinq.
+Retirés. Ce qui les remplace est la **ventilation par étage**, la seule
+découpe du stock à la fois parlante et variable : Bar 45 réf. 2 217 € ·
+Fournil 1 réf. 15 €, avec une barre de proportion.
+
+⚠️ **« Min / Max » est retirée du tableau.** Une colonne qui affiche « 0 / 0 »
+partout n'informe pas : elle prend la largeur dont la valeur a besoin, et
+elle laisse croire que les seuils sont réglés. Ils se posent sur
+`/admin/reassort`, qui est l'écran qui en décide.
+
+⚠️ **Trié par VALEUR par défaut, et c'est un choix.** L'ordre alphabétique
+enterrait le fût d'Affligem à 237 € entre une bière à 1,51 € et un Bailey's :
+on ouvre cet écran pour savoir **où est l'argent**. L'alphabétique reste à un
+clic sur l'en-tête — quand on tient une bouteille et qu'on cherche sa ligne,
+c'est lui qu'il faut. Deux ordres, pas quatre.
+
+⚠️ **La barre de valeur n'est pas un ornement** : elle met les 46 lignes à la
+même échelle, donc l'œil trouve en une seconde où dort l'argent. Dans une
+colonne de chiffres alignés, 237 € et 1,51 € se lisent pareil.
+
+⚠️⚠️ **TROIS BLOCS DE TEXTE SÉPARAIENT LE GÉRANT DE SON STOCK**, et ils ont
+chacun trouvé leur place plutôt que d'être supprimés :
+
+| avant | après |
+|---|---|
+| paragraphe « sur quoi repose ce chiffre » | **pied de la carte de synthèse**, collé au chiffre qu'il qualifie |
+| pavé de 4 lignes « références masquées » | **une ligne**, le détail dans l'infobulle |
+| légende « matière / produit vendu » | **sous le tableau**, là où la colonne Actions pose la question |
+
+⚠️ La règle derrière les trois : **un avertissement qu'il faut franchir pour
+atteindre ses données cesse d'être lu.** C'est la même leçon que l'alerte
+groupée de l'agent Stock (193 lignes rouges d'un coup) et que le test rouge en
+permanence.
+
+⚠️ Les teintes des étages viennent du design system du projet (§6) — bar
+`violet`, cuisine `amber`, info `blue`. On n'invente pas une palette pour un
+écran : deux écrans qui colorent le même étage différemment obligent à relire
+la légende à chaque fois.
+
 ⚠️ La vraie réponse de fond reste une limite du modèle :
 `mouvements_stock` ne porte que `ingredient_id`, pas `recette_id`. Ajouter la
 colonne ouvrirait les trois gestes aux produits vendus — à faire un jour, mais

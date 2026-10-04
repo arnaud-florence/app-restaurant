@@ -58,6 +58,7 @@ export default function StockClient({
   const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
   const [tab, setTab] = useState<'stocks' | 'mouvements' | 'bilan'>('stocks')
+  const [tri, setTri] = useState<'valeur' | 'nom'>('valeur')
   // ⚠️ UNE SEULE LISTE pour l'affichage, la recherche, les filtres et les
   // totaux : deux listes côte à côte finiraient par donner deux chiffres,
   // et c'est exactement ce que la carte du haut et ce tableau faisaient.
@@ -93,6 +94,20 @@ export default function StockClient({
       })
   }, [tout, search, filtreCat, filtreStock])
 
+  /**
+   * ⚠️ TRIÉ PAR VALEUR PAR DÉFAUT, et c'est un choix. L'ordre alphabétique
+   * enterrait le fût d'Affligem à 237 € entre une bière à 1,51 € et un
+   * Bailey's : on ouvre cet écran pour savoir OÙ EST L'ARGENT, et c'est la
+   * première chose qui doit se voir.
+   * ⚠️ Mais l'alphabétique reste à un clic : quand on tient une bouteille et
+   * qu'on cherche sa ligne, c'est lui qu'il faut. Deux ordres, pas quatre.
+   */
+  const affichees = useMemo(() => {
+    const v = (x: Ingredient) => Number(x.stock_actuel) * Number(x.prix_achat_ht ?? 0)
+    return [...filtered].sort((a, b) =>
+      tri === 'nom' ? a.nom.localeCompare(b.nom, 'fr') : v(b) - v(a))
+  }, [filtered, tri])
+
   // Base des compteurs de pastilles catégorie : mêmes filtres que la liste (actifs
   // only + stock + recherche) SAUF la catégorie — sinon le compteur ne correspond
   // pas à la liste (qui n'affiche jamais les ingrédients inactifs).
@@ -107,6 +122,39 @@ export default function StockClient({
 
   // KPIs
   const valeur = useMemo(() => valeurStock(tout.filter(i => i.actif)), [tout])
+  /**
+   * LA VENTILATION PAR ÉTAGE — la seule qui porte du sens ET qui varie.
+   *
+   * ⚠️⚠️ Les trois indicateurs « Stock OK / faible / épuisés » ont été
+   * RETIRÉS : mesurés le 04/10/2026, ils donnaient 46 verts, 0 orange,
+   * 0 rouge — et ils resteront ainsi tant que les seuils valent zéro, ce qui
+   * est le cas sur 46 références sur 46. Trois cases sur cinq qui
+   * n'apprendront jamais rien : un indicateur qui ne varie pas n'est pas lu,
+   * et il fait douter des deux qui restent.
+   */
+  const parPoste = useMemo(() => {
+    const m = new Map<string, { n: number; v: number }>()
+    for (const i of tout) {
+      if (!i.actif) continue
+      const k = origines[i.id]?.poste ?? 'Autres'
+      const e = m.get(k) ?? { n: 0, v: 0 }
+      e.n += 1
+      e.v += Number(i.stock_actuel) * Number(i.prix_achat_ht ?? 0)
+      m.set(k, e)
+    }
+    return [...m].map(([poste, x]) => ({ poste, ...x })).sort((a, b) => b.v - a.v)
+  }, [tout, origines])
+  /** La plus grosse valeur de ligne, pour mettre les barres à l'échelle. */
+  const valeurMax = useMemo(
+    () => Math.max(1, ...tout.map(i => Number(i.stock_actuel) * Number(i.prix_achat_ht ?? 0))),
+    [tout],
+  )
+  /** ⚠️ Une alerte ne s'affiche QUE s'il y a quelque chose à dire. */
+  const sousSeuil = useMemo(
+    () => tout.filter(i => i.actif && Number(i.stock_minimum) > 0
+      && Number(i.stock_actuel) <= Number(i.stock_minimum)).length,
+    [tout],
+  )
   const dlcAlerts = useMemo(() => alertesDLC(mouvements, 3), [mouvements])
   const courses = useMemo(() => listeCourses(ingredients), [ingredients])
   const invendus = useMemo(() => bilanInvendusMois(mouvements), [mouvements])
@@ -166,22 +214,88 @@ export default function StockClient({
           }
         />
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
-          <KPI label="Références en réserve" value={String(stats.totalActifs)} icon="📋" />
-          <KPI label="Stock OK"     value={String(stats.totalActifs - stats.rouge - stats.orange)} icon="✓" tone="green" />
-          <KPI label="Stock faible" value={String(stats.orange)} icon="⚠" tone={stats.orange > 0 ? 'orange' : 'default'} />
-          <KPI label="Épuisés"      value={String(stats.rouge)}  icon="🔴" tone={stats.rouge > 0 ? 'red' : 'default'} pulse={stats.rouge > 0} />
-          {/* ⚠️⚠️ DEUX CHIFFRES DE STOCK SUR LA MÊME PAGE, tous deux justes —
-              et c'était le symptôme, pas la cause. La carte du haut annonçait
-              2 229 € (toute la réserve) quand ce KPI en annonçait 504 (les
-              matières seules), parce que le tableau ignorait les 36 produits
-              revendus du bar. Ce n'était donc pas un libellé à préciser,
-              c'était une liste à compléter : les deux dérivent maintenant de
-              `chargerLignesReassort()` et disent le même nombre. */}
-          <KPI label="Valeur du stock" value={fmtPrix(valeur)} icon="💰"
-               note={sansPrix > 0 ? `+ ${sansPrix} réf. sans prix connu` : undefined} />
-        </div>
+        {/* ── SYNTHÈSE ────────────────────────────────────────────────
+            Un seul chiffre en gros — ce que la réserve VAUT — puis sa
+            ventilation par étage, qui est la seule découpe du stock à la fois
+            parlante et variable. Les cinq KPI d'avant mettaient sur le même
+            plan un total utile et trois compteurs constants. */}
+        <section className="rounded-xl border bg-background overflow-hidden">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 px-4 sm:px-5 pt-4 pb-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                Valeur du stock
+              </p>
+              <p className="text-3xl sm:text-4xl font-black tabular-nums leading-none mt-1">
+                {fmtPrix(valeur)}
+              </p>
+            </div>
+            <div className="text-xs text-muted-foreground text-right leading-relaxed">
+              <p>
+                <b className="text-foreground font-bold tabular-nums">{stats.totalActifs}</b> référence
+                {stats.totalActifs > 1 ? 's' : ''} en réserve
+              </p>
+              {/* ⚠️ Un total DIT ce qu'il ignore : présenté comme ferme alors
+                  qu'il saute des lignes, il devient une contestation (0160). */}
+              {sansPrix > 0 && <p>dont {sansPrix} sans prix connu, non chiffrée{sansPrix > 1 ? 's' : ''}</p>}
+              {sousSeuil > 0 && (
+                <p className="text-amber-700 font-semibold">⚠ {sousSeuil} sous le seuil</p>
+              )}
+            </div>
+          </div>
+
+          {/* La barre : une seule lecture, la part de chaque étage. */}
+          {valeur > 0 && parPoste.length > 1 && (
+            <div className="flex h-1.5 px-4 sm:px-5">
+              {parPoste.map((p, n) => (
+                <div
+                  key={p.poste}
+                  className={cn('h-full first:rounded-l-full last:rounded-r-full', TEINTE_POSTE[n % TEINTE_POSTE.length].barre)}
+                  style={{ width: `${Math.max(1.5, (p.v / valeur) * 100)}%` }}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 px-4 sm:px-5 py-3 text-xs">
+            {parPoste.map((p, n) => (
+              <span key={p.poste} className="inline-flex items-baseline gap-1.5">
+                <span className={cn('size-2 rounded-full translate-y-[-1px]', TEINTE_POSTE[n % TEINTE_POSTE.length].point)} />
+                <b className="font-semibold">{p.poste}</b>
+                <span className="text-muted-foreground tabular-nums">
+                  {p.n} réf. · {fmtPrix(p.v)}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          {/* ⚠️⚠️ SUR QUOI CE CHIFFRE REPOSE — et sa place est ICI, collée au
+              chiffre, pas en tête de la liste. Le tenu est un CALCUL (comptage
+              + livraisons depuis), et un comptage de plus de 30 jours est
+              ÉCARTÉ : la ligne devient « jamais compté » (0163). Afficher la
+              valeur sans dire de quand date son comptage la fait passer pour
+              une mesure du jour.
+              ⚠️ Une ligne, en pied de carte : un avertissement qu'il faut
+              traverser pour atteindre son stock n'est plus lu au bout de
+              trois jours. */}
+          {comptages.length > 0 && (
+            <p className="border-t px-4 sm:px-5 py-2 text-[11px] text-muted-foreground bg-muted/30">
+              Dernier comptage + livraisons enregistrées depuis —{' '}
+              {comptages.map((c, n) => {
+                const j = Math.round((Date.now() - Date.parse(c.le)) / 864e5)
+                return (
+                  <span key={c.poste}>
+                    {n > 0 && ' · '}
+                    <b className="font-semibold text-zinc-700">{c.poste}</b>{' '}
+                    <span className={j > 30 ? 'text-red-600 font-semibold' : ''}>
+                      {j === 0 ? 'aujourd’hui' : j === 1 ? 'hier' : `il y a ${j} j`}
+                      {j > 30 && ' — périmé, écarté du calcul'}
+                    </span>
+                  </span>
+                )
+              })}
+            </p>
+          )}
+        </section>
 
         {/* Sélecteur d'onglets sticky */}
         <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 px-3 sm:px-6 py-2 bg-zinc-50/90 backdrop-blur flex gap-1.5 overflow-x-auto">
@@ -192,67 +306,29 @@ export default function StockClient({
 
         {tab === 'stocks' && (
         <>
-        {/* ⚠️⚠️ SUR QUOI CE STOCK REPOSE, EN UNE LIGNE. Le tenu est un CALCUL
-            — comptage + livraisons depuis — et un comptage de plus de 30 jours
-            ne décrit plus rien : il est écarté, le chiffre devient « jamais
-            compté » (0163). Afficher un stock sans dire de quand date son
-            comptage, c'est le faire passer pour une mesure du jour.
-            ⚠️ Une LIGNE, pas le paragraphe de la carte retirée : un
-            avertissement qu'il faut traverser pour atteindre son stock n'est
-            plus lu au bout de trois jours. */}
-        {comptages.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Comptage + livraisons enregistrées depuis. Dernier comptage —{' '}
-            {comptages.map((c, n) => {
-              const j = Math.round((Date.now() - Date.parse(c.le)) / 864e5)
-              return (
-                <span key={c.poste}>
-                  {n > 0 && ' · '}
-                  <b className="font-semibold text-zinc-700">{c.poste}</b>{' '}
-                  <span className={j > 30 ? 'text-red-600 font-semibold' : ''}>
-                    {j === 0 ? 'aujourd’hui' : j === 1 ? 'hier' : `il y a ${j} j`}
-                    {j > 30 && ' — périmé'}
-                  </span>
-                </span>
-              )
-            })}
-          </p>
-        )}
-        {/* ⚠️⚠️ POURQUOI DEUX JEUX DE GESTES — et il faut le dire, parce que
-            la colonne « Actions » change d'une ligne à l'autre sans raison
-            visible. Les trois gestes du module 7 écrivent dans
-            `mouvements_stock.ingredient_id` : ils ne peuvent viser qu'une
-            MATIÈRE. Un produit vendu se compte à l'inventaire du poste, où la
-            caisse donne aussi ses sorties produit par produit.
-            ⚠️ Affichée seulement quand les DEUX familles sont présentes :
-            expliquer une différence qu'on ne voit pas est du bruit. */}
-        {produits.length > 0 && ingredients.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Une <b className="font-semibold text-zinc-700">matière première</b> s’ajuste ici
-            (<span className="whitespace-nowrap">📥 livraison, ⚠ perte, −1</span>).
-            Un <b className="font-semibold text-zinc-700">produit vendu</b> se compte
-            à l’inventaire du poste — c’est là que la caisse donne ses sorties.
-          </p>
-        )}
-        {/* ⚠️ CE QU'ON NE MONTRE PAS SE DIT. Une liste filtrée sans mention
-            fait croire que la base est vide, et on finit par ressaisir ce qui
-            existe déjà. */}
-        {masques > 0 && (
-          <div className="rounded-md border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-700">
-            <b>{masques} référence{masques > 1 ? 's' : ''} à zéro</b> {masques > 1 ? 'ne sont pas affichées' : 'n’est pas affichée'} :
-            seul ce qu’on a en réserve apparaît ici. {masques > 1 ? 'Elles réapparaissent' : 'Elle réapparaît'} dès
-            qu’une livraison enregistrée {masques > 1 ? 'les' : 'la'} fait entrer — rien n’a été supprimé,
-            {masques > 1 ? ' elles gardent' : ' elle garde'} fournisseur, prix et cible.
-            {horsSuivi > 0 && (
-              <>
-                {' '}
-                <b>{horsSuivi} autre{horsSuivi > 1 ? 's' : ''}</b> {horsSuivi > 1 ? 'ne sont suivies' : 'n’est suivie'} par
-                aucun inventaire : {horsSuivi > 1 ? 'elles n’ont' : 'elle n’a'} donc pas de stock à afficher.
-                Pour {horsSuivi > 1 ? 'les' : 'la'} compter, {horsSuivi > 1 ? 'il faut les marquer' : 'il faut la marquer'} comme
-                suivie{horsSuivi > 1 ? 's' : ''} dans la fiche matière.
-              </>
+        {/* ⚠️ CE QU'ON NE MONTRE PAS SE DIT — sinon une liste courte se lit
+            « la base est vide » et on ressaisit ce qui existe déjà.
+            ⚠️ Mais en UNE ligne : c'était un pavé de quatre lignes au-dessus
+            de la liste, et un avertissement qu'on doit franchir pour atteindre
+            ses données cesse d'être lu. Le détail tient dans l'infobulle. */}
+        {(masques > 0 || horsSuivi > 0) && (
+          <p className="text-[11px] text-muted-foreground px-1">
+            {masques > 0 && (
+              <span title="Rien n’a été supprimé : elles gardent fournisseur, prix et cible, et réapparaissent dès qu’une livraison enregistrée les fait entrer.">
+                <b className="font-semibold text-zinc-700 tabular-nums">{masques}</b> référence
+                {masques > 1 ? 's' : ''} à zéro masquée{masques > 1 ? 's' : ''} — seul ce qu’on a en
+                réserve apparaît ici.
+              </span>
             )}
-          </div>
+            {horsSuivi > 0 && (
+              <span title="Marquer la matière comme suivie dans sa fiche pour la compter.">
+                {masques > 0 && ' '}
+                <b className="font-semibold text-zinc-700 tabular-nums">{horsSuivi}</b> autre
+                {horsSuivi > 1 ? 's' : ''} {horsSuivi > 1 ? 'ne sont suivies' : 'n’est suivie'} par aucun
+                inventaire.
+              </span>
+            )}
+          </p>
         )}
 
         {/* Bandeau alertes DLC */}
@@ -280,7 +356,7 @@ export default function StockClient({
         <div className="sticky top-[60px] z-10 -mx-3 sm:-mx-6 px-3 sm:px-6 py-3 bg-zinc-50/95 backdrop-blur-md border-b border-zinc-200 space-y-2">
           <Input
             type="search"
-            placeholder="🔍 Rechercher un ingrédient..."
+            placeholder="🔍 Rechercher une référence…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="h-11 text-base"
@@ -310,7 +386,7 @@ export default function StockClient({
         </div>
 
         {/* Table ingrédients (mobile cards / desktop table) */}
-        {filtered.length === 0 ? (
+        {affichees.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center text-sm text-muted-foreground italic">
               Aucun ingrédient — relâche tes filtres.
@@ -320,7 +396,7 @@ export default function StockClient({
           <>
             {/* Mobile cards */}
             <div className="grid grid-cols-1 gap-2 md:hidden">
-              {filtered.map(i => (
+              {affichees.map(i => (
                 <IngredientStockCard
                   key={i.id}
                   i={i}
@@ -341,22 +417,42 @@ export default function StockClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <th className="text-left  py-2.5 px-4">Référence</th>
+                        {/* ⚠️⚠️ « MIN / MAX » A ÉTÉ RETIRÉE. Mesuré le
+                            04/10/2026 : le seuil vaut zéro sur 46 références
+                            sur 46, et la cible est absente sur 20. Une colonne
+                            qui affiche « 0 / 0 » partout n'informe pas, elle
+                            occupe la largeur dont la valeur a besoin — et elle
+                            laisse croire que les seuils sont réglés.
+                            Les seuils et les cibles se posent sur
+                            `/admin/reassort`, qui est l'écran qui en décide. */}
+                        <th className="text-left  py-2.5 px-4">
+                          <button type="button" onClick={() => setTri('nom')}
+                                  className={cn('uppercase tracking-wider hover:text-foreground',
+                                    tri === 'nom' && 'text-foreground')}>
+                            Référence {tri === 'nom' && '↓'}
+                          </button>
+                        </th>
                         <th className="text-left  py-2.5 px-2">Catégorie</th>
-                        <th className="text-right py-2.5 px-2">Stock</th>
-                        <th className="text-right py-2.5 px-2">Min / Max</th>
-                        <th className="text-right py-2.5 px-2">Prix HT</th>
-                        <th className="text-right py-2.5 px-2">Valeur</th>
+                        <th className="text-right py-2.5 px-2">En réserve</th>
+                        <th className="text-right py-2.5 px-2">Prix unitaire</th>
+                        <th className="text-right py-2.5 px-2">
+                          <button type="button" onClick={() => setTri('valeur')}
+                                  className={cn('uppercase tracking-wider hover:text-foreground',
+                                    tri === 'valeur' && 'text-foreground')}>
+                            {tri === 'valeur' && '↓ '}Valeur
+                          </button>
+                        </th>
                         <th className="text-right py-2.5 px-4">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map(i => (
+                      {affichees.map(i => (
                         <IngredientStockRow
                           key={i.id}
                           i={i}
                           produit={estProduit(i) ? (i as ProduitEnStock).poste : null}
                           origine={origines[i.id]}
+                          echelle={valeurMax}
                           inconnu={jamais.has(i.id)}
                           onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                           onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
@@ -369,6 +465,22 @@ export default function StockClient({
               </CardContent>
             </Card>
           </>
+        )}
+        {/* ⚠️⚠️ POURQUOI DEUX JEUX DE GESTES — et il faut le dire, parce que
+            la colonne « Actions » change d'une ligne à l'autre sans raison
+            visible. Les trois gestes du module 7 écrivent dans
+            `mouvements_stock.ingredient_id` : ils ne peuvent viser qu'une
+            MATIÈRE. Un produit vendu se compte à l'inventaire du poste, où la
+            caisse donne aussi ses sorties produit par produit.
+            ⚠️ Affichée seulement quand les DEUX familles sont présentes :
+            expliquer une différence qu'on ne voit pas est du bruit. */}
+        {produits.length > 0 && ingredients.length > 0 && (
+          <p className="text-[11px] text-muted-foreground px-1">
+            Une <b className="font-semibold text-zinc-700">matière première</b> s’ajuste ici
+            (<span className="whitespace-nowrap">📥 livraison, ⚠ perte, −1</span>).
+            Un <b className="font-semibold text-zinc-700">produit vendu</b> se compte
+            à l’inventaire du poste — c’est là que la caisse donne ses sorties.
+          </p>
         )}
         </>
         )}
@@ -541,6 +653,22 @@ export default function StockClient({
 }
 
 // ─── KPI ─────────────────────────────────────────────────────────────
+/**
+ * LES TEINTES DES ÉTAGES.
+ *
+ * ⚠️ Reprises du design system du projet (§6) : le bar est `violet`, la
+ * cuisine `amber`, l'info `blue`. On n'invente pas une palette pour un écran
+ * — deux écrans qui colorent le même étage différemment obligent à relire la
+ * légende à chaque fois.
+ */
+const TEINTE_POSTE = [
+  { barre: 'bg-violet-500', point: 'bg-violet-500' },
+  { barre: 'bg-amber-500',  point: 'bg-amber-500' },
+  { barre: 'bg-blue-500',   point: 'bg-blue-500' },
+  { barre: 'bg-emerald-500',point: 'bg-emerald-500' },
+  { barre: 'bg-zinc-400',   point: 'bg-zinc-400' },
+]
+
 function KPI({ label, value, tone = 'default', icon, pulse, note }: {
   label: string
   value: string
@@ -609,7 +737,9 @@ function IngredientStockCard({
                 sous={origine && origine.entrees !== 0
                   ? `${fmtQte(origine.compte ?? 0)} + ${fmtQte(origine.entrees)} livré`
                   : undefined} />
-          <Stat label="Min"    value={`${fmtQte(i.stock_minimum)}`} />
+          {/* ⚠️ « Min » est retiré ici aussi : zéro sur 46 références sur 46.
+              Le prix unitaire, lui, explique la valeur de la ligne. */}
+          <Stat label="Prix"   value={fmtPrix(i.prix_achat_ht)} />
           <Stat label="Valeur" value={fmtPrix(valeur)} />
         </div>
         {/* ⚠️ Un PRODUIT REVENDU n'a pas les gestes du module 7 : ils
@@ -645,9 +775,11 @@ function Stat({ label, value, sous }: { label: string; value: string; sous?: str
 
 // ─── Desktop : ligne de table ────────────────────────────────────────
 function IngredientStockRow({
-  i, inconnu, produit = null, origine, onEntree, onPerte, onMoinsUn,
+  i, inconnu, produit = null, origine, echelle = 0, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
+  /** La plus grosse valeur de ligne — met toutes les barres à la même échelle. */
+  echelle?: number
   inconnu?: boolean
   /** ⚠️ D'où vient le chiffre : « 0 + 32 ». Un stock qu'on ne sait pas
    *  décomposer n'est pas vérifiable, et c'est la première chose qu'on
@@ -697,11 +829,20 @@ function IngredientStockRow({
           </p>
         )}
       </td>
-      <td className="py-2.5 px-2 text-right text-xs text-muted-foreground tabular-nums">
-        {fmtQte(i.stock_minimum)} / {fmtQte(i.stock_maximum)}
+      <td className="py-2.5 px-2 text-right tabular-nums text-muted-foreground">{fmtPrix(i.prix_achat_ht)}</td>
+      {/* ⚠️ LA BARRE N'EST PAS UN ORNEMENT : elle met les 46 lignes à la même
+          échelle, donc l'œil trouve en une seconde où dort l'argent — le fût
+          d'Affligem à 237 € ne se distinguait pas d'une bière à 1,51 € dans
+          une colonne de chiffres alignés. */}
+      <td className="py-2.5 px-2 text-right">
+        <p className="tabular-nums font-bold">{fmtPrix(valeur)}</p>
+        {echelle > 0 && valeur > 0 && (
+          <span className="mt-1 block h-1 rounded-full bg-muted overflow-hidden">
+            <span className="block h-full rounded-full bg-zinc-400"
+                  style={{ width: `${Math.max(2, (valeur / echelle) * 100)}%` }} />
+          </span>
+        )}
       </td>
-      <td className="py-2.5 px-2 text-right tabular-nums">{fmtPrix(i.prix_achat_ht)}</td>
-      <td className="py-2.5 px-2 text-right tabular-nums font-semibold">{fmtPrix(valeur)}</td>
       <td className="py-2.5 px-4">
         {/* ⚠️ Voir la carte mobile : les trois gestes visent `ingredient_id`. */}
         {produit ? (

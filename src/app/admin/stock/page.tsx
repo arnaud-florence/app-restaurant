@@ -107,7 +107,13 @@ export default async function StockPage() {
   const origines: Record<string, Origine> = {}
   for (const l of reel) {
     const id = l.cle.startsWith('ing:') ? l.cle.slice(4) : l.cle
-    origines[id] = { compte: l.compte, entrees: l.entrees, compte_le: l.compte_le }
+    origines[id] = {
+      compte: l.compte, entrees: l.entrees, compte_le: l.compte_le,
+      // ⚠️ `ingredients` n'a pas de colonne d'activité : une matière n'a donc
+      // pas d'établissement. Son poste se lit sur sa catégorie, comme le fait
+      // déjà `(ops)/inventaire`.
+      poste: l.etablissement ?? (l.categorie === 'Bar' ? 'Bar' : 'Matières premières'),
+    }
   }
   // ⚠️ Les dates de comptage par poste, et la règle des 30 jours : un stock
   // calculé sur un comptage périmé est un chiffre auquel personne ne doit
