@@ -50,7 +50,10 @@ export default function ArdoiseClient({
 
   const refMatieres = useMemo(() => {
     const m = new Map<string, Matiere>()
-    for (const x of matieres) m.set(x.id, { id: x.id, nom: x.nom, unite: x.unite, prix_achat_ht: x.prix_achat_ht })
+    for (const x of matieres) m.set(x.id, {
+      id: x.id, nom: x.nom, unite: x.unite,
+      prix_achat_ht: x.prix_achat_ht, dlc_jours: x.dlc_jours,
+    })
     return m
   }, [matieres])
 
@@ -72,6 +75,12 @@ export default function ArdoiseClient({
       refs: lignes.length,
       achat: lignes.reduce((s, l) => s + (l.coutHT ?? 0), 0),
       casse: lignes.reduce((s, l) => s + (l.perteHT ?? 0), 0),
+      // ⚠️ Ce qu'on JETTE vraiment : le reliquat des matières dont on SAIT
+      // qu'elles ne passent pas la semaine. Les `null` n'y entrent pas —
+      // additionner une DLC inconnue dans « ce qu'on jette » serait inventer.
+      perissable: lignes.filter(l => l.perissable === true)
+        .reduce((s, l) => s + (l.perteHT ?? 0), 0),
+      dlcInconnue: lignes.filter(l => l.perissable === null && (l.perteHT ?? 0) > 0).length,
       sansPrix, estimees,
     }
   }, [lignes, matieres])
@@ -138,9 +147,20 @@ export default function ArdoiseClient({
                    note={bilan.sansPrix > 0 ? `dont ${bilan.sansPrix} sans prix connu` : undefined} />
           <Chiffre libelle="Commande / semaine" valeur={fmtPrix(bilan.achat)}
                    note={bilan.estimees > 0 ? `dont ${bilan.estimees} réf. à prix estimé` : undefined} />
-          <Chiffre libelle="Casse prévue" valeur={fmtPrix(bilan.casse)}
-                   ton={bilan.achat > 0 && bilan.casse / bilan.achat > 0.12 ? 'alerte' : 'normal'}
-                   note={bilan.achat > 0 ? `${Math.round(bilan.casse / bilan.achat * 100)} % de la commande` : undefined} />
+          {/* ⚠️⚠️ « CASSE » ÉTAIT FAUX, et le mot comptait. Ce chiffre est le
+              RELIQUAT de fin de semaine : sur l'ardoise du 12 octobre, les
+              épices à tajine (16,56 €), la crème de balsamique (11,06 €) et
+              le pesto (11,52 €) s'y trouvaient — et se gardent des mois.
+              C'est du stock pour la semaine suivante, pas une perte.
+              ⚠️ Seul le reliquat d'un PÉRISSABLE se jette, et on ne sait pas
+              lesquels le sont : `dlc_moyenne_jours` est renseignée sur 4
+              ingrédients sur 117. On affiche donc ce qu'on sait, et on dit
+              ce qu'on ignore. */}
+          <Chiffre libelle="Reliquat de fin de semaine" valeur={fmtPrix(bilan.casse)}
+                   ton={bilan.achat > 0 && bilan.perissable / bilan.achat > 0.08 ? 'alerte' : 'normal'}
+                   note={bilan.dlcInconnue > 0
+                     ? `dont ${fmtPrix(bilan.perissable)} périssable · ${bilan.dlcInconnue} réf. sans DLC connue`
+                     : `dont ${fmtPrix(bilan.perissable)} périssable`} />
         </div>
         {/* ⚠️ La casse est le SEUL chiffre que l'ardoise fait vraiment bouger.
             La commande, elle, ne bouge presque pas : 230 couverts mangent 230

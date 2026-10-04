@@ -159,10 +159,29 @@ export type LigneAchat = {
   besoin: number
   /** Ce qu'on est obligé d'acheter, au conditionnement près. */
   achat: number
-  /** `achat − besoin` : ce qui finit à la poubelle si rien ne tourne. */
+  /**
+   * `achat − besoin` : CE QUI RESTE en fin de semaine.
+   *
+   * ⚠️⚠️ CE N'EST PAS DE LA CASSE, et l'appeler ainsi était faux. Mesuré sur
+   * l'ardoise du 12 octobre : sur 171 € de reliquat, les épices à tajine
+   * (16,56 €), la crème de balsamique (11,06 €) et le pesto (11,52 €) se
+   * gardent des mois — c'est du STOCK pour la semaine suivante, pas une
+   * perte. Seul le reliquat d'un PÉRISSABLE se jette.
+   *
+   * ⚠️ Et on ne peut pas trancher aujourd'hui : `dlc_moyenne_jours` est
+   * renseignée sur 4 ingrédients sur 117. D'où `perissable`, qui vaut `null`
+   * quand on ne sait pas — et un écran qui additionne les `null` dans « ce
+   * qu'on jette » ment, comme l'ancien libellé le faisait.
+   */
   perte: number
+  /**
+   * La matière se périme-t-elle dans la semaine ?
+   * `null` = DLC inconnue, et surtout pas « se garde ».
+   */
+  perissable: boolean | null
   /** `null` quand le prix est inconnu — jamais zéro (0158). */
   coutHT: number | null
+  /** La valeur du RELIQUAT. Perte seulement si `perissable` est vrai. */
   perteHT: number | null
   /** Combien de plats de l'ardoise l'utilisent. 1 = spécifique, ≥4 = socle. */
   plats: number
@@ -193,10 +212,13 @@ export function listeAchat(
     const achat = Math.ceil(q / lot) * lot
     const perte = Math.round((achat - q) * 1000) / 1000
     const pu = m.prix_achat_ht
+    // ⚠️ Moins de 7 jours = ce qui ne passe pas la semaine. `null` quand la
+    // DLC n'est pas renseignée : une absence n'est pas un « ça se garde ».
+    const perissable = m.dlc_jours == null ? null : m.dlc_jours < 7
     lignes.push({
       ingredient_id: id, nom: m.nom, unite: m.unite,
       besoin: Math.round(q * 1000) / 1000,
-      achat, perte,
+      achat, perte, perissable,
       coutHT: pu == null ? null : Math.round(achat * pu * 100) / 100,
       perteHT: pu == null ? null : Math.round(perte * pu * 100) / 100,
       plats: usage.get(id) ?? 0,

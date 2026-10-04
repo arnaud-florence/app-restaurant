@@ -6512,6 +6512,64 @@ ce qui décalait le total de un sans qu'on sache pourquoi. Une assertion qu'on
 ne sait pas expliquer finit par être « ajustée » jusqu'à passer. Ce qui est
 vérifié désormais : **aucun produit actif n'est hors des deux listes**.
 
+### L'ardoise de la semaine 1 — 12 au 18 octobre (04/10/2026)
+
+`node scripts/ardoise-semaine-1.mjs [--ecrire]`. **21 plats à la carte**
+(5 brasserie + 16 pizzas) et **5 plats du jour**, du lundi au vendredi.
+
+| | |
+|---|---|
+| 56 références · **1 439 €** de commande | contre 1 562 € sur la carte entière |
+| reliquat **171 €** (12 %) | contre 231 € (15 %) |
+| dont **1 135 € sur des prix ESTIMÉS** | à confirmer avant d'engager |
+
+**Trois choses relevées en saisissant, et dites plutôt que corrigées en
+silence :**
+
+1. **Burger Montagnard était à 15,90 €**, la carte annonce **17,90 €** —
+   hausse répercutée en base et en caisse.
+2. **« Gnocchis forestiers » n'existait pas.** « Gnocchis quatre fromages »
+   est au MÊME prix (16,50 €) mais ce n'est pas le même plat : quatre
+   fromages ≠ crème de champignons. **Créé, pas renommé** — renommer aurait
+   effacé un plat de la carte.
+3. ⚠️ **Le plat du jour de JEUDI est le même plat que « Gnocchis
+   forestiers »**, à la virgule près. Saisi tel quel, mais si c'est
+   involontaire, jeudi fait doublon avec la carte de la semaine.
+
+⚠️ **LES GRAMMAGES DES PLATS DU JOUR SONT PROPOSÉS, PAS MESURÉS.** Aucun de
+ces cinq plats n'a jamais été servi : portions standard de brasserie, calées
+sur les fiches existantes (0,18 kg de garniture, 0,03 kg de salade, 1 pièce
+de protéine). Elles se corrigent à la balance au premier service — mais sans
+elles, les 140 couverts du midi se commandent à l'aveugle, ce qui est pire.
+
+⚠️ **10 matières créées, toutes à `prix_estime = true`** (0165) : cuisse et
+suprême de poulet, saucisse de Toulouse, filet de poisson, pommes grenailles,
+poireaux, échalotes, persil, citron confit, épices à tajine. Aucune n'a de
+fournisseur — ce sont du frais, et **personne ne nous en vend** (constat du
+27/09). Chaque prix porte son repère dans `notes`.
+
+### ⚠️⚠️ « Casse prévue » était un mot faux — c'est un RELIQUAT
+
+Sur les 171 € annoncés pour la semaine 1, les **épices à tajine (16,56 €)**,
+la **crème de balsamique (11,06 €)** et le **pesto (11,52 €)** se gardent des
+mois : c'est du **stock pour la semaine suivante**, pas une perte. Seul le
+reliquat d'un PÉRISSABLE se jette.
+
+Et on ne peut pas trancher : `dlc_moyenne_jours` est renseignée sur **4
+ingrédients sur 117**. D'où `LigneAchat.perissable`, qui vaut **`null` quand
+on ne sait pas** — et l'écran compte à part « dont X € périssable · N réf.
+sans DLC connue » au lieu de tout jeter dans un total qui ment.
+
+⚠️ C'est la même faute que partout ailleurs dans ce fichier, commise par moi
+cette fois : un nombre présenté comme une chose alors qu'il en mesure une
+autre.
+
+⚠️ **`test-reassort-ardoise.mjs` exigeait que `plats_du_jour` soit VIDE après
+son passage.** Vrai tant qu'aucune ardoise n'existait, faux le jour où le
+gérant pose la sienne — 26 lignes. Il vérifie désormais que SES lignes sont
+parties, pas que la production est vide. Même famille d'erreur que
+`test-zelty-webhook.mjs`, qui effaçait tous les événements au lieu des siens.
+
 ### Les quatre audits de chaîne (02/10/2026)
 
 ⚠️⚠️ **« LES PAGES RÉPONDENT » N'EST PAS « L'APPLICATION FONCTIONNE ».** Les
@@ -6624,6 +6682,7 @@ node scripts/sacs-croissants-formats.mjs       # sacs à croissants : 101/103/10
 node scripts/corriger-stocks-negatifs.mjs      # un stock négatif n'existe pas (essai à blanc)
 node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, sans base)
 PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
+node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)

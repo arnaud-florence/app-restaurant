@@ -137,9 +137,22 @@ try {
     await sb(`plat_du_jour_ingredients?plat_du_jour_id=eq.${id}`, { method: 'DELETE' }).catch(() => {})
     await sb(`plats_du_jour?id=eq.${id}`, { method: 'DELETE' }).catch(() => {})
   }
+  // ⚠️⚠️ ON VÉRIFIE QUE NOS LIGNES SONT PARTIES, PAS QUE LA TABLE EST VIDE.
+  // L'assertion exigeait `reste.length === 0` : vraie tant qu'aucune ardoise
+  // réelle n'existait, elle est devenue fausse le jour où le gérant a posé
+  // la sienne (26 lignes, semaine du 12 octobre). Un test qui exige que la
+  // production soit vide finit par rougir sur une donnée parfaitement
+  // normale — même famille d'erreur que `test-zelty-webhook.mjs`, qui
+  // effaçait TOUS les événements au lieu des siens.
+  const survivants = []
+  for (const id of crees) {
+    const r = await sb(`plats_du_jour?select=id&id=eq.${id}`)
+    if (r.length) survivants.push(id)
+  }
   const reste = await sb('plats_du_jour?select=id&actif=eq.true')
   console.log(`\n── Nettoyage ──`)
-  t(`${crees.length} ligne(s) de test retirées — ${reste.length} ardoise(s) restante(s)`, reste.length === 0)
+  t(`${crees.length} ligne(s) de test retirées — ${reste.length} ardoise(s) réelle(s) intacte(s)`,
+    survivants.length === 0)
 }
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

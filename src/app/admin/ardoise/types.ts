@@ -17,6 +17,8 @@ export type MatiereVue = {
   prix_achat_ht: number | null
   /** ⚠️ 56 prix sur 62 sont des estimations : le total doit le dire. */
   prix_estime: boolean
+  /** Jours de conservation. `null` = inconnu, jamais « se garde ». */
+  dlc_jours: number | null
 }
 
 /** Une ligne d'ardoise déjà posée — un plat de la semaine, ou un plat du jour. */

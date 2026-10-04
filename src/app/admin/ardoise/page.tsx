@@ -35,7 +35,7 @@ export default async function ArdoisePage({
       .select('id, nom, categorie, tag_destination, etablissement_id, prix_vente_ht, tva, actif')
       .eq('actif', true).order('nom').order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('ingredients')
-      .select('id, nom, unite, prix_achat_ht, prix_estime').eq('actif', true).order('id')),
+      .select('id, nom, unite, prix_achat_ht, prix_estime, dlc_moyenne_jours').eq('actif', true).order('id')),
     lireTout<Record<string, unknown>>(() => sb.from('recette_ingredients')
       .select('recette_id, ingredient_id, quantite, unite').order('recette_id').order('ingredient_id')),
     // ⚠️⚠️ `date_fin` PEUT ÊTRE NULLE — l'ancien écran `/admin/plats-du-jour`
@@ -88,6 +88,10 @@ export default async function ArdoisePage({
     unite: (m.unite as string) ?? '',
     prix_achat_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
     prix_estime: m.prix_estime !== false,
+    // ⚠️ `null` = DLC inconnue, pas « se garde ». Renseignée sur 4
+    // ingrédients sur 117 au 04/10/2026.
+    dlc_jours: m.dlc_moyenne_jours == null || Number(m.dlc_moyenne_jours) === 0
+      ? null : Number(m.dlc_moyenne_jours),
   }))
 
   const parOcc = new Map<string, Array<{ ingredient_id: string; quantite: number; unite: string }>>()
