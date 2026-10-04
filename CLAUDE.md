@@ -2889,6 +2889,50 @@ sans que rien ne le signale.
 ⚠️ `on delete restrict` sur l'ingrédient : supprimer une matière ne doit pas
 effacer la composition d'un plat déjà servi.
 
+**Les volumes définitifs (gérant, 04/10/2026) :** midi **20** (7 j), soir
+week-end **20**, soir semaine **10**, et **30 pizzas à emporter par soir**.
+Soit **440 portions/semaine, 63 plats/jour** — dont **64 % pour la
+pizzeria**, qui porte donc les achats.
+
+| brasserie à l'ardoise | réfs | commande/sem | casse/sem | |
+|---|---|---|---|---|
+| toute (19 plats) | 62 | 1 562 € | **231 €** | 15 % |
+| 10 plats | 52 | 1 533 € | 174 € | 11 % |
+| **4 plats** | 44 | 1 456 € | **133 €** | **9 %** |
+| aucune | 33 | 863 € | **127 €** | **15 %** |
+
+⚠️⚠️ **SUPPRIMER LA BRASSERIE FAIT REMONTER LA CASSE À 15 %** — contre-
+intuitif, et c'est la trouvaille de ce chantier : sans elle, les pizzas
+seules ne font plus tourner les matières partagées (mozzarella, roquette,
+parmesan). **La brasserie et la pizzeria se font tourner mutuellement.**
+L'optimum n'est donc pas « le moins de plats possible » mais **4 à 6 plats de
+brasserie qui puisent dans le socle des pizzas** — ce que `coutMarginal()`
+sait dire plat par plat. Écart 19 → 4 plats : **98 €/semaine, ~5 100 €/an**.
+
+⚠️⚠️ **LES CIBLES DE SEPTEMBRE ÉTAIENT SOUS-DIMENSIONNÉES D'UN TIERS** : elles
+supposaient 30 pizzas par soir AU TOTAL, alors que les 30 à emporter
+s'ajoutent aux couverts assis — 43/soir en réalité. Pâton 210 → **280**,
+mozzarella râpée 24 → **31,6 kg**, sauce tomate 12,4 → **16 kg**. C'était la
+rupture du samedi soir. Recalculées avec
+`node scripts/cibles-stock.mjs --couverts=23 --pizzas=40 --ecrire`.
+
+⚠️ **Capacité** : 43 pizzas/soir sur 112 possibles (8 articles × 14 créneaux)
+= 38 %. Large **en moyenne** — mais un vendredi à 20 h concentre la moitié du
+service sur quatre créneaux.
+
+⚠️⚠️ **TROISIÈME FOIS QUE `CATEGORIES_ASSEMBLEES` SE FAIT DÉBORDER.** La
+catégorie « Plat du jour », créée le jour même, s'est retrouvée dans la
+commande d'ouverture — un plat assemblé qu'on allait commander au lieu de ses
+composants. Après `Formule petit-déjeuner` et les familles de la brasserie.
+Le motif se répète : on ajoute une catégorie au catalogue, personne ne pense
+au réassort. **Tout ajout de catégorie de plat assemblé doit passer dans
+`CATEGORIES_ASSEMBLEES`**, et le test le verrouille désormais.
+
+**Le produit « Plat du jour »** est créé — 15,90 € TTC, soit le prix du
+premier plat de la carte (moyenne des « Plat » : 17,97 €). Pas en ligne : le
+site afficherait le plat de la veille. `node scripts/produit-plat-du-jour.mjs
+[--ecrire] [--prix=N]`.
+
 ⚠️⚠️ **`dlc_moyenne_jours` EST RENSEIGNÉE SUR 4 INGRÉDIENTS SUR 117**, et les
 quatre sont des rescapés du jeu de démonstration. La distinction périssable /
 de garde n'a donc **aucune donnée** : classer sur le NOM produit des faux

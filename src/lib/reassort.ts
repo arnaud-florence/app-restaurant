@@ -291,6 +291,14 @@ export const CATEGORIES_ASSEMBLEES = new Set([
   // complet) passaient au travers : un lot n'a pas de stock, ses
   // composants en ont un.
   'Formule petit-déjeuner',
+  // ⚠️⚠️ TROISIÈME FOIS QUE CETTE LISTE SE FAIT DÉBORDER PAR UNE CATÉGORIE
+  // CRÉÉE APRÈS ELLE. « Plat du jour » (0167) est arrivé le 04/10/2026 et
+  // s'est retrouvé dans la commande d'ouverture, sans prix d'achat — un plat
+  // assemblé ne se stocke pas, ce sont ses composants qui se stockent.
+  // Le motif est toujours le même : on ajoute une catégorie au catalogue,
+  // personne ne pense au réassort, et il commande un plat.
+  // → Tout ajout de catégorie de PLAT ASSEMBLÉ doit passer ici.
+  'Plat du jour',
 ])
 
 export function estStockable(p: {

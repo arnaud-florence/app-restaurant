@@ -13,6 +13,7 @@ const CATEGORIES_ASSEMBLEES = new Set([
   'Sandwich', 'Panini', 'Salade', 'Formule',
   'Pizzeria', 'Burger', 'Plat', 'Planche', 'Grande salade', 'Menu',
   'Formule petit-déjeuner',
+  'Plat du jour',
 ])
 const estStockable = p => {
   if (p.categorie && CATEGORIES_ASSEMBLEES.has(p.categorie)) return false
@@ -48,6 +49,13 @@ t('un composant de formule est exclu par son nom',
 
 t('une formule du matin est un lot, pas un stock',
   !estStockable({ nom: 'Formule Express', categorie: 'Formule petit-déjeuner', tag_destination: 'FOURNIL' }))
+// ⚠️⚠️ TROISIÈME CATÉGORIE À AVOIR DÉBORDÉ CETTE LISTE. « Plat du jour »
+// (0167) a été créée le 04/10/2026 et s'est retrouvée dans la commande
+// d'ouverture, sans prix d'achat. Le motif se répète : on ajoute une
+// catégorie au catalogue, personne ne pense au réassort, et il commande un
+// plat au lieu de ses composants.
+t('⚠️ « Plat du jour » ne se stocke pas — ce sont ses composants qui se stockent',
+  !estStockable({ nom: 'Plat du jour', categorie: 'Plat du jour', tag_destination: 'CUISINE' }))
 
 console.log('\n── Un comptage périmé n’est pas un stock ──')
 // ⚠️ RECOPIE de PEREMPTION_COMPTAGE_JOURS (src/lib/reassort.ts).

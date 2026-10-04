@@ -151,6 +151,9 @@ async function main() {
     'Sandwich', 'Panini', 'Salade', 'Formule',            // déjà exclues (0133)
     'Pizzeria', 'Burger', 'Plat', 'Planche',              // brasserie et pizzeria
     'Grande salade', 'Menu', 'Formule petit-déjeuner',
+    // ⚠️ Créée le 04/10/2026 (0167) et tombée aussitôt dans la commande
+    // d'ouverture, sans prix : un plat assemblé ne se stocke pas.
+    'Plat du jour',
   ])
   const estAssemble = r =>
     CAT_ASSEMBLEES.has(r.categorie) || String(r.nom).startsWith('Formule —')
