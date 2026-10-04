@@ -77,3 +77,4 @@ data/relance-eurocash-*.csv
 data/carte-boissons-marges.csv
 data/mail-*.txt
 data/demande-tarif-*.csv
+data/commande-*.pdf
