@@ -104,6 +104,64 @@ await step('alertes DLC', async () => {
   else ko('alertes DLC', 'une DLC à J+40 est remontée dans la fenêtre de 3 jours')
 })
 
+// ─── 2bis. LE STOCK VIT DANS DEUX TABLES ─────────────────────────────
+// ⚠️⚠️ Signalé par le gérant le 04/10/2026 : « j'ai que 9 ingrédients en
+// stock ». C'était exact, et c'était le défaut. En ACHAT-REVENTE (0126)
+// l'essentiel de la réserve est dans `recettes` — les bouteilles, les fûts et
+// les canettes du bar se revendent tels quels — et le tableau du module 7 ne
+// lisait que `ingredients` : 9 références affichées sur 45.
+//
+// ⚠️ L'invariant à tenir n'est pas « le tableau montre beaucoup de lignes »,
+// c'est « le tableau et la carte du haut disent LE MÊME NOMBRE ». Deux
+// chiffres pour la même question, c'est pire qu'un seul chiffre faux : on ne
+// sait plus lequel croire, donc on ne croit aucun des deux.
+//
+// ⚠️ Ce contrôle RECOPIE la règle de `src/app/admin/stock/page.tsx` et de
+// `chargerLignesReassort()` : modifier les deux ensemble.
+await step('le stock couvre les produits revendus ET les matières', async () => {
+  const { data: inv } = await sb.from('inventaires')
+    .select('recette_id, ingredient_id, date_inventaire, quantite')
+    .order('date_inventaire', { ascending: true })
+  const dernier = {}
+  for (const l of inv ?? []) { const c = l.ingredient_id ?? l.recette_id; if (c) dernier[c] = l }
+
+  // les entrées depuis le comptage d'ouverture — une facture rattachée à son
+  // BL n'ajoute rien (0166), sinon le stock serait doublé
+  const { data: docs } = await sb.from('factures_fournisseurs')
+    .select('id, type_document, facture_liee_id').gte('date_emission', '2026-09-30')
+  const entrees = {}
+  for (const d of docs ?? []) {
+    if (d.type_document === 'facture' && d.facture_liee_id) continue
+    const { data: lg } = await sb.from('facture_lignes')
+      .select('quantite, recette_id, ingredient_id').eq('facture_id', d.id)
+    for (const l of lg ?? []) {
+      const c = l.ingredient_id ? `ing:${l.ingredient_id}` : l.recette_id
+      if (c) entrees[c] = (entrees[c] ?? 0) + Number(l.quantite ?? 0)
+    }
+  }
+  const { data: rec } = await sb.from('recettes').select('id, actif').eq('actif', true)
+  const { data: ing } = await sb.from('ingredients').select('id, actif, stocke').eq('actif', true)
+
+  const prod = (rec ?? []).filter(r => (Number(dernier[r.id]?.quantite ?? 0)) + (entrees[r.id] ?? 0) > 0)
+  const mat = (ing ?? []).filter(i => i.stocke
+    && (Number(dernier[i.id]?.quantite ?? 0)) + (entrees[`ing:${i.id}`] ?? 0) > 0)
+
+  if (prod.length > 0) ok(`${prod.length} produit(s) revendu(s) en réserve — ils doivent figurer au tableau`)
+  else ko('produits en réserve', 'aucun — le contrôle ne prouve rien, vérifier les livraisons')
+  ok(`${mat.length} matière(s) en réserve`)
+  // ⚠️ L'assertion qui compte : le tableau ne doit PAS se limiter aux
+  // matières. Si les produits reviennent à zéro un jour, elle le dira.
+  if (prod.length + mat.length > mat.length)
+    ok(`la réserve fait ${prod.length + mat.length} références, pas ${mat.length}`)
+  else ko('couverture', 'la réserve se réduit aux matières — le tableau serait complet par accident')
+
+  // ⚠️ Et aucun stock NÉGATIF : un stock négatif ne se lit pas comme une
+  // erreur, il se lit comme une dette, et il entre dans toutes les sommes.
+  const { data: neg } = await sb.from('ingredients').select('id, nom').lt('stock_actuel', 0)
+  if ((neg ?? []).length === 0) ok('aucun stock négatif en base')
+  else ko('stocks négatifs', `${neg.length} matière(s) sous zéro, dont ${neg[0].nom}`)
+})
+
 // ─── 3. Trigger sortie automatique ──────────────────────────────────
 await step('trigger sortie auto sur article servi', async () => {
   // Sélectionne une recette avec ingrédients

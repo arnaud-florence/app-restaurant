@@ -6074,6 +6074,56 @@ inverse** (une DLC à J+40 ne doit pas alerter — sinon l'écran crierait sur t
 le stock), puis nettoie. Un test ne doit pas dépendre d'une donnée qu'il n'a
 pas créée. 18/18.
 
+### ⚠️⚠️ Le stock vivait dans deux tables, l'écran n'en lisait qu'une (04/10/2026)
+
+Le gérant : **« j'ai que 9 ingrédients en stock »**. C'était exact, et c'était
+le défaut.
+
+En **ACHAT-REVENTE** (0126), l'essentiel de la réserve n'est pas dans
+`ingredients` : les bouteilles, les fûts et les canettes du bar se revendent
+tels quels, donc ils vivent dans `recettes`. Le tableau du module 7 ne lisait
+que `ingredients` — il a été bâti pour un restaurant qui TRANSFORME des
+ingrédients. Mesure du jour :
+
+| | |
+|---|---|
+| produits revendus en réserve (`recettes`) | **36** |
+| matières en réserve (`ingredients`) | **9** |
+| **affiché par `/admin/stock`** | **9 sur 45** |
+
+L'écran était structurellement aveugle aux quatre cinquièmes du stock, et rien
+ne le signalait : 9 lignes sous un titre « 📦 Stocks », avec des KPI calculés
+sur 9.
+
+**Les deux listes viennent désormais de `chargerLignesReassort()`** — la même
+construction que `/admin/reassort`, la carte du haut et l'agent Stock. Il n'y
+a donc pas deux calculs qui pourraient diverger, seulement deux tables
+d'origine. `ProduitEnStock` (`stock/types.ts`) donne au produit la forme d'un
+`Ingredient` pour que recherche, filtres et totaux marchent sans réécrire les
+593 lignes du composant.
+
+⚠️ **UN PRODUIT EST EN LECTURE SEULE ICI.** Les trois gestes du module 7
+(📥 livraison, ⚠ perte, −1) écrivent dans `mouvements_stock.ingredient_id` :
+ils ne peuvent pas viser un produit vendu. Afficher les boutons mènerait à un
+message d'erreur — la ligne renvoie donc vers `(ops)/inventaire?poste=…`, là
+où ce produit se compte vraiment.
+
+⚠️ **DEUX CHIFFRES DE STOCK SUR LA MÊME PAGE, tous deux justes — et c'était le
+symptôme, pas la cause.** La carte du haut annonçait **2 229 €** (toute la
+réserve), le KPI du bas **504 €** (les matières seules). La première tentation
+était de préciser le libellé en « Valeur des matières » : ç'aurait été rendre
+honorable une liste incomplète. Ce n'était pas un libellé à corriger, c'était
+une liste à compléter. Les deux disent maintenant le même nombre.
+
+⚠️ Les produits à zéro entrent dans le compteur de lignes masquées : sans ça
+le bandeau annonçait « 101 matières » en cachant aussi une centaine de
+produits, et un écran qui cache sans le dire est pire qu'un écran long.
+
+**Assertion ajoutée à `test-stock.mjs`** (22 ✓) : la réserve doit faire plus
+de références que les seules matières. ⚠️ Elle RECOPIE la règle de `page.tsx`
+et de `chargerLignesReassort()` — modifier les deux ensemble. Et elle vérifie
+qu'**aucun stock n'est négatif**, le contrôle qui manquait la veille.
+
 ### Les quatre audits de chaîne (02/10/2026)
 
 ⚠️⚠️ **« LES PAGES RÉPONDENT » N'EST PAS « L'APPLICATION FONCTIONNE ».** Les

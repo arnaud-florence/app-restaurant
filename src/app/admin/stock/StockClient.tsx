@@ -20,6 +20,8 @@ import {
   TYPE_MOUVEMENT_LABEL, fmtPrix, fmtQte,
 } from '@/lib/stock'
 import { sortieManuelle } from './actions'
+import type { ProduitEnStock } from './types'
+
 
 import EntreeModal from './EntreeModal'
 import PerteModal from './PerteModal'
@@ -29,7 +31,7 @@ import ListeCoursesModal from './ListeCoursesModal'
 type ActionKind = 'entree' | 'perte' | 'inventaire' | 'courses' | null
 
 export default function StockClient({
-  ingredients, mouvements, jamaisComptes = [], masques = 0, horsSuivi = 0,
+  ingredients, produits = [], mouvements, jamaisComptes = [], masques = 0, horsSuivi = 0,
 }: {
   ingredients: Ingredient[]
   mouvements: Mouvement[]
@@ -40,10 +42,23 @@ export default function StockClient({
   /** Matières qu'aucun inventaire ne suit (`stocke = false`) : rien ne peut
    *  leur donner un stock, donc elles ne figurent pas dans cette liste. */
   horsSuivi?: number
+  /** ⚠️ Les PRODUITS REVENDUS en réserve (bouteilles, fûts, canettes). En
+   *  achat-revente ils portent l'essentiel du stock et vivent dans
+   *  `recettes` : sans eux cet écran montrait 9 références sur 45. Lecture
+   *  seule — les trois gestes du module 7 visent `ingredient_id`. */
+  produits?: ProduitEnStock[]
 }) {
   const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
   const [tab, setTab] = useState<'stocks' | 'mouvements' | 'bilan'>('stocks')
+  // ⚠️ UNE SEULE LISTE pour l'affichage, la recherche, les filtres et les
+  // totaux : deux listes côte à côte finiraient par donner deux chiffres,
+  // et c'est exactement ce que la carte du haut et ce tableau faisaient.
+  const tout = useMemo(
+    () => [...produits, ...ingredients].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')),
+    [produits, ingredients],
+  )
+  const estProduit = (x: Ingredient) => 'produit' in x
   const [search, setSearch] = useState('')
   const [filtreCat, setFiltreCat] = useState('')
   const [filtreStock, setFiltreStock] = useState<'tous' | 'rouge' | 'orange' | 'vert'>('tous')
@@ -55,13 +70,13 @@ export default function StockClient({
 
   const categories = useMemo(() => {
     const set = new Set<string>()
-    ingredients.forEach(i => set.add(i.categorie))
+    tout.forEach(i => set.add(i.categorie))
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
-  }, [ingredients])
+  }, [tout])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return ingredients
+    return tout
       .filter(i => i.actif)
       .filter(i => {
         if (filtreCat && i.categorie !== filtreCat) return false
@@ -69,32 +84,32 @@ export default function StockClient({
         if (q && !i.nom.toLowerCase().includes(q) && !i.categorie.toLowerCase().includes(q)) return false
         return true
       })
-  }, [ingredients, search, filtreCat, filtreStock])
+  }, [tout, search, filtreCat, filtreStock])
 
   // Base des compteurs de pastilles catégorie : mêmes filtres que la liste (actifs
   // only + stock + recherche) SAUF la catégorie — sinon le compteur ne correspond
   // pas à la liste (qui n'affiche jamais les ingrédients inactifs).
   const baseForCounts = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return ingredients.filter(i => i.actif).filter(i => {
+    return tout.filter(i => i.actif).filter(i => {
       if (filtreStock !== 'tous' && statutStock(i.stock_actuel, i.stock_minimum) !== filtreStock) return false
       if (q && !i.nom.toLowerCase().includes(q) && !i.categorie.toLowerCase().includes(q)) return false
       return true
     })
-  }, [ingredients, search, filtreStock])
+  }, [tout, search, filtreStock])
 
   // KPIs
-  const valeur = useMemo(() => valeurStock(ingredients.filter(i => i.actif)), [ingredients])
+  const valeur = useMemo(() => valeurStock(tout.filter(i => i.actif)), [tout])
   const dlcAlerts = useMemo(() => alertesDLC(mouvements, 3), [mouvements])
   const courses = useMemo(() => listeCourses(ingredients), [ingredients])
   const invendus = useMemo(() => bilanInvendusMois(mouvements), [mouvements])
 
   const stats = useMemo(() => {
-    const actifs = ingredients.filter(i => i.actif)
+    const actifs = tout.filter(i => i.actif)
     const rouge = actifs.filter(i => statutStock(i.stock_actuel, i.stock_minimum) === 'rouge').length
     const orange = actifs.filter(i => statutStock(i.stock_actuel, i.stock_minimum) === 'orange').length
     return { totalActifs: actifs.length, rouge, orange }
-  }, [ingredients])
+  }, [tout])
 
   function flashOk(m: string) { setSuccess(m); setErreur(''); setTimeout(() => setSuccess(''), 1800) }
   function flashKo(e: unknown) { setErreur(e instanceof Error ? e.message : 'Erreur'); setSuccess('') }
@@ -146,17 +161,18 @@ export default function StockClient({
 
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
-          <KPI label="Total actifs" value={String(stats.totalActifs)} icon="📋" />
+          <KPI label="Références en réserve" value={String(stats.totalActifs)} icon="📋" />
           <KPI label="Stock OK"     value={String(stats.totalActifs - stats.rouge - stats.orange)} icon="✓" tone="green" />
           <KPI label="Stock faible" value={String(stats.orange)} icon="⚠" tone={stats.orange > 0 ? 'orange' : 'default'} />
           <KPI label="Épuisés"      value={String(stats.rouge)}  icon="🔴" tone={stats.rouge > 0 ? 'red' : 'default'} pulse={stats.rouge > 0} />
-          {/* ⚠️⚠️ DEUX CHIFFRES, DEUX QUESTIONS — et c'est le LIBELLÉ qui les
-              séparait mal. La carte du haut annonce la valeur de TOUT le stock
-              calculé (produits revendus + matières) : 2 229 € le 04/10. Ce
-              KPI-ci ne somme que les MATIÈRES de la liste ci-dessous : 504 €.
-              Tous deux justes, tous deux nommés « stock » — donc lus comme une
-              contradiction, et on finit par ne croire ni l'un ni l'autre. */}
-          <KPI label="Valeur des matières" value={fmtPrix(valeur)} icon="💰" />
+          {/* ⚠️⚠️ DEUX CHIFFRES DE STOCK SUR LA MÊME PAGE, tous deux justes —
+              et c'était le symptôme, pas la cause. La carte du haut annonçait
+              2 229 € (toute la réserve) quand ce KPI en annonçait 504 (les
+              matières seules), parce que le tableau ignorait les 36 produits
+              revendus du bar. Ce n'était donc pas un libellé à préciser,
+              c'était une liste à compléter : les deux dérivent maintenant de
+              `chargerLignesReassort()` et disent le même nombre. */}
+          <KPI label="Valeur du stock" value={fmtPrix(valeur)} icon="💰" />
         </div>
 
         {/* Sélecteur d'onglets sticky */}
@@ -173,7 +189,7 @@ export default function StockClient({
             existe déjà. */}
         {masques > 0 && (
           <div className="rounded-md border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-700">
-            <b>{masques} matière{masques > 1 ? 's' : ''} à zéro</b> {masques > 1 ? 'ne sont pas affichées' : 'n’est pas affichée'} :
+            <b>{masques} référence{masques > 1 ? 's' : ''} à zéro</b> {masques > 1 ? 'ne sont pas affichées' : 'n’est pas affichée'} :
             seul ce qu’on a en réserve apparaît ici. {masques > 1 ? 'Elles réapparaissent' : 'Elle réapparaît'} dès
             qu’une livraison enregistrée {masques > 1 ? 'les' : 'la'} fait entrer — rien n’a été supprimé,
             {masques > 1 ? ' elles gardent' : ' elle garde'} fournisseur, prix et cible.
@@ -258,6 +274,7 @@ export default function StockClient({
                 <IngredientStockCard
                   key={i.id}
                   i={i}
+                  produit={estProduit(i) ? (i as ProduitEnStock).poste : null}
                   inconnu={jamais.has(i.id)}
                   onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                   onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
@@ -273,7 +290,7 @@ export default function StockClient({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <th className="text-left  py-2.5 px-4">Ingrédient</th>
+                        <th className="text-left  py-2.5 px-4">Référence</th>
                         <th className="text-left  py-2.5 px-2">Catégorie</th>
                         <th className="text-right py-2.5 px-2">Stock</th>
                         <th className="text-right py-2.5 px-2">Min / Max</th>
@@ -287,6 +304,7 @@ export default function StockClient({
                         <IngredientStockRow
                           key={i.id}
                           i={i}
+                          produit={estProduit(i) ? (i as ProduitEnStock).poste : null}
                           inconnu={jamais.has(i.id)}
                           onEntree={() => { setIngredientCourant(i); setActionOpen('entree') }}
                           onPerte={() => { setIngredientCourant(i); setActionOpen('perte') }}
@@ -499,10 +517,12 @@ function KPI({ label, value, tone = 'default', icon, pulse }: {
 
 // ─── Mobile : carte d'ingrédient ─────────────────────────────────────
 function IngredientStockCard({
-  i, inconnu, onEntree, onPerte, onMoinsUn,
+  i, inconnu, produit = null, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
   inconnu?: boolean
+  /** Poste où ce PRODUIT REVENDU se compte, ou `null` pour une matière. */
+  produit?: 'bar' | 'fournil' | null
   onEntree: () => void
   onPerte: () => void
   onMoinsUn: () => void
@@ -527,11 +547,22 @@ function IngredientStockCard({
           <Stat label="Min"    value={`${fmtQte(i.stock_minimum)}`} />
           <Stat label="Valeur" value={fmtPrix(valeur)} />
         </div>
-        <div className="flex gap-1.5">
-          <Button size="sm" variant="default"    onClick={onEntree}  className="flex-1">📥 +</Button>
-          <Button size="sm" variant="destructive" onClick={onPerte}  className="flex-1">⚠ Perte</Button>
-          <Button size="sm" variant="outline"    onClick={onMoinsUn}>−1</Button>
-        </div>
+        {/* ⚠️ Un PRODUIT REVENDU n'a pas les gestes du module 7 : ils
+            écrivent dans `mouvements_stock.ingredient_id` et ne peuvent pas
+            le viser. Afficher les boutons mènerait à un message d'erreur —
+            on renvoie là où il se compte vraiment. */}
+        {produit ? (
+          <a href={`/inventaire?poste=${produit}`}
+             className="block text-center text-xs font-semibold rounded-md border px-2 py-2 hover:bg-muted">
+            📊 Se compte à l’inventaire
+          </a>
+        ) : (
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="default"    onClick={onEntree}  className="flex-1">📥 +</Button>
+            <Button size="sm" variant="destructive" onClick={onPerte}  className="flex-1">⚠ Perte</Button>
+            <Button size="sm" variant="outline"    onClick={onMoinsUn}>−1</Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -548,10 +579,12 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 // ─── Desktop : ligne de table ────────────────────────────────────────
 function IngredientStockRow({
-  i, inconnu, onEntree, onPerte, onMoinsUn,
+  i, inconnu, produit = null, onEntree, onPerte, onMoinsUn,
 }: {
   i: Ingredient
   inconnu?: boolean
+  /** Poste où ce PRODUIT REVENDU se compte, ou `null` pour une matière. */
+  produit?: 'bar' | 'fournil' | null
   onEntree: () => void
   onPerte: () => void
   onMoinsUn: () => void
@@ -582,11 +615,22 @@ function IngredientStockRow({
       <td className="py-2.5 px-2 text-right tabular-nums">{fmtPrix(i.prix_achat_ht)}</td>
       <td className="py-2.5 px-2 text-right tabular-nums font-semibold">{fmtPrix(valeur)}</td>
       <td className="py-2.5 px-4">
-        <div className="flex justify-end gap-1">
-          <Button size="sm" variant="ghost" onClick={onEntree} title="Livraison">📥</Button>
-          <Button size="sm" variant="ghost" onClick={onPerte} title="Perte/casse" className="text-destructive">⚠</Button>
-          <Button size="sm" variant="ghost" onClick={onMoinsUn} title="−1 portion">−1</Button>
-        </div>
+        {/* ⚠️ Voir la carte mobile : les trois gestes visent `ingredient_id`. */}
+        {produit ? (
+          <div className="flex justify-end">
+            <a href={`/inventaire?poste=${produit}`}
+               className="text-xs font-semibold rounded-md border px-2 py-1 hover:bg-muted whitespace-nowrap"
+               title="Un produit revendu se compte à l’inventaire du poste">
+              📊 Inventaire
+            </a>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-1">
+            <Button size="sm" variant="ghost" onClick={onEntree} title="Livraison">📥</Button>
+            <Button size="sm" variant="ghost" onClick={onPerte} title="Perte/casse" className="text-destructive">⚠</Button>
+            <Button size="sm" variant="ghost" onClick={onMoinsUn} title="−1 portion">−1</Button>
+          </div>
+        )}
       </td>
     </tr>
   )

@@ -5,6 +5,7 @@ import { listIngredients } from '../ingredients/actions'
 import { createClient } from '@/lib/supabase/server'
 import { chargerLignesReassort } from '@/lib/reassort-donnees'
 import { sansComptagePerime } from '@/lib/reassort'
+import type { ProduitEnStock } from './types'
 
 export const metadata = { title: 'Stocks — Admin' }
 export const dynamic = 'force-dynamic'
@@ -63,12 +64,59 @@ export default async function StockPage() {
   // base, garde son fournisseur, son prix et sa cible, et réapparaît dès
   // qu'une livraison la fait entrer. Le nombre de masquées est DIT — une
   // liste qui cache sans le dire est pire qu'une liste longue.
+  // ⚠️⚠️ LE STOCK NE VIT PAS QUE DANS `ingredients` — ET CET ÉCRAN N'EN
+  // MONTRAIT QUE 9 SUR 45. Signalé par le gérant le 04/10/2026 : « j'ai que
+  // 9 ingrédients en stock ». C'était exact, et c'était le défaut : les
+  // 36 autres références de la réserve — les bouteilles, les fûts et les
+  // canettes du bar — vivent dans `recettes`, parce que la maison est en
+  // ACHAT-REVENTE (0126). Le tableau du module 7 a été bâti pour un
+  // restaurant qui transforme des ingrédients ; ici l'essentiel se revend
+  // tel quel, donc la page était structurellement aveugle aux quatre
+  // cinquièmes du stock.
+  //
+  // Les deux viennent de la MÊME construction (`chargerLignesReassort`), donc
+  // il n'y a pas deux calculs qui pourraient diverger — seulement deux tables
+  // d'origine.
+  //
+  // ⚠️ UN PRODUIT EST EN LECTURE SEULE ICI. Les trois gestes du module 7
+  // (livraison, perte, −1) écrivent dans `mouvements_stock.ingredient_id` :
+  // ils ne peuvent pas viser un produit vendu. Afficher les boutons mènerait
+  // à un message d'erreur ; la ligne renvoie donc là où ce produit se compte
+  // vraiment, `(ops)/inventaire`.
+  const produits: ProduitEnStock[] = reel
+    .filter(l => !l.cle.startsWith('ing:') && l.tenu !== null && l.tenu > 0)
+    .map(l => ({
+      id: l.cle,
+      nom: l.nom,
+      categorie: l.categorie ?? 'Produit revendu',
+      unite: l.unite ?? 'pièce',
+      prix_achat_ht: l.cout_unitaire_ht ?? 0,
+      fournisseur_principal: l.fournisseur ?? null,
+      fournisseur_secondaire: null,
+      stock_actuel: l.tenu as number,
+      stock_minimum: l.seuil ?? 0,
+      stock_maximum: l.cible ?? 0,
+      dlc_moyenne_jours: 0,
+      allergenes: [],
+      actif: true,
+      created_at: '',
+      updated_at: '',
+      produit: true as const,
+      poste: l.etablissement === 'Bar' ? 'bar' : 'fournil',
+    }))
   const inconnus = new Set(jamais)
   const horsSuivi = tous.filter(i => !suivies.has(i.id)).length
   const ingredientsReels = tous.filter(
     i => suivies.has(i.id) && (Number(i.stock_actuel) > 0 || inconnus.has(i.id)),
   )
-  const masques = tous.length - ingredientsReels.length - horsSuivi
+  // ⚠️ Les produits revendus à zéro sont comptés dans les masqués eux aussi :
+  // sans ça le bandeau annoncerait « 101 matières » alors qu'il cache aussi
+  // une centaine de produits, et un écran qui cache sans le dire est pire
+  // qu'un écran long.
+  const produitsAZero = reel.filter(
+    l => !l.cle.startsWith('ing:') && (l.tenu === null || l.tenu <= 0),
+  ).length
+  const masques = tous.length - ingredientsReels.length - horsSuivi + produitsAZero
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
@@ -97,7 +145,7 @@ export default async function StockPage() {
             dépôt : il n'est plus monté nulle part. */}
         <StockReelCard />
       </div>
-      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} masques={masques} horsSuivi={horsSuivi} />
+      <StockClient ingredients={ingredientsReels} produits={produits} mouvements={mouvements} jamaisComptes={jamais} masques={masques} horsSuivi={horsSuivi} />
     </>
   )
 }
