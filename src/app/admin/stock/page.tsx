@@ -1,6 +1,4 @@
-import Link from 'next/link'
 import StockClient from './StockClient'
-import AlertesStockCard from './AlertesStockCard'
 import StockReelCard from './StockReelCard'
 import { listMouvements } from './actions'
 import { listIngredients } from '../ingredients/actions'
@@ -54,32 +52,30 @@ export default async function StockPage() {
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
-        {/* Le stock du FOURNIL (produits finis, achat-revente) se compte sur
-            /inventaire — cette page-ci est le stock INGRÉDIENTS du restaurant
-            (Module 7, composition des recettes). Le gérant a cherché son
-            comptage hebdo ici : ce pont est la réponse. */}
-        <Link href="/inventaire"
-          className="block rounded-xl border-2 border-emerald-600 bg-emerald-50 px-5 py-4 hover:bg-emerald-100 transition-colors">
-          <p className="text-base font-black text-emerald-900">
-            📦 Inventaire du Fournil — compter le stock de la semaine →
-          </p>
-          <p className="text-sm text-emerald-800 mt-0.5">
-            Croissants, pains, boissons… produit par produit, avec la valeur du
-            stock en euros. C&apos;est là que se fait le comptage hebdomadaire.
-          </p>
-          <p className="text-xs text-emerald-700/80 mt-1.5">
-            La page ci-dessous est le stock <b>ingrédients</b> (farine, beurre…),
-            utile au restaurant à partir d&apos;octobre.
-          </p>
-        </Link>
-        {/* Le stock RÉEL, calculé — c'est lui qu'on vient chercher après une
-            livraison. Le tableau du module 7, plus bas, lit encore
-            `ingredients.stock_actuel` : un compteur que le projet n'alimente
-            plus depuis la 0135. Il garde son utilité pour les MOUVEMENTS
-            (entrées manuelles, pertes, inventaires ponctuels), pas pour dire
-            ce qu'il y a en réserve. */}
+        {/* ⚠️⚠️ `AlertesStockCard` A ÉTÉ RETIRÉE D'ICI — 04/10/2026.
+            Elle affichait « 115 ingrédients sous seuil minimum » et proposait
+            de créer les bons de commande en un clic. Trois raisons, et
+            chacune suffirait :
+
+            1. ELLE LISAIT `ingredients.stock_actuel`, le compteur que le
+               projet n'alimente plus depuis la 0135. Après l'incendie il vaut
+               zéro partout : les 115 « alertes » n'étaient que le catalogue
+               entier, et les quantités à commander sortaient à 0,00 kg pour
+               0,00 € — un écran qui crie sur tout ne protège de rien.
+            2. ELLE CRÉAIT DES BONS DE COMMANDE, ce que le gérant vient
+               d'interdire deux fois. L'agent a été coupé le même jour ; laisser
+               le bouton l'aurait contredit.
+            3. ELLE PRENAIT `fournisseur_principal` POUR UN FOURNISSEUR. C'est
+               un champ de TEXTE LIBRE : il affichait « ESTIMATION 21/09/2026 —
+               à remplacer par la première facture » et « Metro France » (du jeu
+               de démonstration purgé en septembre) comme des destinataires de
+               commande. Et il annonçait 191,43 € de poivre et 210,04 € de
+               saumon sur des stocks nuls.
+
+            Ce qu'il faut commander se lit sur `/admin/reassort`, qui part des
+            COMPTAGES et non d'un compteur mort. Le composant reste dans le
+            dépôt : il n'est plus monté nulle part. */}
         <StockReelCard />
-        <AlertesStockCard />
       </div>
       <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} masques={masques} />
     </>
