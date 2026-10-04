@@ -58,6 +58,18 @@ export type LigneReassort = {
   /** L'ingrédient ou le produit visé — la clé du lien avec le catalogue. */
   cible_id?: string | null
   /**
+   * D'OÙ VIENT LA CIBLE.
+   *
+   * ⚠️ `ardoise` : calculée depuis ce qui est réellement à la carte cette
+   * semaine (0167). Elle n'est PAS stockée — stockée, elle deviendrait
+   * fausse le lundi suivant, en silence.
+   * ⚠️ `stock` : la colonne `stock_cible`, un niveau de rayon décidé. C'est
+   * le cas du Fournil et du bar, et c'est le REPLI de la restauration tant
+   * qu'aucune ardoise n'est posée — dimensionné sur la carte ENTIÈRE, donc
+   * sur le scénario le plus coûteux en casse. L'écran doit le dire.
+   */
+  cible_origine?: 'ardoise' | 'stock'
+  /**
    * ⚠️ Le moins cher AILLEURS, quand le catalogue le dit ET que les unités
    * concordent. Calculé par `comparer()`, jamais par un min/max brut :
    * opposer un colis à une pièce annonce « −97 % » sur des serviettes.

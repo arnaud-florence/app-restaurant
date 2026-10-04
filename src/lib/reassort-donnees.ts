@@ -22,9 +22,13 @@ import {
 } from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import { calculerEntrees, type DocEntree } from '@/lib/stock-entrees'
+import {
+  besoinSemaine, VOLUME_CASATASIA,
+  type PlatArdoise, type LigneComposition,
+} from '@/lib/ardoise'
 
 export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
-  const [produits, matieres, inventaires, etabs, lignesDoc] = await Promise.all([
+  const [produits, matieres, inventaires, etabs, ardoiseBrute, compoFiches, compoPdj, lignesDoc] = await Promise.all([
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
     lireTout<Record<string, unknown>>(() => sb.from('recettes')
@@ -36,6 +40,19 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     lireTout<Record<string, unknown>>(() => sb.from('inventaires')
       .select('cible_id, date_inventaire, quantite').order('date_inventaire', { ascending: false }).order('cible_id')),
     sb.from('etablissements').select('id, nom'),
+    // ⚠️⚠️ L'ARDOISE DE LA SEMAINE (0167). Sans elle, le réassort commandait
+    // pour les 48 plats de la carte dont deux ou trois sont servis : 62
+    // ingrédients mobilisés et 231 € de périssable jeté par semaine, contre
+    // 133 € sur une ardoise de quatre plats. On ne lit que ce qui couvre
+    // AUJOURD'HUI — une ardoise passée ne dit plus ce qu'on sert.
+    sb.from('plats_du_jour')
+      .select('id, recette_id, titre, date_debut, date_fin')
+      .eq('actif', true)
+      .lte('date_debut', new Date().toISOString().slice(0, 10)),
+    lireTout<Record<string, unknown>>(() => sb.from('recette_ingredients')
+      .select('recette_id, ingredient_id, quantite, unite').order('recette_id').order('ingredient_id')),
+    lireTout<Record<string, unknown>>(() => sb.from('plat_du_jour_ingredients')
+      .select('plat_du_jour_id, ingredient_id, quantite, unite').order('id')),
     // ⚠️ LES ENTRÉES. Sans elles, `tenu` restait le COMPTAGE BRUT : après la
     // livraison France Boissons du 01/10 — 2 262 € et 801 unités — l'écran
     // affichait encore le zéro du comptage d'ouverture et proposait de tout
@@ -232,6 +249,101 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   // des pâtons, pas « Pizza Reine » (0132). Le regroupement est ce qui
   // empêche de commander deux fois le même fût sous deux noms de boisson.
   const groupes = new Map<string, Record<string, unknown>[]>()
+  // ─── CE QUE L'ARDOISE DE LA SEMAINE RÉCLAME ────────────────────────
+  //
+  // ⚠️⚠️ POUR LA RESTAURATION, LA CIBLE NE SE STOCKE PAS, ELLE SE CALCULE.
+  // Stockée, elle deviendrait fausse le lundi suivant — l'ardoise change et
+  // rien ne l'aurait signalé. Même doctrine que le stock théorique (0135) :
+  // ce qui dépend d'autre chose se recalcule à la lecture.
+  //
+  // ⚠️ REPLI : pas d'ardoise posée → on garde `stock_cible`. Ce repli est
+  // dimensionné sur la carte ENTIÈRE, donc sur le scénario le plus coûteux
+  // en casse (231 €/semaine contre 133 €) — l'écran DOIT le dire, sinon on
+  // croit commander juste. Et surtout on ne propose pas zéro : à huit jours
+  // de l'ouverture, un réassort muet empêcherait de commander.
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const ardoise = (ardoiseBrute.data ?? []).filter(
+    (a: Record<string, unknown>) => !a.date_fin || (a.date_fin as string) >= aujourdhui,
+  )
+  const besoinArdoise = new Map<string, number>()
+  if (ardoise.length > 0) {
+    const parRecette = new Map<string, LigneComposition[]>()
+    for (const l of compoFiches) {
+      const k = l.recette_id as string
+      if (!parRecette.has(k)) parRecette.set(k, [])
+      parRecette.get(k)!.push({
+        ingredient_id: l.ingredient_id as string,
+        quantite: Number(l.quantite ?? 0),
+        unite: (l.unite as string) ?? '',
+      })
+    }
+    // ⚠️ La composition d'un PLAT DU JOUR est attachée à l'OCCURRENCE, pas au
+    // produit : `recette_ingredients` n'en porte qu'une par produit et ne
+    // saurait pas décrire sept plats différents sur le même `recette_id`.
+    const parOccurrence = new Map<string, LigneComposition[]>()
+    for (const l of compoPdj) {
+      const k = l.plat_du_jour_id as string
+      if (!parOccurrence.has(k)) parOccurrence.set(k, [])
+      parOccurrence.get(k)!.push({
+        ingredient_id: l.ingredient_id as string,
+        quantite: Number(l.quantite ?? 0),
+        unite: (l.unite as string) ?? '',
+      })
+    }
+    const parProduit = new Map(produits.map(x => [x.id as string, x]))
+    const plats: PlatArdoise[] = []
+    for (const a of ardoise as Array<Record<string, unknown>>) {
+      const prod = parProduit.get(a.recette_id as string)
+      const propre = parOccurrence.get(a.id as string)
+      // La composition du jour l'emporte ; à défaut, la fiche du produit.
+      const composition = propre ?? parRecette.get(a.recette_id as string)
+      if (!composition || composition.length === 0) continue
+      plats.push({
+        id: a.id as string,
+        nom: (a.titre as string) ?? (prod?.nom as string) ?? '—',
+        carte: prod?.tag_destination === 'PIZZA' ? 'PIZZA' : 'CUISINE',
+        composition,
+      })
+    }
+    for (const [id, q] of besoinSemaine(plats, VOLUME_CASATASIA)) besoinArdoise.set(id, q)
+  }
+
+  // ⚠️⚠️ CE QUI APPARTIENT À LA RESTAURATION, ET SEULEMENT ELLE.
+  //
+  // Sans cet ensemble, une ardoise de pizzas laissait les ingrédients de
+  // brasserie retomber sur leur `stock_cible` — donc on continuait à les
+  // acheter, et tout l'objet de l'ardoise tombait. Un ingrédient dont le
+  // plat n'est pas à la carte cette semaine doit valoir ZÉRO, pas « comme
+  // avant ».
+  //
+  // ⚠️ Mais seulement ceux-là : le Fournil et le bar ne passent pas par
+  // l'ardoise, leur cible est un niveau décidé. Les mettre à zéro parce
+  // qu'aucune pizza ne les utilise viderait le réassort des deux tiers de
+  // la maison.
+  const matieresResto = new Set<string>()
+  {
+    const estResto = new Set(
+      produits.filter(x => nomE.get(x.etablissement_id as string) === 'Restauration')
+        .map(x => x.id as string),
+    )
+    for (const l of compoFiches) {
+      if (estResto.has(l.recette_id as string)) matieresResto.add(l.ingredient_id as string)
+    }
+    for (const l of compoPdj) matieresResto.add(l.ingredient_id as string)
+  }
+  const ardoisePosee = ardoise.length > 0
+  /**
+   * La cible d'une matière, une fois l'ardoise prise en compte.
+   *
+   * ⚠️ Arrondi AU-DESSUS : on n'achète pas 0,4 kg de roquette, on achète le
+   * kilo. Arrondir au plus près ferait manquer la dernière portion.
+   */
+  const cibleMatiere = (id: string, stockee: number | null): { cible: number | null; origine: 'ardoise' | 'stock' } => {
+    if (besoinArdoise.has(id)) return { cible: Math.ceil(besoinArdoise.get(id)! * 100) / 100, origine: 'ardoise' }
+    if (ardoisePosee && matieresResto.has(id)) return { cible: 0, origine: 'ardoise' }
+    return { cible: stockee, origine: 'stock' }
+  }
+
   for (const p of produits) {
     if (!estStockable({
       nom: p.nom as string,
@@ -291,7 +403,10 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       entrees: d ? entreesDe(p.id as string, d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: p.stock_minimum == null ? null : Number(p.stock_minimum),
+      // Un PRODUIT revendu ne passe pas par l'ardoise : il n'a pas de
+      // composition, c'est lui qu'on achète. Sa cible reste un niveau décidé.
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
+      cible_origine: 'stock' as const,
       cout_unitaire_ht: cout,
       ...(() => {
         // Le groupe partage une matière : n'importe lequel de ses membres
@@ -361,7 +476,12 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       entrees: d ? entreesDe(`ing:${m.id}`, d.le) : 0,
       compte_le: d ? d.le : null,
       seuil: m.stock_minimum == null ? null : Number(m.stock_minimum),
-      cible: m.stock_cible == null ? null : Number(m.stock_cible),
+      // ⚠️⚠️ L'ARDOISE L'EMPORTE SUR LA COLONNE — et une matière de la
+      // restauration dont le plat n'y est pas tombe à ZÉRO, pas sur son
+      // ancienne cible. C'est tout l'objet : on cesse de l'acheter sans que
+      // personne ait à y penser.
+      cible: cibleMatiere(m.id as string, m.stock_cible == null ? null : Number(m.stock_cible)).cible,
+      cible_origine: cibleMatiere(m.id as string, null).origine,
       cout_unitaire_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
       fournisseur: f.nom,
       // ⚠️ `prix_estime` (0165) est la SOURCE DE VÉRITÉ. Le marqueur vivait

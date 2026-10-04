@@ -2854,6 +2854,36 @@ dimanche.
 qu'il arrive), 18 intermédiaires, 24 **spécifiques** (1 seul plat, ils
 disparaissent avec lui).
 
+**LE RÉASSORT LIT L'ARDOISE (04/10/2026).** `chargerLignesReassort()` charge
+`plats_du_jour` actif et couvrant AUJOURD'HUI, puis calcule la cible des
+matières de la restauration depuis ce qui est réellement servi.
+
+⚠️⚠️ **POUR LA RESTAURATION, LA CIBLE NE SE STOCKE PAS, ELLE SE CALCULE.**
+Stockée, elle deviendrait fausse le lundi suivant — l'ardoise change et rien
+ne l'aurait signalé. Même doctrine que le stock théorique (0135) : ce qui
+dépend d'autre chose se recalcule à la lecture.
+
+⚠️⚠️ **ET UNE MATIÈRE DE LA RESTAURATION HORS ARDOISE TOMBE À ZÉRO, pas sur
+son ancienne cible.** Première version écrite sans ça : une ardoise de deux
+pizzas laissait les 55 matières de brasserie retomber sur `stock_cible`,
+donc on continuait à les acheter — et tout l'objet de l'ardoise tombait.
+`matieresResto` borne la règle : le Fournil et le bar ne passent pas par
+l'ardoise, les mettre à zéro viderait le réassort des deux tiers de la
+maison.
+
+⚠️ **REPLI : pas d'ardoise posée → `stock_cible` s'applique**, et l'écran
+doit le dire : ce repli est dimensionné sur la carte ENTIÈRE, donc sur le
+scénario le plus coûteux en casse (231 €/sem contre 133 €). On ne propose
+surtout pas zéro — un réassort muet empêcherait de commander.
+
+⚠️ **La composition du PLAT DU JOUR l'emporte sur la fiche du produit** :
+elle est attachée à l'occurrence (`plat_du_jour_ingredients`), et le produit
+« Plat du jour » n'a volontairement aucune fiche.
+
+Test : `PORT=3000 node scripts/test-reassort-ardoise.mjs` — 15 assertions.
+⚠️ Il CRÉE une vraie ardoise et la retire dans un `finally` : une ardoise de
+test laissée en place ferait commander la semaine entière sur deux pizzas.
+
 **`src/lib/ardoise.ts`** porte les règles, PURES : `portionsSemaine()`,
 `besoinSemaine()`, `listeAchat()`, `socle()` / `specifiques()`,
 `coutMarginal()`. Test : `node scripts/test-ardoise.mjs` — 26 assertions,
@@ -6465,6 +6495,7 @@ node scripts/test-cibles-stock.mjs             # ce qui se stocke, et d'où vien
 node scripts/sacs-croissants-formats.mjs       # sacs à croissants : 101/103/104 (essai à blanc)
 node scripts/corriger-stocks-negatifs.mjs      # un stock négatif n'existe pas (essai à blanc)
 node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, sans base)
+PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)

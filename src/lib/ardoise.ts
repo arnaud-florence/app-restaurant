@@ -95,6 +95,25 @@ export type Volume = {
   pizzasAEmporter: number
 }
 
+/**
+ * LE VOLUME DE CASATASIA — décision du gérant, 04/10/2026.
+ *
+ * ⚠️ Ce ne sont PAS des mesures : la restauration n'a pas encore servi un
+ * couvert. Ils vivent ici, nommés et datés, plutôt que dispersés dans les
+ * écrans — c'est la seule façon qu'ils se corrigent d'un seul geste quand
+ * les vraies ventes arriveront.
+ *
+ * ⚠️ Les 30 pizzas à emporter S'AJOUTENT aux couverts assis. Les compter
+ * dedans avait sous-dimensionné le socle pizzeria d'un tiers en septembre
+ * — pâton 210 au lieu de 280 : la rupture du samedi soir.
+ */
+export const VOLUME_CASATASIA: Volume = {
+  midi: 20,
+  soirWeekEnd: 20,
+  soirSemaine: 10,
+  pizzasAEmporter: 30,
+}
+
 /** Les portions d'une semaine, par carte. */
 export function portionsSemaine(v: Volume): { CUISINE: number; PIZZA: number } {
   // ⚠️ Le vendredi et le samedi soir, les DEUX cartes tournent (règle de
