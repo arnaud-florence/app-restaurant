@@ -29,12 +29,14 @@ import ListeCoursesModal from './ListeCoursesModal'
 type ActionKind = 'entree' | 'perte' | 'inventaire' | 'courses' | null
 
 export default function StockClient({
-  ingredients, mouvements, jamaisComptes = [],
+  ingredients, mouvements, jamaisComptes = [], masques = 0,
 }: {
   ingredients: Ingredient[]
   mouvements: Mouvement[]
   /** Ids dont le stock n'a JAMAIS été compté — différent d'un stock à zéro. */
   jamaisComptes?: string[]
+  /** Combien de matières à zéro ne sont pas affichées. Dit, jamais tu. */
+  masques?: number
 }) {
   const jamais = useMemo(() => new Set(jamaisComptes), [jamaisComptes])
   const router = useRouter()
@@ -157,6 +159,18 @@ export default function StockClient({
 
         {tab === 'stocks' && (
         <>
+        {/* ⚠️ CE QU'ON NE MONTRE PAS SE DIT. Une liste filtrée sans mention
+            fait croire que la base est vide, et on finit par ressaisir ce qui
+            existe déjà. */}
+        {masques > 0 && (
+          <div className="rounded-md border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-700">
+            <b>{masques} matière{masques > 1 ? 's' : ''} à zéro</b> {masques > 1 ? 'ne sont pas affichées' : 'n’est pas affichée'} :
+            seul ce qu’on a en réserve apparaît ici. {masques > 1 ? 'Elles réapparaissent' : 'Elle réapparaît'} dès
+            qu’une livraison enregistrée {masques > 1 ? 'les' : 'la'} fait entrer — rien n’a été supprimé,
+            {masques > 1 ? ' elles gardent' : ' elle garde'} fournisseur, prix et cible.
+          </div>
+        )}
+
         {/* Bandeau alertes DLC */}
         {dlcAlerts.length > 0 && (
           <Card className="border-amber-300 bg-amber-50">

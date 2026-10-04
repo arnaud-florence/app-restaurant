@@ -31,13 +31,26 @@ export default async function StockPage() {
   const reel = sansComptagePerime(await chargerLignesReassort(sb))
   const parCle = new Map(reel.map(l => [l.cle, l]))
   const jamais: string[] = []
-  const ingredientsReels = ingredients.map(i => {
+  const tous = ingredients.map(i => {
     const l = parCle.get(`ing:${i.id}`)
     // ⚠️ « Jamais compté » n'est pas « zéro » : personne n'a regardé. On le
     // marque au lieu d'afficher un 0 qui se lirait « il n'en reste plus ».
     if (!l || l.tenu === null) { jamais.push(i.id); return i }
     return { ...i, stock_actuel: l.tenu }
   })
+  // ⚠️⚠️ ON N'AFFICHE QUE CE QU'ON A — demande du gérant, 04/10/2026 : « seul
+  // le stock doit apparaître, il s'alimentera au fur et à mesure des
+  // commandes ». Après l'incendie, 108 matières sont à zéro : une liste de
+  // cent lignes vides fait passer pour un inventaire ce qui est une réserve
+  // vide, et noie les quelques références réellement présentes.
+  //
+  // ⚠️ RIEN N'EST SUPPRIMÉ, c'est un filtre d'AFFICHAGE : la matière reste en
+  // base, garde son fournisseur, son prix et sa cible, et réapparaît dès
+  // qu'une livraison la fait entrer. Le nombre de masquées est DIT — une
+  // liste qui cache sans le dire est pire qu'une liste longue.
+  const inconnus = new Set(jamais)
+  const ingredientsReels = tous.filter(i => Number(i.stock_actuel) > 0 || inconnus.has(i.id))
+  const masques = tous.length - ingredientsReels.length
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 pt-4 space-y-3">
@@ -68,7 +81,7 @@ export default async function StockPage() {
         <StockReelCard />
         <AlertesStockCard />
       </div>
-      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} />
+      <StockClient ingredients={ingredientsReels} mouvements={mouvements} jamaisComptes={jamais} masques={masques} />
     </>
   )
 }
