@@ -73,6 +73,7 @@ data/demande-tarif-*.csv
 # leurs — c'est l'argument de négociation, et il n'a rien à faire dans un
 # dépôt public. Le brouillon reste sur le poste ; c'est le gérant qui envoie.
 data/demande-*.txt
+data/demande-*.csv
 data/Demande de tarif*.xlsx
 data/gineys/
 data/catalogues/
