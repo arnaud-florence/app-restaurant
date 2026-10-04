@@ -194,19 +194,33 @@ export async function GET(req: Request) {
     } catch { /* le ménage ne doit jamais faire échouer l'agent */ }
 
     const bonsDetails: Array<{ fournisseur: string; nb_lignes: number; montant: number; bc_id: string }> = []
+    // ⚠️ Ce qu'on n'a PAS créé se dit : sans ça on croit cinq bons créés et on
+    // n'en trouve que trois, sans savoir pourquoi.
+    const bonsIgnores: string[] = []
     for (const [fournId, lignes] of besoinsParFournisseur) {
       const fournInfo = [...fournisseurParNom.values()].find(f => f.id === fournId)
       if (!fournInfo) continue
 
-      // Skip si un BC agent existe déjà < 6h pour ce fournisseur (anti-doublon)
+      // ⚠️⚠️ UN BROUILLON NON ENVOYÉ BLOQUE, QUEL QUE SOIT SON ÂGE.
+      // La fenêtre de 6 h laissait l'agent — qui tourne toutes les 2 h —
+      // recréer le MÊME brouillon indéfiniment tant que le besoin n'était pas
+      // traité. Mesuré le 04/10 : six bons identiques en deux jours pour UNE
+      // ligne de 0,9 kg d'oignons, et rien ne les arrêtait — au 12 octobre il
+      // y en aurait eu une quarantaine. Un écran de bons de commande illisible
+      // n'est plus lu, donc il ne protège plus de rien (même leçon que le test
+      // rouge en permanence).
+      //
+      // Un brouillon JAMAIS ENVOYÉ dit que le besoin n'est pas traité : en
+      // ajouter un second n'apprend rien. Dès qu'il part, `statut` quitte
+      // « brouillon » et l'agent peut de nouveau proposer.
       const { data: bcExistants } = await ctx.supabase
         .from('bons_commande')
         .select('id, notes, created_at')
         .eq('fournisseur_id', fournId)
         .eq('statut', 'brouillon')
-        .gte('created_at', six_h)
+        .is('envoye_le', null)
         .ilike('notes', '%Agent Stock%')
-      if (bcExistants && bcExistants.length > 0) continue
+      if (bcExistants && bcExistants.length > 0) { bonsIgnores.push(fournInfo.nom); continue }
 
       // Calcule date livraison prévue = today + délai fournisseur
       const dateLiv = new Date()
@@ -310,6 +324,9 @@ export async function GET(req: Request) {
       data: {
         nbReferences: lignesR.length,
         nbRuptures, nbAlerteMin, bonsCreated, bonsDetails,
+        // ⚠️ Les fournisseurs pour lesquels un brouillon attendait déjà. Les
+        // taire ferait croire que l'agent n'a rien trouvé à commander chez eux.
+        bonsIgnores,
         compares, dlcAlertes, sansFournisseur: sansFournisseur.length,
       } as Record<string, unknown>,
     }
