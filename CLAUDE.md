@@ -6426,6 +6426,77 @@ de références que les seules matières. ⚠️ Elle RECOPIE la règle de `page
 et de `chargerLignesReassort()` — modifier les deux ensemble. Et elle vérifie
 qu'**aucun stock n'est négatif**, le contrôle qui manquait la veille.
 
+### Le tour de piste du 04/10/2026 — ce qui a été réglé
+
+**✅ La répétition d'ouverture passe à 19 ✓ / 0 ✗**, pour la première fois
+depuis sa création. Elle échouait depuis septembre faute de carte sur CUISINE
+et PIZZA ; les deux existent maintenant.
+
+**✅ Les quatre audits de chaîne sont au vert.**
+
+⚠️⚠️ **`cibles-stock.mjs` IGNORAIT `recettes.fournisseur_id`** — `fournisseur:
+null` écrit en dur. La 0164 avait ajouté la colonne exactement pour qu'un
+produit vendu sache chez qui il s'achète, et `reassort-donnees.ts` la lit
+depuis ; ce script, non. La commande d'ouverture annonçait donc **1 020 € sans
+destinataire (37 %)** alors que ZÉRO produit du bar était réellement sans
+fournisseur. Deux lecteurs de la même question qui répondent différemment, et
+c'est celui qu'on lit en commandant qui fait la faute. Après correction et
+rattachement de 23 produits + 25 matières : **218 €**, soit 8 %.
+
+**La commande d'ouverture au 04/10/2026 — 2 742,81 €, 213 références :**
+
+| | | |
+|---|---|---|
+| Gineys | 1 127,87 € | ✉ · mardi, jeudi, samedi |
+| France Boissons | 651,33 € | ✉ · **jeudi uniquement** |
+| Félix Potin | 407,76 € | ✉ |
+| Gel Var · Promocash | 230,66 € | ⛔ **pas d'adresse** |
+| sans destinataire | 218 € | dont 181 € de prix estimés |
+
+⚠️ **Le calendrier commande, pas la date d'ouverture** : France Boissons ne
+livre que le **jeudi**, Gineys mardi/jeudi/samedi. Pour une ouverture le lundi
+12, les derniers créneaux sont **jeudi 8** et **samedi 10**.
+
+⚠️ **« Plat du jour » est rangé en famille « Plat »**, pas dans une famille à
+lui. Une famille à un seul produit n'a pas sa place sur une caisse (règle
+posée en rangeant la Focaccia en Sandwich) — et un plat sans famille est un
+**bouton introuvable au comptoir**, ce que la répétition a signalé aussitôt.
+« Plat » est déjà dans `CATEGORIES_ASSEMBLEES`, donc le réassort continue de
+l'exclure.
+
+⚠️ **L'audit des factures criait au loup, deux fois** — et un audit qui crie
+au loup finit ignoré :
+
+1. il annonçait « 9 lignes où un scan écrirait un chiffre d'un autre ordre de
+   grandeur » **sans recopier le garde-fou bas** posé le matin même, qui les
+   refuse toutes. Elles restent listées, marquées « refusé » : une ligne
+   refusée n'est pas saine, c'est un rapprochement faux à trancher (les
+   « VERRES A PIED BIRRA MORETTI » à 0 € qui matchent « Birra Moretti ») ;
+2. il comptait « 55 prix d'achat perdus » sur une facture **dont le BL porte
+   déjà les rattachements**. La 0166 le dit : le BL dit ce qui est ARRIVÉ, la
+   facture ce qu'on DOIT. Les rattacher n'ajouterait rien au stock et
+   écrirait le fût au LITRE (60 × 3,66 €) au lieu du fût (3 × 104 €).
+
+⚠️⚠️ **`test-stock.mjs` DÉPENDAIT DU TIRAGE.** Il prenait les 5 premières
+recettes actives **sans `order`** et y cherchait une composition : PostgREST
+ne promet aucun ordre, donc il tombait sur une recette composée certains jours
+et pas d'autres — « aucune recette avec ≥ 2 ingrédients » sur une base qui en
+compte 43. Même faute que `test-tarifs-fournisseurs.mjs` et ses 1 000 lignes
+tirées au hasard. Corrigé par `!inner` sur la composition et un tri sur `id`.
+
+**Allergènes : 62 produits pré-remplis, 94 sur 186 portent une déclaration.**
+⚠️ **ZÉRO validé, et c'est voulu** : `prefill-allergenes.mjs` propose ce qui
+est vrai PAR DÉFINITION (gluten sur la farine, sulfites sur le vin), il ne
+signe jamais. **105 produits restent à lire sur l'emballage.**
+
+⚠️⚠️ **31 PRIX DU FOURNIL DIFFÈRENT DES AFFICHES, TOUJOURS VERS LE HAUT** —
+croissant 1,20 → 1,40 €, part de flan 2,50 → 3,80 €, tropézienne 2,50 →
+3,80 €. `test-carte-fournil.mjs` compare la base aux affiches de septembre et
+sort rouge. Deux lectures possibles, et **une seule personne peut trancher** :
+soit les affiches de la boutique ont été refaites et c'est le test qui est
+périmé, soit la base a pris de l'avance et **le client est en droit de payer
+le prix affiché**. Ne pas « réparer » le test avant d'avoir regardé le mur.
+
 ### Les quatre audits de chaîne (02/10/2026)
 
 ⚠️⚠️ **« LES PAGES RÉPONDENT » N'EST PAS « L'APPLICATION FONCTIONNE ».** Les

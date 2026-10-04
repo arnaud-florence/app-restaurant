@@ -50,7 +50,7 @@ const estPiece = u => /^(pce|pi[eè]ce|piece|p|u|unite|unité)s?$/.test(String(u
 
 console.log('\n══ AUDIT n°3 — de la facture scannée au prix d’achat ══\n')
 
-const docs = new Map((await lire('factures_fournisseurs?select=id,numero,type_document,date_emission')).map(f => [f.id, f]))
+const docs = new Map((await lire('factures_fournisseurs?select=id,numero,type_document,date_emission,facture_liee_id')).map(f => [f.id, f]))
 const lignes = await lire('facture_lignes?select=id,description,quantite,unite,prix_unitaire_ht,reference,recette_id,ingredient_id,ignoree,facture_id')
 const prods = new Map((await lire('recettes?select=id,nom,cout_achat_ht,unites_par_achat,prix_vente_ht')).map(p => [p.id, p]))
 
@@ -59,7 +59,29 @@ console.log('── 1. Le rattachement des lignes')
 const orph = lignes.filter(l => !l.recette_id && !l.ingredient_id && !l.ignoree)
 console.log(`     ${lignes.length} lignes · ${lignes.filter(l => l.recette_id).length} → produit · `
   + `${lignes.filter(l => l.ingredient_id).length} → matière · ${lignes.filter(l => l.ignoree).length} écartées`)
-orph.length === 0 ? P('aucune orpheline') : E(`${orph.length} orpheline(s) — chacune est un prix d’achat perdu`)
+
+// ⚠️⚠️ UNE ORPHELINE SUR UNE FACTURE DONT LE BL EST RATTACHÉ N'EST PAS UN
+// PRIX PERDU. La 0166 pose la règle : « le BL dit ce qui est ARRIVÉ, la
+// facture ce qu'on DOIT ». Quand le bon de livraison porte déjà les
+// rattachements, la marchandise EST comptée — rattacher la facture
+// n'ajouterait rien au stock et doublerait le risque d'écrire un prix à la
+// mauvaise unité (le fût facturé au LITRE, 60 × 3,66 €, contre 3 fûts sur
+// le BL).
+// Sans cette distinction l'audit annonçait « 55 prix d'achat perdus » sur
+// une livraison intégralement tracée — et un audit qui crie au loup finit
+// ignoré.
+const blRattaches = new Set()
+for (const l of lignes) if (l.recette_id || l.ingredient_id) blRattaches.add(l.facture_id)
+const couverte = l => {
+  const d = docs.get(l.facture_id)
+  return !!(d?.facture_liee_id && blRattaches.has(d.facture_liee_id))
+}
+const perdues = orph.filter(l => !couverte(l))
+const tracees = orph.length - perdues.length
+if (tracees > 0) console.log(`     dont ${tracees} sur une facture dont le BL porte déjà les rattachements`)
+perdues.length === 0
+  ? P(`aucune orpheline non couverte${tracees ? ` — les ${tracees} restantes sont tracées par leur BL` : ''}`)
+  : E(`${perdues.length} orpheline(s) — chacune est un prix d’achat perdu`)
 for (const l of orph.slice(0, 6)) console.log(`        · ${l.description.slice(0, 60)}`)
 
 // ── 2. la référence, qui passe AVANT le libellé ──────────────────────
@@ -114,14 +136,28 @@ for (const l of lignes) {
     const par = Number(p.unites_par_achat ?? 1) || 1
     const attendu = prixAchat / par
     const reel = Number(p.cout_achat_ht)
-    if (reel / attendu > 3 || reel / attendu < 1 / 3) suspects.push({ p, l, attendu, reel, cond, par })
+    if (reel / attendu > 3 || reel / attendu < 1 / 3) {
+      // ⚠️⚠️ RECOPIE DU GARDE-FOU BAS de `createFacture` (fournisseurs/actions.ts) :
+      // un prix qui divise par plus de QUATRE le coût en place est REFUSÉ et
+      // remonté dans `prix_refuses`. Sans cette recopie, l'audit annonçait
+      // « un scan écrirait 0,0458 € » sur des lignes que la propagation
+      // refuse — il criait au loup, et un audit qui crie au loup finit
+      // ignoré (leçon du test rouge en permanence).
+      const refuse = reel > 0 && attendu < reel / 4
+      suspects.push({ p, l, attendu, reel, cond, par, refuse })
+    }
   }
 }
-suspects.length === 0
-  ? P('aucune ligne de facture n’écrirait un coût d’un autre ordre de grandeur')
-  : E(`${suspects.length} ligne(s) où un scan AUJOURD'HUI écrirait un chiffre d’un autre ordre de grandeur`)
+const passants = suspects.filter(s => !s.refuse)
+passants.length === 0
+  ? P(`aucun coût d’un autre ordre de grandeur ne PASSERAIT — ${suspects.length} ligne(s) écartée(s) par le garde-fou bas`)
+  : E(`${passants.length} ligne(s) où un scan écrirait un chiffre d’un autre ordre de grandeur SANS être refusé`)
 for (const s of suspects) {
-  console.log(`        · ${s.p.nom} : posé ${s.reel.toFixed(4)} €, un scan écrirait ${s.attendu.toFixed(4)} €`)
+  // ⚠️ On les liste TOUTES, refusées comprises : une ligne refusée n'est pas
+  // une ligne saine, c'est un rapprochement faux qui reste à trancher. La
+  // taire ferait croire le sujet clos.
+  const marque = s.refuse ? '  [refusé par le garde-fou]' : '  ⚠️ PASSERAIT'
+  console.log(`        · ${s.p.nom} : posé ${s.reel.toFixed(4)} €, un scan écrirait ${s.attendu.toFixed(4)} €${marque}`)
   console.log(`          « ${s.l.description.slice(0, 54)} » — ÷ ${s.cond ?? 1} (C=N) puis ÷ ${s.par} (unités/achat)`)
   if (s.cond && s.par > 1) console.log(`          ⚠️ les deux nombres disent le MÊME rendement : division en double`)
 }

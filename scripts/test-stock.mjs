@@ -164,12 +164,19 @@ await step('le stock couvre les produits revendus ET les matières', async () =>
 
 // ─── 3. Trigger sortie automatique ──────────────────────────────────
 await step('trigger sortie auto sur article servi', async () => {
-  // Sélectionne une recette avec ingrédients
+  // ⚠️⚠️ UN TEST DONT LE VERDICT DÉPEND DU TIRAGE NE PROUVE RIEN. Il prenait
+  // les 5 PREMIÈRES recettes actives sans `order` : PostgREST ne promet aucun
+  // ordre, donc il tombait sur une recette composée certains jours et pas
+  // d'autres. Constaté le 04/10/2026 — « aucune recette avec >= 2
+  // ingrédients » sur une base qui en compte 43. Même faute que
+  // `test-tarifs-fournisseurs.mjs`, qui lisait 1 000 lignes tirées au hasard.
+  // On demande CELLES QUI ONT une composition, et on trie sur `id`.
   const { data: recs } = await sb
     .from('recettes')
-    .select('id, nom, nb_portions, tag_destination, recette_ingredients(ingredient_id, quantite)')
+    .select('id, nom, nb_portions, tag_destination, recette_ingredients!inner(ingredient_id, quantite)')
     .eq('actif', true)
-    .limit(5)
+    .order('id')
+    .limit(50)
   const recette = recs?.find(r => r.recette_ingredients?.length >= 2)
   if (!recette) { ko('recette test', 'aucune recette avec >= 2 ingrédients'); return }
   ok(`recette test : ${recette.nom} (${recette.recette_ingredients.length} ingrédients)`)
