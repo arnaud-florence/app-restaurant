@@ -1366,8 +1366,49 @@ d'ouverture.
 commandes web est bloquée — un libellé inconnu renvoie 400. La lecture, elle,
 fonctionne déjà.
 
-⚠️ Abonnement Zelty **expirant le 03/10/2026**, sans moyen de paiement
-enregistré : le renouvellement automatique échouera.
+⚠️⚠️ **L'ABONNEMENT A EXPIRÉ LE 03/10/2026 ET LES CAISSES SE SONT
+COUPÉES** (constaté le 05/10, iPads bloqués). La note d'août disait « sans
+moyen de paiement enregistré » : c'était faux au 05/10 — une carte
+(•••• 1732, exp. 2029) EST enregistrée. **Elle est REFUSÉE par la banque.**
+
+Le prélèvement automatique a donc échoué le 03/10, Zelty a basculé
+`Renouvellement automatique` sur **Désactivé**, et les licences se sont
+arrêtées. Rien n'est perdu : l'API répond 200, les 181 produits, la carte et
+les réglages sont intacts — c'est la licence d'EXÉCUTION des iPads qui est
+coupée.
+
+| Où | Quoi |
+|---|---|
+| `bo.zelty.fr/licenses` | l'abonnement, les cases à cocher, « Renouveler manuellement » |
+| `bo.zelty.fr/billing` | le renouvellement automatique et les moyens de paiement |
+| `bo.zelty.fr/invoices` | les paiements passés |
+
+⚠️ **Aucun de ces écrans n'est dans le plan du site ni dans le menu** : ils
+ne se trouvent qu'en tapant l'URL. `/subscription` et `/abonnement` rendent
+404 ; c'est **`/billing`** et **`/licenses`**.
+
+**Abonnement : 175 € HT / 210 € TTC par mois** — Cloud 89 €, Caisse n°2
+39 €, deux Télécommandes 19 € chacune, Fabrication 9 €, plus une Caisse et
+une Premium à 0 €. Un bon de commande se génère depuis `/licenses` et
+**expire en 24 h**.
+
+⚠️ **Un prélèvement sur carte ENREGISTRÉE part hors session, sans 3-D
+Secure** — et les banques françaises le refusent en routine. Le chemin qui
+passe est « Payer … en ligne » (nouvelle carte), qui ouvre Stripe Checkout
+avec validation dans l'appli bancaire. ⚠️ Stripe y propose d'abord **Link**,
+qui réutiliserait la carte refusée : il faut cliquer **« Payer sans Link »**
+pour atteindre le formulaire carte.
+
+⚠️ **NE PAS activer le renouvellement automatique tant que le paiement n'est
+pas passé** : l'activer sur une carte qui refuse ne ferait que reproduire la
+panne, un 5 novembre en plein service.
+
+⚠️ **UNE SEULE LICENCE FABRICATION (= 1 KDS) est souscrite**, alors que la
+cuisine ET la pizza en demandent une chacune. Sans la seconde, un des deux
+écrans ne tournera pas le 12 octobre. L'ajout passe par le support
+(09 72 53 55 72), pas par le back-office.
+
+⚠️ **Un seul iPad est appairé** (ref B, dernière activité le 02/09/2026).
 
 **Reste à faire pour la production** : poser `ZELTY_API_KEY` et
 `ZELTY_MONTANTS_EN_CENTIMES=true` sur Vercel — après le passage en mode réel,
@@ -2133,6 +2174,77 @@ portée de clé et versions testées.
 bouton d'ajout. « La gestion et l'activation des partenaires se fait maintenant
 depuis la marketplace Zelty. Les demandes d'ajout de clés API hors marketplace
 peuvent être faites via ce formulaire. »
+
+### Le réseau et les imprimantes de tickets (05-06/10/2026)
+
+Trois **Epson TM-T88VI** (boîtier **M388A**, Ethernet + USB + Série intégrés)
+achetées pour le comptoir, la cuisine et la pizzeria.
+
+| | |
+|---|---|
+| Box | Bbox, **192.168.1.254**, SSID **`CASATASIA`** (renommée — Zelty avait enregistré `Bbox-3135DBFE` en septembre) |
+| Répéteur | **TP-Link RE505X**, `192.168.1.170`, appairé sur `CASATASIA` en **2,4 GHz** |
+| Imprimante **comptoir** | `192.168.1.196` · MAC `44:D2:44:C4:61:2E` · en **câble** sur la box |
+| Imprimante **cuisine** | `192.168.1.47` · nom réseau `EPSON199BBE` · via le **répéteur** |
+| Imprimante **pizza** | à brancher — il manque un **switch 5 ports** (le RE505X n'a qu'UN port) |
+
+**Déclaration dans Zelty : `bo.zelty.fr/printers`** (nom + adresse IP), puis
+rattachement aux postes dans **`bo.zelty.fr/fabrication-places`**.
+⚠️ Ces écrans ne sont dans AUCUN menu : ils ne s'atteignent qu'en tapant l'URL.
+
+⚠️⚠️ **LE RÉSEAU INVITÉ DE LA BBOX EST UN PIÈGE PARFAIT.** Le répéteur a
+d'abord été appairé sur **`WiFiGuest_8FCE`** — le réseau invité de la BOX
+ELLE-MÊME (le suffixe `8FCE` est celui de son nom réseau `186696A18FCE`). Un
+réseau invité est **volontairement isolé** : l'imprimante y a pris
+`192.168.0.102`, passerelle `192.168.0.254`, injoignable depuis le réseau
+principal. Tout fonctionnait — appairage, pont Ethernet, DHCP, impression —
+et **la caisse n'aurait jamais pu lui parler**. Aucune erreur nulle part :
+les bons ne seraient simplement jamais sortis.
+
+C'est le ticket de **test automatique** de l'imprimante qui l'a révélé
+(éteinte → maintenir **FEED** → allumer → relâcher) : il imprime l'IP, le
+masque et la passerelle. ⚠️ Lire `192.168.**0**.x` au lieu de
+`192.168.**1**.x` est le seul indice, et il ne saute pas aux yeux.
+
+⚠️ **Une Epson ne demande son adresse QU'AU DÉMARRAGE.** Brancher le câble
+sur une imprimante déjà allumée ne déclenche aucune requête DHCP : elle reste
+invisible. Vécu deux fois dans la même soirée. **Toujours : câble d'abord,
+alimentation ensuite.**
+
+⚠️ Le RE505X ne voyait pas le **5 GHz** de la box depuis sa position (le
+5 GHz porte moins loin). L'étape 5 GHz de l'assistant Tether se **passe** —
+elle est facultative. Mais le lien box → répéteur est donc en 2,4 GHz, la
+bande qu'un **four à micro-ondes écrase**. À surveiller en service ; le
+remède est de rapprocher le répéteur de la box pour qu'il accroche le 5 GHz.
+
+⚠️ **Derrière le répéteur, l'ARP montre SA propre MAC** pour tous les
+appareils (proxy ARP) : `192.168.1.47`, `.70` et `.170` partagent
+`e2:3a:55:72:a2:cb`. La vraie MAC de l'imprimante se lit sur son ticket
+d'état, ou se devine de son nom réseau (`EPSON199BBE` → `…19:9B:BE`).
+
+⚠️ **Les IP sont en DHCP et doivent être RÉSERVÉES dans la box** (baux
+statiques par MAC). L'iPad est déjà passé de `.69` (septembre) à `.199` : la
+même dérive sur une imprimante enverrait les bons de la cuisine chez le
+pizzaiolo, sans le moindre signalement.
+
+**Une imprimante REMPLACE un KDS iPad** — Zelty : « chaque lieu de
+fabrication pourra être associé à une imprimante **ou** une application iPad
+de fabrication ». Donc pas d'iPad à installer en cuisine, et la 2ᵉ licence
+Fabrication (9 €/mois) devient inutile. ⚠️ Le cumul imprimante + KDS n'est
+pas documenté : à demander au support (09 72 53 55 72). Un KDS consomme de
+toute façon une licence Fabrication, et il n'y en a qu'UNE.
+
+⚠️ **Le rattachement poste ↔ imprimante résiste à l'automatisation** : le
+menu de `/fabrication-places` ne retient pas la valeur posée par script
+(trois méthodes essayées), et il ne donne **aucun retour visuel** une fois
+enregistré à la main. Le seul contrôle qui tranche est une **vraie commande
+passée sur la caisse** — sans risque tant que l'établissement est en **mode
+école**, où les tickets n'entrent pas dans le CA.
+
+⚠️ Zelty **auto-détecte** les imprimantes du réseau et crée une ligne
+`TM-T88VI - <MAC>` à côté de celle qu'on nomme à la main. Illisible avec
+trois machines : garder les noms clairs (`Comptoir`, `Cuisine`, `Pizza`) et
+voir si les lignes auto reviennent après suppression.
 
 ### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
 
