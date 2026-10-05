@@ -103,7 +103,7 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
 
   // ─── Les matières, avec prix et colisage ─────────────────────────────
   const ings = ou(await sb.from('ingredients')
-    .select('id, nom, unite, prix_achat_ht, prix_estime, dlc_moyenne_jours, fournisseur_principal')
+    .select('id, nom, unite, prix_achat_ht, prix_estime, dlc_moyenne_jours')
     .eq('actif', true), 'ingredients')
   // ⚠️ `ingredients` n'a AUCUNE colonne de colisage : on ne sait pas quel est
   // le plus petit lot achetable. `conditionnement: null` fait retomber
@@ -119,12 +119,38 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
   // ⚠️ `prix_estime` a pour DÉFAUT true (0165) : tant que personne n'a
   // prouvé qu'un prix vient d'une facture, il est présumé estimé.
   const estime = new Map(ings.map(i => [i.id, i.prix_estime !== false]))
-  const fourn = new Map(ings.map(i => [i.id, R.lireFournisseur(i.fournisseur_principal).nom]))
 
-  // ─── Le stock réellement compté ──────────────────────────────────────
+  // ─── Le stock compté ET le fournisseur retenu ───────────────────────
   const reassort = R.sansComptagePerime(await chargerLignesReassort(sb, POUR))
-  const stock = new Map()
-  for (const l of reassort) if (l.cle?.startsWith('ing:')) stock.set(l.cle.slice(4), l.tenu)
+  const stock = new Map(), ligne = new Map()
+  for (const l of reassort) if (l.cle?.startsWith('ing:')) {
+    stock.set(l.cle.slice(4), l.tenu)
+    ligne.set(l.cle.slice(4), l)
+  }
+
+  // ⚠️⚠️ LE FOURNISSEUR VIENT DU COMPARATEUR, PAS DU CHAMP ATTITRÉ.
+  // Première version de ce script : il écrivait `fournisseur_principal`
+  // tel quel. Résultat signalé par le gérant le 05/10/2026 — la liste
+  // envoyait l'emmental et la mozzarella chez Gineys alors que le
+  // comparateur les donne 9,5 % moins cher chez Félix Potin et 12 % moins
+  // cher chez Gel Var. Le beurre doux et les olives y perdaient 30 % et
+  // 25 %.
+  //
+  // C'était la TROISIÈME implémentation de la même question, celle que ce
+  // projet refuse partout ailleurs : `/admin/reassort` et l'agent Stock
+  // passent par `fournisseurRetenu()`, ce script l'ignorait. Toute la
+  // plateforme de comparaison ne sert à rien si la liste qu'on imprime
+  // la contourne.
+  const retenu = id => {
+    const l = ligne.get(id)
+    if (!l) return { nom: null, bascule: false, ecart: null }
+    const r = R.fournisseurRetenu(l, true)   // true = au moins cher
+    return r
+      ? { nom: r.nom, bascule: r.bascule, ecart: r.bascule ? l.ailleurs?.ecartPct ?? null : null,
+          de: r.bascule ? l.fournisseur : null }
+      : { nom: null, bascule: false, ecart: null }
+  }
+  const fourn = new Map(ings.map(i => [i.id, retenu(i.id).nom]))
 
   // ⚠️⚠️ LE STOCK NE SE DÉDUIT QU'UNE FOIS. Les deux cartes partagent des
   // matières — le camembert est sur « La Camembert » ET sur le camembert
@@ -189,7 +215,14 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
     // supposer l'inverse ferait manquer la marchandise en plein service.
     const q = st == null ? l.besoin : Math.max(0, Math.round((l.besoin - st) * 1000) / 1000)
     if (q <= 0) continue
-    const pu = matieres.get(l.ingredient_id)?.prix_achat_ht
+    const r0 = retenu(l.ingredient_id)
+    // ⚠️⚠️ UNE LIGNE QUI BASCULE PART SANS PRIX. Notre coût est celui de
+    // NOTRE conditionnement chez l'ANCIEN fournisseur ; celui du nouveau
+    // est celui du sien. Afficher le premier sous le nom du second, c'est
+    // écrire un prix qui n'a jamais existé — et il ne se signale pas, il
+    // se découvre à la facture. Même règle que `lignesCommandables()`,
+    // qui met `prix_unitaire_ht` à NULL dans ce cas, jamais à zéro.
+    const pu = r0.bascule ? null : matieres.get(l.ingredient_id)?.prix_achat_ht
     const cout = pu == null ? null : Math.round(q * pu * 100) / 100
     if (cout == null) SANS++; else TOTAL += cout
     const f = fourn.get(l.ingredient_id) ?? null
@@ -208,10 +241,16 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
     y[1].reduce((s, l) => s + (l.cout ?? 0), 0) - x[1].reduce((s, l) => s + (l.cout ?? 0), 0))) {
     const t = ls.reduce((s, l) => s + (l.cout ?? 0), 0)
     console.log(`\n━━━ ${f} — ${ls.length} lignes · ${eur(t)}`)
-    for (const l of ls.sort((x, y) => (y.cout ?? 0) - (x.cout ?? 0)))
+    for (const l of ls.sort((x, y) => (y.cout ?? 0) - (x.cout ?? 0))) {
+      const r = retenu(l.ingredient_id)
       console.log(`      ${nb(l.q).padStart(8)} ${(l.unite ?? '').slice(0, 12).padEnd(13)} ` +
         `${(l.cout == null ? 'à confirmer' : eur(l.cout)).padStart(10)}  ` +
-        `${l.nom.slice(0, 36).padEnd(37)}${l.stock == null ? ' stock inconnu' : ''}`)
+        `${l.nom.slice(0, 36).padEnd(37)}${l.stock == null ? ' stock inconnu' : ''}` +
+        // ⚠️ La bascule est DITE : recevoir un bon d'un fournisseur chez
+        // qui on n'a jamais commandé, sans savoir pourquoi, c'est le
+        // meilleur moyen de ne pas l'envoyer.
+        (r.bascule ? `  ↪ ${Math.abs(Math.round(r.ecart ?? 0))} % moins cher qu'à ${r.de}` : ''))
+    }
   }
   console.log(`\n╔═══ TOTAL À COMMANDER ${eur(TOTAL)}` + (SANS ? ` · ${SANS} lignes sans prix` : ''))
   console.log('║  ⚠️ la très large majorité de ces prix sont des ESTIMATIONS : aucune')

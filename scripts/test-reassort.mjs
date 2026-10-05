@@ -256,5 +256,37 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
   t('la quantité redevient la cible entière', aCommander(net[0]) === 10)
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️⚠️ UNE SEULE SOURCE POUR « CHEZ QUI ON COMMANDE »
+//
+// Signalé par le gérant le 05/10/2026 : la liste d'achat par carte
+// envoyait l'emmental et la mozzarella chez Gineys alors que le
+// comparateur les donne 9,5 % moins cher chez Félix Potin et 12 % moins
+// cher chez Gel Var — et le beurre doux 30 %, les olives 26 %. Le script
+// écrivait `ingredients.fournisseur_principal` TEL QUEL, sans passer par
+// `fournisseurRetenu()`.
+//
+// C'était la troisième implémentation de la même question. Toute la
+// plateforme de comparaison ne sert à rien si la liste qu'on imprime la
+// contourne — et rien ne le signalait, le nom du fournisseur étant
+// parfaitement plausible.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log('\n── Chez qui on commande : une seule source ──')
+  const src = fs.readFileSync('scripts/liste-achat-cartes.cjs', 'utf8')
+  t('la liste d’achat par carte passe par fournisseurRetenu()',
+    /R\.fournisseurRetenu\(/.test(src))
+  t('⚠️ et n’écrit JAMAIS fournisseur_principal comme destinataire',
+    !/fourn(isseur)?\s*=\s*new Map\([^)]*fournisseur_principal/.test(src)
+    && !/lireFournisseur\(i\.fournisseur_principal\)/.test(src))
+  // ⚠️ Une ligne qui bascule part SANS PRIX : notre coût est celui du
+  // conditionnement de l'ANCIEN fournisseur. L'afficher sous le nom du
+  // nouveau écrirait un prix qui n'a jamais existé.
+  t('⚠️ une ligne qui bascule n’emporte pas l’ancien prix',
+    /r0\.bascule \? null :/.test(src))
+  t('… et la bascule est DITE sur la ligne',
+    /moins cher qu’à|moins cher qu'à/.test(src))
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)
