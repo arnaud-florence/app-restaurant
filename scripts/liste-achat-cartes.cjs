@@ -191,18 +191,89 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
     `${A.VOLUME_CASATASIA.pizzasAEmporter} pizzas à emporter par soir.`)
   console.log('⚠️ Ce ne sont pas des mesures — aucun couvert n\'a encore été servi.')
 
+  // ─── § SNACKING DU FOURNIL — paninis, sandwiches, salades ───────────
+  //
+  // ⚠️ ICI LES VOLUMES SONT MESURÉS, pas supposés : 7 jours de ventes
+  // réelles (17→24 août 2026), le seul historique que la maison possède.
+  // C'est la meilleure base disponible — et il faut dire sa limite : le
+  // Fournil tournait SEUL, sans restaurant ni bar. Ces volumes monteront.
+  const snacking = async () => {
+    const prods = ou(await sb.from('recettes')
+      .select('id, nom, categorie').eq('actif', true)
+      .in('categorie', ['Panini', 'Sandwich', 'Salade']), 'snacking')
+    const ids = prods.map(x => x.id)
+    const ventes = []
+    for (let d = 0; d < 20000; d += 1000) {
+      const lot = ou(await sb.from('commande_articles')
+        .select('recette_id, quantite, commandes(created_at, statut)')
+        .in('recette_id', ids).order('id').range(d, d + 999), 'ventes')
+      ventes.push(...lot); if (lot.length < 1000) break
+    }
+    const vendu = new Map(), jours = new Set()
+    for (const v of ventes) {
+      if (v.commandes?.statut !== 'encaisse') continue
+      jours.add(v.commandes.created_at.slice(0, 10))
+      vendu.set(v.recette_id, (vendu.get(v.recette_id) ?? 0) + Number(v.quantite))
+    }
+    const n = jours.size || 1
+    const besoin = new Map(), platsUtiles = []
+    for (const p of prods) {
+      const parSemaine = Math.round(((vendu.get(p.id) ?? 0) / n) * 7 * 10) / 10
+      const compo = parRecette.get(p.id) ?? []
+      // ⚠️ Un produit SANS composition ne peut rien demander : la focaccia
+      // est en achat-revente, elle se commande telle quelle ailleurs.
+      if (!compo.length || parSemaine <= 0) continue
+      platsUtiles.push(`${p.nom} ×${parSemaine}`)
+      for (const l of compo) besoin.set(l.ingredient_id,
+        Math.round(((besoin.get(l.ingredient_id) ?? 0) + Number(l.quantite) * parSemaine) * 1000) / 1000)
+    }
+    console.log(`\n\n╔═══ SNACKING DU FOURNIL — paninis, sandwiches, salades`)
+    console.log(`║  ${platsUtiles.length} produits · volumes MESURÉS sur ${n} jours de ventes réelles (août 2026)`)
+    console.log(`║  ⚠️ le Fournil tournait seul à l'époque : ces volumes monteront`)
+    console.log('╚' + '═'.repeat(62))
+    console.log(`\n  ${platsUtiles.join(' · ')}\n`)
+    console.log('     besoin  unité            coût   fournisseur       matière')
+    const lignes = []
+    let T = 0, inconnus = 0
+    for (const [id, q] of [...besoin].sort((x, y) => {
+      const px = matieres.get(x[0])?.prix_achat_ht ?? 0, py = matieres.get(y[0])?.prix_achat_ht ?? 0
+      return (y[1] * py) - (x[1] * px)
+    })) {
+      const m = matieres.get(id); if (!m) continue
+      const cout = m.prix_achat_ht == null ? null : Math.round(q * m.prix_achat_ht * 100) / 100
+      if (cout == null) inconnus++; else T += cout
+      lignes.push({ ingredient_id: id, nom: m.nom, unite: m.unite, besoin: q })
+      console.log(`   ${nb(q).padStart(8)}  ${(m.unite ?? '').slice(0, 12).padEnd(13)} ` +
+        `${(cout == null ? 'à confirmer' : eur(cout)).padStart(10)}   ` +
+        `${(fourn.get(id) ?? '⛔ aucun').slice(0, 16).padEnd(17)} ` +
+        `${m.nom.slice(0, 34)}${estime.get(id) ? '  ⚠ prix estimé' : ''}`)
+    }
+    console.log(`\n   ─── ${eur(T)} de consommation` + (inconnus ? ` · ${inconnus} sans prix connu` : ''))
+    return lignes
+  }
+
   const a = bloc('TOUTES LES PIZZAS', 'PIZZA',
     'Elles restent en permanence à la carte : cette liste ne change pas d\'une semaine à l\'autre.')
   const b = bloc('RESTAURATION — l\'ardoise de la semaine', 'CUISINE',
     'Elle change chaque semaine : cette liste est à refaire avec la prochaine ardoise.')
 
-  // ─── CE QU'IL FAUT COMMANDER : le total des deux, moins le stock ─────
+  const c3 = await snacking()
+
+  console.log('\n\n⚠️ CE QUI N\'EST PAS DANS CES LISTES, SUR TA DEMANDE : pains,')
+  console.log('   viennoiseries, pâtisseries, desserts, gourmandises, glaces et')
+  console.log('   boissons. Ce sont des produits ACHETÉS TELS QUELS — tu choisis')
+  console.log('   les quantités. Ils figurent dans la commande complète')
+  console.log('   (`commande-semaine.cjs`), dimensionnés sur leurs cibles.')
+
+  // ─── CE QU'IL FAUT COMMANDER : le total des trois, moins le stock ────
   const besoin = new Map()
-  for (const l of [...a, ...b]) {
+  const quelle = l => a.includes(l) ? 'pizza' : b.includes(l) ? 'resto' : 'snacking'
+  for (const l of [...a, ...b, ...c3]) {
     const e = besoin.get(l.ingredient_id)
     besoin.set(l.ingredient_id, e
-      ? { ...e, besoin: Math.round((e.besoin + l.besoin) * 1000) / 1000, cartes: e.cartes + ' + ' + (a.includes(l) ? 'pizza' : 'resto') }
-      : { ...l, cartes: a.includes(l) ? 'pizza' : 'resto' })
+      ? { ...e, besoin: Math.round((e.besoin + l.besoin) * 1000) / 1000,
+          cartes: e.cartes.includes(quelle(l)) ? e.cartes : e.cartes + ' + ' + quelle(l) }
+      : { ...l, cartes: quelle(l) })
   }
 
   const parF = new Map()
@@ -232,8 +303,8 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
     rows.push({ ...l, fournisseur: f ?? '', stock: st, q, cout })
   }
 
-  console.log(`\n\n╔═══ À COMMANDER — les deux cartes réunies, moins le stock`)
-  console.log(`║  ⚠️ le stock n'est déduit QU'UNE FOIS : les deux cartes partagent des`)
+  console.log(`\n\n╔═══ À COMMANDER — les trois listes réunies, moins le stock`)
+  console.log(`║  ⚠️ le stock n'est déduit QU'UNE FOIS : les trois listes partagent des`)
   console.log(`║     matières (camembert, crème fraîche, parmesan…), et le déduire dans`)
   console.log(`║     chaque liste aurait sous-commandé de tout ce qu'on a en réserve.`)
   console.log('╚' + '═'.repeat(62))
@@ -258,6 +329,23 @@ const nb = n => n.toLocaleString('fr-FR', { maximumFractionDigits: 3 })
   console.log('╚' + '═'.repeat(62))
 
   if (CSV) {
+    // ⚠️ DEUX FICHIERS, parce que ce sont DEUX questions. Le détail dit ce
+    // que CHAQUE carte consomme — c'est lui qu'on relit pour ajuster une
+    // recette. Le consolidé dit ce qu'on COMMANDE, stock déduit une seule
+    // fois. Les fondre en un seul obligerait à choisir laquelle des deux
+    // on perd.
+    const det = ['Section;Matiere;Fournisseur;Besoin semaine;Unite;Prix unitaire HT;Cout HT;Prix releve']
+    for (const [sec, lignes] of [['Pizzas', a], ['Restauration', b], ['Snacking Fournil', c3]])
+      for (const l of lignes) {
+        const pu = matieres.get(l.ingredient_id)?.prix_achat_ht
+        det.push([sec, `"${l.nom.replace(/"/g, "'")}"`, fourn.get(l.ingredient_id) ?? '',
+          l.besoin, l.unite, pu ?? '', pu == null ? '' : (l.besoin * pu).toFixed(2),
+          estime.get(l.ingredient_id) ? 'ESTIME' : 'releve'].join(';'))
+      }
+    const fd = `data/liste-detail-${POUR}.csv`
+    fs.writeFileSync(fd, det.join('\n') + '\n')
+    console.log(`\n✓ ${fd}`)
+
     const out = ['Cartes;Matiere;Fournisseur;Besoin semaine;En stock;A commander;Unite;Cout HT']
     for (const r of rows) out.push([r.cartes, `"${r.nom.replace(/"/g, "'")}"`,
       r.fournisseur, r.besoin, r.stock == null ? 'inconnu' : r.stock, r.q, r.unite, r.cout ?? ''].join(';'))
