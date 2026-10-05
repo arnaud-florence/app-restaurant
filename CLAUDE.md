@@ -3201,6 +3201,129 @@ La Frite Belge ne porte qu'un ketchup.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 
+### La proposition commerciale de Gineys (05/10/2026)
+
+`node scripts/import-prop-gineys.mjs [--ecrire]` puis
+`node scripts/cles-prop-gineys.mjs [--ecrire]`. 66 lignes, chiffrées
+NOMMÉMENT pour CASATASIA par Sabine Ramillon. Le PDF vit dans
+`data/devis-gineys-2026-10-05.pdf`, **gitignoré**.
+
+C'est la TROISIÈME source de prix Gineys, et la plus utile : les factures
+disent ce qu'on a PAYÉ (82 articles), le portail ce qu'il AFFICHE (2 892
+références, dont la 0162 a montré que seuls nos articles contractuels
+portent la remise). Une proposition dit ce qu'on paierait sur des références
+qu'on n'a jamais achetées.
+
+✅ **Les 66 références baissent, aucune ne monte : −27,8 % en moyenne**
+(maxi −50,8 % sur les œufs), ce qui confirme la mesure de la 0162 au point
+près. Elles passent donc du tarif public au tarif de contrat.
+
+⚠️⚠️ **UN TARIF PÉRIMÉ NE PARTICIPE PLUS À LA COMPARAISON — défaut révélé
+par cette proposition.** La clé d'upsert porte la DATE exprès : un tarif
+d'une autre date s'ajoute et l'ancien survit, et c'est lui qui rend une
+hausse lisible. Jusqu'ici chaque référence n'avait de fait qu'une ligne par
+fournisseur, donc la question ne se posait pas. Les deux lignes étant
+actives, `comparer()` voyait **Gineys DEUX FOIS** — une fois couronné « moins
+cher », une fois affiché « le plus cher » — et `ecartPct` mesurait l'écart
+entre deux prix du MÊME fournisseur sur le MÊME article. Un écart de 46 %
+qui ne désigne personne.
+
+`comparer()` marque désormais `perime` toute ligne qu'un tarif plus récent du
+MÊME fournisseur et de la MÊME référence remplace. ⚠️ Elles RESTENT dans
+`lignes`, comme les lignes sans prix : l'écran montre l'historique avec sa
+date. ⚠️ On ne déduplique QUE sur une référence NON VIDE (`reference` a un
+défaut à `''`, l'index unique étant TOTAL) : deux lignes sans code ne sont
+pas le même article. ⚠️ Un groupe réduit à UNE ligne vivante n'est plus un
+face-à-face. ⚠️ Limite connue : les lignes tirées des FACTURES sont clées par
+le LIBELLÉ normalisé (0152), donc une facture d'août et un devis d'octobre du
+même article ne se périment pas l'un l'autre — ils ne faussent pas « qui est
+le moins cher », ils élargissent seulement l'écart affiché.
+
+⚠️⚠️ **L'IMPORT N'ÉCRIT NI LES CLÉS NI LES CONTENANCES.** `cle_comparaison`,
+`contenance_valeur` et `contenance_unite` sont VOLONTAIREMENT absents de sa
+charge : PostgREST ne met à jour que les colonnes présentes, donc une relance
+PRÉSERVE ce qu'un humain a posé. Les y écrire à `null` effaçait vingt-cinq
+rapprochements et cinq contenances — même piège que `tarif_negocie` dans
+l'import du portail (0158). Et la contenance se **calcule à la lecture** par
+`extraireContenance()` : une meilleure extraction profite à tout le catalogue
+sans réimport.
+
+⚠️⚠️ **TOUT CE QUI N'EST PAS kg / L / piece DOIT ÊTRE `'contenant'`.**
+Première version écrite avec l'UF en minuscules (`bqt`, `bte`, `seau`) :
+aucune n'étant dans `CONTENANTS`, `prixReference()` rendait NULL et les
+lignes sortaient de toute comparaison — le miel, les câpres, la burrata et
+les cornichons affichaient « non comparable » alors que leur contenance est
+écrite dans leur propre désignation. Encore une absence rendue comme une
+conclusion, et aucune erreur pour le dire.
+
+⚠️ Le PDF imprime son propre nombre de lignes : c'est le contrôle
+d'extraction, et le script REFUSE d'écrire s'il ne concorde pas. Un décalage
+de colonne ne lève aucune erreur, il rend des nombres plausibles.
+
+⚠️ `[A-Za-z]` NE CONTIENT PAS « é » : « 5-RHF surgelé » ne matchait pas et
+ses dix lignes héritaient de la famille PRÉCÉDENTE — les surgelés rangés
+dans les produits d'entretien, sans une erreur.
+
+**Rapprochements : 18 HÉRITÉS par référence** (exact : même fournisseur, même
+code article, un prix plus récent — 0142) **+ 24 décidés à la main**, dont
+deux clés nouvelles. **24 lignes ÉCARTÉES, chacune avec son motif** — sans
+elles, dans six mois, on ne saura plus si une paire absente est un oubli ou
+une décision. Les motifs sont toujours les mêmes : le travail restant à faire
+change le produit (calamar FARINÉ, camembert AU FOUR), l'affinage aussi
+(serrano 24 mois ≠ 10 mois), la qualité aussi (entrecôte « N°2 »), la matière
+grasse aussi (crème 15 % ≠ 30 % épaisse).
+
+⚠️ **« FROMAGE ITALIEN » NE NOMME PAS LE FROMAGE** : râpé, en pétale ou en
+pointe, grana et mozzarella changent le prix du simple au double. Trois
+lignes écartées, à faire préciser par Sabine.
+
+⚠️ **`MOZZABELLA LANIERE` à 5,40 €/kg est moins cher que notre mélange râpé
+à 5,918** — mais lanière ≠ râpé, et le rendu sur la pizza diffère. C'est une
+question au gérant, pas une correspondance à forcer.
+
+⚠️ **Œuf : la clé est SÉPARÉE PAR CALIBRE.** « Œuf (pièce) » porte le
+calibre G ; les deux lignes 53-63 g vont dans « Œuf calibre M (pièce) ». Un
+œuf de 53-63 g n'est pas un 63-73 g, et le prix à la pièce s'en ressent —
+même règle que les sacs à croissants 101/103/104.
+
+**Verdict, calculé par `comparer()` : Gineys est le moins cher sur 9 de nos
+matières, plus cher sur 20.**
+
+| Gineys gagne | | Gineys perd | |
+|---|---|---|---|
+| Oignons rouges émincés | −42,3 % | Poivrons en lanières | +67,2 % |
+| Champignons émincés | −16,3 % | Graisse de bœuf | +41,6 % |
+| Aubergines grillées | −14,2 % | Miel | +33,7 % |
+| Sauce moutarde | −6,1 % | Huile d'olive | +31,8 % |
+| Lardons fumés | −5,6 % | Jambon blanc tranché | +31,3 % |
+| Gorgonzola | −4,9 % | Cerneaux de noix | +31,1 % |
+| Oignons jaunes émincés | −4,6 % | Gnocchis | +26,5 % |
+| Steak haché 150 g | −3,1 % | Olives noires | +23,9 % |
+| Pain burger | −1,3 % | Reblochon · Jambon cru | +22 % |
+
+⚠️⚠️ **LE PLUS GROS LEVIER N'EST PAS DANS LA PROPOSITION, C'EST CE QU'ELLE
+N'Y MET PAS.** Elle chiffre le pâton **200 g** à −31,5 % (0,499 → 0,342 €/pce)
+et **ne dit rien de nos deux formats** — le 250 g du Fournil et le 350 g de
+la pizzeria, tous deux restés au tarif PORTAIL. À remise égale, le 350 g
+passerait de 0,728 à 0,499 €/pce : sur 280 pâtons par semaine, **≈ 64 €/semaine,
+≈ 3 300 €/an**. C'est la première chose à demander à Sabine.
+
+⚠️ Le 200 g lui-même est écarté : ni notre 250 g ni notre 350 g. Même piège
+que les sacs à croissants.
+
+⚠️ **Aucune matière « boîte à pizza » n'est suivie**, alors qu'on ouvre une
+pizzeria à emporter dans une semaine. La proposition en chiffre une
+(0,2399 €/pce) : à créer, pas à rapprocher.
+
+⚠️ Restent **sans face-à-face** : la sauce pizza (la ligne Krill est au kilo,
+les autres à la boîte 5/1 — bases discordantes), la burrata, les cornichons
+(une 3/1 Gineys dans un groupe de 5/1) et le confit d'oignon (aucune autre
+offre au catalogue, et on les fait à ~6,40 €/kg contre 17,99).
+
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 58 assertions.
+⚠️ Il RECOPIE la règle du tarif périmé depuis le TS ; modifier les deux
+ensemble.
+
 ### Choisir son fournisseur depuis la ligne de commande (05/10/2026)
 
 Le signal « 💡 −30 % chez Félix Potin » était affiché sur la ligne depuis la
