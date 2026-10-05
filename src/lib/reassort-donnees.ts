@@ -17,7 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lireTout } from '@/lib/supabase/pagine'
 import {
-  estStockable, cleMatiere, lireFournisseur,
+  estStockable, cleMatiere, lireFournisseur, calculerEnCommande,
   type LigneReassort, type OffreConcurrente,
 } from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
@@ -380,6 +380,27 @@ export async function chargerLignesReassort(
   // groupes — et surtout, chacun gagnerait de son côté : c'est précisément
   // ainsi que les 96 Fanta entraient dans trois stocks. Le plus long gagne,
   // et il ne peut gagner que s'ils concourent ensemble.
+  // ⚠️⚠️ CE QUI EST DÉJÀ COMMANDÉ ET PAS ENCORE REÇU. Sans ça l'écran
+  // redemande ce qu'on vient de commander : mesuré le 05/10/2026, le
+  // gérant venait de commander 150 pâtons et on lui en réclamait 280.
+  const bonsLignes = await lireTout<Record<string, unknown>>(() => sb
+    .from('bon_commande_lignes')
+    .select('ingredient_id, recette_id, quantite_commandee, quantite_recue, bons_commande!inner(statut)')
+    .order('id'))
+  const { parCle: enRoute, sansCible: enRouteSansCible } = calculerEnCommande(
+    bonsLignes.map(l => ({
+      statut: ((l.bons_commande as { statut?: string } | null)?.statut) ?? '',
+      ingredient_id: (l.ingredient_id as string) ?? null,
+      recette_id: (l.recette_id as string) ?? null,
+      quantite_commandee: l.quantite_commandee == null ? null : Number(l.quantite_commandee),
+      quantite_recue: l.quantite_recue == null ? null : Number(l.quantite_recue),
+    })))
+  if (enRouteSansCible > 0) {
+    // ⚠️ DIT, jamais tu : ces lignes-là ne peuvent rien déduire, et une
+    // commande invisible fait arriver un camion qu'on n'attendait pas.
+    console.warn(`[reassort] ${enRouteSansCible} ligne(s) de commande en route sans cible identifiée — non déduites.`)
+  }
+
   const cibles: Array<{ cle: string; libelle: string }> = []
   for (const [nom, membres] of groupes) {
     const p = membres.slice().sort((a, b) => ((a.id as string) < (b.id as string) ? -1 : 1))[0]
@@ -426,6 +447,7 @@ export async function chargerLignesReassort(
       // composition, c'est lui qu'on achète. Sa cible reste un niveau décidé.
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
       cible_origine: 'stock' as const,
+      enCommande: enRoute.get(p.id as string) ?? 0,
       cout_unitaire_ht: cout,
       ...(() => {
         // Le groupe partage une matière : n'importe lequel de ses membres
@@ -501,6 +523,7 @@ export async function chargerLignesReassort(
       // personne ait à y penser.
       cible: cibleMatiere(m.id as string, m.stock_cible == null ? null : Number(m.stock_cible)).cible,
       cible_origine: cibleMatiere(m.id as string, null).origine,
+      enCommande: enRoute.get(`ing:${m.id as string}`) ?? 0,
       cout_unitaire_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
       fournisseur: f.nom,
       // ⚠️ `prix_estime` (0165) est la SOURCE DE VÉRITÉ. Le marqueur vivait

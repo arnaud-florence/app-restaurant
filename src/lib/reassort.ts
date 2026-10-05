@@ -42,6 +42,20 @@ export type LigneReassort = {
   compte_le: string | null
   seuil: number | null
   cible: number | null
+  /**
+   * Ce qui est DÉJÀ COMMANDÉ et pas encore reçu.
+   *
+   * ⚠️⚠️ SANS CE CHAMP ON RECOMMANDE CE QU'ON VIENT DE COMMANDER. Mesuré le
+   * 05/10/2026 : le gérant venait de commander 150 pâtons de 350 g chez
+   * Gineys, et l'écran lui en redemandait 280 — il ignorait purement et
+   * simplement `bons_commande`. Deux livraisons pour un besoin, et on ne
+   * s'en aperçoit qu'au déchargement.
+   *
+   * Seuls les bons ENVOYÉS comptent. Un brouillon n'est pas une commande :
+   * le déduire ferait l'inverse — on ne commanderait jamais, parce qu'un
+   * brouillon créé puis oublié suffirait à éteindre la ligne.
+   */
+  enCommande: number
   /** Prix de l'unité commandée, quand on le connaît. */
   cout_unitaire_ht: number | null
   fournisseur: string | null
@@ -195,8 +209,42 @@ export function etat(l: LigneReassort): EtatReassort {
  */
 export function aCommander(l: LigneReassort): number {
   if (l.cible == null) return 0
-  const manque = l.cible - tenuEffectif(l)
+  // ⚠️ On retire ce qui est DÉJÀ en route. Le stock qu'on aura, c'est
+  // celui qu'on tient PLUS celui qui arrive.
+  const manque = l.cible - tenuEffectif(l) - (l.enCommande ?? 0)
   return manque > 0 ? Math.round(manque * 1000) / 1000 : 0
+}
+
+/** Statuts d'un bon qui vaut COMMANDE PASSÉE, donc marchandise en route. */
+export const STATUTS_EN_ROUTE = new Set(['envoye', 'confirme'])
+
+/**
+ * Ce qui est commandé et pas encore reçu, par cible.
+ *
+ * ⚠️ UNE LIGNE QUI NE DÉSIGNE QU'UN LIBELLÉ NE PEUT RIEN DÉDUIRE — elle ne
+ * dit pas DE QUOI elle parle. C'est le cas de toute commande saisie à la
+ * main depuis un portail fournisseur. Elles sont COMPTÉES à part et dites,
+ * jamais ignorées en silence : sinon l'écran annonce « rien en route »
+ * alors qu'un camion arrive.
+ */
+export function calculerEnCommande(lignes: Array<{
+  statut: string
+  ingredient_id: string | null
+  recette_id: string | null
+  quantite_commandee: number | null
+  quantite_recue: number | null
+}>): { parCle: Map<string, number>; sansCible: number } {
+  const parCle = new Map<string, number>()
+  let sansCible = 0
+  for (const l of lignes) {
+    if (!STATUTS_EN_ROUTE.has(l.statut)) continue
+    const reste = Number(l.quantite_commandee ?? 0) - Number(l.quantite_recue ?? 0)
+    if (reste <= 0) continue
+    const cle = l.ingredient_id ? `ing:${l.ingredient_id}` : l.recette_id
+    if (!cle) { sansCible++; continue }
+    parCle.set(cle, Math.round(((parCle.get(cle) ?? 0) + reste) * 1000) / 1000)
+  }
+  return { parCle, sansCible }
 }
 
 /** Ce que coûterait la remise à niveau. NULL si le prix est inconnu. */

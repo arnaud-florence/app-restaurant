@@ -288,5 +288,57 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
     /moins cher qu’à|moins cher qu'à/.test(src))
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️⚠️ ON NE RECOMMANDE PAS CE QU'ON VIENT DE COMMANDER
+//
+// Mesuré le 05/10/2026 : le gérant commande 150 pâtons de 350 g le matin,
+// et l'écran lui en réclame 280 l'après-midi. `chargerLignesReassort()`
+// ignorait purement et simplement `bons_commande`. Deux livraisons pour un
+// besoin, et on ne s'en aperçoit qu'au déchargement.
+// ⚠️ RECOPIE de `calculerEnCommande()` / `aCommander()` (src/lib/reassort.ts).
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log('\n── Ce qui est déjà en route ──')
+  const EN_ROUTE = new Set(['envoye', 'confirme'])
+  const calc = (lignes) => {
+    const parCle = new Map(); let sansCible = 0
+    for (const l of lignes) {
+      if (!EN_ROUTE.has(l.statut)) continue
+      const reste = Number(l.quantite_commandee ?? 0) - Number(l.quantite_recue ?? 0)
+      if (reste <= 0) continue
+      const cle = l.ingredient_id ? `ing:${l.ingredient_id}` : l.recette_id
+      if (!cle) { sansCible++; continue }
+      parCle.set(cle, (parCle.get(cle) ?? 0) + reste)
+    }
+    return { parCle, sansCible }
+  }
+  const aCmd = l => l.cible == null ? 0
+    : Math.max(0, Math.round((l.cible - (l.tenu ?? 0) - (l.enCommande ?? 0)) * 1000) / 1000)
+
+  t('un bon ENVOYÉ retire sa quantité du besoin',
+    aCmd({ cible: 280, tenu: 0, enCommande: 150 }) === 130)
+  // ⚠️ Un BROUILLON n'est pas une commande : le déduire ferait l'inverse du
+  // défaut — on ne commanderait JAMAIS, un brouillon oublié suffisant à
+  // éteindre la ligne.
+  t('⚠️ un BROUILLON ne retire rien',
+    calc([{ statut: 'brouillon', ingredient_id: 'a', quantite_commandee: 99, quantite_recue: 0 }]).parCle.size === 0)
+  t('… et un bon REÇU non plus',
+    calc([{ statut: 'recu', ingredient_id: 'a', quantite_commandee: 99, quantite_recue: 99 }]).parCle.size === 0)
+  t('ce qui est déjà reçu sur un bon envoyé est retiré',
+    calc([{ statut: 'envoye', ingredient_id: 'a', quantite_commandee: 100, quantite_recue: 60 }]).parCle.get('ing:a') === 40)
+  // ⚠️ Une ligne qui ne porte qu'un LIBELLÉ ne dit pas DE QUOI elle parle —
+  // c'est le cas de toute commande saisie depuis un portail fournisseur.
+  // Elle est COMPTÉE et dite, jamais ignorée en silence : sinon l'écran
+  // annonce « rien en route » alors qu'un camion arrive.
+  t('⚠️ une ligne sans cible est COMPTÉE, pas ignorée',
+    calc([{ statut: 'envoye', ingredient_id: null, recette_id: null, quantite_commandee: 5, quantite_recue: 0 }]).sansCible === 1)
+  const srcLib = fs.readFileSync('src/lib/reassort.ts', 'utf8')
+  t('la lib porte bien la règle et le garde-fou',
+    /STATUTS_EN_ROUTE/.test(srcLib) && /sansCible/.test(srcLib)
+    && /l\.cible - tenuEffectif\(l\) - \(l\.enCommande \?\? 0\)/.test(srcLib))
+  t('… et le chargeur la branche sur les bons de commande',
+    /bon_commande_lignes/.test(fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')))
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

@@ -170,6 +170,8 @@ export default function ReassortClient(
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Chiffre n={b.lignes} libelle="références" />
         <Chiffre n={b.aCommander} libelle="à commander" accent="text-red-700" />
+        {/* Ce qui est déjà parti : la moitié de la question « où j'en suis ». */}
+        <Chiffre n={lignes.filter(l => l.enCommande > 0).length} libelle="déjà commandé" accent="text-blue-700" />
         <Chiffre n={b.nonParametres} libelle="sans cible" accent="text-amber-700" />
         <Chiffre n={b.jamaisComptes} libelle="jamais comptées" accent="text-zinc-500" />
         <Chiffre texte={fmtPrix(b.coutTotal)} libelle={b.sansPrix ? `dont ${b.sansPrix} sans prix` : 'coût estimé'} />
@@ -345,6 +347,17 @@ function Ligne({
       <span className="w-20 text-right tabular-nums">
         {l.tenu === null ? <span className="text-zinc-400">—</span> : l.tenu}
         <span className="block text-[10px] text-zinc-400">en stock</span>
+      </span>
+
+      {/* ⚠️⚠️ CE QUI EST DÉJÀ EN ROUTE. Sans cette colonne l'écran redemande
+          ce qu'on vient de commander : mesuré le 05/10/2026, 150 pâtons
+          commandés le matin et 280 réclamés l'après-midi. Deux livraisons
+          pour un besoin, et on ne s'en aperçoit qu'au déchargement. */}
+      <span className="w-20 text-right tabular-nums">
+        {l.enCommande > 0
+          ? <span className="font-medium text-blue-700">{l.enCommande}</span>
+          : <span className="text-zinc-300">—</span>}
+        <span className="block text-[10px] text-zinc-400">commandé</span>
       </span>
 
       <label className="w-20">
