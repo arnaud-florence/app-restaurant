@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { useMemo, useState, useTransition } from 'react'
 import {
   filtrer, etatRemise, LIBELLE_REMISE, FILTRES_VIDES, promotions, familles,
+  comparerRecherche, type GrappeRecherche,
   offresTriees,
   filtrerAchetes, bilanAchats, achetesParFournisseur, acheteIncomplet,
   prixReprenable, parRayon, rayonDe, RAYONS, RAYON_AUTRES, FILTRES_ACHETE_VIDES,
@@ -64,6 +65,15 @@ export default function AchatsClient({
     return rayonF === undefined ? base : base.filter(a => rayonFournisseur(a.famille).cle === rayonF)
   }, [articles, f, rayonF])
   const visibles = trouves.slice(0, limite)
+
+  // ⚠️⚠️ LA COMPARAISON NE S'AFFICHE QUE QUAND ON A TAPÉ QUELQUE CHOSE.
+  // Sans requête, regrouper 4 888 références produirait des centaines de
+  // grappes que personne ne lit — et un écran illisible n'est pas consulté.
+  // C'est la question « est-ce moins cher ailleurs ? » qui déclenche le
+  // calcul, et elle se pose en tapant un nom.
+  const grappes = useMemo<GrappeRecherche[]>(
+    () => comparerRecherche(articles, f.requete),
+    [articles, f.requete])
   const lesFamilles = useMemo(() => familles(articles), [articles])
 
   // Toutes les lignes d'une clé, pour la comparaison dépliée.
@@ -207,6 +217,8 @@ export default function AchatsClient({
                 </p>
               )}
             </div>
+
+            {grappes.length > 0 && <ComparaisonRecherche grappes={grappes} />}
 
             <Selection
               selection={selection} fourSelection={fourSelection} envoiEnCours={envoiEnCours}
@@ -1245,5 +1257,73 @@ function Pistes({ origine, catalogue }: { origine: ArticleAchat; catalogue: Arti
         <b> /admin/tarifs-fournisseurs</b>.
       </p>
     </div>
+  )
+}
+
+/**
+ * « Qui le vend, et à quel prix ? » — la réponse dès qu'on tape.
+ *
+ * ⚠️ Le fond de la carte DIT la nature du rapprochement. Une comparaison
+ * validée (clé posée à la main) et une piste calculée ne s'arbitrent pas
+ * pareil : le calcul rapproche « Roquette » de « ROQUEFORT », et un écran
+ * qui les affiche de la même façon ferait changer de fournisseur sur un
+ * rapprochement que personne n'a regardé.
+ */
+function ComparaisonRecherche({ grappes }: { grappes: GrappeRecherche[] }) {
+  return (
+    <section className="mb-5 space-y-3">
+      <h2 className="text-sm font-semibold text-zinc-900">
+        Comparaison — {grappes.length} groupe{grappes.length > 1 ? 's' : ''}
+      </h2>
+      {grappes.map((g, i) => (
+        <article key={g.cle ?? `p${i}`}
+          className={`rounded-xl border p-3 ${g.validee
+            ? 'border-zinc-300 bg-white'
+            : 'border-dashed border-amber-300 bg-amber-50/40'}`}>
+          <header className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-sm font-medium text-zinc-900">{g.titre}</span>
+            {g.validee
+              ? <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">comparaison validée</span>
+              : <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">piste à vérifier</span>}
+            <span className="text-xs text-zinc-500">
+              {g.fournisseurs} fournisseur{g.fournisseurs > 1 ? 's' : ''}
+              {g.fournisseurs < 2 && ' — deux formats du même'}
+            </span>
+            {/* ⚠️ L'écart ne s'affiche QUE si les prix tombent sur la même
+                base. Hors de là on montre les lignes sans les classer : une
+                poche de 600 g et une d'un kilo portent deux prix justes et
+                aucune comparaison. */}
+            {g.comparable && g.ecartPct != null
+              ? <span className="ml-auto text-sm font-semibold tabular-nums text-emerald-700">
+                  −{g.ecartPct.toLocaleString('fr-FR')} % entre les extrêmes
+                </span>
+              : <span className="ml-auto text-xs text-zinc-500">formats différents — non comparable</span>}
+          </header>
+          <ul className="divide-y divide-zinc-100">
+            {g.lignes.map(l => (
+              <li key={l.id} className="flex flex-wrap items-baseline gap-x-3 py-1.5 text-sm">
+                <span className="w-5 shrink-0">{l.id === g.moinsCher ? '🟢' : ''}</span>
+                <span className="w-28 shrink-0 text-right font-medium tabular-nums text-zinc-900">
+                  {l.ref
+                    ? `${l.ref.prix.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} €/${l.ref.unite}`
+                    : <span className="font-normal text-zinc-400">pas de réf.</span>}
+                </span>
+                <span className="w-36 shrink-0 truncate text-zinc-600">{l.fournisseur_nom}</span>
+                <span className="min-w-0 flex-1 truncate text-zinc-500">{l.designation}</span>
+                {/* La NATURE du prix : arbitrer un fournisseur sur un tarif
+                    d'appel en croyant lire un prix payé se paie des mois. */}
+                <span className="shrink-0 text-[11px] uppercase tracking-wide text-zinc-400">{l.nature}</span>
+              </li>
+            ))}
+          </ul>
+          {!g.validee && (
+            <p className="mt-2 text-[11px] text-amber-800">
+              Rapproché sur les mots du libellé, pas par une décision — à vérifier avant d&apos;arbitrer.
+              Aucune clé de comparaison n&apos;est enregistrée.
+            </p>
+          )}
+        </article>
+      ))}
+    </section>
   )
 }

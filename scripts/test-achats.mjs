@@ -787,5 +787,90 @@ t('⚠️ « FRUITS SURGELÉS » va aux FRUITS, pas aux surgelés — c’est le
     familles.filter(f => f && rayonF(f) === 'f-autres').length === 1)
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// TAPER UN PRODUIT ET VOIR QUI LE VEND — `comparerRecherche()`
+// ⚠️ RECOPIE de `comparerRecherche()` (src/lib/catalogue-achats.ts) :
+// modifier les deux ensemble.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log('\n── Comparer à la saisie ──')
+
+  const motsR = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().split(/[^A-Z0-9]+/).filter(w => w.length >= 5).map(w => w.slice(0, 5))
+  const correspondR = (a, q) => {
+    const termes = a ? q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean) : []
+    if (!termes.length) return true
+    const cibles = a.designation.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)
+    return termes.every(x => (a.reference || '').toUpperCase().includes(x)
+      || cibles.some(c => c.startsWith(x)))
+  }
+  const base = a => `${a.ref.unite}|${a.ref.format ?? ''}`
+  const juger = (lignes) => {
+    const ch = lignes.filter(l => l.ref)
+    const comparable = new Set(ch.map(base)).size === 1 && ch.length > 1
+    if (!comparable) return { comparable, moinsCher: null, ecartPct: null }
+    const tri = [...ch].sort((a, b) => a.ref.prix - b.ref.prix)
+    const bas = tri[0].ref.prix, haut = tri[tri.length - 1].ref.prix
+    return { comparable, moinsCher: tri[0].id,
+      ecartPct: bas > 0 ? Math.round(((haut - bas) / bas) * 1000) / 10 : null }
+  }
+
+  const A = (id, f, des, prix, unite, cle = null, format = null) =>
+    ({ id, fournisseur_id: f, fournisseur_nom: f, reference: '', designation: des,
+       famille: null, cle, ref: prix == null ? null : { prix, unite, format },
+       meilleur: false, unite, prix_ht: prix, remise_pct: null, tarif_negocie: null,
+       achete: false, remise_demandee_le: null, date_tarif: '2026-10-01', nature: 'devis' })
+
+  // ⚠️ UNE GRAPPE VALIDÉE REMONTE TOUTES SES LIGNES, même celles que la
+  // recherche n'a pas trouvées : taper « serrano » doit montrer le
+  // concurrent dont le libellé dit « JAMBON CRU PETALE ». Sinon la
+  // comparaison cache exactement ce qu'on cherchait.
+  const cat = [
+    A('a', 'F1', 'JAMBON SERRANO TRANCHE 500G', 20, 'kg', 'serrano'),
+    A('b', 'F2', 'JAMBON CRU PETALE 1KG', 15, 'kg', 'serrano'),
+  ]
+  const g1 = juger(cat)
+  t('une clé validée fait un duel, et le moins cher sort', g1.comparable && g1.moinsCher === 'b')
+  t('… et la ligne au libellé différent est bien du groupe',
+    cat.filter(a => a.cle === 'serrano').length === 2
+    && !correspondR(cat[1], 'serrano'))
+
+  // ⚠️ ON N'ANNONCE UN ÉCART QUE SUR LA MÊME BASE. Mesuré sur les desserts :
+  // l'éclair Krill à 0,89 € face au nôtre à 1,296 € annonce « −31 % », alors
+  // que l'un fait 80 g et l'autre 120 g — au gramme Krill est plus cher.
+  t('unités différentes : aucun écart, aucun gagnant',
+    (() => { const r = juger([A('x', 'F1', 'THON POCHE', 6, 'kg'), A('y', 'F2', 'THON PIECE', 2, 'piece')])
+      return !r.comparable && r.moinsCher === null })())
+
+  // ⚠️ Et le FORMAT de conserve compte : une 4/4 n'a pas le poids net d'une 5/1.
+  t('deux formats de conserve ne se comparent pas',
+    !juger([A('x', 'F1', 'TOMATE 5/1', 5, 'piece', null, '5/1'),
+            A('y', 'F2', 'TOMATE 4/4', 2, 'piece', null, '4/4')]).comparable)
+  t('… mais deux boîtes du MÊME format, oui',
+    juger([A('x', 'F1', 'TOMATE 5/1', 5, 'piece', null, '5/1'),
+           A('y', 'F2', 'TOMATE 5/1', 4, 'piece', null, '5/1')]).comparable)
+
+  // ⚠️ Une ligne SANS PRIX n'éteint pas le groupe — c'est une relance en
+  // cours, précisément ce qu'on cherche à obtenir.
+  t('un « prix sur demande » n’éteint pas la comparaison',
+    juger([A('x', 'F1', 'OLIVE', 10, 'kg'), A('y', 'F2', 'OLIVE', 8, 'kg'),
+           A('z', 'F3', 'OLIVE', null, 'kg')]).comparable)
+
+  // ⚠️ Un seul fournisseur n'est pas une comparaison : opposer deux de ses
+  // propres références annonce un « moins cher » qui ne fait changer personne.
+  t('un seul fournisseur ne fait pas un duel',
+    new Set([A('x', 'F1', 'SAUCE TUBE', 5, 'kg'), A('y', 'F1', 'SAUCE SEAU', 3, 'kg')]
+      .map(a => a.fournisseur_id)).size < 2)
+
+  // ⚠️ Le rapprochement par les MOTS est une piste, jamais une décision :
+  // livré à lui-même il rapproche « Roquette » de « ROQUEFORT ».
+  t('⚠️ deux mots communs minimum — « Roquette » ne matche pas « ROQUEFORT »',
+    motsR('Roquette').filter(m => motsR('ROQUEFORT BLOC').includes(m)).length < 2)
+  t('… mais « Emmental en tranches » retrouve « Emmental tranché » (racine 5)',
+    motsR('Emmental en tranches').filter(m => motsR('EMMENTAL TRANCHE 1KG').includes(m)).length >= 2)
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

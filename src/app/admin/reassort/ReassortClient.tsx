@@ -20,7 +20,9 @@ const ETAT: Record<EtatReassort, { texte: string; classe: string }> = {
   non_parametre: { texte: 'à paramétrer',  classe: 'bg-zinc-100 text-zinc-500' },
 }
 
-export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) {
+export default function ReassortClient(
+  { lignes, pour }: { lignes: LigneReassort[]; pour: string },
+) {
   const [vue, setVue] = useState<Vue>('categories')
   const [requete, setRequete] = useState('')
   const [aParametrer, setAParametrer] = useState(false)
@@ -33,6 +35,10 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   // — rester chez l'habituel quand on ne veut pas ouvrir un compte.
   const [auMoinsCher, setAuMoinsCher] = useState(true)
   const [creation, creer] = useTransition()
+
+  // Combien de cibles viennent réellement de l'ardoise : c'est ce qui dit
+  // si la date choisie sert à quelque chose.
+  const surArdoise = lignes.filter(l => l.cible_origine === 'ardoise').length
 
   // Les saisies en cours priment sur ce qui vient du serveur.
   // ⚠️ Un comptage périmé est ramené à « inconnu » pour le CALCUL : sinon
@@ -125,6 +131,29 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
           {' · '}<Link href="/inventaire" className="underline">Compter le stock</Link>
         </p>
       </header>
+
+      {/* ⚠️⚠️ ON COMMANDE POUR LA SEMAINE QU'ON VA SERVIR, PAS POUR
+          AUJOURD'HUI. C'est cette date qui choisit l'ardoise, donc les
+          quantités de la restauration. Au 05/10/2026, à sept jours de
+          l'ouverture, l'ardoise du 12 était saisie et l'écran dimensionnait
+          quand même sur la carte ENTIÈRE — le scénario le plus coûteux en
+          reliquat — sans que rien ne le dise. */}
+      <form method="get" className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
+        <label htmlFor="pour" className="font-medium text-zinc-900">Commander pour la semaine du</label>
+        <input id="pour" name="pour" type="date" defaultValue={pour}
+          className="h-9 rounded-lg border border-zinc-300 px-2 tabular-nums" />
+        <button type="submit" className="h-9 rounded-lg bg-zinc-900 px-3 font-medium text-white">
+          Recalculer
+        </button>
+        <span className="text-zinc-600">
+          {surArdoise > 0
+            ? <>✓ {surArdoise} référence{surArdoise > 1 ? 's' : ''} dimensionnée{surArdoise > 1 ? 's' : ''} sur l&apos;ardoise de cette semaine</>
+            : <span className="text-amber-800">
+                ⚠️ aucune ardoise ne couvre cette date — repli sur la carte entière,
+                c&apos;est le scénario le plus coûteux en reliquat
+              </span>}
+        </span>
+      </form>
 
       {/* ⚠️ Un stock à zéro partout n'est pas un réassort, c'est une
           ouverture. Le dire change la lecture de tout l'écran : il n'y a

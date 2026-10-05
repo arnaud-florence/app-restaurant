@@ -74,6 +74,8 @@ data/demande-tarif-*.csv
 # dépôt public. Le brouillon reste sur le poste ; c'est le gérant qui envoie.
 data/demande-*.txt
 data/demande-*.csv
+# Les listes de commande portent nos prix d'achat.
+data/commande-*.csv
 data/Demande de tarif*.xlsx
 data/gineys/
 data/catalogues/

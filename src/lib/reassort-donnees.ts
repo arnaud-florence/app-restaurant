@@ -27,7 +27,27 @@ import {
   type PlatArdoise, type LigneComposition,
 } from '@/lib/ardoise'
 
-export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
+/**
+ * @param pour Date (AAAA-MM-JJ) pour laquelle on dimensionne. Défaut :
+ *   aujourd'hui.
+ *
+ * ⚠️⚠️ ON COMMANDE POUR LA SEMAINE QU'ON VA SERVIR, PAS POUR AUJOURD'HUI.
+ * Le chargeur ne lisait que l'ardoise couvrant le jour même. Mesuré le
+ * 05/10/2026, à sept jours de l'ouverture : l'ardoise du 12 au 18 octobre
+ * existait, elle était saisie, et les 223 cibles tombaient quand même sur
+ * le repli `stock_cible` — c'est-à-dire sur la carte ENTIÈRE, le scénario
+ * le plus coûteux en reliquat (231 €/semaine contre 133 €). On aurait
+ * commandé la carte complète pour servir une ardoise réduite, et rien ne
+ * l'aurait signalé : l'écran affichait des cibles parfaitement plausibles.
+ *
+ * Un réassort se lit AVANT le service, et une commande se passe plusieurs
+ * jours avant la livraison : la date du jour est presque toujours la
+ * mauvaise borne.
+ */
+export async function chargerLignesReassort(
+  sb: SupabaseClient,
+  pour = new Date().toISOString().slice(0, 10),
+): Promise<LigneReassort[]> {
   const [produits, matieres, inventaires, etabs, ardoiseBrute, compoFiches, compoPdj, lignesDoc] = await Promise.all([
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
@@ -48,7 +68,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     sb.from('plats_du_jour')
       .select('id, recette_id, titre, date_debut, date_fin')
       .eq('actif', true)
-      .lte('date_debut', new Date().toISOString().slice(0, 10)),
+      .lte('date_debut', pour),
     lireTout<Record<string, unknown>>(() => sb.from('recette_ingredients')
       .select('recette_id, ingredient_id, quantite, unite').order('recette_id').order('ingredient_id')),
     lireTout<Record<string, unknown>>(() => sb.from('plat_du_jour_ingredients')
@@ -261,9 +281,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   // en casse (231 €/semaine contre 133 €) — l'écran DOIT le dire, sinon on
   // croit commander juste. Et surtout on ne propose pas zéro : à huit jours
   // de l'ouverture, un réassort muet empêcherait de commander.
-  const aujourdhui = new Date().toISOString().slice(0, 10)
   const ardoise = (ardoiseBrute.data ?? []).filter(
-    (a: Record<string, unknown>) => !a.date_fin || (a.date_fin as string) >= aujourdhui,
+    (a: Record<string, unknown>) => !a.date_fin || (a.date_fin as string) >= pour,
   )
   const besoinArdoise = new Map<string, number>()
   if (ardoise.length > 0) {
