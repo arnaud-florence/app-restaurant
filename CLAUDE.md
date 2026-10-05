@@ -2241,10 +2241,51 @@ enregistré à la main. Le seul contrôle qui tranche est une **vraie commande
 passée sur la caisse** — sans risque tant que l'établissement est en **mode
 école**, où les tickets n'entrent pas dans le CA.
 
-⚠️ Zelty **auto-détecte** les imprimantes du réseau et crée une ligne
-`TM-T88VI - <MAC>` à côté de celle qu'on nomme à la main. Illisible avec
-trois machines : garder les noms clairs (`Comptoir`, `Cuisine`, `Pizza`) et
-voir si les lignes auto reviennent après suppression.
+⚠️⚠️ **CE SONT LES ENTRÉES *AUTO* QUI FONCTIONNENT, PAS LES MANUELLES.**
+Zelty auto-détecte les imprimantes du réseau et crée une ligne
+`TM-T88VI<I> - <MAC>`. Une imprimante déclarée **à la main** (nom + IP) reste
+à **« Dernière connexion : N/A »** pour toujours : la caisse ne lui parle
+jamais. Les noms lisibles qu'on y pose (`Comptoir`, `Cuisine`) ne servent
+donc à rien pour le routage — il faut rattacher les postes à la ligne AUTO,
+même si son nom est un numéro de série.
+
+⚠️ **Le rattachement poste ↔ imprimante s'affiche en CASE À COCHER SOUS le
+menu déroulant**, jamais dans le menu lui-même, qui revient toujours à
+« Imprimante liée à l'appareil ». Trois quarts d'heure perdus à croire que
+l'enregistrement échouait alors qu'il passait : **il faut regarder sous le
+menu, pas dedans.** Séquence : choisir dans le menu → **Ajouter** (une case
+apparaît) → **Sauvegarder**.
+
+⚠️ Plusieurs imprimantes peuvent être cochées sur un même poste — donc
+décocher celles qui pointent sur la MÊME machine, sinon le bon sort en
+double.
+
+✅✅ **`bo.zelty.fr/printers/reports` EST LA PAGE QUI RÉSOUT TOUT.** « Envoyer
+tout » n'imprimait rien et aucun écran ne disait pourquoi. Ce rapport l'a
+donné en une ligne :
+
+    Connection: 192.168.1.196:9100 [Operation timed out]
+    Name: TM-T88VI - 44D244C4612E
+    IP: 192.168.1.70  SSID: CASATASIA_5GEXT
+    Error: POSIXErrorCode 60
+
+La caisse imprimait sur l'imprimante du **COMPTOIR** (débranchée à ce
+moment-là) parce que le poste Cuisine n'avait aucune imprimante attachée et
+retombait sur « l'imprimante liée à l'appareil ». **Quand un bon ne sort
+pas, cette page est le PREMIER endroit où regarder** — elle donne l'IP
+visée, l'appareil émetteur, son SSID et le code d'erreur POSIX.
+
+⚠️ **Le bouton « imprimante » du ticket ne prouve RIEN sur le routage** : il
+sort le ticket entier sur l'imprimante par défaut de la caisse, sans
+consulter les lieux de fabrication. Seul **« Envoyer tout »** (l'envoi en
+production) exerce la chaîne réelle. Tester avec le mauvais bouton fait
+conclure que tout marche alors que rien n'est routé.
+
+⚠️ **L'app Zelty KDS refuse les identifiants du back-office** (« erreur
+d'authentification ») alors que l'app Zelty Caisse les accepte sur le MÊME
+iPad, et que Safari ouvre le back-office avec le même mot de passe tapé au
+même clavier. Question ouverte pour le support (09 72 53 55 72). Le KDS
+n'est pas sur le chemin critique : les bons sortent sur papier.
 
 ### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
 
