@@ -77,6 +77,7 @@ data/demande-*.csv
 # Les listes de commande portent nos prix d'achat.
 data/commande-*.csv
 data/liste-*.csv
+data/liste-*.txt
 data/Demande de tarif*.xlsx
 data/gineys/
 data/catalogues/
