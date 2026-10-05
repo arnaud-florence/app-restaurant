@@ -9,7 +9,7 @@ import {
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
 import { prixReprenable } from '@/lib/catalogue-achats'
-import { fmtPrix, fmtEcart } from '@/lib/foodCost'
+import { fmtPrix, fmtPrix4, fmtEcart } from '@/lib/foodCost'
 import { enregistrerParametres, creerBonsDepuisReassort, basculerFournisseur } from './actions'
 
 type Vue = 'categories' | 'fournisseurs' | 'etablissements'
@@ -447,17 +447,24 @@ function Offres({ l }: { l: LigneReassort }) {
         // L'ancien est réécrit tel quel — l'effacer perdrait le seul
         // chiffre qu'on ait, et un `null` se lit « prix inconnu » sur
         // l'écran qui déclenche la commande.
-        prix: repris ? p : l.cout_unitaire_ht,
+        prix: repris ? p.prix : l.cout_unitaire_ht,
         prix_releve: repris ? o.nature === 'facture' : !l.estime,
       })
+      // ⚠️ UN PRIX CONVERTI MONTRE SON CALCUL. Un nombre dérivé qu'on ne
+      // sait pas décomposer n'est pas vérifiable, et c'est la première
+      // chose qu'on conteste quand il paraît faux.
+      const calcul = p == null ? '' : p.converti
+        ? ` Prix converti : ${fmtPrix(o.prix_ref)}/${o.unite_ref} × ${p.facteur} `
+          + `${o.unite_ref} = ${fmtPrix4(p.prix)} par ${l.unite}.`
+        : ` Prix repris : ${fmtPrix(p.prix)}/${o.unite_ref}.`
       setMot(r.ok
         ? r.message + (repris
-            ? (o.nature === 'facture'
-                ? ` Prix repris : ${fmtPrix(o.prix_ref)}/${o.unite_ref} (payé).`
-                : ` Prix repris à ${fmtPrix(o.prix_ref)}/${o.unite_ref} — il vient d'un ${o.nature}, `
-                  + `donc marqué ESTIMÉ jusqu'à leur première facture.`)
-            : ` ⚠️ Le PRIX n'est pas repris : l'offre est en ${o.unite_ref}, notre ligne en `
-              + `${l.unite ?? 'unité inconnue'}. À saisir dans la fiche.`)
+            ? calcul + (o.nature === 'facture'
+                ? ' (prix payé)'
+                : ` ⚠️ Il vient d'un ${o.nature} : marqué ESTIMÉ jusqu'à leur première facture.`)
+            : ` ⚠️ Le PRIX n'est pas repris : l'offre est en ${o.unite_ref} et notre unité `
+              + `(« ${l.unite ?? 'inconnue'} ») ne dit pas combien elle en contient. `
+              + `À saisir dans la fiche.`)
         : '⚠️ ' + r.message)
     })
   }
@@ -470,7 +477,20 @@ function Offres({ l }: { l: LigneReassort }) {
       <ul className="mt-1.5 space-y-1">
         {/* ⚠️ TOUTES les offres, pas seulement la meilleure : le deuxième
             livre peut-être le lendemain, ou sans minimum de commande. */}
-        {offres.map(o => (
+        {offres.map(o => {
+          // ⚠️⚠️ L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX, et
+          // les deux peuvent diverger de signe. `ecartPct` compare l'offre
+          // à la ligne de catalogue de NOTRE fournisseur ; ce qu'on paie
+          // vraiment est `cout_unitaire_ht`, qui a pu être posé à la main,
+          // relevé sur une facture ou basculé avant. Mesuré le 05/10/2026 :
+          // la sauce moutarde est annoncée moins chère chez La Frite Belge
+          // et coûterait +12,5 % de plus que ce qu'on paie. Afficher le
+          // seul écart catalogue ferait basculer vers un prix PLUS CHER
+          // avec un pourcentage négatif sous les yeux.
+          const p = prixReprenable(o, l.unite)
+          const nous = l.cout_unitaire_ht
+          const effet = p != null && nous != null && nous > 0 ? p.prix / nous - 1 : null
+          return (
           <li key={o.fournisseur_id + o.designation}
             className="flex flex-wrap items-center gap-2 text-[13px]">
             <span className="w-14 text-right font-bold tabular-nums text-violet-800">
@@ -481,6 +501,23 @@ function Offres({ l }: { l: LigneReassort }) {
             {/* ⚠️ La NATURE change ce qu'on a le droit d'en conclure : un
                 devis est une proposition, une facture une preuve. */}
             <NatureOffre nature={o.nature} />
+            {/* CE QUE ÇA FAIT À NOTRE PRIX — le seul chiffre qui décide. */}
+            {p == null
+              ? <span className="rounded bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-800">
+                  prix à saisir
+                </span>
+              : <span className="tabular-nums text-zinc-900">
+                  → {fmtPrix4(p.prix)}/{l.unite}
+                  {effet != null && (
+                    <span className={`ml-1 rounded px-1.5 py-px text-[10px] font-bold ${
+                      effet > 0.001 ? 'bg-red-100 text-red-800'
+                      : effet < -0.001 ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-zinc-100 text-zinc-600'}`}>
+                      {effet > 0.001 ? '⚠️ +' : effet < -0.001 ? '−' : '='}
+                      {Math.abs(effet) > 0.001 ? fmtEcart(Math.abs(effet) * 100) : ''}
+                    </span>
+                  )}
+                </span>}
             <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">
               {o.designation}{o.reference && <> · réf. {o.reference}</>}
             </span>
@@ -489,16 +526,21 @@ function Offres({ l }: { l: LigneReassort }) {
               {enCours ? '…' : 'Prendre celui-ci'}
             </button>
           </li>
-        ))}
+          )
+        })}
       </ul>
       {mot && <p className="mt-1.5 text-[12px] font-medium text-zinc-800">{mot}</p>}
       <p className="mt-1.5 text-[11px] text-violet-900">
-        ⚠️ Un écart en pourcentage ne décide de rien tant qu&apos;il n&apos;est pas multiplié par
-        les quantités réelles : vérifiez le minimum de commande et le délai avant de basculer.
-        {' '}Le prix n&apos;est repris que si son unité est la nôtre
-        {l.unite === 'unité d’achat' && (
-          <> — ici notre ligne est à l&apos;<strong>unité d&apos;achat</strong>, donc c&apos;est
-          le fournisseur et sa référence qui sont repris, pas le prix</>
+        ⚠️ Le pourcentage violet à gauche compare les deux <strong>catalogues</strong> ;
+        la pastille verte ou rouge dit ce que ça fait à <strong>ce que nous payons</strong> —
+        les deux peuvent diverger de signe, et c&apos;est la seconde qui décide.
+        {' '}Un écart ne décide de rien tant qu&apos;il n&apos;est pas multiplié par les quantités
+        réelles : vérifiez le minimum de commande et le délai avant de basculer.
+        {' '}Le prix est ramené à notre unité d&apos;achat quand elle dit sa contenance
+        {prixReprenable(offres[0], l.unite) == null && (
+          <> — ⚠️ ce n&apos;est pas le cas de « <strong>{l.unite ?? 'inconnue'}</strong> », qui ne dit
+          pas combien de {offres[0].unite_ref} elle contient : seuls le fournisseur et sa
+          référence seront repris</>
         )}.
       </p>
     </div>

@@ -380,7 +380,32 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
   // ⚠️ Un prix non reprenable ne doit pas être EFFACÉ : un `null` se lit
   // « prix inconnu » sur l'écran qui déclenche la commande.
   t('⚠️ une unité discordante n’efface pas le prix existant',
-    /prix: repris \? p : l\.cout_unitaire_ht/.test(cli))
+    /prix: repris \? p\.prix : l\.cout_unitaire_ht/.test(cli))
+  // ⚠️ UN PRIX CONVERTI MONTRE SON CALCUL. Un nombre dérivé qu'on ne sait
+  // pas décomposer n'est pas vérifiable, et c'est la première chose qu'on
+  // conteste quand il paraît faux.
+  t('⚠️ un prix CONVERTI affiche son calcul',
+    /p\.converti/.test(cli) && /p\.facteur/.test(cli))
+  // ⚠️ Et quand la conversion n'est pas possible, l'écran dit POURQUOI :
+  // ce n'est pas « les unités diffèrent », c'est « notre unité ne dit pas
+  // combien elle en contient ». La nuance est ce qui indique quoi corriger.
+  t('… et un refus dit que notre unité ne porte pas sa contenance',
+    /ne dit pas combien/.test(cli))
+
+  // ⚠️⚠️ L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX. `ecartPct`
+  // compare l'offre à la ligne de catalogue de NOTRE fournisseur ; ce qu'on
+  // paie vraiment est `cout_unitaire_ht`. Mesuré le 05/10/2026 : la sauce
+  // moutarde est annoncée moins chère chez La Frite Belge et coûterait
+  // +12,5 % de plus que ce qu'on paie. Afficher le seul écart catalogue
+  // ferait basculer vers un prix PLUS CHER, pourcentage négatif à l'appui.
+  t('⚠️⚠️ chaque offre dit ce qu’elle fait à NOTRE prix, pas que l’écart catalogue',
+    /p\.prix \/ nous - 1/.test(cli) && /effet > 0\.001/.test(cli))
+  t('… et une hausse est marquée en ROUGE, jamais fondue dans l’écart',
+    /bg-red-100 text-red-800/.test(cli))
+  // On AVERTIT, on ne bloque pas : un minimum de commande ou une
+  // disponibilité peut justifier de payer plus cher. C'est une décision.
+  t('… l’écran AVERTIT sans interdire la bascule',
+    !/disabled=\{enCours \|\| effet/.test(cli))
 
   t('les offres sont TOUTES montrées, triées par le chargeur',
     /offres\.map\(o =>/.test(cli) && /offre\(s\) moins chère\(s\)/.test(cli))

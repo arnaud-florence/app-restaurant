@@ -14,7 +14,7 @@ import {
   type OffreFournisseur, type EtatPlateforme, type Manque,
   type ArticleAchete, type FiltresAchete, type OffreConcurrente,
 } from '@/lib/catalogue-achats'
-import { fmtPrix, fmtEcart } from '@/lib/foodCost'
+import { fmtPrix, fmtPrix4, fmtEcart } from '@/lib/foodCost'
 import { demanderRemises, type ResultatDemande } from './actions'
 import { modifierArticleAchat } from './modifier-actions'
 
@@ -1143,19 +1143,29 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
                       // facture arrive marqué « estimé » (0165).
                       const p = prixReprenable(o, a.unite)
                       if (p != null) {
-                        setPrix(String(p))
+                        setPrix(String(p.prix))
                         setReleve(o.nature === 'facture')
-                        dire(o.nature === 'facture' ? null
-                          : `${o.fournisseur} repris à ${fmtPrix(o.prix_ref)}/${o.unite_ref}. `
-                            + `⚠️ Ce prix vient d'un ${o.nature} : il reste marqué ESTIMÉ `
-                            + `jusqu'à leur première facture.`)
+                        // ⚠️ UN PRIX CONVERTI MONTRE SON CALCUL : un nombre
+                        // dérivé qu'on ne sait pas décomposer n'est pas
+                        // vérifiable, et c'est la première chose qu'on
+                        // conteste quand il paraît faux.
+                        const calcul = p.converti
+                          ? `${o.fournisseur} : ${fmtPrix(o.prix_ref)}/${o.unite_ref} × ${p.facteur} `
+                            + `${o.unite_ref} = ${fmtPrix4(p.prix)} par ${a.unite}.`
+                          : `${o.fournisseur} repris à ${fmtPrix(p.prix)}/${o.unite_ref}.`
+                        dire(o.nature === 'facture' && !p.converti ? null
+                          : calcul + (o.nature === 'facture' ? ' (prix payé)'
+                            : ` ⚠️ Ce prix vient d'un ${o.nature} : il reste marqué ESTIMÉ `
+                              + `jusqu'à leur première facture.`))
                       } else {
-                        // ⚠️ L'unité ne concorde pas : un sachet de neuf
-                        // pains recopié sur une ligne à la pièce
-                        // multiplierait le coût par neuf.
+                        // ⚠️ Notre unité ne dit pas sa contenance — « unité
+                        // d'achat », « sachet » — donc il n'y a RIEN à
+                        // convertir. Recopier le prix du sachet de neuf
+                        // pains sur une ligne à la pièce multiplierait le
+                        // coût par neuf, sans que rien ne le signale.
                         dire(`${o.fournisseur} et sa référence sont repris. ⚠️ Le PRIX ne l'est pas : `
-                          + `l'offre est en ${o.unite_ref}, notre ligne en ${a.unite ?? 'unité inconnue'} `
-                          + `— à saisir à la main.`)
+                          + `l'offre est en ${o.unite_ref} et notre unité (« ${a.unite ?? 'inconnue'} ») `
+                          + `ne dit pas combien elle en contient — à saisir à la main.`)
                       }
                     }}
                     className="rounded border border-violet-400 bg-white px-2 py-1 text-xs font-bold text-violet-800 hover:bg-violet-100">
@@ -1165,7 +1175,9 @@ function EditionAchat({ a, fournisseurs, fermer, dire }: {
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-violet-900">
-              ⚠️ Un prix repris d&apos;un <strong>devis</strong> reste marqué « estimé » jusqu&apos;à
+              ⚠️ Le prix est ramené à notre unité d&apos;achat quand elle dit sa contenance
+              (« barquette 500 g » face à un €/kg) ; sinon seuls le fournisseur et sa référence
+              sont repris. Un prix repris d&apos;un <strong>devis</strong> reste marqué « estimé » jusqu&apos;à
               la première facture : il dit ce qu&apos;on va payer, pas ce qu&apos;on a payé. Un écart
               en pourcentage ne décide de rien tant qu&apos;il n&apos;est pas multiplié par les
               quantités réelles. Vérifiez le minimum de commande et le délai avant de basculer.

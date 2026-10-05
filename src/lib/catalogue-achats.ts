@@ -1,4 +1,4 @@
-import { mots, MOTS_COMMUNS_MINIMUM } from '@/lib/tarifs-fournisseurs'
+import { mots, MOTS_COMMUNS_MINIMUM, prixReferenceMatiere } from '@/lib/tarifs-fournisseurs'
 // La plateforme d'achat — un seul catalogue, tous fournisseurs.
 //
 // L'outil savait comparer ce qu'on achète DÉJÀ (`/admin/tarifs-fournisseurs`,
@@ -534,10 +534,10 @@ export type OffreConcurrente = {
 }
 
 /**
- * ⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE ?
+ * CE QUE L'OFFRE VAUT DANS NOTRE UNITÉ D'ACHAT.
  *
- * OUI dès que son unité de référence est la NÔTRE — quelle que soit sa
- * nature.
+ * ⚠️ PEUT-ON REPRENDRE LE PRIX ? Oui dès qu'on sait le ramener à l'unité
+ * dans laquelle on achète — quelle que soit la nature de l'offre.
  *
  * ⚠️ CORRECTION D'UNE SUR-PRUDENCE (27/09/2026). Une première version
  * refusait tout prix qui ne venait pas d'une facture, pour protéger
@@ -553,23 +553,75 @@ export type OffreConcurrente = {
  * disant qu'il est une hypothèse, et la première facture le confirmera.
  * Seule une offre de nature `facture` coche « prix relevé ».
  *
- * ⚠️ L'unité, elle, reste une condition dure : notre « Pain burger » se
- * compte à la pièce quand l'offre est un sachet de neuf — y recopier le
- * prix du sachet multiplierait notre coût par neuf, sans que rien ne le
- * signale. Là, on reprend le fournisseur et pas le prix, et on le dit.
+ * ⚠️⚠️ ET LA CONTENANCE DE NOTRE UNITÉ EST LUE (05/10/2026). Jusqu'ici la
+ * reprise exigeait que notre unité soit LITTÉRALEMENT celle de l'offre —
+ * donc elle échouait sur « barquette 500 g » face à un €/kg, c'est-à-dire
+ * sur la moitié de nos matières. Mesuré : 4 lignes sur 15 reprenaient le
+ * prix. Or la conversion n'est pas une invention : c'est
+ * `prixReferenceMatiere()`, exactement la fonction qui a permis d'AFFICHER
+ * l'écart. Si on lui fait confiance pour comparer, on peut lui faire
+ * confiance pour écrire — un écart calculé sur une contenance fausse
+ * serait déjà faux, et il est déjà sous les yeux du gérant.
+ *
+ * ⚠️ La concordance de FORMAT et de BASE est garantie en AMONT : une offre
+ * ne sort que d'un groupe rendu comparable par `comparer()`, qui exige
+ * `memeBase()`. Une botte ne se confronte jamais à un kilo, ni une 5/1 à
+ * une 4/4 — donc ici le facteur ne peut pas franchir ces frontières.
+ *
+ * ⚠️ `converti` et `facteur` sont RENDUS, pas gardés pour nous : un prix
+ * dérivé qu'on ne sait pas décomposer n'est pas vérifiable, et c'est la
+ * première chose qu'on conteste quand il paraît faux. L'écran doit pouvoir
+ * montrer « 9,717 €/kg × 0,5 kg ».
+ *
+ * ⚠️ RESTE REFUSÉ : une unité qu'on ne sait pas lire. « unité d'achat »
+ * — celle des produits revendus — ne dit pas combien de kilos elle
+ * contient, et il n'y a rien à en déduire. Là on reprend le fournisseur
+ * et pas le prix, et on le dit.
  */
+export type ReprisePrix = {
+  /** Prix pour NOTRE unité d'achat. */
+  prix: number
+  /** ⚠️ Vrai quand le prix est DÉRIVÉ de l'unité de référence. */
+  converti: boolean
+  /** Combien d'unités de référence tient notre unité (1 si lu tel quel). */
+  facteur: number
+  /** L'unité de référence de l'offre — pour montrer le calcul. */
+  unite_ref: string
+}
+
+/** kg / L / pièce, écrits de dix façons dans nos unités de stock. */
+function uniteRef(u: string | null | undefined): string {
+  const t = String(u ?? '').trim().toLowerCase()
+  if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
+  if (['l', 'litre', 'litres'].includes(t)) return 'litre'
+  if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
+  return t
+}
+
 export function prixReprenable(
   offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref'>,
   uniteNotre: string | null,
-): number | null {
-  const n = (u: string | null | undefined) => {
-    const t = String(u ?? '').trim().toLowerCase()
-    if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
-    if (['l', 'litre', 'litres'].includes(t)) return 'litre'
-    if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
-    return t
+): ReprisePrix | null {
+  const cible = uniteRef(offre.unite_ref)
+  // Notre unité EST celle de l'offre : rien à convertir.
+  if (cible === uniteRef(uniteNotre)) {
+    return { prix: offre.prix_ref, converti: false, facteur: 1, unite_ref: offre.unite_ref }
   }
-  return n(offre.unite_ref) === n(uniteNotre) ? offre.prix_ref : null
+  if (!uniteNotre) return null
+
+  // ⚠️ `prixReferenceMatiere(u, 1)` rend le prix de reference d'une unite
+  // qui coûterait 1 € : son `prix` vaut donc 1 / (contenance). On inverse.
+  const r = prixReferenceMatiere(uniteNotre, 1)
+  if (!r || uniteRef(r.unite) !== cible || !(r.prix > 0)) return null
+  const facteur = 1 / r.prix
+  // ⚠️ 4 décimales, comme `cout_achat_ht` et `prix_achat_ht` : un arrondi
+  // à 2 fait disparaître le prix d'une capsule ou d'un sac.
+  return {
+    prix: Math.round(offre.prix_ref * facteur * 10000) / 10000,
+    converti: true,
+    facteur: Math.round(facteur * 10000) / 10000,
+    unite_ref: offre.unite_ref,
+  }
 }
 
 export type FiltresAchete = {

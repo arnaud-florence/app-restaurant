@@ -3201,6 +3201,87 @@ La Frite Belge ne porte qu'un ketchup.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 
+### Choisir son fournisseur depuis la ligne de commande (05/10/2026)
+
+Le signal « 💡 −30 % chez Félix Potin » était affiché sur la ligne depuis la
+0163, mais pour AGIR il fallait partir sur `/admin/achats`. Entre les deux
+écrans on perd la ligne qu'on regardait, et le geste ne se fait pas — l'écart
+reste, exactement comme avant qu'on sache le détecter.
+
+Bouton « ▾ N offre(s) » sur la ligne ; « Prendre celui-ci » bascule
+fournisseur, référence et prix. `basculerFournisseur()` appelle
+`modifierArticleAchat` — le garde-fou des 95 %, la division par
+`unites_par_achat` et le drapeau `prix_estime` (0165) ne sont PAS réécrits.
+
+⚠️⚠️ **UNE LIGNE DE RÉASSORT EST UN GROUPE, PAS UN PRODUIT.** L'écran replie
+les produits qui partagent une matière (0131) : « PLAQUE PIZZA CRUE » porte la
+margherita ET la jambon-fromage, la même capsule porte les quatre cafés.
+N'écrire que sur le représentant laisserait les autres chez l'ancien
+fournisseur — **et la ligne afficherait quand même le nouveau**, puisqu'elle
+prend le PREMIER membre qui en porte un. Le groupe paraîtrait basculé alors
+qu'il ne l'est qu'à moitié. Un refus partiel est DIT.
+
+⚠️ Le prix passé est celui de l'unité ACHETÉE, la MÊME pour tout le groupe
+puisque c'est ce qui le définit ; chaque membre le divise par SON
+`unites_par_achat`. C'est l'argument décisif pour boucler sur l'action
+partagée plutôt que d'écrire soi-même.
+
+⚠️ Le groupe est reconstitué en JS, pas par un `.or()` PostgREST : un libellé
+fournisseur contient des virgules et des parenthèses, qui sont la syntaxe même
+des filtres — la requête partirait tronquée sans lever d'erreur. Et la
+précédence de `cleMatiere` (`nom_matiere ?? libelle_achat ?? nom`) ne
+s'exprime pas en SQL.
+
+**`prixReprenable()` lit la CONTENANCE de notre unité (05/10/2026).**
+Elle exigeait que notre unité soit LITTÉRALEMENT celle de l'offre, donc elle
+échouait sur « barquette 500 g » face à un €/kg — **4 lignes sur 15
+reprenaient le prix**. Or la conversion n'est pas une invention : c'est
+`prixReferenceMatiere()`, exactement la fonction qui a permis d'AFFICHER
+l'écart. Si on lui fait confiance pour comparer, on peut lui faire confiance
+pour écrire. **12 sur 15** désormais (4 telles quelles, 8 converties).
+
+⚠️ La concordance de FORMAT et de BASE est garantie en AMONT : une offre ne
+sort que d'un groupe rendu comparable par `comparer()`, qui exige
+`memeBase()`. Une botte ne se confronte jamais à un kilo, ni une 5/1 à une
+4/4 — le facteur ne peut pas franchir ces frontières.
+
+⚠️ `converti` et `facteur` sont RENDUS, pas gardés : un prix dérivé qu'on ne
+sait pas décomposer n'est pas vérifiable, et c'est la première chose qu'on
+conteste quand il paraît faux. L'écran montre « 2,437 €/kg × 0,92 kg =
+2,2420 € la bouteille ».
+
+⚠️ RESTE REFUSÉ : une unité qu'on ne sait pas lire. « unité d'achat » — celle
+des produits revendus — ne dit pas combien de kilos elle contient. Les trois
+boissons (Coca, Coca Zéro, Perrier) sont dans ce cas : fournisseur et
+référence repris, prix à saisir, et l'écran dit POURQUOI.
+
+✅ **Contrôle croisé** : sur les matières déjà basculées à la main, la
+conversion retrouve le prix au millième (Serrano 6,8890 contre 6,8900 posé ;
+mayonnaise 2,2420 contre 2,2420). C'est la meilleure vérification qu'on
+pouvait avoir de l'arithmétique.
+
+⚠️⚠️ **L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX, et les deux
+peuvent diverger de SIGNE.** `ecartPct` compare l'offre à la ligne de
+catalogue de NOTRE fournisseur ; ce qu'on paie vraiment est
+`cout_unitaire_ht`, qui a pu être posé à la main, relevé sur une facture ou
+basculé avant. Trouvé le jour même : **la sauce moutarde est annoncée moins
+chère chez La Frite Belge et coûterait +12,5 % de plus que ce qu'on paie.**
+N'afficher que l'écart catalogue ferait basculer vers un prix PLUS CHER,
+pourcentage négatif à l'appui. Chaque offre porte donc une pastille — verte,
+grise ou **rouge** — qui dit ce qu'elle fait à notre prix. On AVERTIT sans
+interdire : un minimum de commande ou une disponibilité peut justifier de
+payer plus cher, c'est une décision.
+
+⚠️⚠️ Et c'est ce qui rend le bon CHIFFRABLE : une ligne simplement
+RÉAIGUILLÉE par « au moins cher » part sans prix, et le bon sans montant (le
+bon Félix Potin à 0,00 €). Basculer pour de bon reprend le prix.
+
+Test : `PORT=3000 node scripts/test-reassort.mjs` — 76 assertions.
+⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble. Et
+`test-achats.mjs` RECOPIE `prixReprenable()` en déléguant la lecture de la
+contenance — une assertion de source vérifie que la lib ne la réimplémente
+pas de son côté.
+
 ### Les cibles de stock — posées, et chacune dit d'où elle vient (27/09/2026)
 
 `/admin/reassort` affichait **191 références sans cible** : l'écran savait

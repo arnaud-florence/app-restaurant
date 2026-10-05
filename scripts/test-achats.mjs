@@ -594,22 +594,96 @@ titre('Basculer chez le moins cher, depuis la fiche')
     if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
     return t
   }
-  const prixReprenable = (o, notre) => (nU(o.unite_ref) === nU(notre) ? o.prix_ref : null)
+  // ⚠️ RECOPIE de `prixReprenable()`. La lecture de la contenance, elle,
+  // est DÉLÉGUÉE à `prixReferenceMatiere()` — la fonction qui a permis
+  // d'AFFICHER l'écart. Le lecteur ci-dessous ne couvre que les formes
+  // réellement en usage (« barquette 500 g », « bouteille 950 g »,
+  // « poche 1 kg », « colis 3000 ») ; l'extraction complète est gardée par
+  // `test-tarifs-fournisseurs.mjs`, et une assertion de source vérifie
+  // plus bas que la lib ne la réimplémente pas de son côté.
+  const contenance = u => {
+    const t = String(u ?? '').trim().toLowerCase()
+    let m = t.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|cl|ml)\b/)
+    if (m) {
+      const v = Number(m[1].replace(',', '.'))
+      if (m[2] === 'kg') return { valeur: v, unite: 'kg' }
+      if (m[2] === 'g') return { valeur: v / 1000, unite: 'kg' }
+      if (m[2] === 'l') return { valeur: v, unite: 'litre' }
+      if (m[2] === 'cl') return { valeur: v / 100, unite: 'litre' }
+      if (m[2] === 'ml') return { valeur: v / 1000, unite: 'litre' }
+    }
+    m = t.match(/^(?:colis|sac|sachet|carton|boite|lot)\s+(\d+)$/)
+    if (m) return { valeur: Number(m[1]), unite: 'pièce' }
+    return null
+  }
+  const prixReprenable = (o, notre) => {
+    const cible = nU(o.unite_ref)
+    if (cible === nU(notre)) return { prix: o.prix_ref, converti: false, facteur: 1 }
+    if (!notre) return null
+    const c = contenance(notre)
+    if (!c || nU(c.unite) !== cible) return null
+    return {
+      prix: Math.round(o.prix_ref * c.valeur * 10000) / 10000,
+      converti: true,
+      facteur: Math.round(c.valeur * 10000) / 10000,
+    }
+  }
   // ⚠️ Ce n'est PAS le refus du prix qui protège, c'est le drapeau.
   const estimeApres = nature => nature !== 'facture'
 
   t('⚠️ LE PRIX SUIT LE FOURNISSEUR — garder l’ancien serait plus faux',
-    prixReprenable({ unite_ref: 'kg', prix_ref: 5.625 }, 'kg') === 5.625)
+    prixReprenable({ unite_ref: 'kg', prix_ref: 5.625 }, 'kg').prix === 5.625)
   t('« Kg » et « kg » sont la même unité',
-    prixReprenable({ unite_ref: 'Kg', prix_ref: 5.6 }, 'kg') === 5.6)
+    prixReprenable({ unite_ref: 'Kg', prix_ref: 5.6 }, 'kg').prix === 5.6)
   t('⚠️⚠️ un prix repris d’un DEVIS arrive marqué ESTIMÉ', estimeApres('devis') === true)
   t('⚠️ d’un PORTAIL aussi — c’est un prix affiché', estimeApres('portail') === true)
   t('d’un CATALOGUE aussi', estimeApres('catalogue') === true)
   t('seule une FACTURE vaut prix relevé', estimeApres('facture') === false)
   t('⚠️⚠️ le prix ne se reprend PAS d’un sachet de neuf vers une pièce',
     prixReprenable({ unite_ref: 'sachet', prix_ref: 5.776 }, 'pièce') === null)
-  t('ni d’un kilo vers une barquette de 500 g',
-    prixReprenable({ unite_ref: 'kg', prix_ref: 9 }, 'barquette 500 g') === null)
+
+  // ⚠️⚠️ ASSERTION RÉVISÉE SUR DÉCISION DU GÉRANT (05/10/2026), pas
+  // contournée. Elle exigeait qu'un €/kg ne se reprenne JAMAIS sur une
+  // « barquette 500 g » — ce qui refusait le prix sur 11 de nos 15 lignes
+  // comparables, c'est-à-dire presque partout. Or la conversion n'est pas
+  // une invention : c'est `prixReferenceMatiere()`, la fonction même qui a
+  // permis d'afficher l'écart. Si on lui fait confiance pour comparer, on
+  // peut lui faire confiance pour écrire.
+  // CE QUI RESTE INTERDIT N'A PAS BOUGÉ : une unité dont on ne sait pas
+  // lire la contenance ne produit AUCUN prix.
+  const barq = prixReprenable({ unite_ref: 'kg', prix_ref: 9 }, 'barquette 500 g')
+  t('un €/kg se ramène à notre barquette de 500 g',
+    barq.prix === 4.5 && barq.converti === true && barq.facteur === 0.5)
+  t('… et le facteur est RENDU, pour que l’écran montre le calcul',
+    barq.facteur === 0.5)
+  t('la mayonnaise : 2,437 €/kg × 0,92 = 2,2420 € la bouteille',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 2.437 }, 'bouteille 920 g').prix === 2.242)
+  t('un colis de 3000 pièces se chiffre au colis',
+    prixReprenable({ unite_ref: 'piece', prix_ref: 0.0127 }, 'colis 3000').prix === 38.1)
+  t('⚠️ une unité ramenée telle quelle n’est PAS marquée convertie',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 5.6 }, 'kg').converti === false)
+  // ⚠️ « unité d'achat » est celle des produits REVENDUS : elle ne dit pas
+  // combien de kilos elle contient, et il n'y a rien à en déduire. Là on
+  // reprend le fournisseur et pas le prix — c'est le cas des 3 boissons.
+  t('⚠️⚠️ « unité d’achat » ne dit pas sa contenance : AUCUN prix',
+    prixReprenable({ unite_ref: 'L', prix_ref: 1.818 }, 'unité d’achat') === null)
+  t('… ni un « sachet » nu',
+    prixReprenable({ unite_ref: 'kg', prix_ref: 9 }, 'sachet') === null)
+
+  // ⚠️ La lib ne doit pas réimplémenter la lecture de la contenance de son
+  // côté : une seconde extraction finirait par convertir un prix que
+  // /admin/tarifs-fournisseurs refuse de comparer.
+  {
+    const lib = fs.readFileSync('src/lib/catalogue-achats.ts', 'utf8')
+    t('la conversion DÉLÈGUE à prixReferenceMatiere(), elle ne la refait pas',
+      /prixReferenceMatiere\(uniteNotre, 1\)/.test(lib))
+    // ⚠️ La concordance de FORMAT et de BASE est garantie en amont par
+    // `comparer()` : une botte ne se confronte jamais à un kilo. Le
+    // commentaire doit le dire, sinon quelqu'un ajoutera un garde-fou
+    // redondant ici et un vrai garde-fou nulle part.
+    t('… et la garantie amont (comparer/memeBase) est écrite',
+      /memeBase\(\)/.test(lib) && /comparer\(\)/.test(lib))
+  }
   t('une unité inconnue des deux côtés ne se reprend pas non plus',
     prixReprenable({ unite_ref: 'BT', prix_ref: 3 }, null) === null)
 
