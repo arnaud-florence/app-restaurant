@@ -340,5 +340,51 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
     /bon_commande_lignes/.test(fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')))
 }
 
+// ─── Basculer de fournisseur depuis la ligne de commande ──────────────
+//
+// ⚠️ Il RECOPIE la règle depuis le TS : modifier les deux ensemble.
+{
+  console.log('\n── Basculer de fournisseur depuis le réassort ──')
+  const act = fs.readFileSync('src/app/admin/reassort/actions.ts', 'utf8')
+  const cli = fs.readFileSync('src/app/admin/reassort/ReassortClient.tsx', 'utf8')
+
+  // ⚠️ UNE SEULE IMPLÉMENTATION. Le garde-fou des 95 %, la division par
+  // `unites_par_achat` et le drapeau `prix_estime` vivent dans
+  // `modifierArticleAchat` : les réécrire ici finirait par écrire un prix
+  // que l'autre écran refuse.
+  t('la bascule appelle l’action partagée, elle ne réécrit pas la règle',
+    /modifierArticleAchat\(/.test(act) && !/0\.95/.test(act))
+
+  // ⚠️⚠️ UNE LIGNE DE RÉASSORT EST UN GROUPE. N'écrire que sur le
+  // représentant laisserait les autres membres chez l'ancien fournisseur,
+  // pendant que la ligne afficherait le nouveau — basculé à moitié, et
+  // rien pour le dire.
+  t('⚠️ le groupe ENTIER est basculé, pas le seul représentant',
+    /cleMatiere\(/.test(act) && /membres/.test(act) && /for \(const id of membres\)/.test(act))
+  t('… et le groupe est reconstitué en JS, pas par un .or() PostgREST',
+    !/\.or\(`?nom_matiere/.test(act))
+  t('… un refus partiel est DIT',
+    /refus\.length/.test(act) && /refusé\(s\)/.test(act))
+
+  // ⚠️ LA RÉFÉRENCE DE L'ANCIEN FOURNISSEUR NE SURVIT PAS (0142) : un code
+  // Gineys cité à Félix Potin fait chiffrer autre chose.
+  t('⚠️ la référence reprise est celle de l’OFFRE, jamais l’ancienne',
+    /reference: o\.reference \?\? null/.test(cli))
+
+  // ⚠️ LE PRIX SUIT LE FOURNISSEUR, mais seulement si l'unité est la
+  // nôtre — et le drapeau est ce qui protège, pas le refus (0165).
+  t('le prix ne suit que si l’unité concorde',
+    /prixReprenable\(o, l\.unite\)/.test(cli))
+  t('⚠️ un prix repris d’un devis reste ESTIMÉ',
+    /prix_releve: repris \? o\.nature === 'facture'/.test(cli))
+  // ⚠️ Un prix non reprenable ne doit pas être EFFACÉ : un `null` se lit
+  // « prix inconnu » sur l'écran qui déclenche la commande.
+  t('⚠️ une unité discordante n’efface pas le prix existant',
+    /prix: repris \? p : l\.cout_unitaire_ht/.test(cli))
+
+  t('les offres sont TOUTES montrées, triées par le chargeur',
+    /offres\.map\(o =>/.test(cli) && /offre\(s\) moins chère\(s\)/.test(cli))
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)
