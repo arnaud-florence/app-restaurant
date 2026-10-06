@@ -3354,6 +3354,48 @@ La Frite Belge ne porte qu'un ketchup.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
 
+### Gineys, ce sont DEUX fournisseurs (06/10/2026)
+
+⚠️⚠️ **Décision du gérant : le portail et la proposition commerciale ne
+viennent pas de la même personne, et leurs prix diffèrent sur les mêmes
+références.** **Nicolas** tient le compte et le tarif du portail ;
+**Sabine Ramillon** a chiffré la proposition du 05/10. Ils doivent être
+traités comme deux fournisseurs à part entière — c'est tout l'intérêt : on
+peut enfin les comparer.
+
+| Fiche | Ce qu'elle porte |
+|---|---|
+| **Gineys** | portail du 26/09, factures d'août, catalogue Arti'Pat — et les 46 matières, 40 produits et bons de commande qui s'y rattachent |
+| **Gineys — Sabine** | les 66 lignes de la proposition du 05/10, rien d'autre |
+
+⚠️⚠️ **SANS CETTE SÉPARATION, LA RÈGLE DU TARIF PÉRIMÉ LES ÉCRASE L'UN
+L'AUTRE.** `comparer()` marque comme remplacée toute ligne du MÊME
+fournisseur portant la MÊME référence à une date plus ancienne — règle juste
+quand un fournisseur révise son tarif, **fausse quand deux commerciaux
+proposent chacun le leur**. Sous une seule fiche, la proposition de Sabine
+éteignait silencieusement les prix de Nicolas : le comparateur n'en montrait
+qu'un, et on ne pouvait plus voir lequel des deux est le moins cher. Le
+défaut a été introduit et corrigé le même jour.
+
+**Résultat : 26 face-à-face sur la même référence, Sabine moins chère sur la
+très large majorité.** Les exceptions sont à regarder sur
+`/admin/tarifs-fournisseurs` : un commercial peut avoir plusieurs formats
+dans le même groupe, et l'huile d'olive oppose deux huiles différentes.
+
+⚠️ **ON N'A DÉPLACÉ QUE LES 66 LIGNES.** Renommer la fiche existante en
+« Gineys — Nicolas » romprait en silence les 46 matières dont
+`fournisseur_principal` porte le TEXTE « Gineys ». Si on veut le faire, il
+faut mettre à jour ce champ dans le même geste.
+
+⚠️ **Sabine n'a pas d'adresse e-mail en base** : un bon de commande pour
+elle sera rendu à copier, pas envoyé. À demander.
+
+`node scripts/separer-gineys-sabine.mjs [--ecrire]` — il REFUSE d'agir si le
+compte de lignes ne fait pas 66 : déplacer un sous-ensemble laisserait la
+grille coupée en deux et opposerait Nicolas à une Sabine amputée. Il
+REPOINTE les lignes au lieu de les recréer, sinon les clés de comparaison et
+les contenances posées à la main seraient perdues.
+
 ### La proposition commerciale de Gineys (05/10/2026)
 
 `node scripts/import-prop-gineys.mjs [--ecrire]` puis
