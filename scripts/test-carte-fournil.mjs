@@ -90,16 +90,16 @@ const AFFICHES = {
   'Formule Tartine': 4.4, 'Ice Tea 33 cl': 2, 'Ice Tea pêche 1,5 L': 3.5,
   'Jus d\'orange 33 cl': 2.2, 'Jus de pomme 33 cl': 2.2, 'Le Nordique': 5.5,
   'Le Parisien': 4.5, 'Le Poulet': 4.9, 'Le Rosette': 4.5,
-  'Madeleine chocolat-noisette': 1.9, 'Muffin chocolat-noisette': 3.5, 'Muffin citron': 3.5,
+  'Madeleine chocolat-noisette': 1.9, 'Muffin chocolat-noisette': 3.85, 'Muffin citron': 3.85,
   'Oasis tropical 1,5 L': 3.5, 'Orangina 1,5 L': 3.5, 'Orangina 33 cl': 2,
   'Pain au chocolat': 1.4, 'Pain aux raisins': 1.8, 'Pain complet': 2.6,
   'Pain lin-tournesol': 4.2, 'Panini chèvre-miel': 4.9, 'Panini jambon-fromage': 4.5,
   'Panini poulet-pesto': 4.9, 'Part de flan pâtissier': 3.8,
   'Perrier 33 cl': 2, 'Pizza à la plaque jambon-fromage': 2.9, 'Pizza à la plaque Margherita': 2.9,
   'Pizza ronde chèvre-miel': 3.9, 'Pizza ronde poulet-pesto': 3.9, 'Pizza ronde Reine': 3.9,
-  'Sacristain': 3.2, 'Salade italienne': 5.4, 'Salade poulet-feta': 5.2,
+  'Sacristain': 3.55, 'Salade italienne': 5.4, 'Salade poulet-feta': 5.2,
   'Salade saumon': 6, 'Tarte aux pommes': 3.8, 'Tartelette citron meringuée': 3.8,
-  'Thé': 2, 'Tiramisu individuel': 3.8, 'Tropézienne individuelle': 3.8,
+  'Thé': 2, 'Tiramisu individuel': 4.25, 'Tropézienne individuelle': 3.8,
 }
 // « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
 // SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent
