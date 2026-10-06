@@ -59,10 +59,10 @@ const api = async (chemin, init) => {
 // ─── Les matières qui manquaient ──────────────────────────────────────
 const A_CREER = [
   { nom: 'Baguette sandwich (pièce)', unite: 'pièce', prix: 0.435, stocke: false,
-    fournisseur: 'Gineys', categorie: 'Boulangerie',
+    fournisseur: 'Gineys (Nicolas)', categorie: 'Boulangerie',
     note: 'même pain que le produit vendu « Baguette classique » — NON stocké pour ne pas le commander deux fois' },
   { nom: 'Pain panini (pièce)', unite: 'pièce', prix: 0.566, stocke: true,
-    fournisseur: 'Gineys', categorie: 'Boulangerie',
+    fournisseur: 'Gineys (Nicolas)', categorie: 'Boulangerie',
     note: 'PANINI OVALE NATURE PRECUIT 20CM 125G ARTIPAT C=50, 28,29 € le colis de 50 (portail Gineys)' },
   { nom: 'Concombre (kg)', unite: 'kg', prix: 2.50, stocke: true,
     fournisseur: null, categorie: 'Restaurant',

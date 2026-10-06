@@ -59,7 +59,7 @@ const NOM = 'Pâton à pizza 350 g (pièce)'
   // affaire. Le comparateur lui-même ignore tout écart sous 10 %. On reste
   // donc chez le fournisseur où l'on commande déjà des pâtons — même
   // camion, pas de minimum de commande à atteindre ailleurs.
-  const dejaChezNous = offres.find(o => o.f === 'Gineys') ?? offres[0]
+  const dejaChezNous = offres.find(o => o.f === 'Gineys (Nicolas)') ?? offres[0]
   const ecart = ((dejaChezNous.piece / offres[0].piece) - 1) * 100
   console.log(`\n   retenu : ${dejaChezNous.f} à ${dejaChezNous.piece.toFixed(4)} €/pâton` +
     (ecart > 0.01 ? `  (+${ecart.toFixed(1)} % vs ${offres[0].f} — sous le seuil de 10 %, c'est du bruit)` : ''))

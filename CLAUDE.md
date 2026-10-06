@@ -3406,6 +3406,27 @@ perdue.
 elle correspond EXACTEMENT à l'ancien nom : un remplacement sur la chaîne
 entière abîmerait les notes qui citent le fournisseur.
 
+**Les sept scripts qui cherchaient la fiche par son nom sont alignés**
+(`cles-comparaison`, `fiches-fournil`, `tarifs-signature-gineys`,
+`corrections-gerant-0510`, `produits-commande-gineys`, `paton-350-pizzeria`,
+`demande-tarif-gineys-restauration`). Les littéraux « Gineys » qui
+subsistent sont des **fixtures de test** en mémoire — des noms fictifs, sans
+base derrière.
+
+⚠️⚠️ **ET LE VRAI GARDE-FOU EST AILLEURS : « tout fournisseur cité par une
+matière existe en base ».** `ingredients.fournisseur_principal` ne suit
+aucune clé étrangère ; un renommage fait à moitié laisse donc des matières
+pointant vers une fiche disparue, et elles glissent **en silence** dans
+« sans interlocuteur » au bas du réassort — on cesse simplement de les
+commander. L'assertion attrape n'importe quel renommage futur, pas seulement
+celui de Gineys.
+
+⚠️ Elle RECOPIE `lireFournisseur()` jusqu'au bout — tête avant la note,
+`ESTIMATION` écartée, **et les fournisseurs du jeu de démonstration aussi** :
+le sel et le poivre citent encore « Metro France », purgé en septembre. Être
+plus strict que la règle ferait rougir ce test en permanence, et un test
+rouge en permanence finit par être ignoré.
+
 ⚠️ **Sabine n'a pas d'adresse e-mail en base** : un bon de commande pour
 elle sera rendu à copier, pas envoyé. À demander.
 

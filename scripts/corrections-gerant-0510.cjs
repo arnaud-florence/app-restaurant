@@ -90,7 +90,7 @@ const RENOMMER = [
       if (ECRIRE) [m] = ou(await sb.from('ingredients').insert({
         nom: 'Pain restaurant (pièce)', unite: 'pièce', categorie: 'Boulangerie',
         prix_achat_ht: prix, prix_estime: false, stocke: true, actif: true,
-        fournisseur_principal: 'Gineys', libelle_achat: prod.libelle_achat,
+        fournisseur_principal: 'Gineys (Nicolas)', libelle_achat: prod.libelle_achat,
       }).select('id, nom').limit(1), 'création pain')
       else m = { id: 'FICTIF' }
     }

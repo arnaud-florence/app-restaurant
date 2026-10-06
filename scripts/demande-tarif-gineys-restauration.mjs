@@ -113,7 +113,7 @@ const meilleur = (i) => {
   // ⚠️ l'unité du meilleur prix doit être celle dans laquelle NOUS comptons
   if (base(i.unite) && u !== base(i.unite)) return null
   const best = memeBase.slice().sort((a, b) => a.ref.prix - b.ref.prix)[0]
-  const gin = memeBase.filter(l => l.fournisseur_nom === 'Gineys').sort((a, b) => a.ref.prix - b.ref.prix)[0]
+  const gin = memeBase.filter(l => l.fournisseur_nom === 'Gineys (Nicolas)').sort((a, b) => a.ref.prix - b.ref.prix)[0]
   return {
     prix: best.ref.prix, unite: best.ref.unite, nature: best.nature,
     // ⚠️⚠️ VIENT-IL DE GINEYS ? Décision du gérant (02/10) : on ne lui renvoie

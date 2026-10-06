@@ -46,7 +46,7 @@ const NOUVEAUX = [
 ;(async () => {
   console.log(`\n${ECRIRE ? '✍️  ÉCRITURE' : '👀 ESSAI À BLANC'} — les produits manquants de la commande Gineys\n`)
   const [etab] = ou(await sb.from('etablissements').select('id, nom').ilike('nom', '%fournil%').limit(1), 'etab')
-  const [four] = ou(await sb.from('fournisseurs').select('id').eq('nom', 'Gineys').limit(1), 'fournisseur')
+  const [four] = ou(await sb.from('fournisseurs').select('id').eq('nom', 'Gineys (Nicolas)').limit(1), 'fournisseur')
 
   // ① Le pavé : c'est LE JEANNOT nature, pas le céréale.
   // ⚠️ Notre coût actuel correspond en fait au PAVE CÉRÉALE :

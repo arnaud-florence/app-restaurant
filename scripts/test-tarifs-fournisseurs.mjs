@@ -391,6 +391,36 @@ console.log('\n── La proposition Gineys du 05/10/2026 (Sabine) ──')
   const fautifs = tous.filter(f => String(f.nom ?? '').includes(' — '))
   T('⚠️⚠️ aucun nom de fournisseur ne contient « — »', fautifs.length === 0,
     fautifs.map(f => f.nom).join(', '))
+
+  // ⚠️⚠️ TOUT NOM ÉCRIT DANS LE TEXTE LIBRE DOIT CORRESPONDRE À UNE FICHE.
+  // `ingredients.fournisseur_principal` est du TEXTE : il ne suit AUCUNE clé
+  // étrangère. Un renommage fait à moitié laisse donc des matières pointant
+  // vers un fournisseur qui n'existe plus — elles glissent silencieusement
+  // dans « sans interlocuteur » au bas de l'écran de réassort, et on ne les
+  // commande plus. C'est le contrôle qui attrape n'importe quel renommage
+  // futur, pas seulement celui de Gineys.
+  //
+  // ⚠️ RECOPIE de `lireFournisseur()` : on ne garde que la tête, avant la
+  // note ; une ESTIMATION n'a pas de fournisseur ; et les fournisseurs du
+  // JEU DE DÉMONSTRATION, purgé en septembre, sont écartés — le sel et le
+  // poivre citent encore « Metro France », qui n'a jamais existé en vrai.
+  // ⚠️ Être plus strict que la règle ferait rougir ce test en permanence,
+  // et un test rouge en permanence finit par être ignoré.
+  const DEMO = new Set(['Metro France', 'Sysco France', 'Brake France', 'Transgourmet',
+    'Ferme du Plateau', 'Boucherie Bio', 'Boulangerie Coop', 'Maraîcher du coin',
+    'Marée fraîche', 'Domaine Provence', 'Crémerie Local', 'Épicerie fine', 'Gynes'])
+  const noms = new Set(tous.map(f => f.nom))
+  const mat = await sbTout('ingredients?select=nom,fournisseur_principal&fournisseur_principal=not.is.null&actif=is.true')
+  const orphelines = mat.filter(m => {
+    const brut = String(m.fournisseur_principal)
+    if (/^ESTIMATION/i.test(brut)) return false
+    const tete = brut.split(' — ')[0].trim()
+    if (DEMO.has(tete)) return false
+    return tete.length > 0 && !noms.has(tete)
+  })
+  T('⚠️⚠️ chaque fournisseur cité par une matière existe en base',
+    orphelines.length === 0,
+    orphelines.slice(0, 5).map(m => `${m.nom} → « ${String(m.fournisseur_principal).split(' — ')[0]} »`).join(' · '))
   const prop = await sbTout(`catalogue_fournisseur?select=id,reference,designation,unite,prix_ht,nature,tarif_negocie,cle_comparaison,contenance_valeur&fournisseur_id=eq.${g.id}&date_tarif=eq.2026-10-05`)
   T('les 66 lignes sont chez Sabine', prop.length === 66, `${prop.length}`)
   // ⚠️ Et SURTOUT pas chez Nicolas : c'est la séparation qui permet le

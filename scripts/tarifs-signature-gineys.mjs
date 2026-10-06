@@ -41,7 +41,7 @@ const OFFRE = [
   { ref: '0073480', colis: 32.77, pcs: 56, g: 90, vente: 1.50, remplace: null },
 ]
 
-const [gineys] = await sb('fournisseurs?nom=eq.Gineys&select=id,nom')
+const [gineys] = await sb('fournisseurs?nom=eq.Gineys%20(Nicolas)&select=id,nom')
 if (!gineys) throw new Error('fournisseur Gineys introuvable')
 
 console.log(`\n╔══════════════════════════════════════════════════════════════════════╗`)
