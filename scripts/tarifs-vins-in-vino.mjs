@@ -1,16 +1,20 @@
-// La carte des vins In Vino — 25 % de food cost en salle, 10 € sur la pizza.
+// La carte des vins In Vino — coefficient 4 sur le PRIX D'ACHAT, 10 € sur
+// la pizza.
 //
-// Décision du gérant, 06/10/2026 : toutes les bouteilles de la facture
-// FAC-829 à 25 % de food cost en restauration SUR PLACE, et l'entrée de
-// gamme (la Roquière rouge / blanc / rosé) à 10 € avec la pizza à emporter
-// et en livraison.
+// Décision du gérant, 06/10/2026, en deux temps. D'abord « 25 % de food cost
+// sur place » ; puis, les chiffres sous les yeux, « mets plutôt sur le prix
+// d'achat ». Le TTC vaut donc QUATRE FOIS le prix payé au fournisseur.
 //
-// ⚠️⚠️ 25 % DE FOOD COST SUR UN PRODUIT À 20 % DE TVA FAIT UN COEFFICIENT DE
-// 4,8 SUR LE PRIX D'ACHAT, pas de 4. Le food cost se mesure sur le HT, le
-// client paie le TTC : ×4 en HT, puis ×1,2. C'est ce qui porte le champagne
-// à 91 € et le Château La Lieue blanc à 44 €. Le chiffre est juste, et c'est
-// une carte de restaurant gastronomique dans un village — c'est une décision
-// commerciale, elle est assumée et elle se révise d'un chiffre.
+// ⚠️⚠️ CE N'EST PAS LA MÊME CHOSE, ET L'ÉCART EST ÉNORME EN HAUT DE CARTE.
+// Le food cost se mesure sur le HT, le client paie le TTC : viser 25 % de
+// food cost sur de l'alcool revient à un coefficient de 4,8 sur l'achat, pas
+// de 4. Le champagne sortait à 91 € ; au coefficient 4 il sort à 76 €. Même
+// consigne en apparence, quinze euros d'écart sur la bouteille.
+//
+// ⚠️ Un coefficient 4 TTC sur un achat HT donne exactement 30 % de food cost
+// (1,2 ÷ 4), sur toute la gamme et quel que soit le prix. C'est la règle
+// classique de la carte des vins, et elle a l'avantage d'être vérifiable de
+// tête au comptoir : le prix affiché est le prix payé fois quatre.
 //
 // ⚠️ LES PRIX SONT ARRONDIS À L'EURO SUPÉRIEUR, jamais à l'inférieur : au
 //-dessus, le food cost reste SOUS 25 % ; en dessous il passerait au-dessus
@@ -37,7 +41,8 @@
 import fs from 'node:fs'
 process.stdout.on('error', e => { if (e.code === 'EPIPE') process.exit(0) })
 const ECRIRE = process.argv.includes('--ecrire')
-const FC = 0.25
+// TTC = prix d'achat × COEF. Un seul nombre à bouger pour revoir la carte.
+const COEF = 4
 
 // nom de carte, coût d'achat HT (facture FAC-829)
 const NOUVEAUX = [
@@ -65,8 +70,10 @@ const sb = async (p, o = {}) => {
   return t ? JSON.parse(t) : null
 }
 const f = n => n.toFixed(2).replace('.', ',')
-// 25 % de food cost → HT = coût / 0,25 ; TTC = HT × 1,2 ; arrondi AU-DESSUS.
-const tarif = cout => Math.ceil(cout / FC * 1.2)
+// TTC = achat × 4, arrondi AU-DESSUS. Au-dessus, le food cost reste SOUS
+// 30 % ; en dessous il passerait au-dessus de la consigne sans que personne
+// ne le voie. Et un prix de carte se lit 30,00 €, pas 29,40 €.
+const tarif = cout => Math.ceil(cout * COEF)
 
 // Le gabarit : on CLONE une fiche de vin existante plutôt que d'inventer des
 // champs. `etablissement_id`, `tag_destination` et `tva` mal posés cassent en
@@ -75,13 +82,13 @@ const [modele] = await sb('recettes?select=*&nom=eq.Bouteille%20Coteaux%20Varois
 if (!modele) { console.error('⛔ gabarit « Bouteille Coteaux Varois » introuvable'); process.exit(1) }
 
 console.log(`\n── ${ECRIRE ? 'ÉCRITURE' : 'ESSAI À BLANC'} · carte des vins In Vino ──\n`)
-console.log('   SUR PLACE, 25 % de food cost')
-console.log('   vin                                  achat    exact   retenu   fc réel')
+console.log(`   SUR PLACE, coefficient ${COEF} sur le prix d'achat`)
+console.log('   vin                                  achat    ×4 exact   retenu   fc réel')
 const aCreer = []
 for (const [nom, cout] of NOUVEAUX) {
   const ttc = tarif(cout), ht = Math.round(ttc / 1.2 * 10000) / 10000
   const [deja] = await sb(`recettes?select=id,prix_vente_ht&nom=eq.${encodeURIComponent(nom)}`)
-  console.log(`   ${nom.padEnd(36)} ${f(cout).padStart(6)} ${f(cout / FC * 1.2).padStart(8)} ${f(ttc).padStart(8)} ${(cout / ht * 100).toFixed(1).padStart(7)} %${deja ? '   (existe)' : ''}`)
+  console.log(`   ${nom.padEnd(36)} ${f(cout).padStart(6)} ${f(cout * COEF).padStart(8)} ${f(ttc).padStart(8)} ${(cout / ht * 100).toFixed(1).padStart(7)} %${deja ? '   (existe)' : ''}`)
   aCreer.push({ nom, cout, ttc, ht, id: deja?.id ?? null })
 }
 
