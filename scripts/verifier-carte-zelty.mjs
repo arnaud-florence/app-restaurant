@@ -19,11 +19,25 @@ const rz = await fetch('https://api.zelty.fr/2.11/catalog/dishes?show_all=true&l
   { headers: { Authorization: `Bearer ${env.ZELTY_API_KEY}` } })
 const plats = (await rz.json()).dishes ?? []
 
+// ⚠️ LES FAMILLES SE CONTRÔLENT CÔTÉ CAISSE, PAS DANS NOTRE BASE.
+// Un produit dont la `categorie` est renseignée chez nous peut n'être
+// rattaché à AUCUN tag Zelty : l'import CRÉE les plats et les laisse à
+// plat. Le plat existe, il est actif, son prix est juste — et il n'a
+// aucun bouton au comptoir. Vécu le 06/10/2026 sur la Baguette Jeannette
+// et la Baguette Paris : ce contrôle était au vert pendant que le gérant
+// ne les trouvait pas sur son iPad.
+const rt = await fetch('https://api.zelty.fr/2.11/catalog/tags?limit=0',
+  { headers: { Authorization: `Bearer ${env.ZELTY_API_KEY}` } })
+const nomDuTag = new Map(((await rt.json()).tags ?? []).map(t => [String(t.id), t.name]))
+const famillesCaisse = p => (p.tags ?? [])
+  .map(t => nomDuTag.get(String(typeof t === 'object' ? t?.id : t)))
+  .filter(Boolean)
+
 // ── Ce que notre base détient ───────────────────────────────────────
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const sb = async p => (await fetch(`${U}/rest/v1/${p}`,
   { headers: { apikey: K, Authorization: `Bearer ${K}` } })).json()
-const nous = await sb('recettes?select=id,nom,nom_caisse,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
+const nous = await sb('recettes?select=id,nom,nom_caisse,categorie,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
 
 // La TVA sur place suit la LOI, pas le panneau : un croissant mangé à table
 // est à 10 %, pas à 5,5 %. L'alcool reste à 20 %, la presse à 2,1 %.
@@ -73,6 +87,19 @@ for (const r of nous) {
   // être lisible sans qu'on ait à la chercher.
   if (p.name !== r.nom) ecartsVitrine.push(`${r.nom.padEnd(32).slice(0, 32)} caisse : « ${p.name} »`)
   if (p.disable) { dire(r, 'état', 'actif', 'désactivé'); bon = false }
+  // ⚠️⚠️ UN PLAT SANS FAMILLE EST UN BOUTON INTROUVABLE AU COMPTOIR.
+  // Il ne s'affiche sous aucun onglet de la caisse : il est vendable en
+  // théorie et invendable en pratique. C'est un ÉCART, pas une remarque —
+  // le prix peut être parfait, le produit ne se vend pas.
+  // Correctif : `node scripts/pousser-familles-zelty.mjs --ecrire`.
+  const fams = famillesCaisse(p)
+  if (fams.length === 0) { dire(r, 'famille', r.categorie || 'une famille', 'aucune — bouton introuvable'); bon = false }
+  // ⚠️ Et une famille qui ne concorde PAS range le bouton au mauvais
+  // onglet : la pizza chez les pains. Le tag Zelty porte notre nom de
+  // famille (son `remote_id`), donc la comparaison est exacte.
+  else if (r.categorie && !fams.includes(r.categorie)) {
+    dire(r, 'famille', r.categorie, fams.join(' + ')); bon = false
+  }
   if (bon) ok++
 }
 
