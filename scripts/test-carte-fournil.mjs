@@ -53,7 +53,24 @@ const step = async (n, fn) => {
 // jamais après coup, sinon elle redevient un décor.
 //
 // Dernière confirmation par le gérant : 04/10/2026.
+// ⚠️ Mise à jour du 06/10/2026, sur la facture Gineys 03777865 — la
+// première livraison d'ouverture. « Pavé multicéréales » disparaît : c'est
+// « Pavé Le Jeannot », le nom Arti'Pat de la référence 0071374, au même
+// prix. Les huit produits ajoutés viennent de cette facture ou de décisions
+// du gérant ; ils sont ici, et pas dans HORS_AFFICHE, parce qu'un prix
+// ARRÊTÉ doit être protégé de la dérive silencieuse — c'est tout l'objet de
+// cette liste.
 const AFFICHES = {
+  // Créés le 05/10/2026 depuis le catalogue Arti'Pat, puis rechiffrés sur la
+  // facture du 06/10 : leur coût a baissé de 10 à 37 %, leur prix n'a pas
+  // bougé.
+  'Mini beignet nature': 1.2, 'Mini beignet chocolat': 1.7,
+  'Baguette Jeannette': 2.1, 'Pain Paris': 3.0, 'Pavé Le Jeannot': 4.2,
+  // ⚠️ Les deux focaccias se vendent à la PART : 8 parts par plaque,
+  // décision du gérant du 06/10. Le prix est calé sur les pizzas à la
+  // plaque — même format, même geste au comptoir.
+  'Focaccia ail-basilic': 2.9, 'Focaccia tomate cerise': 2.9,
+  'Donut fourré': 2.2,
   'Baguette classique': 1.2, 'Baguette Victoire': 1.5, 'Bâtard céréales': 3.2,
   'Bâtard maïs et graines': 3.2, 'Café allongé': 1.4, 'Café expresso': 1.4,
   'Café noisette': 1.5, 'Campestre multicéréales': 2, 'Cannelé': 1.5,
@@ -70,7 +87,7 @@ const AFFICHES = {
   'Oasis tropical 1,5 L': 3.5, 'Orangina 1,5 L': 3.5, 'Orangina 33 cl': 2,
   'Pain au chocolat': 1.4, 'Pain aux raisins': 1.8, 'Pain complet': 2.6,
   'Pain lin-tournesol': 4.2, 'Panini chèvre-miel': 4.9, 'Panini jambon-fromage': 4.5,
-  'Panini poulet-pesto': 4.9, 'Part de flan pâtissier': 3.8, 'Pavé multicéréales': 4.2,
+  'Panini poulet-pesto': 4.9, 'Part de flan pâtissier': 3.8,
   'Perrier 33 cl': 2, 'Pizza à la plaque jambon-fromage': 2.9, 'Pizza à la plaque Margherita': 2.9,
   'Pizza ronde chèvre-miel': 3.9, 'Pizza ronde poulet-pesto': 3.9, 'Pizza ronde Reine': 3.9,
   'Sacristain': 3.2, 'Salade italienne': 5.4, 'Salade poulet-feta': 5.2,
