@@ -32,6 +32,7 @@ const ttc = r => Math.round(Number(r.prix_vente_ht) * (1 + Number(r.tva) / 100) 
 
 const parId = new Map(plats.map(p => [String(p.remote_id ?? ''), p]))
 let ok = 0; const pbs = []
+const ecartsVitrine = []
 const dire = (r, quoi, attendu, recu) =>
   pbs.push(`${r.nom.padEnd(34).slice(0, 34)} ${quoi} — attendu ${attendu}, Zelty a ${recu}`)
 
@@ -58,6 +59,19 @@ for (const r of nous) {
   // et un contrôle rouge en permanence finit par être ignoré.
   const attendu = (r.nom_caisse?.trim() || r.nom)
   if (p.name !== attendu) { dire(r, 'nom', attendu, p.name); bon = false }
+  // ⚠️⚠️ ET ON SIGNALE QUAND LA CAISSE AFFICHE AUTRE CHOSE QUE LA CARTE,
+  // même si `nom_caisse` le justifie. Le 06/10/2026 le gérant a vu « Pavé
+  // multicéréales » sur sa caisse alors que sa carte disait « Pavé Le
+  // Jeannot » depuis la veille — douze noms divergeaient, et ce contrôle
+  // annonçait « conformes en tout point ». Il avait raison selon sa règle,
+  // et c'est précisément le problème : une règle juste qui laisse
+  // l'exploitant devant un nom qu'il ne reconnaît pas.
+  //
+  // Ce n'est PAS une erreur — le suffixe « (salle) » est voulu, et
+  // `nom_caisse` existe pour que l'éclair du comptoir et celui de la table
+  // ne portent pas le même libellé. C'est une INFORMATION, et elle doit
+  // être lisible sans qu'on ait à la chercher.
+  if (p.name !== r.nom) ecartsVitrine.push(`${r.nom.padEnd(32).slice(0, 32)} caisse : « ${p.name} »`)
   if (p.disable) { dire(r, 'état', 'actif', 'désactivé'); bon = false }
   if (bon) ok++
 }
@@ -76,6 +90,11 @@ console.log(`\n── Carte Zelty vs notre base ──\n`)
 console.log(`  produits actifs chez nous : ${nous.length}`)
 console.log(`  plats dans la caisse      : ${plats.length}`)
 console.log(`  conformes en tout point   : ${ok}`)
+if (ecartsVitrine.length) {
+  console.log(`\n  ℹ ${ecartsVitrine.length} produit(s) dont la CAISSE affiche un autre nom que la CARTE`)
+  console.log(`    (voulu quand c'est le suffixe « (salle) » ; à corriger sinon)`)
+  for (const e of ecartsVitrine) console.log(`      ${e}`)
+}
 console.log(`  écarts                    : ${pbs.length}`)
 console.log(`  plats sans contrepartie   : ${orphelins.length}`)
 console.log(`  plats éteints en caisse   : ${eteints}`)
