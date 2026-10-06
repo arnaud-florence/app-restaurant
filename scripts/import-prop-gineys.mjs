@@ -161,7 +161,7 @@ for (const r of rows) parFam[r.famille ?? '?'] = (parFam[r.famille ?? '?'] ?? 0)
 console.log('\n   familles :', Object.entries(parFam).map(([k, v]) => `${k} ${v}`).join(' · '))
 
 // ─── Écriture ─────────────────────────────────────────────────────────
-const [f] = await sb('fournisseurs?select=id,nom&nom=eq.Gineys')
+const [f] = await sb('fournisseurs?select=id,nom&nom=eq.Gineys%20(Nicolas)')
 if (!f) { console.error('\n⛔ Fournisseur Gineys introuvable.'); process.exit(1) }
 
 // ⚠️ LA CLÉ PORTE LA DATE : rejouer la même proposition corrige, une

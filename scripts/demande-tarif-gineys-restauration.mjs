@@ -72,7 +72,7 @@ const ECARTEES = {
 // Envoyer « nous obtenons les câpres à 3,29 € la pièce » quand on les compte au
 // kilo, c'est demander un alignement sur un chiffre qui ne veut rien dire.
 const nomF = new Map((await lire('fournisseurs?select=id,nom')).map(x => [x.id, x.nom]))
-const [g] = await lire('fournisseurs?nom=eq.Gineys&select=id,nom,contact,email,telephone')
+const [g] = await lire('fournisseurs?nom=eq.Gineys%20(Nicolas)&select=id,nom,contact,email,telephone')
 const cat = new Map((await lire(`catalogue_fournisseur?fournisseur_id=eq.${g.id}&select=reference,designation,prix_ht,unite,famille`))
   .map(c => [String(c.reference), c]))
 const prods = await lire('recettes?actif=is.true&select=id,nom,tag_destination')

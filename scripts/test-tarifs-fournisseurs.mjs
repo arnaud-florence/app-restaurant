@@ -367,11 +367,36 @@ console.log('\n── Un tarif remplacé ne compare plus ──')
 }
 
 // ─── La proposition commerciale de Gineys ───────────────────────────
-console.log('\n── La proposition Gineys du 05/10/2026 ──')
+// ─── Gineys, ce sont DEUX fournisseurs ───────────────────────────────
+//
+// ⚠️ RECOPIE de la règle (06/10/2026) : le portail est tenu par Nicolas, la
+// proposition commerciale par Sabine, et leurs prix diffèrent sur les mêmes
+// références. Sous une seule fiche, la règle du tarif PÉRIMÉ éteignait
+// silencieusement les prix du plus ancien — on ne voyait plus lequel des
+// deux est le moins cher.
+console.log('\n── La proposition Gineys du 05/10/2026 (Sabine) ──')
 {
-  const [g] = await sb('fournisseurs?select=id&nom=eq.Gineys')
+  const [g] = await sb('fournisseurs?select=id&nom=eq.Gineys%20(Sabine)')
+  T('la fiche « Gineys (Sabine) » existe', !!g)
+  const [nic] = await sb('fournisseurs?select=id&nom=eq.Gineys%20(Nicolas)')
+  T('… et « Gineys (Nicolas) » aussi', !!nic)
+
+  // ⚠️⚠️ AUCUN NOM DE FOURNISSEUR NE DOIT CONTENIR « — ».
+  // `lireFournisseur()` lit `brut.split(' — ')[0]` : le tiret cadratin
+  // sépare le fournisseur de la note dans `ingredients.fournisseur_principal`,
+  // qui est du TEXTE LIBRE. Un fournisseur nommé « Gineys — Nicolas » se
+  // lirait « Gineys » et ne correspondrait à aucune fiche — 48 matières
+  // se retrouveraient sans fournisseur, sans le moindre message.
+  const tous = await sb('fournisseurs?select=nom')
+  const fautifs = tous.filter(f => String(f.nom ?? '').includes(' — '))
+  T('⚠️⚠️ aucun nom de fournisseur ne contient « — »', fautifs.length === 0,
+    fautifs.map(f => f.nom).join(', '))
   const prop = await sbTout(`catalogue_fournisseur?select=id,reference,designation,unite,prix_ht,nature,tarif_negocie,cle_comparaison,contenance_valeur&fournisseur_id=eq.${g.id}&date_tarif=eq.2026-10-05`)
-  T('les 66 lignes sont en base', prop.length === 66, `${prop.length}`)
+  T('les 66 lignes sont chez Sabine', prop.length === 66, `${prop.length}`)
+  // ⚠️ Et SURTOUT pas chez Nicolas : c'est la séparation qui permet le
+  // face-à-face entre les deux grilles.
+  const chezNic = await sbTout(`catalogue_fournisseur?select=id&fournisseur_id=eq.${nic.id}&date_tarif=eq.2026-10-05`)
+  T('⚠️ et aucune n’est restée chez Nicolas', chezNic.length === 0, `${chezNic.length}`)
   // ⚠️ Un devis est une PROPOSITION, une facture une PREUVE. Arbitrer un
   // fournisseur sur le premier en croyant lire le second se paie des mois.
   T('⚠️ elles sont de nature DEVIS, jamais facture', prop.every(l => l.nature === 'devis'))

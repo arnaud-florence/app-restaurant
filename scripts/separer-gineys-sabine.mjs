@@ -45,7 +45,7 @@ const sb = async (p, o = {}) => {
   return t ? JSON.parse(t) : null
 }
 
-const [gineys] = await sb('fournisseurs?select=id,nom,email,conditions_tarifaires&nom=eq.Gineys')
+const [gineys] = await sb('fournisseurs?select=id,nom,email,conditions_tarifaires&nom=eq.Gineys%20(Nicolas)')
 if (!gineys) { console.error('⛔ Fournisseur « Gineys » introuvable.'); process.exit(1) }
 
 const prop = await sb(`catalogue_fournisseur?select=id,reference,designation&fournisseur_id=eq.${gineys.id}&date_tarif=eq.${DATE_PROP}&nature=eq.devis`)

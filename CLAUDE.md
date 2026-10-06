@@ -3365,8 +3365,17 @@ peut enfin les comparer.
 
 | Fiche | Ce qu'elle porte |
 |---|---|
-| **Gineys** | portail du 26/09, factures d'août, catalogue Arti'Pat — et les 46 matières, 40 produits et bons de commande qui s'y rattachent |
-| **Gineys — Sabine** | les 66 lignes de la proposition du 05/10, rien d'autre |
+| **Gineys (Nicolas)** | portail du 26/09, factures d'août, catalogue Arti'Pat — et les 48 matières, 40 produits et bons de commande qui s'y rattachent |
+| **Gineys (Sabine)** | les 66 lignes de la proposition du 05/10, rien d'autre |
+
+⚠️⚠️ **AUCUN NOM DE FOURNISSEUR NE DOIT CONTENIR « — ».**
+`lireFournisseur()` lit `brut.split(' — ')[0]` : le tiret cadratin sépare le
+fournisseur de la NOTE dans `ingredients.fournisseur_principal`, qui est du
+texte libre (module 3). Un fournisseur nommé « Gineys — Nicolas » se lirait
+donc **« Gineys »**, ne correspondrait à aucune fiche, et **48 matières se
+retrouveraient sans fournisseur sans le moindre message**. D'où les
+parenthèses. Une assertion de `test-tarifs-fournisseurs.mjs` l'interdit
+désormais pour TOUS les fournisseurs.
 
 ⚠️⚠️ **SANS CETTE SÉPARATION, LA RÈGLE DU TARIF PÉRIMÉ LES ÉCRASE L'UN
 L'AUTRE.** `comparer()` marque comme remplacée toute ligne du MÊME
@@ -3382,10 +3391,20 @@ très large majorité.** Les exceptions sont à regarder sur
 `/admin/tarifs-fournisseurs` : un commercial peut avoir plusieurs formats
 dans le même groupe, et l'huile d'olive oppose deux huiles différentes.
 
-⚠️ **ON N'A DÉPLACÉ QUE LES 66 LIGNES.** Renommer la fiche existante en
-« Gineys — Nicolas » romprait en silence les 46 matières dont
-`fournisseur_principal` porte le TEXTE « Gineys ». Si on veut le faire, il
-faut mettre à jour ce champ dans le même geste.
+⚠️ **ON N'A DÉPLACÉ QUE LES 66 LIGNES** : le portail, les factures et le
+catalogue restent chez Nicolas.
+
+**Le renommage, lui, a dû être COMPLET** (`node scripts/renommer-gineys.mjs
+[--ecrire]`). `recettes.fournisseur_id` et `bons_commande.fournisseur_id`
+sont des clés étrangères et suivent seules ; `ingredients.fournisseur_principal`
+est du TEXTE et ne suit pas — ce sont ses **48 lignes** qui étaient le piège,
+plus cinq scripts qui cherchaient la fiche par `nom=eq.Gineys`. Contrôle
+après coup : 84 lignes de réassort attribuées à « Gineys (Nicolas) », zéro
+perdue.
+
+⚠️ Le script ne remplace que la **partie avant la note**, et seulement si
+elle correspond EXACTEMENT à l'ancien nom : un remplacement sur la chaîne
+entière abîmerait les notes qui citent le fournisseur.
 
 ⚠️ **Sabine n'a pas d'adresse e-mail en base** : un bon de commande pour
 elle sera rendu à copier, pas envoyé. À demander.

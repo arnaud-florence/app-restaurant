@@ -114,7 +114,7 @@ const sb = async (p, o = {}) => {
   return t ? JSON.parse(t) : null
 }
 
-const [g] = await sb('fournisseurs?select=id,nom&nom=eq.Gineys')
+const [g] = await sb('fournisseurs?select=id,nom&nom=eq.Gineys%20(Nicolas)')
 const prop = await sb(`catalogue_fournisseur?select=id,reference,designation,cle_comparaison&fournisseur_id=eq.${g.id}&date_tarif=eq.${DATE}`)
 const parRef = new Map(prop.map(l => [l.reference, l]))
 const anciennes = await sb(`catalogue_fournisseur?select=reference,cle_comparaison,date_tarif&fournisseur_id=eq.${g.id}&date_tarif=neq.${DATE}&cle_comparaison=not.is.null`)
