@@ -87,3 +87,7 @@ data/carte-boissons-marges.csv
 data/mail-*.txt
 data/demande-tarif-*.csv
 data/commande-*.pdf
+
+# Factures fournisseurs — pièces comptables, dépôt public.
+data/facture-*.pdf
+data/*_signed.pdf
