@@ -91,3 +91,6 @@ data/commande-*.pdf
 # Factures fournisseurs — pièces comptables, dépôt public.
 data/facture-*.pdf
 data/*_signed.pdf
+
+# Photos produit du catalogue Arti'Pat (tiers) + affiche montee dessus
+data/affiche-*
