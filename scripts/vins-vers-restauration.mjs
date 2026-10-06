@@ -1,7 +1,17 @@
-// Les six bouteilles nommées comptent pour la RESTAURATION, pas pour le bar.
+// Les vins de table comptent pour la RESTAURATION, pas pour le bar.
 //
-// Décision du gérant, 06/10/2026. Ce sont des vins de table : leur chiffre
-// d'affaires doit remonter à l'étage qui les sert.
+// Décision du gérant, 06/10/2026, en deux temps : les six bouteilles
+// nommées, puis les six pichets. Leur chiffre d'affaires doit remonter à
+// l'étage qui les sert.
+//
+// ⚠️ Les pichets n'ont QU'UN SEUL PRIX pour les deux services (4,50 € et
+// 8,00 €) : tout leur CA tombe donc dans l'établissement où on les range,
+// y compris un quart bu au comptoir. C'est assumé — le pichet est un
+// format de table, et c'est là qu'il partira.
+//
+// ⚠️ Le VERRE, lui, ne bouge pas : il a deux fiches, l'une au Bar (2,80 €)
+// et l'autre en Restauration (4,00 €). Chacune est déjà au bon étage, et
+// les déplacer ferait compter le comptoir dans la salle.
 //
 // ⚠️ LA VENTILATION DU CA SUIT `recettes.etablissement_id`, et elle le suit
 // sur la LIGNE de vente, jamais sur l'en-tête du ticket — un même ticket
@@ -28,6 +38,8 @@ const VINS = [
   'Côte du Rhône Lucien Tramier', 'Château La Lieue tradition rosé',
   'Bordeaux supérieur Toulouse-Lautrec', 'Château La Lieue tradition blanc',
   'Château La Lieue Batilde Philomène', 'Champagne Pol Cochet',
+  'Pichet de rouge 25 cl', 'Pichet de rosé 25 cl', 'Pichet de blanc 25 cl',
+  'Pichet de rouge 50 cl', 'Pichet de rosé 50 cl', 'Pichet de blanc 50 cl',
 ]
 
 for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
