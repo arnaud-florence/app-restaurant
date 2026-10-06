@@ -72,7 +72,8 @@ const AFFICHES = {
   // chère que la Campestre de 295 g alors qu'elle n'en fait que 270 — c'était
   // l'anomalie de la carte pain. 49 % de food cost assumé, et NON propagé :
   // sept des onze pains et viennoiseries sont déjà dans la fourchette 38-45 %.
-  'Baguette Jeannette': 1.4, 'Baguette Paris': 3.0, 'Pavé Le Jeannot': 4.2,
+  'Baguette Jeannette': 1.4, 'Baguette Paris': 2.4, 'Pavé Le Jeannot': 3.9,
+  'Pain restaurant': 1.9,
   // ⚠️ Les deux focaccias se vendent à la PART : 8 parts par plaque,
   // décision du gérant du 06/10. Le prix est calé sur les pizzas à la
   // plaque — même format, même geste au comptoir.
@@ -80,8 +81,8 @@ const AFFICHES = {
   'Donut fourré': 2.2,
   'Baguette classique': 1.2, 'Baguette Victoire': 1.5, 'Bâtard céréales': 3.2,
   'Bâtard maïs et graines': 3.2, 'Café allongé': 1.4, 'Café expresso': 1.4,
-  'Café noisette': 1.5, 'Campestre multicéréales': 2, 'Cannelé': 1.5,
-  'Cappuccino': 2.5, 'Chausson aux pommes': 1.5, 'Chocolat chaud': 2.5,
+  'Café noisette': 1.5, 'Campestre multicéréales': 1.9, 'Cannelé': 1.5,
+  'Cappuccino': 2.5, 'Chausson aux pommes': 1.4, 'Chocolat chaud': 2.5,
   'Coca-Cola 1,5 L': 3.5, 'Coca-Cola 33 cl': 2, 'Coca-Cola Zéro 1,5 L': 3.5,
   'Coca-Cola Zéro 33 cl': 2, 'Cookie chocolat': 2.9, 'Croissant': 1.4,
   'Eau gazeuse 50 cl': 2, 'Eau plate 50 cl': 1, 'Éclair au chocolat': 3.6,
@@ -92,7 +93,7 @@ const AFFICHES = {
   'Le Parisien': 4.5, 'Le Poulet': 4.9, 'Le Rosette': 4.5,
   'Madeleine chocolat-noisette': 1.9, 'Muffin chocolat-noisette': 3.85, 'Muffin citron': 3.85,
   'Oasis tropical 1,5 L': 3.5, 'Orangina 1,5 L': 3.5, 'Orangina 33 cl': 2,
-  'Pain au chocolat': 1.4, 'Pain aux raisins': 1.8, 'Pain complet': 2.6,
+  'Pain au chocolat': 1.4, 'Pain aux raisins': 1.4, 'Pain complet': 2.3,
   'Pain lin-tournesol': 4.2, 'Panini chèvre-miel': 4.9, 'Panini jambon-fromage': 4.5,
   'Panini poulet-pesto': 4.9, 'Part de flan pâtissier': 3.8,
   'Perrier 33 cl': 2, 'Pizza à la plaque jambon-fromage': 2.9, 'Pizza à la plaque Margherita': 2.9,
@@ -131,7 +132,7 @@ const HORS_AFFICHE = new Set([
   'Formule — croissant ou pain au chocolat', 'Formule — expresso ou allongé',
   // Arrivés par les tickets SumUp puis classés le 28/08/2026 : ils ne figurent
   // sur aucune affiche, ce qui ne les rend pas illégitimes.
-  'Croque-monsieur', 'Paris-Brest', 'Moelleux au chocolat', 'Pain restaurant',
+  'Croque-monsieur', 'Paris-Brest', 'Moelleux au chocolat',
   'Panuozzi', 'Donuts', 'Cappuccino ou chocolat chaud',
   'Pago orange 20 cl', 'Pago pomme 20 cl', 'Pago pomme 33 cl', 'Red Bull Ice',
   'Sunroll', 'Fusée', 'Mario', 'Cône vanille',
