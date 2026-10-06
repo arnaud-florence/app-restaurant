@@ -68,7 +68,11 @@ const AFFICHES = {
     // ⚠️ « Baguette Paris » et pas « Pain Paris » : la facture dit 50 cm pour
   // 280 g, c'est un format baguette. Corrigé le 06/10/2026 sur remarque du
   // gérant — le nom de vitrine doit décrire ce que le client achète.
-  'Baguette Jeannette': 2.1, 'Baguette Paris': 3.0, 'Pavé Le Jeannot': 4.2,
+    // ⚠️ La Jeannette passe à 1,40 € le 06/10/2026 : à 2,10 € elle était plus
+  // chère que la Campestre de 295 g alors qu'elle n'en fait que 270 — c'était
+  // l'anomalie de la carte pain. 49 % de food cost assumé, et NON propagé :
+  // sept des onze pains et viennoiseries sont déjà dans la fourchette 38-45 %.
+  'Baguette Jeannette': 1.4, 'Baguette Paris': 3.0, 'Pavé Le Jeannot': 4.2,
   // ⚠️ Les deux focaccias se vendent à la PART : 8 parts par plaque,
   // décision du gérant du 06/10. Le prix est calé sur les pizzas à la
   // plaque — même format, même geste au comptoir.
