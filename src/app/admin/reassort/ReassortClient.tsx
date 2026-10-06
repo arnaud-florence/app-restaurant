@@ -8,8 +8,9 @@ import {
   comptagePerime, stockAReconstituer, PEREMPTION_COMPTAGE_JOURS,
   type LigneReassort, type EtatReassort,
 } from '@/lib/reassort'
-import { fmtPrix, fmtEcart } from '@/lib/foodCost'
-import { enregistrerParametres, creerBonsDepuisReassort } from './actions'
+import { prixReprenable } from '@/lib/catalogue-achats'
+import { fmtPrix, fmtPrix4, fmtEcart } from '@/lib/foodCost'
+import { enregistrerParametres, creerBonsDepuisReassort, basculerFournisseur } from './actions'
 
 type Vue = 'categories' | 'fournisseurs' | 'etablissements'
 
@@ -20,7 +21,9 @@ const ETAT: Record<EtatReassort, { texte: string; classe: string }> = {
   non_parametre: { texte: 'à paramétrer',  classe: 'bg-zinc-100 text-zinc-500' },
 }
 
-export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) {
+export default function ReassortClient(
+  { lignes, pour }: { lignes: LigneReassort[]; pour: string },
+) {
   const [vue, setVue] = useState<Vue>('categories')
   const [requete, setRequete] = useState('')
   const [aParametrer, setAParametrer] = useState(false)
@@ -33,6 +36,10 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
   // — rester chez l'habituel quand on ne veut pas ouvrir un compte.
   const [auMoinsCher, setAuMoinsCher] = useState(true)
   const [creation, creer] = useTransition()
+
+  // Combien de cibles viennent réellement de l'ardoise : c'est ce qui dit
+  // si la date choisie sert à quelque chose.
+  const surArdoise = lignes.filter(l => l.cible_origine === 'ardoise').length
 
   // Les saisies en cours priment sur ce qui vient du serveur.
   // ⚠️ Un comptage périmé est ramené à « inconnu » pour le CALCUL : sinon
@@ -126,6 +133,29 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
         </p>
       </header>
 
+      {/* ⚠️⚠️ ON COMMANDE POUR LA SEMAINE QU'ON VA SERVIR, PAS POUR
+          AUJOURD'HUI. C'est cette date qui choisit l'ardoise, donc les
+          quantités de la restauration. Au 05/10/2026, à sept jours de
+          l'ouverture, l'ardoise du 12 était saisie et l'écran dimensionnait
+          quand même sur la carte ENTIÈRE — le scénario le plus coûteux en
+          reliquat — sans que rien ne le dise. */}
+      <form method="get" className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm">
+        <label htmlFor="pour" className="font-medium text-zinc-900">Commander pour la semaine du</label>
+        <input id="pour" name="pour" type="date" defaultValue={pour}
+          className="h-9 rounded-lg border border-zinc-300 px-2 tabular-nums" />
+        <button type="submit" className="h-9 rounded-lg bg-zinc-900 px-3 font-medium text-white">
+          Recalculer
+        </button>
+        <span className="text-zinc-600">
+          {surArdoise > 0
+            ? <>✓ {surArdoise} référence{surArdoise > 1 ? 's' : ''} dimensionnée{surArdoise > 1 ? 's' : ''} sur l&apos;ardoise de cette semaine</>
+            : <span className="text-amber-800">
+                ⚠️ aucune ardoise ne couvre cette date — repli sur la carte entière,
+                c&apos;est le scénario le plus coûteux en reliquat
+              </span>}
+        </span>
+      </form>
+
       {/* ⚠️ Un stock à zéro partout n'est pas un réassort, c'est une
           ouverture. Le dire change la lecture de tout l'écran : il n'y a
           rien à « compléter », il y a tout à constituer. */}
@@ -141,6 +171,8 @@ export default function ReassortClient({ lignes }: { lignes: LigneReassort[] }) 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Chiffre n={b.lignes} libelle="références" />
         <Chiffre n={b.aCommander} libelle="à commander" accent="text-red-700" />
+        {/* Ce qui est déjà parti : la moitié de la question « où j'en suis ». */}
+        <Chiffre n={lignes.filter(l => l.enCommande > 0).length} libelle="déjà commandé" accent="text-blue-700" />
         <Chiffre n={b.nonParametres} libelle="sans cible" accent="text-amber-700" />
         <Chiffre n={b.jamaisComptes} libelle="jamais comptées" accent="text-zinc-500" />
         <Chiffre texte={fmtPrix(b.coutTotal)} libelle={b.sansPrix ? `dont ${b.sansPrix} sans prix` : 'coût estimé'} />
@@ -272,8 +304,10 @@ function Ligne({
   const e = etat(l)
   const q = aCommander(l)
   const c = coutReassort(l)
+  const [ouvert, setOuvert] = useState(false)
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 px-3 py-2 text-sm">
+   <div className="border-t border-zinc-100">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
       <div className="min-w-[180px] flex-1">
         <p className="font-medium text-zinc-900">{l.nom}</p>
         <p className="text-[11px] text-zinc-400">
@@ -303,6 +337,15 @@ function Ligne({
                 : <>💡 −{fmtEcart(l.ailleurs.ecartPct)} chez {l.ailleurs.fournisseur}</>}
             </span>
           )}
+          {/* ⚠️ Le signal était affiché ici depuis la 0163, mais agir
+              demandait de partir sur `/admin/achats` — donc on ne le
+              faisait pas. Le sélecteur vient à la ligne. */}
+          {(l.offres?.length ?? 0) > 0 && (
+            <button onClick={() => setOuvert(v => !v)}
+              className="ml-1.5 rounded border border-violet-300 bg-violet-50 px-1.5 py-px align-middle text-[11px] font-bold text-violet-800 hover:bg-violet-100">
+              {ouvert ? '▴ masquer' : `▾ ${l.offres!.length} offre(s)`}
+            </button>
+          )}
           {/* ⚠️ « jamais compté » ≠ « zéro » : le premier dit que personne
               n'a regardé. */}
           {l.tenu === null
@@ -316,6 +359,17 @@ function Ligne({
       <span className="w-20 text-right tabular-nums">
         {l.tenu === null ? <span className="text-zinc-400">—</span> : l.tenu}
         <span className="block text-[10px] text-zinc-400">en stock</span>
+      </span>
+
+      {/* ⚠️⚠️ CE QUI EST DÉJÀ EN ROUTE. Sans cette colonne l'écran redemande
+          ce qu'on vient de commander : mesuré le 05/10/2026, 150 pâtons
+          commandés le matin et 280 réclamés l'après-midi. Deux livraisons
+          pour un besoin, et on ne s'en aperçoit qu'au déchargement. */}
+      <span className="w-20 text-right tabular-nums">
+        {l.enCommande > 0
+          ? <span className="font-medium text-blue-700">{l.enCommande}</span>
+          : <span className="text-zinc-300">—</span>}
+        <span className="block text-[10px] text-zinc-400">commandé</span>
       </span>
 
       <label className="w-20">
@@ -348,7 +402,161 @@ function Ligne({
         {ETAT[e].texte}
       </span>
     </div>
+    {ouvert && <Offres l={l} />}
+   </div>
   )
+}
+
+/**
+ * ⚠️ LE SÉLECTEUR DE FOURNISSEUR, SUR LA LIGNE DE COMMANDE.
+ *
+ * C'est le même mécanisme que l'onglet 🧺 de `/admin/achats`, et il
+ * appelle la même action — pas une seconde implémentation. Ce qui change
+ * est l'ENDROIT : on décide au moment où on regarde ce qu'il faut
+ * commander, pas en changeant d'écran et en perdant la ligne.
+ *
+ * ⚠️⚠️ ET C'EST CE QUI REND LE BON CHIFFRABLE. Une ligne simplement
+ * RÉAIGUILLÉE par `auMoinsCher` part sans prix, et le bon sans montant :
+ * notre coût est celui de NOTRE conditionnement, le leur celui du sien.
+ * Basculer pour de bon reprend le prix du fournisseur, donc le bon porte
+ * un total au lieu d'un « tarif à confirmer ».
+ */
+function Offres({ l }: { l: LigneReassort }) {
+  const [enCours, demarrer] = useTransition()
+  const [mot, setMot] = useState<string | null>(null)
+  const offres = l.offres ?? []
+
+  const prendre = (o: NonNullable<LigneReassort['offres']>[number]) => {
+    // ⚠️ LE PRIX SUIT LE FOURNISSEUR. Garder l'ancien après avoir changé
+    // affirmerait qu'on paie un tarif qui ne s'applique plus — c'est plus
+    // faux que de reprendre le nouveau. Ce qui protège n'est pas le refus,
+    // c'est le DRAPEAU : un prix qui ne vient pas d'une facture arrive
+    // marqué « estimé » (0165).
+    const p = prixReprenable(o, l.unite)
+    const repris = p != null
+    demarrer(async () => {
+      const r = await basculerFournisseur({
+        cle: l.cle,
+        fournisseur_id: o.fournisseur_id,
+        // ⚠️⚠️ LA RÉFÉRENCE DE L'ANCIEN FOURNISSEUR NE SURVIT PAS. Un code
+        // Gineys cité à Félix Potin fait chiffrer autre chose, et l'écart
+        // se découvre à la livraison : une référence fausse est pire
+        // qu'une référence absente (0142).
+        reference: o.reference ?? null,
+        // ⚠️ Unité discordante : on reprend le fournisseur et PAS le prix.
+        // L'ancien est réécrit tel quel — l'effacer perdrait le seul
+        // chiffre qu'on ait, et un `null` se lit « prix inconnu » sur
+        // l'écran qui déclenche la commande.
+        prix: repris ? p.prix : l.cout_unitaire_ht,
+        prix_releve: repris ? o.nature === 'facture' : !l.estime,
+      })
+      // ⚠️ UN PRIX CONVERTI MONTRE SON CALCUL. Un nombre dérivé qu'on ne
+      // sait pas décomposer n'est pas vérifiable, et c'est la première
+      // chose qu'on conteste quand il paraît faux.
+      const calcul = p == null ? '' : p.converti
+        ? ` Prix converti : ${fmtPrix(o.prix_ref)}/${o.unite_ref} × ${p.facteur} `
+          + `${o.unite_ref} = ${fmtPrix4(p.prix)} par ${l.unite}.`
+        : ` Prix repris : ${fmtPrix(p.prix)}/${o.unite_ref}.`
+      setMot(r.ok
+        ? r.message + (repris
+            ? calcul + (o.nature === 'facture'
+                ? ' (prix payé)'
+                : ` ⚠️ Il vient d'un ${o.nature} : marqué ESTIMÉ jusqu'à leur première facture.`)
+            : ` ⚠️ Le PRIX n'est pas repris : l'offre est en ${o.unite_ref} et notre unité `
+              + `(« ${l.unite ?? 'inconnue'} ») ne dit pas combien elle en contient. `
+              + `À saisir dans la fiche.`)
+        : '⚠️ ' + r.message)
+    })
+  }
+
+  return (
+    <div className="border-t border-violet-100 bg-violet-50/60 px-3 py-2">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-violet-900">
+        {offres.length} offre(s) moins chère(s) — {l.nom}
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {/* ⚠️ TOUTES les offres, pas seulement la meilleure : le deuxième
+            livre peut-être le lendemain, ou sans minimum de commande. */}
+        {offres.map(o => {
+          // ⚠️⚠️ L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX, et
+          // les deux peuvent diverger de signe. `ecartPct` compare l'offre
+          // à la ligne de catalogue de NOTRE fournisseur ; ce qu'on paie
+          // vraiment est `cout_unitaire_ht`, qui a pu être posé à la main,
+          // relevé sur une facture ou basculé avant. Mesuré le 05/10/2026 :
+          // la sauce moutarde est annoncée moins chère chez La Frite Belge
+          // et coûterait +12,5 % de plus que ce qu'on paie. Afficher le
+          // seul écart catalogue ferait basculer vers un prix PLUS CHER
+          // avec un pourcentage négatif sous les yeux.
+          const p = prixReprenable(o, l.unite)
+          const nous = l.cout_unitaire_ht
+          const effet = p != null && nous != null && nous > 0 ? p.prix / nous - 1 : null
+          return (
+          <li key={o.fournisseur_id + o.designation}
+            className="flex flex-wrap items-center gap-2 text-[13px]">
+            <span className="w-14 text-right font-bold tabular-nums text-violet-800">
+              −{fmtEcart(o.ecartPct)}
+            </span>
+            <span className="font-medium text-zinc-900">{o.fournisseur}</span>
+            <span className="tabular-nums text-zinc-700">{fmtPrix(o.prix_ref)}/{o.unite_ref}</span>
+            {/* ⚠️ La NATURE change ce qu'on a le droit d'en conclure : un
+                devis est une proposition, une facture une preuve. */}
+            <NatureOffre nature={o.nature} />
+            {/* CE QUE ÇA FAIT À NOTRE PRIX — le seul chiffre qui décide. */}
+            {p == null
+              ? <span className="rounded bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-800">
+                  prix à saisir
+                </span>
+              : <span className="tabular-nums text-zinc-900">
+                  → {fmtPrix4(p.prix)}/{l.unite}
+                  {effet != null && (
+                    <span className={`ml-1 rounded px-1.5 py-px text-[10px] font-bold ${
+                      effet > 0.001 ? 'bg-red-100 text-red-800'
+                      : effet < -0.001 ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-zinc-100 text-zinc-600'}`}>
+                      {effet > 0.001 ? '⚠️ +' : effet < -0.001 ? '−' : '='}
+                      {Math.abs(effet) > 0.001 ? fmtEcart(Math.abs(effet) * 100) : ''}
+                    </span>
+                  )}
+                </span>}
+            <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">
+              {o.designation}{o.reference && <> · réf. {o.reference}</>}
+            </span>
+            <button onClick={() => prendre(o)} disabled={enCours}
+              className="rounded border border-violet-400 bg-white px-2 py-1 text-[11px] font-bold text-violet-800 hover:bg-violet-100 disabled:opacity-40">
+              {enCours ? '…' : 'Prendre celui-ci'}
+            </button>
+          </li>
+          )
+        })}
+      </ul>
+      {mot && <p className="mt-1.5 text-[12px] font-medium text-zinc-800">{mot}</p>}
+      <p className="mt-1.5 text-[11px] text-violet-900">
+        ⚠️ Le pourcentage violet à gauche compare les deux <strong>catalogues</strong> ;
+        la pastille verte ou rouge dit ce que ça fait à <strong>ce que nous payons</strong> —
+        les deux peuvent diverger de signe, et c&apos;est la seconde qui décide.
+        {' '}Un écart ne décide de rien tant qu&apos;il n&apos;est pas multiplié par les quantités
+        réelles : vérifiez le minimum de commande et le délai avant de basculer.
+        {' '}Le prix est ramené à notre unité d&apos;achat quand elle dit sa contenance
+        {prixReprenable(offres[0], l.unite) == null && (
+          <> — ⚠️ ce n&apos;est pas le cas de « <strong>{l.unite ?? 'inconnue'}</strong> », qui ne dit
+          pas combien de {offres[0].unite_ref} elle contient : seuls le fournisseur et sa
+          référence seront repris</>
+        )}.
+      </p>
+    </div>
+  )
+}
+
+const NATURE_OFFRE: Record<string, { texte: string; classe: string }> = {
+  facture:   { texte: 'prix payé', classe: 'bg-emerald-100 text-emerald-800' },
+  devis:     { texte: 'devis',     classe: 'bg-blue-100 text-blue-800' },
+  portail:   { texte: 'portail',   classe: 'bg-violet-100 text-violet-800' },
+  catalogue: { texte: 'catalogue', classe: 'bg-zinc-100 text-zinc-700' },
+}
+
+function NatureOffre({ nature }: { nature: string }) {
+  const n = NATURE_OFFRE[nature] ?? { texte: nature, classe: 'bg-zinc-100 text-zinc-700' }
+  return <span className={`rounded px-1.5 py-px text-[10px] font-medium ${n.classe}`}>{n.texte}</span>
 }
 
 function Bloc({ titre, sous, cout, children }: {

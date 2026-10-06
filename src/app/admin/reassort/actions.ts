@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireManager } from '@/lib/auth'
 import { referenceBon } from '@/lib/bon-commande'
+import { cleMatiere } from '@/lib/reassort'
+import { modifierArticleAchat } from '../achats/modifier-actions'
 
 const Schema = z.array(z.object({
   cle: z.string().min(1).max(60),
@@ -161,4 +163,96 @@ export async function creerBonsDepuisReassort(input: z.infer<typeof SchemaBons>)
   // ⚠️ Un doublon évité est DIT, pas tu : sans ça le gérant croirait avoir
   // créé cinq bons et n'en trouverait que trois, sans savoir pourquoi.
   return { ok: true as const, crees, dejaEnCours }
+}
+
+// ─── Basculer un fournisseur depuis l'écran de commande ────────────────
+//
+// Le signal « 💡 moins cher ailleurs » était affiché ici depuis la
+// 0163, mais pour AGIR il fallait partir sur `/admin/achats`. Entre les
+// deux écrans on perd la ligne qu'on regardait, et le geste ne se fait
+// pas — l'écart reste, exactement comme avant qu'on sache le détecter.
+//
+// ⚠️ TOUTE la discipline du sélecteur de `/admin/achats` est REPRISE, pas
+// réécrite : `modifierArticleAchat` porte le garde-fou des 95 %, la
+// division par `unites_par_achat` et le drapeau `prix_estime` (0165). Une
+// seconde implémentation finirait par écrire un prix que l'autre écran
+// refuse.
+
+const SchemaBascule = z.object({
+  cle: z.string().min(1).max(60),
+  fournisseur_id: z.string().uuid(),
+  /** ⚠️ `null` EFFACE : la référence de l'ancien fournisseur ne survit pas. */
+  reference: z.string().trim().max(60).nullable(),
+  prix: z.number().min(0).max(100000).nullable(),
+  prix_releve: z.boolean(),
+})
+
+export async function basculerFournisseur(
+  input: z.infer<typeof SchemaBascule>,
+): Promise<{ ok: boolean; message: string }> {
+  await requireManager()
+  const i = SchemaBascule.parse(input)
+
+  // Une matière est seule : il n'y a pas de groupe à résoudre.
+  if (i.cle.startsWith('ing:')) return modifierArticleAchat(i)
+
+  const sb = await createClient()
+
+  // ⚠️⚠️ UNE LIGNE DE RÉASSORT EST UN GROUPE, PAS UN PRODUIT. L'écran
+  // replie les produits qui partagent une matière (0131) : « PLAQUE PIZZA
+  // CRUE » porte la margherita ET la jambon-fromage, la même capsule porte
+  // les quatre cafés. N'écrire que sur le représentant laisserait les
+  // autres chez l'ancien fournisseur — et la ligne afficherait quand même
+  // le nouveau, parce qu'elle prend le PREMIER membre qui en porte un. Le
+  // groupe paraîtrait basculé alors qu'il ne l'est qu'à moitié.
+  const { data: rep } = await sb.from('recettes')
+    .select('nom, nom_matiere, libelle_achat').eq('id', i.cle).single()
+  if (!rep) return { ok: false, message: 'Produit introuvable.' }
+  const k = cleMatiere(rep as { nom: string; nom_matiere?: string | null; libelle_achat?: string | null })
+
+  // ⚠️ Le groupe est reconstitué en JS, pas par un `.or()` PostgREST : un
+  // libellé fournisseur contient des virgules et des parenthèses, qui sont
+  // la syntaxe même des filtres — la requête partirait tronquée sans lever
+  // d'erreur. Et la précédence de `cleMatiere` (nom_matiere ?? libelle ??
+  // nom) ne s'exprime pas en SQL : un produit dont le NOM vaut `k` mais
+  // qui porte un `nom_matiere` n'appartient pas au groupe.
+  const { data: toutes, error: eLect } = await sb.from('recettes')
+    .select('id, nom, nom_matiere, libelle_achat').order('id')
+  if (eLect) return { ok: false, message: eLect.message }
+  const membres = (toutes ?? [])
+    .filter(r => cleMatiere(r as { nom: string; nom_matiere?: string | null; libelle_achat?: string | null }) === k)
+    .map(r => r.id as string)
+  if (!membres.includes(i.cle)) membres.push(i.cle)
+
+  // ⚠️ Le prix passé est celui de l'unité ACHETÉE : c'est la MÊME pour
+  // tout le groupe, puisque c'est ce qui le définit. Chaque membre le
+  // divise ensuite par SON `unites_par_achat` — une part de flan par dix,
+  // le flan par un. C'est l'argument décisif pour boucler sur l'action
+  // partagée plutôt que d'écrire soi-même.
+  const refus: string[] = []
+  let ecrits = 0
+  for (const id of membres) {
+    const r = await modifierArticleAchat({ ...i, cle: id })
+    if (r.ok) ecrits++
+    else refus.push(r.message)
+  }
+
+  revalidatePath('/admin/reassort')
+  revalidatePath('/admin/achats')
+
+  if (refus.length === 0) {
+    return {
+      ok: true,
+      message: membres.length > 1
+        ? `Basculé sur les ${membres.length} produits qui partagent cette matière.`
+        : 'Basculé.',
+    }
+  }
+  // ⚠️ On DIT ce qui n'est pas passé. Taire un refus laisserait croire le
+  // groupe basculé en entier, et la moitié resterait chez l'ancien
+  // fournisseur sans que rien ne le signale.
+  return {
+    ok: ecrits > 0,
+    message: `${ecrits} produit(s) basculé(s), ${refus.length} refusé(s) : ${refus[0]}`,
+  }
 }

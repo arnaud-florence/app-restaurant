@@ -17,7 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { lireTout } from '@/lib/supabase/pagine'
 import {
-  estStockable, cleMatiere, lireFournisseur,
+  estStockable, cleMatiere, lireFournisseur, calculerEnCommande,
   type LigneReassort, type OffreConcurrente,
 } from '@/lib/reassort'
 import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
@@ -27,7 +27,27 @@ import {
   type PlatArdoise, type LigneComposition,
 } from '@/lib/ardoise'
 
-export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneReassort[]> {
+/**
+ * @param pour Date (AAAA-MM-JJ) pour laquelle on dimensionne. Défaut :
+ *   aujourd'hui.
+ *
+ * ⚠️⚠️ ON COMMANDE POUR LA SEMAINE QU'ON VA SERVIR, PAS POUR AUJOURD'HUI.
+ * Le chargeur ne lisait que l'ardoise couvrant le jour même. Mesuré le
+ * 05/10/2026, à sept jours de l'ouverture : l'ardoise du 12 au 18 octobre
+ * existait, elle était saisie, et les 223 cibles tombaient quand même sur
+ * le repli `stock_cible` — c'est-à-dire sur la carte ENTIÈRE, le scénario
+ * le plus coûteux en reliquat (231 €/semaine contre 133 €). On aurait
+ * commandé la carte complète pour servir une ardoise réduite, et rien ne
+ * l'aurait signalé : l'écran affichait des cibles parfaitement plausibles.
+ *
+ * Un réassort se lit AVANT le service, et une commande se passe plusieurs
+ * jours avant la livraison : la date du jour est presque toujours la
+ * mauvaise borne.
+ */
+export async function chargerLignesReassort(
+  sb: SupabaseClient,
+  pour = new Date().toISOString().slice(0, 10),
+): Promise<LigneReassort[]> {
   const [produits, matieres, inventaires, etabs, ardoiseBrute, compoFiches, compoPdj, lignesDoc] = await Promise.all([
     // ⚠️ Les catégories qui ne se stockent PAS sont exclues — un sandwich
     // ou un panini s'assemble, il ne se compte pas (règle de la 0133).
@@ -48,7 +68,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
     sb.from('plats_du_jour')
       .select('id, recette_id, titre, date_debut, date_fin')
       .eq('actif', true)
-      .lte('date_debut', new Date().toISOString().slice(0, 10)),
+      .lte('date_debut', pour),
     lireTout<Record<string, unknown>>(() => sb.from('recette_ingredients')
       .select('recette_id, ingredient_id, quantite, unite').order('recette_id').order('ingredient_id')),
     lireTout<Record<string, unknown>>(() => sb.from('plat_du_jour_ingredients')
@@ -261,9 +281,8 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   // en casse (231 €/semaine contre 133 €) — l'écran DOIT le dire, sinon on
   // croit commander juste. Et surtout on ne propose pas zéro : à huit jours
   // de l'ouverture, un réassort muet empêcherait de commander.
-  const aujourdhui = new Date().toISOString().slice(0, 10)
   const ardoise = (ardoiseBrute.data ?? []).filter(
-    (a: Record<string, unknown>) => !a.date_fin || (a.date_fin as string) >= aujourdhui,
+    (a: Record<string, unknown>) => !a.date_fin || (a.date_fin as string) >= pour,
   )
   const besoinArdoise = new Map<string, number>()
   if (ardoise.length > 0) {
@@ -361,6 +380,27 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
   // groupes — et surtout, chacun gagnerait de son côté : c'est précisément
   // ainsi que les 96 Fanta entraient dans trois stocks. Le plus long gagne,
   // et il ne peut gagner que s'ils concourent ensemble.
+  // ⚠️⚠️ CE QUI EST DÉJÀ COMMANDÉ ET PAS ENCORE REÇU. Sans ça l'écran
+  // redemande ce qu'on vient de commander : mesuré le 05/10/2026, le
+  // gérant venait de commander 150 pâtons et on lui en réclamait 280.
+  const bonsLignes = await lireTout<Record<string, unknown>>(() => sb
+    .from('bon_commande_lignes')
+    .select('ingredient_id, recette_id, quantite_commandee, quantite_recue, bons_commande!inner(statut)')
+    .order('id'))
+  const { parCle: enRoute, sansCible: enRouteSansCible } = calculerEnCommande(
+    bonsLignes.map(l => ({
+      statut: ((l.bons_commande as { statut?: string } | null)?.statut) ?? '',
+      ingredient_id: (l.ingredient_id as string) ?? null,
+      recette_id: (l.recette_id as string) ?? null,
+      quantite_commandee: l.quantite_commandee == null ? null : Number(l.quantite_commandee),
+      quantite_recue: l.quantite_recue == null ? null : Number(l.quantite_recue),
+    })))
+  if (enRouteSansCible > 0) {
+    // ⚠️ DIT, jamais tu : ces lignes-là ne peuvent rien déduire, et une
+    // commande invisible fait arriver un camion qu'on n'attendait pas.
+    console.warn(`[reassort] ${enRouteSansCible} ligne(s) de commande en route sans cible identifiée — non déduites.`)
+  }
+
   const cibles: Array<{ cle: string; libelle: string }> = []
   for (const [nom, membres] of groupes) {
     const p = membres.slice().sort((a, b) => ((a.id as string) < (b.id as string) ? -1 : 1))[0]
@@ -407,6 +447,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // composition, c'est lui qu'on achète. Sa cible reste un niveau décidé.
       cible: p.stock_cible == null ? null : Number(p.stock_cible),
       cible_origine: 'stock' as const,
+      enCommande: enRoute.get(p.id as string) ?? 0,
       cout_unitaire_ht: cout,
       ...(() => {
         // Le groupe partage une matière : n'importe lequel de ses membres
@@ -482,6 +523,7 @@ export async function chargerLignesReassort(sb: SupabaseClient): Promise<LigneRe
       // personne ait à y penser.
       cible: cibleMatiere(m.id as string, m.stock_cible == null ? null : Number(m.stock_cible)).cible,
       cible_origine: cibleMatiere(m.id as string, null).origine,
+      enCommande: enRoute.get(`ing:${m.id as string}`) ?? 0,
       cout_unitaire_ht: m.prix_achat_ht == null ? null : Number(m.prix_achat_ht),
       fournisseur: f.nom,
       // ⚠️ `prix_estime` (0165) est la SOURCE DE VÉRITÉ. Le marqueur vivait

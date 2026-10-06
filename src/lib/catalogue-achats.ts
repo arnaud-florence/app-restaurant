@@ -1,4 +1,4 @@
-import { mots, MOTS_COMMUNS_MINIMUM } from '@/lib/tarifs-fournisseurs'
+import { mots, MOTS_COMMUNS_MINIMUM, prixReferenceMatiere } from '@/lib/tarifs-fournisseurs'
 // La plateforme d'achat — un seul catalogue, tous fournisseurs.
 //
 // L'outil savait comparer ce qu'on achète DÉJÀ (`/admin/tarifs-fournisseurs`,
@@ -23,8 +23,15 @@ export type ArticleAchat = {
   famille: string | null
   /** Clé de comparaison, quand un humain l'a posée. */
   cle: string | null
-  /** Prix ramené à l'unité de référence, quand il est calculable. */
-  ref: { prix: number; unite: string } | null
+  /**
+   * Prix ramené à l'unité de référence, quand il est calculable.
+   *
+   * ⚠️ `format` porte le format de conserve (« 5/1 »). Deux boîtes 5/1 se
+   * comparent au prix de la boîte, mais une 4/4 n'a pas le même poids net :
+   * sans ce champ, la comparaison de recherche opposerait les deux et la
+   * 4/4 gagnerait à tous les coups.
+   */
+  ref: { prix: number; unite: string; format?: string | null } | null
   /** Vrai si cette ligne est la MOINS CHÈRE de son groupe comparable. */
   meilleur: boolean
   fournisseur_id: string
@@ -527,10 +534,10 @@ export type OffreConcurrente = {
 }
 
 /**
- * ⚠️ PEUT-ON REPRENDRE LE PRIX DE L'OFFRE ?
+ * CE QUE L'OFFRE VAUT DANS NOTRE UNITÉ D'ACHAT.
  *
- * OUI dès que son unité de référence est la NÔTRE — quelle que soit sa
- * nature.
+ * ⚠️ PEUT-ON REPRENDRE LE PRIX ? Oui dès qu'on sait le ramener à l'unité
+ * dans laquelle on achète — quelle que soit la nature de l'offre.
  *
  * ⚠️ CORRECTION D'UNE SUR-PRUDENCE (27/09/2026). Une première version
  * refusait tout prix qui ne venait pas d'une facture, pour protéger
@@ -546,23 +553,75 @@ export type OffreConcurrente = {
  * disant qu'il est une hypothèse, et la première facture le confirmera.
  * Seule une offre de nature `facture` coche « prix relevé ».
  *
- * ⚠️ L'unité, elle, reste une condition dure : notre « Pain burger » se
- * compte à la pièce quand l'offre est un sachet de neuf — y recopier le
- * prix du sachet multiplierait notre coût par neuf, sans que rien ne le
- * signale. Là, on reprend le fournisseur et pas le prix, et on le dit.
+ * ⚠️⚠️ ET LA CONTENANCE DE NOTRE UNITÉ EST LUE (05/10/2026). Jusqu'ici la
+ * reprise exigeait que notre unité soit LITTÉRALEMENT celle de l'offre —
+ * donc elle échouait sur « barquette 500 g » face à un €/kg, c'est-à-dire
+ * sur la moitié de nos matières. Mesuré : 4 lignes sur 15 reprenaient le
+ * prix. Or la conversion n'est pas une invention : c'est
+ * `prixReferenceMatiere()`, exactement la fonction qui a permis d'AFFICHER
+ * l'écart. Si on lui fait confiance pour comparer, on peut lui faire
+ * confiance pour écrire — un écart calculé sur une contenance fausse
+ * serait déjà faux, et il est déjà sous les yeux du gérant.
+ *
+ * ⚠️ La concordance de FORMAT et de BASE est garantie en AMONT : une offre
+ * ne sort que d'un groupe rendu comparable par `comparer()`, qui exige
+ * `memeBase()`. Une botte ne se confronte jamais à un kilo, ni une 5/1 à
+ * une 4/4 — donc ici le facteur ne peut pas franchir ces frontières.
+ *
+ * ⚠️ `converti` et `facteur` sont RENDUS, pas gardés pour nous : un prix
+ * dérivé qu'on ne sait pas décomposer n'est pas vérifiable, et c'est la
+ * première chose qu'on conteste quand il paraît faux. L'écran doit pouvoir
+ * montrer « tant €/kg × 0,5 kg ».
+ *
+ * ⚠️ RESTE REFUSÉ : une unité qu'on ne sait pas lire. « unité d'achat »
+ * — celle des produits revendus — ne dit pas combien de kilos elle
+ * contient, et il n'y a rien à en déduire. Là on reprend le fournisseur
+ * et pas le prix, et on le dit.
  */
+export type ReprisePrix = {
+  /** Prix pour NOTRE unité d'achat. */
+  prix: number
+  /** ⚠️ Vrai quand le prix est DÉRIVÉ de l'unité de référence. */
+  converti: boolean
+  /** Combien d'unités de référence tient notre unité (1 si lu tel quel). */
+  facteur: number
+  /** L'unité de référence de l'offre — pour montrer le calcul. */
+  unite_ref: string
+}
+
+/** kg / L / pièce, écrits de dix façons dans nos unités de stock. */
+function uniteRef(u: string | null | undefined): string {
+  const t = String(u ?? '').trim().toLowerCase()
+  if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
+  if (['l', 'litre', 'litres'].includes(t)) return 'litre'
+  if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
+  return t
+}
+
 export function prixReprenable(
   offre: Pick<OffreConcurrente, 'unite_ref' | 'prix_ref'>,
   uniteNotre: string | null,
-): number | null {
-  const n = (u: string | null | undefined) => {
-    const t = String(u ?? '').trim().toLowerCase()
-    if (['kg', 'kilo', 'kilogramme'].includes(t)) return 'kg'
-    if (['l', 'litre', 'litres'].includes(t)) return 'litre'
-    if (['pce', 'pièce', 'piece', 'u', 'unité', 'unite'].includes(t)) return 'pièce'
-    return t
+): ReprisePrix | null {
+  const cible = uniteRef(offre.unite_ref)
+  // Notre unité EST celle de l'offre : rien à convertir.
+  if (cible === uniteRef(uniteNotre)) {
+    return { prix: offre.prix_ref, converti: false, facteur: 1, unite_ref: offre.unite_ref }
   }
-  return n(offre.unite_ref) === n(uniteNotre) ? offre.prix_ref : null
+  if (!uniteNotre) return null
+
+  // ⚠️ `prixReferenceMatiere(u, 1)` rend le prix de reference d'une unite
+  // qui coûterait 1 € : son `prix` vaut donc 1 / (contenance). On inverse.
+  const r = prixReferenceMatiere(uniteNotre, 1)
+  if (!r || uniteRef(r.unite) !== cible || !(r.prix > 0)) return null
+  const facteur = 1 / r.prix
+  // ⚠️ 4 décimales, comme `cout_achat_ht` et `prix_achat_ht` : un arrondi
+  // à 2 fait disparaître le prix d'une capsule ou d'un sac.
+  return {
+    prix: Math.round(offre.prix_ref * facteur * 10000) / 10000,
+    converti: true,
+    facteur: Math.round(facteur * 10000) / 10000,
+    unite_ref: offre.unite_ref,
+  }
 }
 
 export type FiltresAchete = {
@@ -889,4 +948,134 @@ export function pistesAchat(
     .sort((a, b) => (b.s - a.s) || ((a.ecartPct ?? 0) - (b.ecartPct ?? 0)))
     .slice(0, max)
     .map(({ s: _s, ...p }) => p)
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * TAPER UN PRODUIT, ET VOIR TOUT DE SUITE QUI LE VEND ET À QUEL PRIX
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La recherche rendait une LISTE À PLAT : trente lignes « mozzarella » de
+ * quatre fournisseurs, dans l'ordre du catalogue, avec chacune le prix de
+ * SON conditionnement. Pour savoir qui est le moins cher il fallait sortir
+ * une calculatrice — donc personne ne le faisait, et on recommandait chez
+ * l'habituel.
+ *
+ * `comparerRecherche()` regroupe les résultats et ramène chaque ligne à son
+ * unité de référence.
+ *
+ * ⚠️⚠️ DEUX NATURES DE GRAPPE, ET IL NE FAUT JAMAIS LES CONFONDRE.
+ *
+ *   • VALIDÉE — les lignes partagent une `cle_comparaison`, posée à la main
+ *     par quelqu'un qui a regardé les deux produits (0151). C'est une
+ *     comparaison sur laquelle on peut arbitrer.
+ *   • PISTE — les lignes ont seulement des MOTS en commun. C'est un calcul,
+ *     et le calcul livré à lui-même rapproche « Roquette » de « ROQUEFORT »,
+ *     « Citron » de « GATEAU CITRON ROND », « Glace » de « SUCRE GLACE ».
+ *     On propose, l'écran le DIT, et **aucune clé n'est jamais écrite**.
+ *
+ * ⚠️ UNE GRAPPE VALIDÉE REMONTE TOUTES SES LIGNES, même celles que la
+ * recherche n'a pas trouvées. Taper « serrano » doit montrer le concurrent
+ * dont le libellé dit « JAMBON CRU PETALE » — sinon la comparaison cache
+ * précisément ce qu'on cherchait, et c'est pire que pas de comparaison.
+ *
+ * ⚠️ ON N'ANNONCE UN ÉCART QUE SI LES PRIX TOMBENT SUR LA MÊME BASE — même
+ * unité ET même format de conserve, exactement la règle de `comparer()`.
+ * Hors de là l'écran montre les lignes sans les classer : une poche de
+ * 600 g et une d'un kilo portent deux prix justes et aucune comparaison.
+ */
+export type GrappeRecherche = {
+  /** Le libellé le plus court du groupe — le plus lisible. */
+  titre: string
+  cle: string | null
+  /** Clé posée par un humain (true) ou rapprochement calculé (false). */
+  validee: boolean
+  lignes: ArticleAchat[]
+  comparable: boolean
+  /** Écart entre le moins cher et le plus cher, en %. Null si incomparable. */
+  ecartPct: number | null
+  /** Id de la ligne la moins chère — UNIQUEMENT si le groupe est comparable. */
+  moinsCher: string | null
+  /** Nombre de fournisseurs DISTINCTS ayant chiffré. */
+  fournisseurs: number
+}
+
+/** La base d'un prix de référence : unité ET format doivent concorder. */
+const baseRef = (a: ArticleAchat) => `${a.ref!.unite}|${a.ref!.format ?? ''}`
+
+function juger(lignes: ArticleAchat[], titre: string, cle: string | null, validee: boolean): GrappeRecherche {
+  const chiffrees = lignes.filter(l => l.ref)
+  const bases = new Set(chiffrees.map(baseRef))
+  const comparable = bases.size === 1 && chiffrees.length > 1
+  let moinsCher: string | null = null, ecartPct: number | null = null
+  if (comparable) {
+    const tri = [...chiffrees].sort((a, b) => a.ref!.prix - b.ref!.prix)
+    moinsCher = tri[0].id
+    const bas = tri[0].ref!.prix, haut = tri[tri.length - 1].ref!.prix
+    ecartPct = bas > 0 ? Math.round(((haut - bas) / bas) * 1000) / 10 : null
+  }
+  return {
+    titre, cle, validee, comparable, moinsCher, ecartPct,
+    // ⚠️ On compte ceux qui ont CHIFFRÉ : un fournisseur à qui on vient
+    // d'envoyer une demande de tarif n'est pas un participant au duel.
+    fournisseurs: new Set((chiffrees.length ? chiffrees : lignes).map(l => l.fournisseur_id)).size,
+    lignes: [...lignes].sort((a, b) =>
+      (a.ref ? a.ref.prix : Infinity) - (b.ref ? b.ref.prix : Infinity)),
+  }
+}
+
+export function comparerRecherche(
+  articles: ArticleAchat[],
+  requete: string,
+  max = 12,
+): GrappeRecherche[] {
+  if (!motsCles(requete).length) return []
+  const trouves = articles.filter(a => correspond(a, requete))
+  if (!trouves.length) return []
+
+  const grappes: GrappeRecherche[] = []
+  const pris = new Set<string>()
+
+  // ① Les comparaisons VALIDÉES, avec toutes leurs lignes.
+  const cles = new Set(trouves.map(a => a.cle).filter((c): c is string => !!c))
+  for (const cle of cles) {
+    const l = articles.filter(a => a.cle === cle)
+    for (const a of l) pris.add(a.id)
+    if (l.length < 2) continue
+    const titre = [...l].sort((a, b) => a.designation.length - b.designation.length)[0].designation
+    grappes.push(juger(l, titre, cle, true))
+  }
+
+  // ② Les PISTES : ce que la recherche a trouvé et que rien ne relie encore.
+  // On part des libellés les plus COURTS — ce sont les plus génériques, donc
+  // les meilleurs noyaux ; partir d'un libellé à rallonge produirait autant
+  // de grappes d'une ligne que de références.
+  const reste = trouves.filter(a => !pris.has(a.id))
+    .sort((a, b) => a.designation.length - b.designation.length)
+  for (const noyau of reste) {
+    if (pris.has(noyau.id)) continue
+    const mn = mots(noyau.designation)
+    if (!mn.length) continue
+    const grappe = [noyau]
+    pris.add(noyau.id)
+    for (const a of reste) {
+      if (pris.has(a.id)) continue
+      if (mots(a.designation).filter(m => mn.includes(m)).length < MOTS_COMMUNS_MINIMUM) continue
+      grappe.push(a); pris.add(a.id)
+    }
+    // ⚠️ Un seul fournisseur n'est pas une comparaison, c'est une gamme :
+    // opposer deux de ses propres références annoncerait un « moins cher »
+    // qui ne fait changer de personne.
+    if (new Set(grappe.map(a => a.fournisseur_id)).size < 2) continue
+    grappes.push(juger(grappe, noyau.designation, null, false))
+  }
+
+  // Les comparaisons sûres d'abord, puis le plus gros écart : c'est là qu'il
+  // y a de l'argent à aller chercher.
+  return grappes
+    .sort((a, b) =>
+      Number(b.validee) - Number(a.validee) ||
+      Number(b.comparable) - Number(a.comparable) ||
+      (b.ecartPct ?? -1) - (a.ecartPct ?? -1))
+    .slice(0, max)
 }
