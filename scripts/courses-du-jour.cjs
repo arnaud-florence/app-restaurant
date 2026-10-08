@@ -1,7 +1,33 @@
 // LA LISTE DES COURSES — tous les postes, en tableaux, au moins cher.
 //
-//   node scripts/courses-du-jour.cjs [--pour AAAA-MM-JJ] [--habituel]
+//   node scripts/courses-du-jour.cjs [--pour AAAA-MM-JJ] [--jours N] [--habituel]
 //                                    [--avec-glaces] [--avec-promocash] [--ecrire]
+//
+// ⚠️⚠️ ON COMMANDE POUR UNE SEMAINE, PAS POUR UN JOUR — et c'est le gérant
+// qui l'a vu : « je ne vois pas la saucisse de Toulouse d'un plat du jour ».
+// `chargerLignesReassort(jour)` ne charge que l'ardoise COUVRANT ce jour-là.
+// Lancé le 8 octobre, il ne voyait ni la carte du 12-18 ni les cinq plats du
+// jour de la semaine : la saucisse du mercredi 14 n'existait tout simplement
+// pas, sans qu'aucune ligne ne le signale.
+//
+// `--jours N` parcourt N jours à partir de `--pour` et garde, pour chaque
+// référence, le BESOIN LE PLUS FORT de la période.
+//
+// ⚠️ LE MAXIMUM, PAS LA SOMME : la cible d'une matière est un NIVEAU de
+// stock à atteindre, pas une consommation. Les additionner ferait commander
+// sept fois le stock de la semaine.
+//
+// ⚠️⚠️ ET LE MAXIMUM EST UN PLANCHER, pas le besoin, pour toute référence
+// que PLUSIEURS jours réclament : la crème fraîche de deux plats du jour
+// différents ne se cumule pas dans un maximum. Ces lignes sont SIGNALÉES
+// avec leur min et leur max plutôt que corrigées au jugé.
+//
+// ⚠️ Et on ne peut PAS simplement additionner les écarts au minimum : le
+// besoin de la carte varie DÉJÀ d'un jour à l'autre (le gérant compte
+// 20 couverts le soir le week-end contre 10 en semaine). Un écart n'est
+// donc pas forcément un plat du jour. Corriger cela demande que la
+// bibliothèque sache raisonner sur une PÉRIODE — ce n'est pas à une liste
+// de courses de l'inventer.
 //
 // LECTURE SEULE : aucun bon créé, aucun message envoyé, rien écrit en base.
 // `--ecrire` ne sort que des fichiers à copier dans data/.
@@ -38,6 +64,7 @@ const NATURE = { facture: 'prix déjà payé', devis: 'devis', portail: 'tarif p
 
 const arg = n => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null }
 const POUR = arg('--pour') ?? new Date().toISOString().slice(0, 10)
+const JOURS = Math.max(1, Number(arg('--jours') ?? 1))
 const MOINS_CHER = !process.argv.includes('--habituel')
 const ECRIRE = process.argv.includes('--ecrire')
 
@@ -75,10 +102,24 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 
 ;(async () => {
   const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
-  const brut = await chargerLignesReassort(sb, POUR)
-  // ⚠️ Un comptage de plus de 30 jours N'EST PAS UN STOCK : ramené à
-  // « inconnu », sinon on complète une réserve qui n'existe plus.
-  let lignes = R.sansComptagePerime(brut)
+  // ── le besoin de la PÉRIODE, jour par jour ──
+  const d0 = new Date(POUR + 'T12:00:00Z')
+  const jours = Array.from({ length: JOURS }, (_, i) =>
+    new Date(d0.getTime() + i * 86400000).toISOString().slice(0, 10))
+  const parCle = new Map()
+  const suivi = new Map()         // cle → cible par jour
+  for (const j of jours) {
+    // ⚠️ Un comptage de plus de 30 jours N'EST PAS UN STOCK : ramené à
+    // « inconnu », sinon on complète une réserve qui n'existe plus.
+    for (const l of R.sansComptagePerime(await chargerLignesReassort(sb, j))) {
+      const a = parCle.get(l.cle)
+      if (!a || (l.cible ?? 0) > (a.cible ?? 0)) parCle.set(l.cle, l)
+      if (!suivi.has(l.cle)) suivi.set(l.cle, new Map())
+      suivi.get(l.cle).set(j, l.cible ?? 0)
+    }
+  }
+  let lignes = [...parCle.values()]
+  if (JOURS > 1) console.log(`  période : ${jours[0]} → ${jours[jours.length - 1]} (${JOURS} j)\n`)
 
   const retires = { assembles: [], glaces: [] }
   lignes = lignes.filter(l => {
@@ -87,6 +128,15 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
     return true
   })
 
+  // ⚠️ Une cible qui VARIE sur la période veut dire que le besoin n'est pas
+  // le même tous les jours — plat du jour, ou simplement le week-end. Le
+  // maximum couvre le jour le plus fort ; dès que DEUX jours dépassent le
+  // minimum, il devient un PLANCHER. On le dit, ligne par ligne.
+  const variables = JOURS > 1 ? [...suivi.entries()].map(([cle, m]) => {
+    const v = [...m.values()], mn = Math.min(...v), mx = Math.max(...v)
+    const jDessus = [...m.entries()].filter(([, x]) => x > mn).map(([j]) => j.slice(8))
+    return { cle, mn, mx, jDessus, nom: (parCle.get(cle) || {}).nom, unite: (parCle.get(cle) || {}).unite }
+  }).filter(x => x.mx > x.mn && x.jDessus.length > 1).sort((a, b) => b.jDessus.length - a.jDessus.length) : []
   const ouverture = R.stockAReconstituer(lignes)
   const { prets, sansFournisseur, bascules } = R.lignesCommandables(lignes, MOINS_CHER)
 
@@ -224,6 +274,10 @@ footer{margin-top:30px;color:var(--g);font-size:12px;border-top:1px solid var(--
 <div><b>${nSansPrix}</b><span>lignes sans prix connu</span></div>
 <div><b>${manque.length}</b><span>sans interlocuteur</span></div>
 </div>
+${variables.length ? `<div class="mq"><h2>⚠️ ${variables.length} référence(s) à besoin VARIABLE sur la période <small>la quantité retenue est un plancher</small></h2>
+<div class="s" style="margin-bottom:6px">Le besoin n’est pas le même tous les jours — un plat du jour, ou le week-end plus chargé. On retient le <b>jour le plus fort</b> ; dès que plusieurs jours dépassent le minimum, c’est un <b>plancher</b>, pas le besoin de la semaine. À arbitrer à la main.</div>
+<table><thead><tr><th>Produit</th><th>Mini/jour</th><th>Retenu (max)</th><th>Unité</th><th>Jours au-dessus</th></tr></thead><tbody>${
+variables.map(v => `<tr><td class="n">${esc(v.nom)}</td><td class="c">${f(v.mn, 2)}</td><td class="c b">${f(v.mx, 2)}</td><td>${esc(v.unite ?? '')}</td><td class="c">${v.jDessus.join(', ')} oct.</td></tr>`).join('')}</tbody></table></div>` : ''}
 ${ouverture ? '<div class="al"><b>⚠️ Aucun comptage récent</b> — c’est une commande d’OUVERTURE, pas un réassort : les quantités valent la cible entière.</div>' : ''}
 <div class="al"><b>📦 Livré</b> = entré depuis le dernier comptage &nbsp;·&nbsp; <b>🚚 Commandé</b> = déjà parti, pas encore reçu — ces deux colonnes sont <b>déjà déduites</b> de « à commander ».<br>
 Une ligne <b>« tarif à confirmer »</b> change de fournisseur : son prix est celui de NOTRE conditionnement, pas du sien. On ne le convertit pas — un faux prix ne se signale pas, il se découvre à la facture.</div>
