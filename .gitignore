@@ -97,3 +97,6 @@ data/affiche-*
 
 # Listes de courses — prix fournisseurs negocies, depot public
 data/courses-*
+
+data/manque-*
+data/commande-felix-potin-*.json
