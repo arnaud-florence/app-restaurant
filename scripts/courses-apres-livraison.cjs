@@ -1,7 +1,14 @@
 // CE QUI MANQUE APRÈS UNE LIVRAISON — et chez qui peut encore livrer.
 //
 //   node scripts/courses-apres-livraison.cjs --commande data/commande-X.json \
-//        [--pour AAAA-MM-JJ] [--jours N] [--livreurs "A,B,C"] [--ecrire]
+//        [--pour AAAA-MM-JJ] [--jours N] [--livreurs "A,B,C"]
+//        [--recu "D,E"] [--ecrire]
+//
+// ⚠️ `--recu` sort de la liste ce qu'un fournisseur a DÉJÀ livré sans qu'on
+// ait son document. C'est un pansement d'affichage, et il faut le dire : le
+// STOCK, lui, continue d'ignorer cette marchandise, donc elle reviendra à
+// la prochaine liste. Seule une facture ou un BL enregistré la fait entrer
+// pour de bon (0166).
 //
 // LECTURE SEULE : aucun bon créé, aucun message envoyé, rien en base.
 //
@@ -47,6 +54,7 @@ const CMD = JSON.parse(fs.readFileSync(arg('--commande'), 'utf8'))
 const POUR = arg('--pour') ?? new Date().toISOString().slice(0, 10)
 const JOURS = Math.max(1, Number(arg('--jours') ?? 7))
 const LIVREURS = (arg('--livreurs') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+const RECU = (arg('--recu') ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const ECRIRE = process.argv.includes('--ecrire')
 const f = (n, d = 2) => n.toFixed(d).replace('.', ',')
 const q = n => (Number.isInteger(n) ? String(n) : f(n, 3))
@@ -115,10 +123,13 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 
   // ── 3. qui peut encore livrer ──
   const peut = n => !LIVREURS.length || LIVREURS.includes(n)
-  const reste = [], servis = [], bloques = []
+  const reste = [], servis = [], bloques = [], dejaRecu = []
   for (const l of prets) {
     const c = couvert.get(l.cle)
     if (c) { servis.push({ l, c }); continue }
+    // ⚠️ Déjà livré par un fournisseur dont on n'a pas le document : sorti
+    // de la liste, mais le stock l'ignore toujours.
+    if (RECU.includes(l.retenu.nom)) { dejaRecu.push(l); continue }
     if (peut(l.retenu.nom)) { reste.push({ ...l, par: l.retenu.nom, via: 'fournisseur retenu' }); continue }
     // ⚠️ On cherche une offre chez ceux qui PEUVENT livrer. Sans prix repris :
     // le prix du concurrent est celui de SON conditionnement.
@@ -138,6 +149,7 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
   console.log('═'.repeat(70))
   console.log(`\n  ✓ ${servis.length} référence(s) couvertes par la livraison`)
   console.log(`  → ${reste.length} à commander chez ceux qui peuvent livrer`)
+  if (dejaRecu.length) console.log(`  ✓ ${dejaRecu.length} déjà livrée(s) par ${RECU.join(', ')} — ⚠️ mais le STOCK l'ignore`)
   console.log(`  ⚠️ ${bloques.length} bloquée(s) — personne parmi eux ne les a`)
   console.log(`  ℹ ${parNom.length} ligne(s) rattrapées par le NOM (à vérifier) · ${inconnus.length - parNom.length} sans aucune correspondance`)
   if (sansCible.length) console.log(`  ⚠️ ${sansCible.length} ligne(s) au catalogue mais rattachées à aucune fiche`)
@@ -188,7 +200,9 @@ h2.bl+table th{background:#b43d3d}td{padding:5px 8px;border-bottom:1px solid var
 <div class="s">Après ${esc(CMD.fournisseur)} ${esc(CMD.numero)}, livrée le ${esc(CMD.livraison)} · ${f(CMD.total_ht)} € HT${LIVREURS.length ? ` · peuvent livrer : ${esc(LIVREURS.join(', '))}` : ''}</div>
 <div class="k"><div><b>${servis.length}</b><span>couvertes par la livraison</span></div>
 <div><b>${reste.length}</b><span>à commander</span></div>
+${dejaRecu.length ? `<div><b>${dejaRecu.length}</b><span>déjà livrées (${esc(RECU.join(', '))})</span></div>` : ''}
 <div><b>${bloques.length}</b><span>bloquées</span></div></div>
+${dejaRecu.length ? `<div class="al"><b>⚠️ ${dejaRecu.length} référence(s) sorties de la liste parce que ${esc(RECU.join(', '))} a déjà livré</b> — mais sans sa facture ni son bon de livraison enregistré, le STOCK ne le sait pas : elles reviendront à la prochaine liste, et le réassort continuera de croire la réserve vide. Il faut scanner le document.</div>` : ''}
 <div class="al"><b>⚠️ Les quantités livrées ne sont PAS déduites</b> — la commande est dans l’unité du fournisseur (sachet, barquette, colis), nos cibles dans la nôtre. Une conversion faite de tête donnerait un reste faux, et un reste faux fait manquer de marchandise un samedi soir. Une référence livrée est marquée <b>couverte</b>, point.</div>
 ${Object.entries(gr).sort((a, b) => b[1].length - a[1].length).map(([fo, ls]) => tbl(`${fo} — ${ls.length} ligne(s)`,
   ls.sort((a, b) => poste(a).localeCompare(poste(b)) || a.nom.localeCompare(b.nom)).map(l =>
