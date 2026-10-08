@@ -94,3 +94,6 @@ data/*_signed.pdf
 
 # Photos produit du catalogue Arti'Pat (tiers) + affiche montee dessus
 data/affiche-*
+
+# Listes de courses — prix fournisseurs negocies, depot public
+data/courses-*
