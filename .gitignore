@@ -69,6 +69,15 @@ data/*.xlsx
 # partaient dans l'historique, d'où on ne les retire plus vraiment.
 data/gelvar/
 data/demande-tarif-*.csv
+# ⚠️ Un message de demande de tarif porte NOS coûts d'achat en face des
+# leurs — c'est l'argument de négociation, et il n'a rien à faire dans un
+# dépôt public. Le brouillon reste sur le poste ; c'est le gérant qui envoie.
+data/demande-*.txt
+data/demande-*.csv
+# Les listes de commande portent nos prix d'achat.
+data/commande-*.csv
+data/liste-*.csv
+data/liste-*.txt
 data/Demande de tarif*.xlsx
 data/gineys/
 data/catalogues/
@@ -78,3 +87,16 @@ data/carte-boissons-marges.csv
 data/mail-*.txt
 data/demande-tarif-*.csv
 data/commande-*.pdf
+
+# Factures fournisseurs — pièces comptables, dépôt public.
+data/facture-*.pdf
+data/*_signed.pdf
+
+# Photos produit du catalogue Arti'Pat (tiers) + affiche montee dessus
+data/affiche-*
+
+# Listes de courses — prix fournisseurs negocies, depot public
+data/courses-*
+
+data/manque-*
+data/commande-felix-potin-*.json

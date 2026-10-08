@@ -19,11 +19,25 @@ const rz = await fetch('https://api.zelty.fr/2.11/catalog/dishes?show_all=true&l
   { headers: { Authorization: `Bearer ${env.ZELTY_API_KEY}` } })
 const plats = (await rz.json()).dishes ?? []
 
+// ⚠️ LES FAMILLES SE CONTRÔLENT CÔTÉ CAISSE, PAS DANS NOTRE BASE.
+// Un produit dont la `categorie` est renseignée chez nous peut n'être
+// rattaché à AUCUN tag Zelty : l'import CRÉE les plats et les laisse à
+// plat. Le plat existe, il est actif, son prix est juste — et il n'a
+// aucun bouton au comptoir. Vécu le 06/10/2026 sur la Baguette Jeannette
+// et la Baguette Paris : ce contrôle était au vert pendant que le gérant
+// ne les trouvait pas sur son iPad.
+const rt = await fetch('https://api.zelty.fr/2.11/catalog/tags?limit=0',
+  { headers: { Authorization: `Bearer ${env.ZELTY_API_KEY}` } })
+const nomDuTag = new Map(((await rt.json()).tags ?? []).map(t => [String(t.id), t.name]))
+const famillesCaisse = p => (p.tags ?? [])
+  .map(t => nomDuTag.get(String(typeof t === 'object' ? t?.id : t)))
+  .filter(Boolean)
+
 // ── Ce que notre base détient ───────────────────────────────────────
 const U = env.NEXT_PUBLIC_SUPABASE_URL, K = env.SUPABASE_SERVICE_ROLE_KEY
 const sb = async p => (await fetch(`${U}/rest/v1/${p}`,
   { headers: { apikey: K, Authorization: `Bearer ${K}` } })).json()
-const nous = await sb('recettes?select=id,nom,nom_caisse,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
+const nous = await sb('recettes?select=id,nom,nom_caisse,categorie,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
 
 // La TVA sur place suit la LOI, pas le panneau : un croissant mangé à table
 // est à 10 %, pas à 5,5 %. L'alcool reste à 20 %, la presse à 2,1 %.
@@ -32,6 +46,7 @@ const ttc = r => Math.round(Number(r.prix_vente_ht) * (1 + Number(r.tva) / 100) 
 
 const parId = new Map(plats.map(p => [String(p.remote_id ?? ''), p]))
 let ok = 0; const pbs = []
+const ecartsVitrine = []
 const dire = (r, quoi, attendu, recu) =>
   pbs.push(`${r.nom.padEnd(34).slice(0, 34)} ${quoi} — attendu ${attendu}, Zelty a ${recu}`)
 
@@ -58,7 +73,33 @@ for (const r of nous) {
   // et un contrôle rouge en permanence finit par être ignoré.
   const attendu = (r.nom_caisse?.trim() || r.nom)
   if (p.name !== attendu) { dire(r, 'nom', attendu, p.name); bon = false }
+  // ⚠️⚠️ ET ON SIGNALE QUAND LA CAISSE AFFICHE AUTRE CHOSE QUE LA CARTE,
+  // même si `nom_caisse` le justifie. Le 06/10/2026 le gérant a vu « Pavé
+  // multicéréales » sur sa caisse alors que sa carte disait « Pavé Le
+  // Jeannot » depuis la veille — douze noms divergeaient, et ce contrôle
+  // annonçait « conformes en tout point ». Il avait raison selon sa règle,
+  // et c'est précisément le problème : une règle juste qui laisse
+  // l'exploitant devant un nom qu'il ne reconnaît pas.
+  //
+  // Ce n'est PAS une erreur — le suffixe « (salle) » est voulu, et
+  // `nom_caisse` existe pour que l'éclair du comptoir et celui de la table
+  // ne portent pas le même libellé. C'est une INFORMATION, et elle doit
+  // être lisible sans qu'on ait à la chercher.
+  if (p.name !== r.nom) ecartsVitrine.push(`${r.nom.padEnd(32).slice(0, 32)} caisse : « ${p.name} »`)
   if (p.disable) { dire(r, 'état', 'actif', 'désactivé'); bon = false }
+  // ⚠️⚠️ UN PLAT SANS FAMILLE EST UN BOUTON INTROUVABLE AU COMPTOIR.
+  // Il ne s'affiche sous aucun onglet de la caisse : il est vendable en
+  // théorie et invendable en pratique. C'est un ÉCART, pas une remarque —
+  // le prix peut être parfait, le produit ne se vend pas.
+  // Correctif : `node scripts/pousser-familles-zelty.mjs --ecrire`.
+  const fams = famillesCaisse(p)
+  if (fams.length === 0) { dire(r, 'famille', r.categorie || 'une famille', 'aucune — bouton introuvable'); bon = false }
+  // ⚠️ Et une famille qui ne concorde PAS range le bouton au mauvais
+  // onglet : la pizza chez les pains. Le tag Zelty porte notre nom de
+  // famille (son `remote_id`), donc la comparaison est exacte.
+  else if (r.categorie && !fams.includes(r.categorie)) {
+    dire(r, 'famille', r.categorie, fams.join(' + ')); bon = false
+  }
   if (bon) ok++
 }
 
@@ -76,6 +117,11 @@ console.log(`\n── Carte Zelty vs notre base ──\n`)
 console.log(`  produits actifs chez nous : ${nous.length}`)
 console.log(`  plats dans la caisse      : ${plats.length}`)
 console.log(`  conformes en tout point   : ${ok}`)
+if (ecartsVitrine.length) {
+  console.log(`\n  ℹ ${ecartsVitrine.length} produit(s) dont la CAISSE affiche un autre nom que la CARTE`)
+  console.log(`    (voulu quand c'est le suffixe « (salle) » ; à corriger sinon)`)
+  for (const e of ecartsVitrine) console.log(`      ${e}`)
+}
 console.log(`  écarts                    : ${pbs.length}`)
 console.log(`  plats sans contrepartie   : ${orphelins.length}`)
 console.log(`  plats éteints en caisse   : ${eteints}`)

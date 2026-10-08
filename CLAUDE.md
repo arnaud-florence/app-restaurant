@@ -1366,8 +1366,49 @@ d'ouverture.
 commandes web est bloquée — un libellé inconnu renvoie 400. La lecture, elle,
 fonctionne déjà.
 
-⚠️ Abonnement Zelty **expirant le 03/10/2026**, sans moyen de paiement
-enregistré : le renouvellement automatique échouera.
+⚠️⚠️ **L'ABONNEMENT A EXPIRÉ LE 03/10/2026 ET LES CAISSES SE SONT
+COUPÉES** (constaté le 05/10, iPads bloqués). La note d'août disait « sans
+moyen de paiement enregistré » : c'était faux au 05/10 — une carte
+(•••• 1732, exp. 2029) EST enregistrée. **Elle est REFUSÉE par la banque.**
+
+Le prélèvement automatique a donc échoué le 03/10, Zelty a basculé
+`Renouvellement automatique` sur **Désactivé**, et les licences se sont
+arrêtées. Rien n'est perdu : l'API répond 200, les 181 produits, la carte et
+les réglages sont intacts — c'est la licence d'EXÉCUTION des iPads qui est
+coupée.
+
+| Où | Quoi |
+|---|---|
+| `bo.zelty.fr/licenses` | l'abonnement, les cases à cocher, « Renouveler manuellement » |
+| `bo.zelty.fr/billing` | le renouvellement automatique et les moyens de paiement |
+| `bo.zelty.fr/invoices` | les paiements passés |
+
+⚠️ **Aucun de ces écrans n'est dans le plan du site ni dans le menu** : ils
+ne se trouvent qu'en tapant l'URL. `/subscription` et `/abonnement` rendent
+404 ; c'est **`/billing`** et **`/licenses`**.
+
+**Abonnement : 175 € HT / 210 € TTC par mois** — Cloud 89 €, Caisse n°2
+39 €, deux Télécommandes 19 € chacune, Fabrication 9 €, plus une Caisse et
+une Premium à 0 €. Un bon de commande se génère depuis `/licenses` et
+**expire en 24 h**.
+
+⚠️ **Un prélèvement sur carte ENREGISTRÉE part hors session, sans 3-D
+Secure** — et les banques françaises le refusent en routine. Le chemin qui
+passe est « Payer … en ligne » (nouvelle carte), qui ouvre Stripe Checkout
+avec validation dans l'appli bancaire. ⚠️ Stripe y propose d'abord **Link**,
+qui réutiliserait la carte refusée : il faut cliquer **« Payer sans Link »**
+pour atteindre le formulaire carte.
+
+⚠️ **NE PAS activer le renouvellement automatique tant que le paiement n'est
+pas passé** : l'activer sur une carte qui refuse ne ferait que reproduire la
+panne, un 5 novembre en plein service.
+
+⚠️ **UNE SEULE LICENCE FABRICATION (= 1 KDS) est souscrite**, alors que la
+cuisine ET la pizza en demandent une chacune. Sans la seconde, un des deux
+écrans ne tournera pas le 12 octobre. L'ajout passe par le support
+(09 72 53 55 72), pas par le back-office.
+
+⚠️ **Un seul iPad est appairé** (ref B, dernière activité le 02/09/2026).
 
 **Reste à faire pour la production** : poser `ZELTY_API_KEY` et
 `ZELTY_MONTANTS_EN_CENTIMES=true` sur Vercel — après le passage en mode réel,
@@ -2133,6 +2174,118 @@ portée de clé et versions testées.
 bouton d'ajout. « La gestion et l'activation des partenaires se fait maintenant
 depuis la marketplace Zelty. Les demandes d'ajout de clés API hors marketplace
 peuvent être faites via ce formulaire. »
+
+### Le réseau et les imprimantes de tickets (05-06/10/2026)
+
+Trois **Epson TM-T88VI** (boîtier **M388A**, Ethernet + USB + Série intégrés)
+achetées pour le comptoir, la cuisine et la pizzeria.
+
+| | |
+|---|---|
+| Box | Bbox, **192.168.1.254**, SSID **`CASATASIA`** (renommée — Zelty avait enregistré `Bbox-3135DBFE` en septembre) |
+| Répéteur | **TP-Link RE505X**, `192.168.1.170`, appairé sur `CASATASIA` en **2,4 GHz** |
+| Imprimante **comptoir** | `192.168.1.196` · MAC `44:D2:44:C4:61:2E` · en **câble** sur la box |
+| Imprimante **cuisine** | `192.168.1.47` · nom réseau `EPSON199BBE` · via le **répéteur** |
+| Imprimante **pizza** | à brancher — il manque un **switch 5 ports** (le RE505X n'a qu'UN port) |
+
+**Déclaration dans Zelty : `bo.zelty.fr/printers`** (nom + adresse IP), puis
+rattachement aux postes dans **`bo.zelty.fr/fabrication-places`**.
+⚠️ Ces écrans ne sont dans AUCUN menu : ils ne s'atteignent qu'en tapant l'URL.
+
+⚠️⚠️ **LE RÉSEAU INVITÉ DE LA BBOX EST UN PIÈGE PARFAIT.** Le répéteur a
+d'abord été appairé sur **`WiFiGuest_8FCE`** — le réseau invité de la BOX
+ELLE-MÊME (le suffixe `8FCE` est celui de son nom réseau `186696A18FCE`). Un
+réseau invité est **volontairement isolé** : l'imprimante y a pris
+`192.168.0.102`, passerelle `192.168.0.254`, injoignable depuis le réseau
+principal. Tout fonctionnait — appairage, pont Ethernet, DHCP, impression —
+et **la caisse n'aurait jamais pu lui parler**. Aucune erreur nulle part :
+les bons ne seraient simplement jamais sortis.
+
+C'est le ticket de **test automatique** de l'imprimante qui l'a révélé
+(éteinte → maintenir **FEED** → allumer → relâcher) : il imprime l'IP, le
+masque et la passerelle. ⚠️ Lire `192.168.**0**.x` au lieu de
+`192.168.**1**.x` est le seul indice, et il ne saute pas aux yeux.
+
+⚠️ **Une Epson ne demande son adresse QU'AU DÉMARRAGE.** Brancher le câble
+sur une imprimante déjà allumée ne déclenche aucune requête DHCP : elle reste
+invisible. Vécu deux fois dans la même soirée. **Toujours : câble d'abord,
+alimentation ensuite.**
+
+⚠️ Le RE505X ne voyait pas le **5 GHz** de la box depuis sa position (le
+5 GHz porte moins loin). L'étape 5 GHz de l'assistant Tether se **passe** —
+elle est facultative. Mais le lien box → répéteur est donc en 2,4 GHz, la
+bande qu'un **four à micro-ondes écrase**. À surveiller en service ; le
+remède est de rapprocher le répéteur de la box pour qu'il accroche le 5 GHz.
+
+⚠️ **Derrière le répéteur, l'ARP montre SA propre MAC** pour tous les
+appareils (proxy ARP) : `192.168.1.47`, `.70` et `.170` partagent
+`e2:3a:55:72:a2:cb`. La vraie MAC de l'imprimante se lit sur son ticket
+d'état, ou se devine de son nom réseau (`EPSON199BBE` → `…19:9B:BE`).
+
+⚠️ **Les IP sont en DHCP et doivent être RÉSERVÉES dans la box** (baux
+statiques par MAC). L'iPad est déjà passé de `.69` (septembre) à `.199` : la
+même dérive sur une imprimante enverrait les bons de la cuisine chez le
+pizzaiolo, sans le moindre signalement.
+
+**Une imprimante REMPLACE un KDS iPad** — Zelty : « chaque lieu de
+fabrication pourra être associé à une imprimante **ou** une application iPad
+de fabrication ». Donc pas d'iPad à installer en cuisine, et la 2ᵉ licence
+Fabrication (9 €/mois) devient inutile. ⚠️ Le cumul imprimante + KDS n'est
+pas documenté : à demander au support (09 72 53 55 72). Un KDS consomme de
+toute façon une licence Fabrication, et il n'y en a qu'UNE.
+
+⚠️ **Le rattachement poste ↔ imprimante résiste à l'automatisation** : le
+menu de `/fabrication-places` ne retient pas la valeur posée par script
+(trois méthodes essayées), et il ne donne **aucun retour visuel** une fois
+enregistré à la main. Le seul contrôle qui tranche est une **vraie commande
+passée sur la caisse** — sans risque tant que l'établissement est en **mode
+école**, où les tickets n'entrent pas dans le CA.
+
+⚠️⚠️ **CE SONT LES ENTRÉES *AUTO* QUI FONCTIONNENT, PAS LES MANUELLES.**
+Zelty auto-détecte les imprimantes du réseau et crée une ligne
+`TM-T88VI<I> - <MAC>`. Une imprimante déclarée **à la main** (nom + IP) reste
+à **« Dernière connexion : N/A »** pour toujours : la caisse ne lui parle
+jamais. Les noms lisibles qu'on y pose (`Comptoir`, `Cuisine`) ne servent
+donc à rien pour le routage — il faut rattacher les postes à la ligne AUTO,
+même si son nom est un numéro de série.
+
+⚠️ **Le rattachement poste ↔ imprimante s'affiche en CASE À COCHER SOUS le
+menu déroulant**, jamais dans le menu lui-même, qui revient toujours à
+« Imprimante liée à l'appareil ». Trois quarts d'heure perdus à croire que
+l'enregistrement échouait alors qu'il passait : **il faut regarder sous le
+menu, pas dedans.** Séquence : choisir dans le menu → **Ajouter** (une case
+apparaît) → **Sauvegarder**.
+
+⚠️ Plusieurs imprimantes peuvent être cochées sur un même poste — donc
+décocher celles qui pointent sur la MÊME machine, sinon le bon sort en
+double.
+
+✅✅ **`bo.zelty.fr/printers/reports` EST LA PAGE QUI RÉSOUT TOUT.** « Envoyer
+tout » n'imprimait rien et aucun écran ne disait pourquoi. Ce rapport l'a
+donné en une ligne :
+
+    Connection: 192.168.1.196:9100 [Operation timed out]
+    Name: TM-T88VI - 44D244C4612E
+    IP: 192.168.1.70  SSID: CASATASIA_5GEXT
+    Error: POSIXErrorCode 60
+
+La caisse imprimait sur l'imprimante du **COMPTOIR** (débranchée à ce
+moment-là) parce que le poste Cuisine n'avait aucune imprimante attachée et
+retombait sur « l'imprimante liée à l'appareil ». **Quand un bon ne sort
+pas, cette page est le PREMIER endroit où regarder** — elle donne l'IP
+visée, l'appareil émetteur, son SSID et le code d'erreur POSIX.
+
+⚠️ **Le bouton « imprimante » du ticket ne prouve RIEN sur le routage** : il
+sort le ticket entier sur l'imprimante par défaut de la caisse, sans
+consulter les lieux de fabrication. Seul **« Envoyer tout »** (l'envoi en
+production) exerce la chaîne réelle. Tester avec le mauvais bouton fait
+conclure que tout marche alors que rien n'est routé.
+
+⚠️ **L'app Zelty KDS refuse les identifiants du back-office** (« erreur
+d'authentification ») alors que l'app Zelty Caisse les accepte sur le MÊME
+iPad, et que Safari ouvre le back-office avec le même mot de passe tapé au
+même clavier. Question ouverte pour le support (09 72 53 55 72). Le KDS
+n'est pas sur le chemin critique : les bons sortent sur papier.
 
 ### Les écrans de la caisse — trois iPad et un iPhone (25/09/2026)
 
@@ -3200,6 +3353,294 @@ ligne unique chez un nouveau fournisseur plus chère que l'économie — le bon
 La Frite Belge ne porte qu'un ketchup.
 
 Test : `PORT=3000 node scripts/test-reassort.mjs` — 34 assertions.
+
+### Gineys, ce sont DEUX fournisseurs (06/10/2026)
+
+⚠️⚠️ **Décision du gérant : le portail et la proposition commerciale ne
+viennent pas de la même personne, et leurs prix diffèrent sur les mêmes
+références.** **Nicolas** tient le compte et le tarif du portail ;
+**Sabine Ramillon** a chiffré la proposition du 05/10. Ils doivent être
+traités comme deux fournisseurs à part entière — c'est tout l'intérêt : on
+peut enfin les comparer.
+
+| Fiche | Ce qu'elle porte |
+|---|---|
+| **Gineys (Nicolas)** | portail du 26/09, factures d'août, catalogue Arti'Pat — et les 48 matières, 40 produits et bons de commande qui s'y rattachent |
+| **Gineys (Sabine)** | les 66 lignes de la proposition du 05/10, rien d'autre |
+
+⚠️⚠️ **AUCUN NOM DE FOURNISSEUR NE DOIT CONTENIR « — ».**
+`lireFournisseur()` lit `brut.split(' — ')[0]` : le tiret cadratin sépare le
+fournisseur de la NOTE dans `ingredients.fournisseur_principal`, qui est du
+texte libre (module 3). Un fournisseur nommé « Gineys — Nicolas » se lirait
+donc **« Gineys »**, ne correspondrait à aucune fiche, et **48 matières se
+retrouveraient sans fournisseur sans le moindre message**. D'où les
+parenthèses. Une assertion de `test-tarifs-fournisseurs.mjs` l'interdit
+désormais pour TOUS les fournisseurs.
+
+⚠️⚠️ **SANS CETTE SÉPARATION, LA RÈGLE DU TARIF PÉRIMÉ LES ÉCRASE L'UN
+L'AUTRE.** `comparer()` marque comme remplacée toute ligne du MÊME
+fournisseur portant la MÊME référence à une date plus ancienne — règle juste
+quand un fournisseur révise son tarif, **fausse quand deux commerciaux
+proposent chacun le leur**. Sous une seule fiche, la proposition de Sabine
+éteignait silencieusement les prix de Nicolas : le comparateur n'en montrait
+qu'un, et on ne pouvait plus voir lequel des deux est le moins cher. Le
+défaut a été introduit et corrigé le même jour.
+
+**Résultat : 26 face-à-face sur la même référence, Sabine moins chère sur la
+très large majorité.** Les exceptions sont à regarder sur
+`/admin/tarifs-fournisseurs` : un commercial peut avoir plusieurs formats
+dans le même groupe, et l'huile d'olive oppose deux huiles différentes.
+
+⚠️ **ON N'A DÉPLACÉ QUE LES 66 LIGNES** : le portail, les factures et le
+catalogue restent chez Nicolas.
+
+**Le renommage, lui, a dû être COMPLET** (`node scripts/renommer-gineys.mjs
+[--ecrire]`). `recettes.fournisseur_id` et `bons_commande.fournisseur_id`
+sont des clés étrangères et suivent seules ; `ingredients.fournisseur_principal`
+est du TEXTE et ne suit pas — ce sont ses **48 lignes** qui étaient le piège,
+plus cinq scripts qui cherchaient la fiche par `nom=eq.Gineys`. Contrôle
+après coup : 84 lignes de réassort attribuées à « Gineys (Nicolas) », zéro
+perdue.
+
+⚠️ Le script ne remplace que la **partie avant la note**, et seulement si
+elle correspond EXACTEMENT à l'ancien nom : un remplacement sur la chaîne
+entière abîmerait les notes qui citent le fournisseur.
+
+**Les sept scripts qui cherchaient la fiche par son nom sont alignés**
+(`cles-comparaison`, `fiches-fournil`, `tarifs-signature-gineys`,
+`corrections-gerant-0510`, `produits-commande-gineys`, `paton-350-pizzeria`,
+`demande-tarif-gineys-restauration`). Les littéraux « Gineys » qui
+subsistent sont des **fixtures de test** en mémoire — des noms fictifs, sans
+base derrière.
+
+⚠️⚠️ **ET LE VRAI GARDE-FOU EST AILLEURS : « tout fournisseur cité par une
+matière existe en base ».** `ingredients.fournisseur_principal` ne suit
+aucune clé étrangère ; un renommage fait à moitié laisse donc des matières
+pointant vers une fiche disparue, et elles glissent **en silence** dans
+« sans interlocuteur » au bas du réassort — on cesse simplement de les
+commander. L'assertion attrape n'importe quel renommage futur, pas seulement
+celui de Gineys.
+
+⚠️ Elle RECOPIE `lireFournisseur()` jusqu'au bout — tête avant la note,
+`ESTIMATION` écartée, **et les fournisseurs du jeu de démonstration aussi** :
+le sel et le poivre citent encore « Metro France », purgé en septembre. Être
+plus strict que la règle ferait rougir ce test en permanence, et un test
+rouge en permanence finit par être ignoré.
+
+⚠️ **Sabine n'a pas d'adresse e-mail en base** : un bon de commande pour
+elle sera rendu à copier, pas envoyé. À demander.
+
+`node scripts/separer-gineys-sabine.mjs [--ecrire]` — il REFUSE d'agir si le
+compte de lignes ne fait pas 66 : déplacer un sous-ensemble laisserait la
+grille coupée en deux et opposerait Nicolas à une Sabine amputée. Il
+REPOINTE les lignes au lieu de les recréer, sinon les clés de comparaison et
+les contenances posées à la main seraient perdues.
+
+### La proposition commerciale de Gineys (05/10/2026)
+
+`node scripts/import-prop-gineys.mjs [--ecrire]` puis
+`node scripts/cles-prop-gineys.mjs [--ecrire]`. 66 lignes, chiffrées
+NOMMÉMENT pour CASATASIA par Sabine Ramillon. Le PDF vit dans
+`data/devis-gineys-2026-10-05.pdf`, **gitignoré**.
+
+C'est la TROISIÈME source de prix Gineys, et la plus utile : les factures
+disent ce qu'on a PAYÉ (82 articles), le portail ce qu'il AFFICHE (2 892
+références, dont la 0162 a montré que seuls nos articles contractuels
+portent la remise). Une proposition dit ce qu'on paierait sur des références
+qu'on n'a jamais achetées.
+
+✅ **Les 66 références baissent, aucune ne monte**, et dans des proportions
+qui confirment la mesure de la 0162 : le portail n'applique le tarif négocié
+qu'aux articles du contrat, ces 66 y entrent. ⚠️ Les écarts chiffrés restent
+hors du dépôt — ils se lisent dans `/admin/tarifs-fournisseurs`.
+
+⚠️⚠️ **UN TARIF PÉRIMÉ NE PARTICIPE PLUS À LA COMPARAISON — défaut révélé
+par cette proposition.** La clé d'upsert porte la DATE exprès : un tarif
+d'une autre date s'ajoute et l'ancien survit, et c'est lui qui rend une
+hausse lisible. Jusqu'ici chaque référence n'avait de fait qu'une ligne par
+fournisseur, donc la question ne se posait pas. Les deux lignes étant
+actives, `comparer()` voyait **Gineys DEUX FOIS** — une fois couronné « moins
+cher », une fois affiché « le plus cher » — et `ecartPct` mesurait l'écart
+entre deux prix du MÊME fournisseur sur le MÊME article. Un écart de 46 %
+qui ne désigne personne.
+
+`comparer()` marque désormais `perime` toute ligne qu'un tarif plus récent du
+MÊME fournisseur et de la MÊME référence remplace. ⚠️ Elles RESTENT dans
+`lignes`, comme les lignes sans prix : l'écran montre l'historique avec sa
+date. ⚠️ On ne déduplique QUE sur une référence NON VIDE (`reference` a un
+défaut à `''`, l'index unique étant TOTAL) : deux lignes sans code ne sont
+pas le même article. ⚠️ Un groupe réduit à UNE ligne vivante n'est plus un
+face-à-face. ⚠️ Limite connue : les lignes tirées des FACTURES sont clées par
+le LIBELLÉ normalisé (0152), donc une facture d'août et un devis d'octobre du
+même article ne se périment pas l'un l'autre — ils ne faussent pas « qui est
+le moins cher », ils élargissent seulement l'écart affiché.
+
+⚠️⚠️ **L'IMPORT N'ÉCRIT NI LES CLÉS NI LES CONTENANCES.** `cle_comparaison`,
+`contenance_valeur` et `contenance_unite` sont VOLONTAIREMENT absents de sa
+charge : PostgREST ne met à jour que les colonnes présentes, donc une relance
+PRÉSERVE ce qu'un humain a posé. Les y écrire à `null` effaçait vingt-cinq
+rapprochements et cinq contenances — même piège que `tarif_negocie` dans
+l'import du portail (0158). Et la contenance se **calcule à la lecture** par
+`extraireContenance()` : une meilleure extraction profite à tout le catalogue
+sans réimport.
+
+⚠️⚠️ **TOUT CE QUI N'EST PAS kg / L / piece DOIT ÊTRE `'contenant'`.**
+Première version écrite avec l'UF en minuscules (`bqt`, `bte`, `seau`) :
+aucune n'étant dans `CONTENANTS`, `prixReference()` rendait NULL et les
+lignes sortaient de toute comparaison — le miel, les câpres, la burrata et
+les cornichons affichaient « non comparable » alors que leur contenance est
+écrite dans leur propre désignation. Encore une absence rendue comme une
+conclusion, et aucune erreur pour le dire.
+
+⚠️ Le PDF imprime son propre nombre de lignes : c'est le contrôle
+d'extraction, et le script REFUSE d'écrire s'il ne concorde pas. Un décalage
+de colonne ne lève aucune erreur, il rend des nombres plausibles.
+
+⚠️ `[A-Za-z]` NE CONTIENT PAS « é » : « 5-RHF surgelé » ne matchait pas et
+ses dix lignes héritaient de la famille PRÉCÉDENTE — les surgelés rangés
+dans les produits d'entretien, sans une erreur.
+
+**Rapprochements : 18 HÉRITÉS par référence** (exact : même fournisseur, même
+code article, un prix plus récent — 0142) **+ 24 décidés à la main**, dont
+deux clés nouvelles. **24 lignes ÉCARTÉES, chacune avec son motif** — sans
+elles, dans six mois, on ne saura plus si une paire absente est un oubli ou
+une décision. Les motifs sont toujours les mêmes : le travail restant à faire
+change le produit (calamar FARINÉ, camembert AU FOUR), l'affinage aussi
+(serrano 24 mois ≠ 10 mois), la qualité aussi (entrecôte « N°2 »), la matière
+grasse aussi (crème 15 % ≠ 30 % épaisse).
+
+⚠️ **« FROMAGE ITALIEN » NE NOMME PAS LE FROMAGE** : râpé, en pétale ou en
+pointe, grana et mozzarella changent le prix du simple au double. Trois
+lignes écartées, à faire préciser par Sabine.
+
+⚠️ **`MOZZABELLA LANIERE` ressort moins cher que notre mélange râpé** — mais
+lanière ≠ râpé, et le rendu sur la pizza diffère. C'est une question au
+gérant, pas une correspondance à forcer.
+
+⚠️ **Œuf : la clé est SÉPARÉE PAR CALIBRE.** « Œuf (pièce) » porte le
+calibre G ; les deux lignes 53-63 g vont dans « Œuf calibre M (pièce) ». Un
+œuf de 53-63 g n'est pas un 63-73 g, et le prix à la pièce s'en ressent —
+même règle que les sacs à croissants 101/103/104.
+
+**Verdict, calculé par `comparer()` : Gineys est le moins cher sur 9 de nos
+matières, plus cher sur 20.**
+
+**Gineys est le moins cher sur 9 de nos matières, plus cher sur 20.**
+
+| Gineys gagne | Gineys perd |
+|---|---|
+| Oignons rouges émincés · Champignons émincés | Poivrons en lanières · Graisse de bœuf |
+| Aubergines grillées · Sauce moutarde | Miel · Huile d'olive · Olives noires |
+| Lardons fumés · Gorgonzola | Jambon blanc tranché · Cerneaux de noix |
+| Oignons jaunes émincés · Steak haché · Pain burger | Gnocchis · Reblochon · Jambon cru |
+
+⚠️ Les écarts chiffrés ne sont pas repris ici : ce sont des conditions
+négociées, et le dépôt est public. Ils vivent dans
+`/admin/tarifs-fournisseurs`, qui est l'écran fait pour ça.
+
+⚠️⚠️ **LE PLUS GROS LEVIER N'EST PAS DANS LA PROPOSITION, C'EST CE QU'ELLE
+N'Y MET PAS.** Elle chiffre le pâton **200 g** avec une remise franche et
+**ne dit rien de nos deux formats** — le 250 g du Fournil et le 350 g de la
+pizzeria, tous deux restés au tarif PORTAIL. À remise égale sur le 350 g,
+dont on consomme 280 par semaine, l'économie annuelle se compte en milliers
+d'euros. **C'est la première chose à demander à Sabine.**
+
+⚠️ Le 200 g lui-même est écarté : ni notre 250 g ni notre 350 g. Même piège
+que les sacs à croissants.
+
+⚠️ **Aucune matière « boîte à pizza » n'est suivie**, alors qu'on ouvre une
+pizzeria à emporter dans une semaine. La proposition en chiffre une : à créer,
+pas à rapprocher.
+
+⚠️ Restent **sans face-à-face** : la sauce pizza (la ligne Krill est au kilo,
+les autres à la boîte 5/1 — bases discordantes), la burrata, les cornichons
+(une 3/1 Gineys dans un groupe de 5/1) et le confit d'oignon (aucune autre
+offre au catalogue, et les faire soi-même revient à une fraction du prix).
+
+Test : `PORT=3000 node scripts/test-tarifs-fournisseurs.mjs` — 58 assertions.
+⚠️ Il RECOPIE la règle du tarif périmé depuis le TS ; modifier les deux
+ensemble.
+
+### Choisir son fournisseur depuis la ligne de commande (05/10/2026)
+
+Le signal « 💡 moins cher chez un autre fournisseur » était affiché sur la
+ligne depuis la 0163, mais pour AGIR il fallait partir sur `/admin/achats`. Entre les deux
+écrans on perd la ligne qu'on regardait, et le geste ne se fait pas — l'écart
+reste, exactement comme avant qu'on sache le détecter.
+
+Bouton « ▾ N offre(s) » sur la ligne ; « Prendre celui-ci » bascule
+fournisseur, référence et prix. `basculerFournisseur()` appelle
+`modifierArticleAchat` — le garde-fou des 95 %, la division par
+`unites_par_achat` et le drapeau `prix_estime` (0165) ne sont PAS réécrits.
+
+⚠️⚠️ **UNE LIGNE DE RÉASSORT EST UN GROUPE, PAS UN PRODUIT.** L'écran replie
+les produits qui partagent une matière (0131) : « PLAQUE PIZZA CRUE » porte la
+margherita ET la jambon-fromage, la même capsule porte les quatre cafés.
+N'écrire que sur le représentant laisserait les autres chez l'ancien
+fournisseur — **et la ligne afficherait quand même le nouveau**, puisqu'elle
+prend le PREMIER membre qui en porte un. Le groupe paraîtrait basculé alors
+qu'il ne l'est qu'à moitié. Un refus partiel est DIT.
+
+⚠️ Le prix passé est celui de l'unité ACHETÉE, la MÊME pour tout le groupe
+puisque c'est ce qui le définit ; chaque membre le divise par SON
+`unites_par_achat`. C'est l'argument décisif pour boucler sur l'action
+partagée plutôt que d'écrire soi-même.
+
+⚠️ Le groupe est reconstitué en JS, pas par un `.or()` PostgREST : un libellé
+fournisseur contient des virgules et des parenthèses, qui sont la syntaxe même
+des filtres — la requête partirait tronquée sans lever d'erreur. Et la
+précédence de `cleMatiere` (`nom_matiere ?? libelle_achat ?? nom`) ne
+s'exprime pas en SQL.
+
+**`prixReprenable()` lit la CONTENANCE de notre unité (05/10/2026).**
+Elle exigeait que notre unité soit LITTÉRALEMENT celle de l'offre, donc elle
+échouait sur « barquette 500 g » face à un €/kg — **4 lignes sur 15
+reprenaient le prix**. Or la conversion n'est pas une invention : c'est
+`prixReferenceMatiere()`, exactement la fonction qui a permis d'AFFICHER
+l'écart. Si on lui fait confiance pour comparer, on peut lui faire confiance
+pour écrire. **12 sur 15** désormais (4 telles quelles, 8 converties).
+
+⚠️ La concordance de FORMAT et de BASE est garantie en AMONT : une offre ne
+sort que d'un groupe rendu comparable par `comparer()`, qui exige
+`memeBase()`. Une botte ne se confronte jamais à un kilo, ni une 5/1 à une
+4/4 — le facteur ne peut pas franchir ces frontières.
+
+⚠️ `converti` et `facteur` sont RENDUS, pas gardés : un prix dérivé qu'on ne
+sait pas décomposer n'est pas vérifiable, et c'est la première chose qu'on
+conteste quand il paraît faux. L'écran montre le calcul en clair —
+« tant €/kg × 0,92 kg = tant la bouteille ».
+
+⚠️ RESTE REFUSÉ : une unité qu'on ne sait pas lire. « unité d'achat » — celle
+des produits revendus — ne dit pas combien de kilos elle contient. Les trois
+boissons (Coca, Coca Zéro, Perrier) sont dans ce cas : fournisseur et
+référence repris, prix à saisir, et l'écran dit POURQUOI.
+
+✅ **Contrôle croisé** : sur les matières déjà basculées à la main, la
+conversion retrouve le prix au millième (Serrano 6,8890 contre 6,8900 posé ;
+mayonnaise 2,2420 contre 2,2420). C'est la meilleure vérification qu'on
+pouvait avoir de l'arithmétique.
+
+⚠️⚠️ **L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX, et les deux
+peuvent diverger de SIGNE.** `ecartPct` compare l'offre à la ligne de
+catalogue de NOTRE fournisseur ; ce qu'on paie vraiment est
+`cout_unitaire_ht`, qui a pu être posé à la main, relevé sur une facture ou
+basculé avant. Trouvé le jour même : **la sauce moutarde est annoncée moins
+chère chez un concurrent et coûterait pourtant PLUS que ce qu'on paie.**
+N'afficher que l'écart catalogue ferait basculer vers un prix PLUS CHER,
+pourcentage négatif à l'appui. Chaque offre porte donc une pastille — verte,
+grise ou **rouge** — qui dit ce qu'elle fait à notre prix. On AVERTIT sans
+interdire : un minimum de commande ou une disponibilité peut justifier de
+payer plus cher, c'est une décision.
+
+⚠️⚠️ Et c'est ce qui rend le bon CHIFFRABLE : une ligne simplement
+RÉAIGUILLÉE par « au moins cher » part sans prix, et le bon sans montant (le
+bon Félix Potin à 0,00 €). Basculer pour de bon reprend le prix.
+
+Test : `PORT=3000 node scripts/test-reassort.mjs` — 76 assertions.
+⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble. Et
+`test-achats.mjs` RECOPIE `prixReprenable()` en déléguant la lecture de la
+contenance — une assertion de source vérifie que la lib ne la réimplémente
+pas de son côté.
 
 ### Les cibles de stock — posées, et chacune dit d'où elle vient (27/09/2026)
 

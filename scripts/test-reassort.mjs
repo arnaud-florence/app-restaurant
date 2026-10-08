@@ -256,5 +256,160 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
   t('la quantité redevient la cible entière', aCommander(net[0]) === 10)
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️⚠️ UNE SEULE SOURCE POUR « CHEZ QUI ON COMMANDE »
+//
+// Signalé par le gérant le 05/10/2026 : la liste d'achat par carte
+// envoyait l'emmental et la mozzarella chez Gineys alors que le
+// comparateur les donne 9,5 % moins cher chez Félix Potin et 12 % moins
+// cher chez Gel Var — et le beurre doux 30 %, les olives 26 %. Le script
+// écrivait `ingredients.fournisseur_principal` TEL QUEL, sans passer par
+// `fournisseurRetenu()`.
+//
+// C'était la troisième implémentation de la même question. Toute la
+// plateforme de comparaison ne sert à rien si la liste qu'on imprime la
+// contourne — et rien ne le signalait, le nom du fournisseur étant
+// parfaitement plausible.
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log('\n── Chez qui on commande : une seule source ──')
+  const src = fs.readFileSync('scripts/liste-achat-cartes.cjs', 'utf8')
+  t('la liste d’achat par carte passe par fournisseurRetenu()',
+    /R\.fournisseurRetenu\(/.test(src))
+  t('⚠️ et n’écrit JAMAIS fournisseur_principal comme destinataire',
+    !/fourn(isseur)?\s*=\s*new Map\([^)]*fournisseur_principal/.test(src)
+    && !/lireFournisseur\(i\.fournisseur_principal\)/.test(src))
+  // ⚠️ Une ligne qui bascule part SANS PRIX : notre coût est celui du
+  // conditionnement de l'ANCIEN fournisseur. L'afficher sous le nom du
+  // nouveau écrirait un prix qui n'a jamais existé.
+  t('⚠️ une ligne qui bascule n’emporte pas l’ancien prix',
+    /r0\.bascule \? null :/.test(src))
+  t('… et la bascule est DITE sur la ligne',
+    /moins cher qu’à|moins cher qu'à/.test(src))
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ⚠️⚠️ ON NE RECOMMANDE PAS CE QU'ON VIENT DE COMMANDER
+//
+// Mesuré le 05/10/2026 : le gérant commande 150 pâtons de 350 g le matin,
+// et l'écran lui en réclame 280 l'après-midi. `chargerLignesReassort()`
+// ignorait purement et simplement `bons_commande`. Deux livraisons pour un
+// besoin, et on ne s'en aperçoit qu'au déchargement.
+// ⚠️ RECOPIE de `calculerEnCommande()` / `aCommander()` (src/lib/reassort.ts).
+// ─────────────────────────────────────────────────────────────────────────
+{
+  console.log('\n── Ce qui est déjà en route ──')
+  const EN_ROUTE = new Set(['envoye', 'confirme'])
+  const calc = (lignes) => {
+    const parCle = new Map(); let sansCible = 0
+    for (const l of lignes) {
+      if (!EN_ROUTE.has(l.statut)) continue
+      const reste = Number(l.quantite_commandee ?? 0) - Number(l.quantite_recue ?? 0)
+      if (reste <= 0) continue
+      const cle = l.ingredient_id ? `ing:${l.ingredient_id}` : l.recette_id
+      if (!cle) { sansCible++; continue }
+      parCle.set(cle, (parCle.get(cle) ?? 0) + reste)
+    }
+    return { parCle, sansCible }
+  }
+  const aCmd = l => l.cible == null ? 0
+    : Math.max(0, Math.round((l.cible - (l.tenu ?? 0) - (l.enCommande ?? 0)) * 1000) / 1000)
+
+  t('un bon ENVOYÉ retire sa quantité du besoin',
+    aCmd({ cible: 280, tenu: 0, enCommande: 150 }) === 130)
+  // ⚠️ Un BROUILLON n'est pas une commande : le déduire ferait l'inverse du
+  // défaut — on ne commanderait JAMAIS, un brouillon oublié suffisant à
+  // éteindre la ligne.
+  t('⚠️ un BROUILLON ne retire rien',
+    calc([{ statut: 'brouillon', ingredient_id: 'a', quantite_commandee: 99, quantite_recue: 0 }]).parCle.size === 0)
+  t('… et un bon REÇU non plus',
+    calc([{ statut: 'recu', ingredient_id: 'a', quantite_commandee: 99, quantite_recue: 99 }]).parCle.size === 0)
+  t('ce qui est déjà reçu sur un bon envoyé est retiré',
+    calc([{ statut: 'envoye', ingredient_id: 'a', quantite_commandee: 100, quantite_recue: 60 }]).parCle.get('ing:a') === 40)
+  // ⚠️ Une ligne qui ne porte qu'un LIBELLÉ ne dit pas DE QUOI elle parle —
+  // c'est le cas de toute commande saisie depuis un portail fournisseur.
+  // Elle est COMPTÉE et dite, jamais ignorée en silence : sinon l'écran
+  // annonce « rien en route » alors qu'un camion arrive.
+  t('⚠️ une ligne sans cible est COMPTÉE, pas ignorée',
+    calc([{ statut: 'envoye', ingredient_id: null, recette_id: null, quantite_commandee: 5, quantite_recue: 0 }]).sansCible === 1)
+  const srcLib = fs.readFileSync('src/lib/reassort.ts', 'utf8')
+  t('la lib porte bien la règle et le garde-fou',
+    /STATUTS_EN_ROUTE/.test(srcLib) && /sansCible/.test(srcLib)
+    && /l\.cible - tenuEffectif\(l\) - \(l\.enCommande \?\? 0\)/.test(srcLib))
+  t('… et le chargeur la branche sur les bons de commande',
+    /bon_commande_lignes/.test(fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')))
+}
+
+// ─── Basculer de fournisseur depuis la ligne de commande ──────────────
+//
+// ⚠️ Il RECOPIE la règle depuis le TS : modifier les deux ensemble.
+{
+  console.log('\n── Basculer de fournisseur depuis le réassort ──')
+  const act = fs.readFileSync('src/app/admin/reassort/actions.ts', 'utf8')
+  const cli = fs.readFileSync('src/app/admin/reassort/ReassortClient.tsx', 'utf8')
+
+  // ⚠️ UNE SEULE IMPLÉMENTATION. Le garde-fou des 95 %, la division par
+  // `unites_par_achat` et le drapeau `prix_estime` vivent dans
+  // `modifierArticleAchat` : les réécrire ici finirait par écrire un prix
+  // que l'autre écran refuse.
+  t('la bascule appelle l’action partagée, elle ne réécrit pas la règle',
+    /modifierArticleAchat\(/.test(act) && !/0\.95/.test(act))
+
+  // ⚠️⚠️ UNE LIGNE DE RÉASSORT EST UN GROUPE. N'écrire que sur le
+  // représentant laisserait les autres membres chez l'ancien fournisseur,
+  // pendant que la ligne afficherait le nouveau — basculé à moitié, et
+  // rien pour le dire.
+  t('⚠️ le groupe ENTIER est basculé, pas le seul représentant',
+    /cleMatiere\(/.test(act) && /membres/.test(act) && /for \(const id of membres\)/.test(act))
+  t('… et le groupe est reconstitué en JS, pas par un .or() PostgREST',
+    !/\.or\(`?nom_matiere/.test(act))
+  t('… un refus partiel est DIT',
+    /refus\.length/.test(act) && /refusé\(s\)/.test(act))
+
+  // ⚠️ LA RÉFÉRENCE DE L'ANCIEN FOURNISSEUR NE SURVIT PAS (0142) : un code
+  // Gineys cité à Félix Potin fait chiffrer autre chose.
+  t('⚠️ la référence reprise est celle de l’OFFRE, jamais l’ancienne',
+    /reference: o\.reference \?\? null/.test(cli))
+
+  // ⚠️ LE PRIX SUIT LE FOURNISSEUR, mais seulement si l'unité est la
+  // nôtre — et le drapeau est ce qui protège, pas le refus (0165).
+  t('le prix ne suit que si l’unité concorde',
+    /prixReprenable\(o, l\.unite\)/.test(cli))
+  t('⚠️ un prix repris d’un devis reste ESTIMÉ',
+    /prix_releve: repris \? o\.nature === 'facture'/.test(cli))
+  // ⚠️ Un prix non reprenable ne doit pas être EFFACÉ : un `null` se lit
+  // « prix inconnu » sur l'écran qui déclenche la commande.
+  t('⚠️ une unité discordante n’efface pas le prix existant',
+    /prix: repris \? p\.prix : l\.cout_unitaire_ht/.test(cli))
+  // ⚠️ UN PRIX CONVERTI MONTRE SON CALCUL. Un nombre dérivé qu'on ne sait
+  // pas décomposer n'est pas vérifiable, et c'est la première chose qu'on
+  // conteste quand il paraît faux.
+  t('⚠️ un prix CONVERTI affiche son calcul',
+    /p\.converti/.test(cli) && /p\.facteur/.test(cli))
+  // ⚠️ Et quand la conversion n'est pas possible, l'écran dit POURQUOI :
+  // ce n'est pas « les unités diffèrent », c'est « notre unité ne dit pas
+  // combien elle en contient ». La nuance est ce qui indique quoi corriger.
+  t('… et un refus dit que notre unité ne porte pas sa contenance',
+    /ne dit pas combien/.test(cli))
+
+  // ⚠️⚠️ L'ÉCART DU CATALOGUE N'EST PAS L'EFFET SUR NOTRE PRIX. `ecartPct`
+  // compare l'offre à la ligne de catalogue de NOTRE fournisseur ; ce qu'on
+  // paie vraiment est `cout_unitaire_ht`. Mesuré le 05/10/2026 : la sauce
+  // moutarde est annoncée moins chère chez La Frite Belge et coûterait
+  // +12,5 % de plus que ce qu'on paie. Afficher le seul écart catalogue
+  // ferait basculer vers un prix PLUS CHER, pourcentage négatif à l'appui.
+  t('⚠️⚠️ chaque offre dit ce qu’elle fait à NOTRE prix, pas que l’écart catalogue',
+    /p\.prix \/ nous - 1/.test(cli) && /effet > 0\.001/.test(cli))
+  t('… et une hausse est marquée en ROUGE, jamais fondue dans l’écart',
+    /bg-red-100 text-red-800/.test(cli))
+  // On AVERTIT, on ne bloque pas : un minimum de commande ou une
+  // disponibilité peut justifier de payer plus cher. C'est une décision.
+  t('… l’écran AVERTIT sans interdire la bascule',
+    !/disabled=\{enCours \|\| effet/.test(cli))
+
+  t('les offres sont TOUTES montrées, triées par le chargeur',
+    /offres\.map\(o =>/.test(cli) && /offre\(s\) moins chère\(s\)/.test(cli))
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)

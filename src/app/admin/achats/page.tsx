@@ -13,7 +13,7 @@ import {
   type ArticleAchete,
 } from '@/lib/catalogue-achats'
 import { chargerLignesReassort } from '@/lib/reassort-donnees'
-import { comparer, type LigneTarif } from '@/lib/tarifs-fournisseurs'
+import { comparer, prixReference, type LigneTarif } from '@/lib/tarifs-fournisseurs'
 import AchatsClient from './AchatsClient'
 
 export const dynamic = 'force-dynamic'
@@ -54,11 +54,33 @@ export default async function AchatsPage() {
     colis_quantite: l.colis_quantite === null ? null : Number(l.colis_quantite),
     contenance_valeur: l.contenance_valeur === null ? null : Number(l.contenance_valeur),
   }))
-  const refParLigne = new Map<string, { prix: number; unite: string }>()
+  // ⚠️⚠️ LE PRIX DE RÉFÉRENCE SE CALCULE POUR TOUTE LIGNE LISIBLE, pas
+  // seulement pour celles qui portent déjà une `cle_comparaison`. Il ne
+  // l'était que dans la boucle de `comparer()` ci-dessous — donc sur ~300
+  // lignes du catalogue, 6 %. Les 94 % restantes arrivaient à l'écran avec
+  // `ref: null`, c'est-à-dire INCOMPARABLES PAR CONSTRUCTION : taper un
+  // produit ne pouvait rien confronter, même quand les deux unités étaient
+  // parfaitement lisibles et que deux fournisseurs le vendaient.
+  //
+  // ⚠️ Ça ne crée AUCUNE comparaison validée. `prixReference()` lit une
+  // unité, il ne décide pas que deux produits sont le même — c'est un
+  // humain qui pose la clé (0151), et `meilleur` continue de ne sortir que
+  // de `comparer()`. Un prix de référence rend la confrontation POSSIBLE ;
+  // il ne la rend pas VRAIE.
+  //
+  // ⚠️ Le `format` est conservé : sans lui une boîte 4/4 se comparerait à
+  // une 5/1, qui n'ont pas le même poids net.
+  const refParLigne = new Map<string, { prix: number; unite: string; format?: string | null }>()
+  for (const l of pourComparer) {
+    const r = prixReference(l)
+    if (r) refParLigne.set(l.id, { prix: r.prix, unite: r.unite, format: r.format ?? null })
+  }
   const meilleurs = new Set<string>()
   const groupes: GroupeComparaison[] = []
   for (const g of comparer(pourComparer)) {
-    for (const l of g.lignes) if (l.ref) refParLigne.set(l.id, { prix: l.ref.prix, unite: l.ref.unite })
+    // Le repli « même format de conserve » de `comparer()` peut chiffrer une
+    // ligne que `prixReference()` seul laisse muette : on garde le sien.
+    for (const l of g.lignes) if (l.ref) refParLigne.set(l.id, { prix: l.ref.prix, unite: l.ref.unite, format: l.ref.format ?? null })
     // ⚠️ On ne désigne un « moins cher » QUE si le groupe est comparable :
     // sinon on couronnerait une poche de 600 g face à une d'un kilo.
     if (g.comparable && g.meilleur) meilleurs.add(g.meilleur)

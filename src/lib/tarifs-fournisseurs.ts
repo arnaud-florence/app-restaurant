@@ -225,6 +225,20 @@ export function prixReferenceMatiere(unite: string, prix: number): PrixRef | nul
   const fmt = formatConserve(u)
   if (fmt) return { prix, unite: 'piece', derive: false, format: fmt }
 
+  // ⚠️ Une BOTTE n'a pas de poids, et il ne faut surtout pas lui en inventer
+  // un. Le persil se vend à la botte, se commande à la botte et se compte à
+  // la botte ; son poids varie d'un maraîcher à l'autre et d'une saison à
+  // l'autre. Écrire « botte 100 g » pour satisfaire la règle des contenances
+  // donnerait un €/kg faux, affiché comme les autres — exactement la faute
+  // que la règle existe pour empêcher.
+  //
+  // C'est le même cas que le format de conserve juste au-dessus : aucun poids
+  // déductible, mais deux bottes se comparent PARFAITEMENT l'une à l'autre.
+  // Le format les enferme entre elles — une botte ne se confrontera jamais à
+  // un kilo ni à une pièce nue.
+  const atome = u.match(/^(BOTTE|BOUQUET|BRIN)S?$/)
+  if (atome) return { prix, unite: 'piece', derive: false, format: atome[1].toLowerCase() }
+
   const c = extraireContenance(u)
   if (c) return { prix: prix / c.valeur, unite: c.unite, derive: true }
 
@@ -291,7 +305,13 @@ export function score(libelle: string, cible: string): number {
 
 export type Groupe = {
   cle: string
-  lignes: (LigneTarif & { ref: PrixRef | null })[]
+  /**
+   * Toutes les lignes du groupe, y compris celles qu'on ne compare pas :
+   * celles sans prix (une relance à faire) et celles qu'un tarif plus récent
+   * a PÉRIMÉES. L'écran doit les montrer — c'est l'historique, et c'est lui
+   * qui rend une hausse lisible.
+   */
+  lignes: (LigneTarif & { ref: PrixRef | null; perime?: boolean })[]
   meilleur: string | null       // id de la ligne la moins chère
   ecartPct: number | null       // écart entre la moins chère et la plus chère
   comparable: boolean           // toutes les lignes ramenées à la MÊME base ?
@@ -315,18 +335,52 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
   }
   const groupes: Groupe[] = []
   for (const [cle, ls] of par) {
-    const avecRef = ls.map(l => ({ ...l, ref: prixReference(l) }))
+    // ⚠️⚠️ UN TARIF PÉRIMÉ NE PARTICIPE PAS À LA COMPARAISON.
+    //
+    // La clé d'upsert porte la DATE (`fournisseur, reference, date_tarif`),
+    // exprès : un tarif d'une autre date s'ajoute et l'ancien survit, et
+    // c'est lui qui rend une hausse lisible. Jusqu'au 05/10/2026 chaque
+    // référence n'avait de fait qu'une ligne par fournisseur, donc la
+    // question ne se posait pas.
+    //
+    // La proposition commerciale de Gineys l'a posée : ses 66 références
+    // existaient déjà au portail, 28 % plus cher en moyenne. Les deux lignes
+    // étant actives, le comparateur voyait Gineys DEUX FOIS — une fois
+    // couronné « moins cher », une fois affiché « le plus chèr » — et
+    // `ecartPct` mesurait l'écart entre deux prix du MÊME fournisseur sur le
+    // MÊME article. Un écart de 46 % qui ne désigne personne.
+    //
+    // ⚠️ Elles RESTENT dans `lignes`, comme les lignes sans prix : l'écran
+    // montre l'historique avec sa date. Elles ne participent simplement pas
+    // au calcul.
+    // ⚠️ On ne déduplique QUE sur une référence NON VIDE : `reference` a un
+    // défaut à `''` (l'index unique est TOTAL, `on_conflict` ne sachant pas
+    // viser un index partiel), et deux lignes sans code ne sont pas le même
+    // article.
+    const plusRecent = new Map<string, string>()
+    for (const l of ls) {
+      const r = (l.reference ?? '').trim()
+      if (!r) continue
+      const k = `${l.fournisseur_id}|${r}`
+      const d = plusRecent.get(k)
+      if (!d || l.date_tarif > d) plusRecent.set(k, l.date_tarif)
+    }
+    const avecRef = ls.map(l => {
+      const r = (l.reference ?? '').trim()
+      const d = r ? plusRecent.get(`${l.fournisseur_id}|${r}`) : undefined
+      return { ...l, ref: prixReference(l), perime: d != null && l.date_tarif < d }
+    })
     // Repli légitime : aucune contenance connue, mais toutes les lignes sont
     // le MÊME format de conserve. Deux boîtes 5/1 se comparent au prix de la
     // boîte sans qu'on ait besoin d'en connaître le poids net.
     const formats = new Set(avecRef.map(l => formatConserve(l.designation)))
     if (avecRef.every(l => !l.ref) && formats.size === 1 && !formats.has(null)) {
       for (const l of avecRef) {
-        if (l.prix_ht == null) continue
+        if (l.prix_ht == null || l.perime) continue
         l.ref = { prix: l.prix_ht, unite: 'piece', derive: false }
       }
     }
-    const chiffrees = avecRef.filter(l => l.ref)
+    const chiffrees = avecRef.filter(l => l.ref && !l.perime)
     const bases = new Set(chiffrees.map(l => `${l.ref!.unite}|${l.ref!.format ?? ''}`))
     // ⚠️ UNE LIGNE SANS PRIX NE DOIT PAS ÉTEINDRE LE GROUPE. La règle exigeait
     // auparavant que TOUTES les lignes soient chiffrées : la seule présence
@@ -355,7 +409,11 @@ export function comparer(lignes: LigneTarif[]): Groupe[] {
     // entrée de catalogue. Les laisser noyait les quinze vrais face-à-face
     // sous quatre-vingt-dix lignes sans rien en face — et un écran illisible
     // n'est pas consulté.
-    if (avecRef.length < 2) continue
+    // ⚠️ Un groupe d'UNE SEULE ligne n'est pas une comparaison, c'est une
+    // entrée de catalogue. Les périmées ne comptent pas pour atteindre deux :
+    // sinon un article dont on a deux tarifs du MÊME fournisseur passerait
+    // pour un face-à-face.
+    if (avecRef.filter(l => !l.perime).length < 2) continue
     // ⚠️ On compte les fournisseurs qui ont CHIFFRÉ, pas ceux qui figurent au
     // groupe : un fournisseur à qui on vient d'envoyer une demande de tarif
     // n'est pas un participant au face-à-face, et le compter gonflerait le

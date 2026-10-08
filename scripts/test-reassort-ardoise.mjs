@@ -116,9 +116,24 @@ try {
   // jamais s'afficher. Deux lecteurs de la même table qui divergent.
   t('⚠️⚠️ l’écran inclut les ardoises SANS date de fin, comme le réassort',
     /date_fin\.is\.null,date_fin\.gte\./.test(srcPage))
+  // ⚠️ L'ASSERTION A ÉTÉ RÉVISÉE, PAS FORCÉE (05/10/2026). Elle recopiait le
+  // nom de variable `aujourdhui`, renommé en `pour` le jour où le réassort
+  // s'est mis à se dimensionner sur une DATE choisie. La règle — une
+  // ardoise sans date de fin est OUVERTE — n'a pas bougé d'un caractère ;
+  // c'est sa mesure qui visait un identifiant plutôt qu'un comportement.
+  const srcDon = fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')
   t('⚠️ … et le réassort les traite bien comme ouvertes',
-    /!a\.date_fin \|\| \(a\.date_fin as string\) >= aujourdhui/.test(
-      fs.readFileSync('src/lib/reassort-donnees.ts', 'utf8')))
+    /!a\.date_fin \|\| \(a\.date_fin as string\) >= \w+/.test(srcDon))
+  // ⚠️⚠️ ON COMMANDE POUR LA SEMAINE QU'ON VA SERVIR, PAS POUR AUJOURD'HUI.
+  // Mesuré le 05/10/2026 : l'ardoise du 12 au 18 octobre était saisie, et
+  // les 223 cibles tombaient quand même sur le repli `stock_cible` — donc
+  // sur la carte ENTIÈRE, le scénario le plus coûteux en reliquat. Rien ne
+  // le signalait : les cibles affichées étaient parfaitement plausibles.
+  t('⚠️⚠️ le réassort se dimensionne sur une DATE, pas sur le jour même',
+    /pour = new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/.test(srcDon)
+    && /\.lte\('date_debut', pour\)/.test(srcDon))
+  t('⚠️ … et l’écran laisse choisir cette semaine',
+    /searchParams/.test(srcPage.replace(/[\s\S]*/, '') + fs.readFileSync('src/app/admin/reassort/page.tsx', 'utf8')))
   t('⚠️ les deux sources de menu connaissent l’écran (piège documenté)',
     /\/admin\/ardoise/.test(fs.readFileSync('src/lib/navigation.ts', 'utf8'))
     && /\/admin\/ardoise/.test(fs.readFileSync('src/app/admin/AdminNav.tsx', 'utf8')))
