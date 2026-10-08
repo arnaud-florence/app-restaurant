@@ -25,6 +25,16 @@ const jiti = require('jiti')(__filename, {
 const { createClient } = require('@supabase/supabase-js')
 const { chargerLignesReassort } = jiti('../src/lib/reassort-donnees.ts')
 const R = jiti('../src/lib/reassort.ts')
+// ⚠️ `prixReprenable()` est la SEULE implémentation de la conversion vers
+// notre unité — la même que `/admin/reassort`. Elle REFUSE quand notre unité
+// ne dit pas sa contenance, et c'est ce refus qui protège : une conversion
+// faite de tête écrirait un prix faux qui ne se signale pas.
+const { prixReprenable } = jiti('../src/lib/catalogue-achats.ts')
+
+/** L'offre du fournisseur retenu, quand la ligne a changé de main. */
+const offreDe = (l, fid) => (l.offres ?? []).find(o => o.fournisseur_id === fid) ?? null
+
+const NATURE = { facture: 'prix déjà payé', devis: 'devis', portail: 'tarif portail', catalogue: 'tarif catalogue' }
 
 const arg = n => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null }
 const POUR = arg('--pour') ?? new Date().toISOString().slice(0, 10)
@@ -84,7 +94,10 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
   const manque = [...sansFournisseur.map(l => ({ l, pourquoi: 'aucun fournisseur connu' }))]
   const gardes = []
   for (const l of prets) {
-    if (!ECARTES.has(l.retenu.nom)) { gardes.push(l); continue }
+    if (!ECARTES.has(l.retenu.nom)) {
+      gardes.push(l.retenu.bascule ? { ...l, offre: offreDe(l, l.retenu.id) } : l)
+      continue
+    }
     // ⚠️ On cherche la MEILLEURE offre d'un AUTRE fournisseur. Sans prix
     // repris : le prix du concurrent est celui de SON conditionnement, et le
     // convertir de tête écrirait un faux prix sur un document qui engage de
@@ -92,7 +105,7 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
     const o = (l.offres ?? []).find(x => !ECARTES.has(x.fournisseur))
     if (!o) { manque.push({ l, pourquoi: `écarté de ${l.retenu.nom}, aucune autre offre` }); continue }
     gardes.push({ ...l, retenu: { id: o.fournisseur_id, nom: o.fournisseur, bascule: true },
-      prix: null, reaiguille: l.retenu.nom, ecartRea: o.ecartPct })
+      prix: null, offre: o, reaiguille: l.retenu.nom, ecartRea: o.ecartPct })
   }
 
   const parFourn = new Map()
@@ -104,7 +117,7 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 
   // ── sortie ──
   let totalRel = 0, totalEst = 0, nSansPrix = 0
-  const csv = ['Fournisseur;Poste;Produit;Stock;Livre depuis;Deja commande;A commander;Unite;PU HT;Total HT;Nature prix;Note']
+  const csv = ['Fournisseur;Poste;Produit;Stock;Livre depuis;Deja commande;A commander;Unite;PU HT;Total HT;Nature prix;Prix a confirmer;Total indicatif;Note']
   const blocs = [], fichiers = new Map()
   const poste = l => l.etablissement ?? (l.categorie ? l.categorie : 'non rattaché')
 
@@ -116,9 +129,29 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
       if (tot == null) { sans++; nSansPrix++ }
       else if (l.estime) { sEst += tot; totalEst += tot }
       else { sRel += tot; totalRel += tot }
-      const note = l.reaiguille ? `⇄ repris de ${l.reaiguille} (−${Math.abs(l.ecartRea ?? 0).toFixed(0)} %) · tarif à confirmer`
-        : l.retenu.bascule ? `⇄ moins cher que ${l.fournisseur ?? 'ailleurs'} (−${Math.abs(l.ailleurs?.ecartPct ?? 0).toFixed(0)} %) · tarif à confirmer`
-        : l.estime ? 'prix estimé' : ''
+      // ⚠️⚠️ UN « TARIF À CONFIRMER » DOIT PORTER LE PRIX QU'ON ATTEND.
+      // Sans chiffre, la ligne ne sert qu'à dire qu'on ne sait pas — et on
+      // appelle le fournisseur sans rien à lui opposer. On affiche donc SON
+      // prix, dans SON unité, avec sa NATURE : un devis n'est pas un prix
+      // payé, et arbitrer sur un tarif d'appel en croyant lire une facture
+      // se paie pendant des mois (0152).
+      const o = l.offre
+      const rep = o ? prixReprenable(o, l.unite) : null
+      let aConf = null, totConf = null
+      if (o) {
+        // Converti dans NOTRE unité quand `prixReprenable()` l'accepte ;
+        // sinon on montre le prix brut du fournisseur, jamais une
+        // conversion faite à la main.
+        aConf = rep
+          ? `${f(rep.prix, 4)} €/${l.unite}${rep.converti ? ` (${f(o.prix_ref, 4)} €/${o.unite_ref} × ${f(rep.facteur, 4)})` : ''}`
+          : `${f(o.prix_ref, 4)} €/${o.unite_ref}`
+        if (rep) totConf = Math.round(l.quantite * rep.prix * 100) / 100
+      }
+      const note = [
+        l.reaiguille ? `⇄ repris de ${l.reaiguille}` : l.retenu.bascule ? `⇄ au lieu de ${l.fournisseur ?? 'ailleurs'}` : null,
+        o ? `${NATURE[o.nature] ?? o.nature}${o.reference ? ` · réf ${o.reference}` : ''}` : null,
+        !o && l.estime ? 'prix estimé' : null,
+      ].filter(Boolean).join(' · ')
       // ⚠️ CE QUI EST DÉJÀ LÀ OU DÉJÀ PARTI EST DIT, colonne par colonne :
       // sans ça on recommande ce qu'on vient de commander, et on ne s'en
       // aperçoit qu'au déchargement.
@@ -127,18 +160,22 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
         + `<td class="c${l.entrees ? ' ok' : ''}">${l.entrees ? '📦 ' + q(l.entrees) : '—'}</td>`
         + `<td class="c${l.enCommande ? ' ok' : ''}">${l.enCommande ? '🚚 ' + q(l.enCommande) : '—'}</td>`
         + `<td class="c b">${q(l.quantite)}</td><td>${esc(l.unite ?? '')}</td>`
-        + `<td class="c">${tot == null ? '<i>à confirmer</i>' : f(tot) + ' €'}</td>`
+        + `<td class="c">${tot == null ? '<i>—</i>' : f(tot) + ' €'}</td>`
+        + `<td class="c${aConf ? ' ac' : ''}">${aConf ? esc(aConf) + (totConf != null ? `<br><b>≈ ${f(totConf)} €</b>` : '') : '—'}</td>`
         + `<td class="s">${esc(note)}</td></tr>`)
-      txt.push(`  ${q(l.quantite)} ${l.unite ?? ''} — ${l.nom}${note ? `   [${note}]` : ''}`)
+      txt.push(`  ${q(l.quantite)} ${l.unite ?? ''} — ${l.nom}`
+        + (aConf ? `   [à confirmer : ${aConf}${totConf != null ? ` → ≈ ${f(totConf)} €` : ''}]` : '')
+        + (note ? `   (${note})` : ''))
       csv.push([fourn, poste(l), l.nom, l.tenu ?? '', l.entrees || '', l.enCommande || '', q(l.quantite),
         l.unite ?? '', l.prix == null ? '' : f(l.prix, 4), tot == null ? '' : f(tot),
-        l.prix == null ? 'inconnu' : l.estime ? 'estime' : 'releve', note].join(';'))
+        l.prix == null ? 'inconnu' : l.estime ? 'estime' : 'releve', aConf ?? '',
+        totConf == null ? '' : f(totConf), note].join(';'))
     }
     const bilan = [sRel ? `${f(sRel)} € relevés` : null, sEst ? `${f(sEst)} € estimés` : null,
       sans ? `${sans} sans prix` : null].filter(Boolean).join(' · ') || 'aucun prix connu'
     blocs.push(`<h2>${esc(fourn)} <small>${ls.length} ligne(s) · ${esc(bilan)}</small></h2>
 <table><thead><tr><th>Poste</th><th>Produit</th><th>Stock</th><th>Livré</th><th>Commandé</th>
-<th>À commander</th><th>Unité</th><th>Total HT</th><th>Note</th></tr></thead><tbody>${tr.join('')}</tbody></table>`)
+<th>À commander</th><th>Unité</th><th>Total HT</th><th>Prix à confirmer</th><th>Note</th></tr></thead><tbody>${tr.join('')}</tbody></table>`)
     fichiers.set(fourn, `COMMANDE ${fourn} — ${POUR}\nCASATASIA, Parking des Ferrages, 83136 Sainte-Anastasie-sur-Issole\n\n${txt.join('\n')}\n\n${bilan}\n`)
     console.log(`  ${fourn.padEnd(24)} ${String(ls.length).padStart(3)} ligne(s)   ${bilan}`)
   }
@@ -150,7 +187,7 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
       + `<td class="s">${esc(pourquoi)}</td></tr>`).join('')
   for (const { l, pourquoi } of manque)
     csv.push(['(SANS FOURNISSEUR)', poste(l), l.nom, l.tenu ?? '', l.entrees || '', l.enCommande || '',
-      q(R.aCommander(l)), l.unite ?? '', '', '', 'inconnu', pourquoi].join(';'))
+      q(R.aCommander(l)), l.unite ?? '', '', '', 'inconnu', '', '', pourquoi].join(';'))
 
   const eco = R.economieEstimee(gardes)
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
@@ -167,7 +204,7 @@ padding:6px 8px;text-align:left}
 td{padding:5px 8px;border-bottom:1px solid var(--b);vertical-align:top}
 tr:nth-child(even) td{background:#fcfbf9}
 .c{text-align:center;white-space:nowrap}.b{font-weight:700}.n{font-weight:600}
-.s{font-size:12px;color:var(--g)}.ok{color:#0a7d42;font-weight:600}
+.s{font-size:12px;color:var(--g)}.ac{background:#fff6e5;font-size:12px;white-space:normal}.ok{color:#0a7d42;font-weight:600}
 i{color:var(--g);font-style:italic}
 .k{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
 .k div{background:#fff;border:1px solid var(--b);border-radius:6px;padding:8px 12px;min-width:150px}
