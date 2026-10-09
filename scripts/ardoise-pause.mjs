@@ -75,7 +75,13 @@ if (!ECRIRE) { console.log('\n  (essai à blanc — relancer avec --ecrire)\n');
 // UPSERT qui exige `name`, `price` et `tax` : un objet incomplet écrase le
 // prix imprimé sur les tickets. On recopie ces trois champs TELS QUELS et on
 // REFUSE de construire s'il en manque un (0141).
-const cat = await z('catalog/dishes?limit=0')
+// ⚠️⚠️ `show_all=true` EST OBLIGATOIRE ICI. Sans lui, `GET /catalog/dishes`
+// OMET les plats désactivés (192 rendus contre 242 réels, mesuré le
+// 10/10/2026) — donc ce script ne retrouvait PAS les plats qu'il avait
+// lui-même éteints, et `--reprendre` était structurellement incapable de
+// rallumer quoi que ce soit : les 15 plats seraient tous ressortis « sans
+// contrepartie », sans la moindre erreur. La pause était à sens unique.
+const cat = await z('catalog/dishes?show_all=true&limit=0')
 const plats = cat.j?.dishes ?? []
 if (plats.length < 100) {
   console.error(`   ✗ la caisse rend ${plats.length} plats — c'est une LECTURE RATÉE, pas un catalogue vide. Rien n'est écrit.`)

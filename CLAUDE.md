@@ -1115,6 +1115,89 @@ perdue en silence.
 Test : `PORT=3000 node scripts/test-zelty-disponibilites.mjs` — 16 assertions,
 dont l'essentiel porte sur ce que le constructeur REFUSE de faire.
 
+#### Les suppléments d'ingrédients — `POST /catalog/options` (10/10/2026)
+
+`node scripts/supplements-caisse.mjs [--ecrire]` — essai à blanc par défaut.
+**67 suppléments en 3 groupes**, rattachés à 44 plats : `Suppléments pizza`
+(34 valeurs, les 16 pizzas), `Suppléments` (24, burgers / plats / salades /
+planches, sauces comprises), `Suppléments dessert` (8, les 9 desserts).
+
+Un supplément est une vente à marge pure — il s'ajoute à un ticket déjà
+décidé. Mais il n'existe que si la caisse sait le taper : sinon le serveur
+l'offre, ou le refuse.
+
+Le contrat, LU sur `docs.zelty.fr` (accessible une fois connecté au
+back-office ; `/llms.txt` liste toutes les opérations) :
+
+- `POST /catalog/options` prend un **TABLEAU NU** d'options, comme les plats ;
+- une option porte `name`, `values[]` et **`max_choices` (obligatoire)** ;
+- une valeur porte `name` et `price` — **centimes TTC**, comme les plats ;
+- le plat référence les groupes par **`options: [id]`**, donc le rattachement
+  passe par `POST /catalog/dishes`, l'upsert dangereux de la 0141 : on RELIT,
+  on recopie `name`/`price`/`tax` tels quels, on ne touche QUE `options`, et
+  on REFUSE de construire s'il en manque un.
+
+⚠️⚠️ **`GET /catalog/dishes` OMET LES PLATS DÉSACTIVÉS.** 192 rendus contre
+**242 réels** le 10/10/2026 — 50 invisibles. `show_all=true` les rend. La
+doc ne le dit pas : elle présente ce drapeau comme concernant `zc_only`.
+
+C'est une troncature silencieuse de plus, de la même famille que
+`expand[]=items` oublié et que les 1 000 lignes de PostgREST : aucune erreur,
+un résultat plausible, un tiers du catalogue absent.
+
+Deux conséquences, les deux corrigées :
+
+1. les 13 plats de brasserie **en pause pour l'ardoise** n'auraient jamais
+   reçu leurs suppléments, et personne ne l'aurait vu — ils ne sont pas à la
+   carte cette semaine, ils seraient revenus amputés ;
+2. ⚠️ **`ardoise-pause.mjs --reprendre` ÉTAIT STRUCTURELLEMENT INCAPABLE DE
+   RALLUMER QUOI QUE CE SOIT.** Il relisait sans `show_all`, donc il ne
+   retrouvait pas les plats qu'il venait lui-même d'éteindre : les 15
+   seraient tous ressortis « sans contrepartie exploitable ». La pause était
+   à sens unique, et ça ne se serait découvert que le jour où le gérant
+   voulait sa brasserie de retour.
+
+✅ `client.ts` (le miroir du catalogue, cron de 3 h 10) posait déjà
+`show_all=true` — le miroir de production n'était pas touché.
+
+⚠️ **La portion est exprimée dans l'UNITÉ DE LA MATIÈRE**, la même convention
+que `recette_ingredients` : aucune conversion, donc aucune erreur de facteur
+mille (le « SEL FIN SAC=25G »). Le coût est `portion × prix_achat_ht`.
+
+⚠️ **Chaque supplément est adossé à une matière `stocke = true`**, et le
+script REFUSE d'en construire un dont la matière n'existe pas ou n'est pas
+suivie. Un supplément sans matière, c'est un client à qui on dit non après
+l'avoir encaissé — et une sortie de stock que le réassort ne voit pas venir.
+
+⚠️ **ROQUEFORT et CHANTILLY, demandés par le gérant, sont dans `A_COMMANDER`,
+pas dans la grille** : ni l'un ni l'autre n'est en stock. Ils sont chiffrés
+avec leur fournisseur (Félix Potin pour les deux) et basculent dans la grille
+le jour de la livraison. ⚠️ Aucune `OptionValue` ne porte de drapeau
+`disable` — on ne peut donc pas « créer éteint ». Ne pas pousser est le seul
+moyen de ne pas vendre ce qu'on n'a pas.
+
+⚠️ Les prix sont des **PALIERS ronds** (0,50 / 1,00 / 1,50 / 2,00 / 2,50 /
+3,00 / 4,50), pas un coût × coefficient : un supplément à 1,37 € ne se lit
+pas sur une ardoise et ne se rend pas en monnaie. Le script affiche le food
+cost de chacun pour que le palier se vérifie.
+
+⚠️ **Cinq suppléments restent au-dessus de 30 %**, et c'est DIT plutôt que
+corrigé en gonflant le prix : burrata 46 %, steak haché 39 %, œuf 36 %,
+saumon fumé 31 %. Trois de ces coûts sont des **estimations** (l'œuf à
+0,489 € et la burrata à 1,90 € sont hauts pour du pro) — la première facture
+tranchera. Gonfler le prix d'un supplément pour faire tomber un ratio calculé
+sur un coût inventé, c'est traiter le symptôme.
+
+⚠️ `min_choices: 0` — un supplément ne s'impose jamais. `pick_same_value:
+true` — deux œufs, c'est deux œufs. **La fenêtre s'affiche à chaque vente**
+(`donotpresent` non posé) : c'est un appui de plus par plat en service, mais
+c'est la seule façon dont le supplément est découvrable par quelqu'un qui ne
+connaît pas la caisse. À inverser d'un mot si ça freine le comptoir.
+
+⚠️ Idempotent par `remote_id` (`supp-pizza`, et `supp-pizza::Œuf` par valeur) :
+le script relit `GET /catalog/options`, renvoie l'`id` numérique de ce qui
+existe, et ne crée que le reste. Une relance ne duplique rien.
+
 #### Webhooks — temps réel plutôt que sondage
 
 `POST /api/integrations/zelty/webhook`. Le sondage horaire a deux défauts :
@@ -7229,6 +7312,7 @@ node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, s
 PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
+node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
