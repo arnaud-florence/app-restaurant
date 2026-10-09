@@ -1118,13 +1118,52 @@ dont l'essentiel porte sur ce que le constructeur REFUSE de faire.
 #### Les suppléments d'ingrédients — `POST /catalog/options` (10/10/2026)
 
 `node scripts/supplements-caisse.mjs [--ecrire]` — essai à blanc par défaut.
-**67 suppléments en 3 groupes**, rattachés à 44 plats : `Suppléments pizza`
-(34 valeurs, les 16 pizzas), `Suppléments` (24, burgers / plats / salades /
-planches, sauces comprises), `Suppléments dessert` (8, les 9 desserts).
+**72 suppléments en 3 groupes**, rattachés à 44 plats : `Suppléments pizza`
+(31 valeurs, les 16 pizzas), `Suppléments` (35, burgers / plats / salades /
+planches), `Suppléments dessert` (6, les 9 desserts).
 
 Un supplément est une vente à marge pure — il s'ajoute à un ticket déjà
 décidé. Mais il n'existe que si la caisse sait le taper : sinon le serveur
 l'offre, ou le refuse.
+
+⚠️⚠️ **LA GRILLE SE DÉRIVE DES CARTES, ELLE NE SE SAISIT PAS.** Première
+version écrite à la main depuis le stock : elle proposait du thon, de la
+feta, des crevettes et du poulet rôti **sur une pizza** — que la cuisine ne
+pose sur rien — et OUBLIAIT le camembert, les pommes de terre, la banane et
+la noix de coco, qui sont bel et bien sur la carte. Un supplément doit être
+un ingrédient que le plat d'à côté porte déjà : sinon on vend une assiette
+hors fiche, dont personne ne connaît le dressage ni le coût.
+
+Le script lit donc `recette_ingredients` des plats visés et prend la portion
+**MÉDIANE réellement pesée**. Il en retire trois choses, nommées une par une
+avec leur raison : les **bases** (pâton, sauce tomate, pain, gnocchis), les
+**matières de cuisson et d'assaisonnement** (huile, beurre, farine, origan,
+vinaigrette, herbes de dressage), et la **protéine qui FAIT le plat** —
+« supplément entrecôte » ou « supplément andouillette » n'existe pas.
+
+⚠️ **CONSÉQUENCE VOULUE : un ingrédient qui entre à la carte apparaît ici
+tout seul.** Et s'il n'a pas de prix dans `PRIX`, il est REFUSÉ et NOMMÉ —
+il ne peut donc ni disparaître en silence, ni recevoir un prix deviné. Même
+raisonnement que « sans cible, aucune quantité n'est proposée » (0163).
+
+⚠️ `PORTION_SUPP` corrige les portions qui sont des portions de BASE : la
+mozzarella d'une pizza (0,13 kg) est TOUT son fromage, on en remet la moitié
+en supplément ; les olives d'une planche (0,06 kg) sont un ramequin, pas une
+poignée. Sans ces corrections le food cost passait à 50 % sur les olives.
+
+⚠️ Les **desserts du Fournil sont de l'achat-revente** : aucune fiche
+chiffrée, donc rien à dériver d'eux. Les suppléments sucrés viennent des
+seules fiches sucrées de la maison — les trois pizzas Nutella et la coupe de
+glace.
+
+⚠️ **Deux valeurs seulement sont HORS FICHES, et elles sont nommées** :
+ketchup et mayonnaise. Personne ne les a mises dans une recette, mais un
+client qui a des frites devant lui les demande, et elles sont en stock. Tout
+le reste vient des cartes.
+
+⚠️ `LIBELLE` traduit le nom de STOCK en nom de CAISSE : « Mélange râpé
+mozzarella 60 % / emmental 40 % » et « Bûchette de chèvre » n'ont rien à
+faire sur un écran de prise de commande.
 
 Le contrat, LU sur `docs.zelty.fr` (accessible une fois connecté au
 back-office ; `/llms.txt` liste toutes les opérations) :
@@ -1181,12 +1220,19 @@ moyen de ne pas vendre ce qu'on n'a pas.
 pas sur une ardoise et ne se rend pas en monnaie. Le script affiche le food
 cost de chacun pour que le palier se vérifie.
 
-⚠️ **Cinq suppléments restent au-dessus de 30 %**, et c'est DIT plutôt que
+⚠️ **Six suppléments restent au-dessus de 30 %**, et c'est DIT plutôt que
 corrigé en gonflant le prix : burrata 46 %, steak haché 39 %, œuf 36 %,
-saumon fumé 31 %. Trois de ces coûts sont des **estimations** (l'œuf à
-0,489 € et la burrata à 1,90 € sont hauts pour du pro) — la première facture
-tranchera. Gonfler le prix d'un supplément pour faire tomber un ratio calculé
-sur un coût inventé, c'est traiter le symptôme.
+coppa 34 %, viande hachée 33 %, crevettes 33 %. La plupart de ces coûts sont
+des **estimations** (l'œuf à 0,489 € et la burrata à 1,90 € sont hauts pour
+du pro) — la première facture tranchera. Gonfler le prix d'un supplément
+pour faire tomber un ratio calculé sur un coût inventé, c'est traiter le
+symptôme.
+
+⚠️ **Zelty REMPLACE les `values` d'une option, il ne les fusionne pas** :
+vérifié en passant la grille de 34/24/8 à 31/35/6, aucune valeur de
+l'ancienne liste n'a survécu. C'est le bon comportement ici — mais ça veut
+dire qu'une relance avec une table amputée EFFACE les suppléments manquants
+sans rien dire.
 
 ⚠️ `min_choices: 0` — un supplément ne s'impose jamais. `pick_same_value:
 true` — deux œufs, c'est deux œufs. **La fenêtre s'affiche à chaque vente**

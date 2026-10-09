@@ -106,104 +106,168 @@ const zelty = async (path, init = {}) => {
 //  balance au premier service.
 // ═══════════════════════════════════════════════════════════════════════
 
-const PIZZA = [
-  // fromages
-  ['Mozzarella râpée',      'Mélange râpé mozzarella 60 % / emmental 40 %', 0.05,  1.50],
-  ['Mozzarella cerise',     'Mozzarella cerise',                            0.05,  2.00],
-  ['Parmesan',              'Parmesan (kg)',                                0.015, 1.50],
-  ['Gorgonzola',            'Gorgonzola (kg)',                              0.04,  2.00],
-  ['Chèvre',                'Bûchette de chèvre',                           0.33,  2.50],
-  ['Feta',                  'Feta en dés',                                  0.04,  2.00],
-  ['Reblochon',             'Reblochon (kg)',                               0.06,  3.00],
-  ['Burrata',               'Burrata 125 g (pièce)',                        1,     4.50],
-  ['Crème fraîche',         'Crème fraîche épaisse',                        0.05,  1.00],
-  // charcuterie & viandes
-  ['Jambon blanc',          'Jambon blanc tranché',                         0.04,  1.50],
-  ['Jambon cru',            'Jambon cru tranché (kg)',                      0.03,  2.00],
-  ['Coppa',                 'Coppa tranchée (kg)',                          0.03,  2.00],
-  ['Chorizo',               'Chorizo tranché (kg)',                         0.04,  2.00],
-  ['Lardons fumés',         'Lardons fumés (kg)',                           0.05,  1.50],
-  ['Poulet rôti',           'Filet de poulet rôti',                         0.05,  2.00],
-  ['Viande hachée',         'Viande hachée de bœuf (kg)',                   0.07,  2.50],
-  ['Œuf',                   'Œuf (pièce)',                                  1,     1.50],
-  // mer
-  ['Saumon fumé',           'Saumon fumé tranché',                          0.04,  3.00],
-  ['Crevettes',             'Crevettes décortiquées (kg)',                  0.04,  2.50],
-  ['Thon',                  'Thon listao',                                  0.05,  1.50],
-  ['Anchois — câpres',      'Câpres (kg)',                                  0.01,  1.00],
-  // légumes & herbes
-  ['Champignons frais',     'Champignons de Paris frais (kg)',              0.05,  1.00],
-  ['Oignons rouges',        'Oignons rouges émincés (kg)',                  0.03,  1.00],
-  ['Oignons confits',       'Oignons confits (kg)',                         0.03,  1.00],
-  ['Poivrons',              'Poivrons en lanières (kg)',                    0.04,  1.00],
-  ['Aubergines grillées',   'Aubergines grillées (kg)',                     0.04,  1.00],
-  ['Courgettes grillées',   'Courgettes grillées (kg)',                     0.04,  1.50],
-  ['Olives noires',         'Olives noires',                                0.02,  1.00],
-  ['Tomates cerises',       'Tomates cerises (kg)',                         0.04,  1.00],
-  ['Roquette',              'Roquette (kg)',                                0.02,  1.00],
-  ['Cerneaux de noix',      'Cerneaux de noix (kg)',                        0.02,  1.00],
-  ['Pesto',                 'Pesto alla genovese',                          0.015, 1.00],
-  ['Miel',                  'Miel liquide',                                 0.015, 1.00],
-  ['Huile pimentée',        'Huile pimentée (litre)',                       0.01,  0.50],
-]
+// ═══════════════════════════════════════════════════════════════════════
+//  LA GRILLE SE DÉRIVE DES CARTES, ELLE NE SE SAISIT PAS
+//
+//  ⚠️⚠️ Un supplément doit être un ingrédient QUI EST DÉJÀ SUR LA CARTE.
+//  Une liste tapée à la main depuis le stock proposait au client des choses
+//  que la cuisine ne pose sur rien (thon, feta, crevettes sur une pizza) et
+//  OUBLIAIT ce qui y est vraiment (camembert, pommes de terre, banane,
+//  noix de coco). La première version de ce fichier faisait exactement ça.
+//
+//  Donc : on lit `recette_ingredients` des plats visés, on prend la portion
+//  MÉDIANE réellement pesée en cuisine, et on en retire trois choses — les
+//  bases, les assaisonnements, et la protéine principale d'un plat.
+//
+//  ⚠️ CONSÉQUENCE VOULUE : quand la carte gagne un ingrédient, il apparaît
+//  ici tout seul. Et s'il n'a pas de prix, le script REFUSE de le pousser et
+//  le NOMME — il ne peut donc ni disparaître en silence, ni recevoir un prix
+//  inventé. C'est le même raisonnement que « sans cible, aucune quantité
+//  n'est proposée » du réassort (0163).
+// ═══════════════════════════════════════════════════════════════════════
 
-const PLAT = [
-  ['Œuf au plat',           'Œuf (pièce)',                                  1,     1.50],
-  ['Cheddar',               'Cheddar en tranches (kg)',                     0.03,  1.00],
-  ['Emmental',              'Emmental en tranches',                         0.04,  1.00],
-  ['Chèvre',                'Bûchette de chèvre',                           0.33,  2.50],
-  ['Gorgonzola',            'Gorgonzola (kg)',                              0.04,  2.00],
-  ['Reblochon',             'Reblochon (kg)',                               0.06,  3.00],
-  ['Parmesan',              'Parmesan (kg)',                                0.015, 1.50],
-  ['Bacon (lard fumé)',     'Lard fumé en tranches (kg)',                   0.03,  1.50],
-  ['Lardons fumés',         'Lardons fumés (kg)',                           0.05,  1.50],
-  ['Jambon cru',            'Jambon cru tranché (kg)',                      0.03,  2.00],
-  ['Steak haché 150 g',     'Steak haché de bœuf 150 g (pièce)',            1,     4.50],
-  ['Poulet rôti',           'Filet de poulet rôti',                         0.05,  2.00],
-  ['Champignons poêlés',    'Champignons de Paris frais (kg)',              0.05,  1.00],
-  ['Oignons confits',       'Oignons confits (kg)',                         0.03,  1.00],
-  ['Roquette',              'Roquette (kg)',                                0.02,  1.00],
-  ['Tomates cerises',       'Tomates cerises (kg)',                         0.04,  1.00],
-  ['Portion de frites',     'Frites belges 12×12 (kg)',                     0.18,  2.50],
-  // sauces — mêmes valeurs, même fenêtre : deux pop-ups par burger seraient
-  // deux fois trop pour un comptoir en service.
-  ['Sauce ketchup',         'Sauce ketchup',                                0.03,  0.50],
-  ['Sauce mayonnaise',      'Sauce mayonnaise',                             0.03,  0.50],
-  ['Sauce barbecue',        'Sauce barbecue',                               0.03,  0.50],
-  ['Sauce burger',          'Sauce burger',                                 0.03,  0.50],
-  ['Sauce moutarde',        'Sauce moutarde',                               0.03,  0.50],
-  ['Sauce kebab',           'Sauce kebab',                                  0.03,  0.50],
-  ['Aïoli',                 'Aïoli (kg)',                                   0.025, 0.50],
-]
+// Ce qui est sur la carte mais ne s'ajoute pas, et POURQUOI.
+const BASES = {
+  'supp-pizza': {
+    'Pâton à pizza 350 g (pièce)': 'c’est la pizza elle-même',
+    'Sauce tomate pizza (kg)':     'la base, pas une garniture',
+    'Origan':                      'assaisonnement — offert',
+    'Citron (pièce)':              'quartier de service du saumon',
+    'Aneth frais (botte)':         'herbe de dressage',
+  },
+  'supp-plat': {
+    'Focaccia (pièce)':            'le pain du plat',
+    'Pain burger (pièce)':         'le pain du burger',
+    'Gnocchis frais (kg)':         'la base du plat',
+    'Pommes de terre (kg)':        'la garniture du plat — les frites tiennent ce rôle en supplément',
+    'Graisse de bœuf (kg)':        'matière de friture',
+    'Huile d’olive':               'matière de cuisson',
+    'Beurre doux':                 'matière de cuisson',
+    'Farine de blé T55':           'panure',
+    'Vinaigrette (litre)':         'assaisonnement inclus',
+    'Persil frais (botte)':        'herbe de dressage',
+    'Citron (pièce)':              'quartier de service',
+    'Sauce tomate pizza (kg)':     'base de cuisson',
+    // ⚠️ les protéines qui FONT le plat : « supplément entrecôte » n'existe pas
+    'Entrecôte de bœuf (kg)':      'c’est le plat',
+    'Bœuf pour carpaccio (kg)':    'c’est le plat',
+    'Bœuf haché au couteau (kg)':  'c’est le plat',
+    'Andouillette (pièce)':        'c’est le plat',
+    'Éperlans (kg)':               'c’est le plat',
+    'Anneaux de calamars (kg)':    'c’est le plat',
+  },
+}
 
-const DESSERT = [
-  ['Boule de glace',        'Glace (boule)',                                1,     1.50],
-  ['Nutella',               'Nutella (kg)',                                 0.03,  1.00],
-  ['Cerneaux de noix',      'Cerneaux de noix (kg)',                        0.02,  1.00],
-  ['Noix de coco râpée',    'Noix de coco râpée',                           0.01,  0.50],
-  ['Miel',                  'Miel liquide',                                 0.015, 0.50],
-  ['Coulis (sirop)',        'Sirop (litre)',                                0.02,  0.50],
-  ['Banane',                'Banane (pièce)',                               1,     1.50],
-  ['Crème de balsamique',   'Crème de balsamique (litre)',                  0.01,  0.50],
-]
+// ⚠️ Quand la fiche porte une portion de BASE et non de supplément.
+// La mozzarella d'une pizza, c'est tout son fromage ; en supplément on en
+// remet la moitié. Pareil pour un gratin ou une sauce de montage.
+const PORTION_SUPP = {
+  'supp-pizza': { 'Mélange râpé mozzarella 60 % / emmental 40 %': 0.065 },
+  'supp-plat': {
+    'Mozzarella râpée': 0.04, 'Reblochon (kg)': 0.06, 'Coppa tranchée (kg)': 0.05,
+    'Lardons fumés (kg)': 0.05, 'Champignons de Paris frais (kg)': 0.06,
+    'Jambon cru tranché (kg)': 0.04, 'Crème fraîche épaisse': 0.05,
+    'Parmesan (kg)': 0.015, 'Cheddar en tranches (kg)': 0.03,
+    'Camembert 250 g (pièce)': 0.3333,
+    'Sauce moutarde (kg)': 0.03, 'Aïoli (kg)': 0.025, 'Sauce burger maison (kg)': 0.02,
+    'Olives noires': 0.03,
+  },
+}
 
-// ⚠️ DEMANDÉS PAR LE GÉRANT, PAS EN STOCK. Chiffrés, pas poussés.
+// Les desserts du Fournil sont de l'achat-revente : AUCUNE fiche chiffrée,
+// donc rien à dériver. Les suppléments sucrés sont pris sur la carte des
+// pizzas sucrées + la coupe de glace, qui sont les seules fiches sucrées.
+const DESSERT_DEPUIS_CARTE = ['Glace (boule)', 'Nutella (kg)', 'Banane (pièce)',
+  'Noix de coco râpée', 'Cerneaux de noix (kg)', 'Miel liquide']
+const PORTION_DESSERT = { 'Glace (boule)': 1, 'Nutella (kg)': 0.05, 'Banane (pièce)': 1,
+  'Noix de coco râpée': 0.01, 'Cerneaux de noix (kg)': 0.015, 'Miel liquide': 0.015 }
+
+// ⚠️ HORS FICHES, et assumé : personne ne les a mises dans une recette, mais
+// un client qui a des frites devant lui les demande. Elles sont en stock.
+// Tout le reste de la grille vient des cartes ; ces deux-là sont nommées.
+const HORS_FICHES = {
+  'supp-plat': [
+    ['Sauce ketchup',    'Sauce ketchup',    0.03],
+    ['Sauce mayonnaise', 'Sauce mayonnaise', 0.03],
+  ],
+}
+
+// Le nom affiché sur la caisse. Un libellé de stock (« Bûchette de chèvre »,
+// « Mélange râpé mozzarella 60 % / emmental 40 % ») n'a rien à faire sur un
+// écran de prise de commande.
+const LIBELLE = {
+  'Mélange râpé mozzarella 60 % / emmental 40 %': 'Mozzarella râpée',
+  'Bûchette de chèvre': 'Chèvre', 'Camembert 250 g (pièce)': 'Camembert',
+  'Burrata 125 g (pièce)': 'Burrata', 'Steak haché de bœuf 150 g (pièce)': 'Steak haché 150 g',
+  'Œuf (pièce)': 'Œuf', 'Glace (boule)': 'Boule de glace', 'Banane (pièce)': 'Banane',
+  'Nutella (kg)': 'Nutella', 'Miel liquide': 'Miel', 'Noix de coco râpée': 'Noix de coco',
+  'Cerneaux de noix (kg)': 'Cerneaux de noix', 'Olives noires': 'Olives noires',
+  'Crème fraîche épaisse': 'Crème fraîche', 'Jambon blanc tranché': 'Jambon blanc',
+  'Jambon cru tranché (kg)': 'Jambon cru', 'Coppa tranchée (kg)': 'Coppa',
+  'Chorizo tranché (kg)': 'Chorizo', 'Lardons fumés (kg)': 'Lardons fumés',
+  'Lard fumé en tranches (kg)': 'Bacon', 'Saumon fumé tranché': 'Saumon fumé',
+  'Crevettes décortiquées (kg)': 'Crevettes', 'Viande hachée de bœuf (kg)': 'Viande hachée',
+  'Champignons de Paris frais (kg)': 'Champignons', 'Oignons rouges émincés (kg)': 'Oignons rouges',
+  'Oignons jaunes émincés (kg)': 'Oignons', 'Oignons confits (kg)': 'Oignons confits',
+  'Poivrons en lanières (kg)': 'Poivrons', 'Aubergines grillées (kg)': 'Aubergines grillées',
+  'Courgettes grillées (kg)': 'Courgettes grillées', 'Tomates cerises (kg)': 'Tomates cerises',
+  'Tomates (kg)': 'Tomates', 'Roquette (kg)': 'Roquette', 'Salade mesclun (kg)': 'Salade',
+  'Pommes de terre (kg)': 'Pommes de terre', 'Frites belges 12×12 (kg)': 'Portion de frites',
+  'Parmesan (kg)': 'Parmesan', 'Gorgonzola (kg)': 'Gorgonzola', 'Reblochon (kg)': 'Reblochon',
+  'Cheddar en tranches (kg)': 'Cheddar', 'Mozzarella râpée': 'Mozzarella râpée',
+  'Pesto alla genovese': 'Pesto', 'Câpres (kg)': 'Câpres', 'Cornichons (kg)': 'Cornichons',
+  'Sauce moutarde (kg)': 'Sauce moutarde', 'Aïoli (kg)': 'Aïoli',
+  'Sauce burger maison (kg)': 'Sauce burger maison', 'Sauce ketchup': 'Ketchup',
+  'Sauce mayonnaise': 'Mayonnaise',
+}
+
+// ⚠️ LES PRIX SONT DES PALIERS RONDS, pas un coût × coefficient : un
+// supplément à 1,37 € ne se lit pas sur une ardoise et ne se rend pas en
+// monnaie. Le script imprime le food cost de chacun pour que le palier se
+// vérifie. Un ingrédient de la carte ABSENT de cette table est REFUSÉ et
+// nommé — jamais poussé à un prix deviné.
+const PRIX = {
+  'Olives noires': 1.00, 'Mélange râpé mozzarella 60 % / emmental 40 %': 1.50,
+  'Mozzarella râpée': 1.00, 'Crème fraîche épaisse': 1.00, 'Poivrons en lanières (kg)': 1.00,
+  'Roquette (kg)': 1.50, 'Parmesan (kg)': 1.50, 'Nutella (kg)': 2.50,
+  'Jambon blanc tranché': 2.00, 'Champignons de Paris frais (kg)': 1.00,
+  'Oignons rouges émincés (kg)': 1.00, 'Oignons jaunes émincés (kg)': 1.00,
+  'Oignons confits (kg)': 1.00, 'Jambon cru tranché (kg)': 2.00,
+  'Tomates cerises (kg)': 1.00, 'Tomates (kg)': 1.00, 'Bûchette de chèvre': 2.50,
+  'Pommes de terre (kg)': 1.00, 'Banane (pièce)': 1.50, 'Chorizo tranché (kg)': 2.00,
+  'Saumon fumé tranché': 3.00, 'Miel liquide': 0.50, 'Cerneaux de noix (kg)': 1.00,
+  'Gorgonzola (kg)': 2.00, 'Lardons fumés (kg)': 1.50, 'Œuf (pièce)': 1.50,
+  'Courgettes grillées (kg)': 1.50, 'Aubergines grillées (kg)': 1.00,
+  'Camembert 250 g (pièce)': 2.50, 'Burrata 125 g (pièce)': 4.50,
+  'Coppa tranchée (kg)': 2.50, 'Pesto alla genovese': 1.00,
+  'Viande hachée de bœuf (kg)': 2.50, 'Noix de coco râpée': 0.50,
+  'Salade mesclun (kg)': 1.50, 'Frites belges 12×12 (kg)': 2.50,
+  'Steak haché de bœuf 150 g (pièce)': 4.50, 'Reblochon (kg)': 3.00,
+  'Cheddar en tranches (kg)': 1.00, 'Lard fumé en tranches (kg)': 1.50,
+  'Crevettes décortiquées (kg)': 3.00, 'Câpres (kg)': 1.00, 'Cornichons (kg)': 0.50,
+  'Sauce moutarde (kg)': 0.50, 'Aïoli (kg)': 0.50, 'Sauce burger maison (kg)': 0.50,
+  'Glace (boule)': 1.50, 'Sauce ketchup': 0.50, 'Sauce mayonnaise': 0.50,
+}
+
+// ⚠️ DEMANDÉS PAR LE GÉRANT, PAS EN STOCK. Chiffrés, pas poussés — et une
+// `OptionValue` ne porte AUCUN drapeau `disable`, donc on ne peut pas « créer
+// éteint ». Ne pas pousser est le seul moyen de ne pas vendre ce qu'on n'a pas.
 const A_COMMANDER = [
-  ['Roquefort',  'entrecôte, burger, salade', 'Félix Potin Provence',
+  ['Roquefort', 'entrecôte, burger, salade', 'Félix Potin Provence',
    'ROQUEFORT AOP 31% LC BREBIS 1/2 1K35', '13,68 €/kg — soit 0,55 € les 40 g, à vendre 2,00 €'],
-  ['Chantilly',  'coulant au chocolat, desserts', 'Félix Potin Provence',
+  ['Chantilly', 'coulant au chocolat, desserts', 'Félix Potin Provence',
    'CREME SUCREE S/PRESSION UHT AERO 32% 700ML DEBIC',
    '7,39 € la bombe de 700 ml — ~25 doses, soit 0,30 € la dose, à vendre 1,00 €'],
 ]
 
 // Les groupes, et à quels plats ils se rattachent.
 const GROUPES = [
-  { cle: 'supp-pizza',   nom: 'Suppléments pizza',   valeurs: PIZZA,
+  { cle: 'supp-pizza',   nom: 'Suppléments pizza',
     cible: r => r.tag_destination === 'PIZZA'   && r.categorie === 'Pizzeria' },
-  { cle: 'supp-plat',    nom: 'Suppléments',         valeurs: PLAT,
+  { cle: 'supp-plat',    nom: 'Suppléments',
     cible: r => r.tag_destination === 'CUISINE' &&
                 ['Burger', 'Plat', 'Grande salade', 'Planche'].includes(r.categorie) },
-  { cle: 'supp-dessert', nom: 'Suppléments dessert', valeurs: DESSERT,
+  { cle: 'supp-dessert', nom: 'Suppléments dessert',
     cible: r => r.tag_destination === 'CUISINE' && r.categorie === 'Dessert' },
 ]
 
@@ -211,40 +275,91 @@ const eur = n => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFr
 const pct = n => (n * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' %'
 
 async function main() {
-  // ─── 1. les matières, et le refus de ce qui n'existe pas ──────────────
+  // ─── 1. la grille, DÉRIVÉE DES CARTES ────────────────────────────────
   const ings = await T('ingredients?select=id,nom,unite,prix_achat_ht,prix_estime,stocke,actif&actif=eq.true')
-  const parNom = new Map(ings.map(i => [i.nom, i]))
+  const parIngId = new Map(ings.map(i => [i.id, i]))
+  const parNom   = new Map(ings.map(i => [i.nom, i]))
+  const recs = await T('recettes?select=id,nom,categorie,tag_destination,actif')
+  const ri   = await T('recette_ingredients?select=recette_id,ingredient_id,quantite')
+  const fiches = {}
+  for (const l of ri) (fiches[l.recette_id] = fiches[l.recette_id] || []).push(l)
 
-  const refus = []
-  let coutInconnu = 0
+  const mediane = a => { const t = [...a].sort((x, y) => x - y); return t[Math.floor(t.length / 2)] }
+  const sansPrix = [], refus = []
   const construit = []
 
   for (const g of GROUPES) {
-    const valeurs = []
-    for (const [nom, matiere, portion, prix] of g.valeurs) {
-      const i = parNom.get(matiere)
-      if (!i)        { refus.push(`${g.cle} / ${nom} : matière « ${matiere} » absente du catalogue`); continue }
-      if (!i.stocke) { refus.push(`${g.cle} / ${nom} : « ${matiere} » n'est pas suivie en stock`);    continue }
-      const cout = i.prix_achat_ht == null ? null : Number(i.prix_achat_ht) * portion
-      if (cout == null) coutInconnu++
-      valeurs.push({ nom, matiere, portion, unite: i.unite, prix, cout, estime: i.prix_estime !== false })
+    const plats = recs.filter(g.cible)
+
+    // Ce que la carte emploie RÉELLEMENT, et dans combien de plats.
+    const vus = new Map()
+    for (const p of plats) for (const l of (fiches[p.id] || [])) {
+      const i = parIngId.get(l.ingredient_id); if (!i) continue
+      if (!vus.has(i.nom)) vus.set(i.nom, { plats: 0, q: [] })
+      const v = vus.get(i.nom); v.plats++; v.q.push(Number(l.quantite))
     }
-    construit.push({ ...g, valeurs })
+
+    // ⚠️ Les desserts du Fournil sont de l'achat-revente : AUCUNE fiche
+    // chiffrée, donc rien à dériver d'eux. Les suppléments sucrés viennent
+    // des seules fiches sucrées de la maison — les pizzas Nutella et la
+    // coupe de glace.
+    let noms, portionDe
+    if (g.cle === 'supp-dessert') {
+      noms = [...DESSERT_DEPUIS_CARTE]
+      portionDe = n => PORTION_DESSERT[n]
+    } else {
+      noms = [...vus.keys()].filter(n => !BASES[g.cle]?.[n])
+      portionDe = n => PORTION_SUPP[g.cle]?.[n] ?? mediane(vus.get(n).q)
+    }
+    for (const h of (HORS_FICHES[g.cle] || [])) if (!noms.includes(h[0])) noms.push(h[0])
+
+    const valeurs = []
+    for (const nom of noms) {
+      const i = parNom.get(nom)
+      if (!i)        { refus.push(`${g.cle} / ${nom} : absent du catalogue des matières`); continue }
+      if (!i.stocke) { refus.push(`${g.cle} / ${nom} : pas suivi en stock`); continue }
+      const hf = (HORS_FICHES[g.cle] || []).find(h => h[0] === nom)
+      const portion = hf ? hf[2] : portionDe(nom)
+      const prix = PRIX[nom]
+      // ⚠️ Pas de prix = pas de supplément, et on le NOMME. Un prix deviné
+      // sur une marchandise jamais tarifée se découvre sur le ticket.
+      if (prix == null) { sansPrix.push(`${g.cle} / ${nom} (${vus.get(nom)?.plats ?? 0} plat(s))`); continue }
+      const cout = i.prix_achat_ht == null ? null : Number(i.prix_achat_ht) * portion
+      valeurs.push({
+        nom: LIBELLE[nom] ?? nom, matiere: nom, portion, unite: i.unite, prix, cout,
+        estime: i.prix_estime !== false,
+        surCarte: vus.get(nom)?.plats ?? 0,
+        reduite: !hf && g.cle !== 'supp-dessert' && PORTION_SUPP[g.cle]?.[nom] != null,
+        horsFiche: !!hf,
+      })
+    }
+    valeurs.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+    construit.push({ ...g, valeurs, plats, ecartes: Object.entries(BASES[g.cle] || {}) })
   }
 
   // ─── 2. la grille, à l'écran ──────────────────────────────────────────
   console.log('\n╔══ SUPPLÉMENTS — grille proposée ' + '═'.repeat(44))
   for (const g of construit) {
     console.log(`\n  ▸ ${g.nom}  (${g.valeurs.length} suppléments)`)
-    console.log('    ' + 'supplément'.padEnd(22) + 'portion'.padStart(10) + '  ' +
-                'unité'.padEnd(20) + 'coût'.padStart(8) + 'prix'.padStart(8) + '  f.cost')
+    console.log('    ' + 'supplément'.padEnd(22) + 'portion'.padStart(8) + '   ' +
+                'unité'.padEnd(18) + 'coût'.padStart(8) + 'prix'.padStart(8) + '  f.cost  d\u2019où il vient')
     for (const v of g.valeurs) {
       const fc = v.cout == null ? '   —  ' : pct(v.cout / (v.prix / 1.10)).padStart(7)
+      const src = v.horsFiche ? 'hors fiche'
+        : v.surCarte === 0 ? 'fiches sucrées'
+        : `${v.surCarte} plat${v.surCarte > 1 ? 's' : ''} de la carte`
       console.log('    ' + v.nom.padEnd(22) +
-        String(v.portion).padStart(10) + '  ' + String(v.unite || '').padEnd(20) +
+        String(v.portion).padStart(8) + (v.reduite ? '↓' : ' ') + '  ' + String(v.unite || '').padEnd(18) +
         (v.cout == null ? '     —' : eur(v.cout).padStart(8)) +
-        eur(v.prix).padStart(8) + '  ' + fc + (v.estime ? '  (coût estimé)' : ''))
+        eur(v.prix).padStart(8) + '  ' + fc + '  ' + src.padEnd(20) + (v.estime ? 'coût estimé' : ''))
     }
+    if (g.ecartes.length) console.log('    ── écartés : ' +
+      g.ecartes.map(([n, r]) => `${LIBELLE[n] ?? n} (${r})`).join(' · '))
+  }
+
+  if (sansPrix.length) {
+    console.log('\n  ⚠ SUR LA CARTE MAIS SANS PRIX — refusés, jamais poussés à un prix deviné :')
+    for (const r of sansPrix) console.log('    · ' + r)
   }
 
   if (refus.length) {
@@ -257,7 +372,6 @@ async function main() {
     console.log(`    · ${nom} (${usage})\n      ${fourn} — ${ref}\n      ${note}`)
 
   // ─── 3. les plats visés ───────────────────────────────────────────────
-  const recs = await T('recettes?select=id,nom,categorie,tag_destination,actif')
   const corr = await T('correspondances_catalogue?select=recette_id,identifiant_externe&systeme=eq.zelty')
   const idCaisse = new Map(corr.map(c => [c.recette_id, String(c.identifiant_externe)]))
 
