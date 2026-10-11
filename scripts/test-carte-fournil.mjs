@@ -85,7 +85,7 @@ const AFFICHES = {
   'Cappuccino': 2.5, 'Chausson aux pommes': 1.4, 'Chocolat chaud': 2.5,
   'Coca-Cola 1,5 L': 3.5, 'Coca-Cola 33 cl': 2, 'Coca-Cola Zéro 1,5 L': 3.5,
   'Coca-Cola Zéro 33 cl': 2, 'Cookie chocolat': 2.9, 'Croissant': 1.4,
-  'Eau gazeuse 50 cl': 2, 'Eau plate 50 cl': 1, 'Éclair au chocolat': 3.6,
+  'Eau gazeuse 50 cl': 2, 'Eau plate 50 cl': 1, 'Éclair au chocolat': 3.8,
   'Fondant au chocolat': 3.8, 'Formule Petit-déjeuner complet': 4.3, 'Formule salade + boisson': 5.8,
   'Formule salade + boisson + dessert': 8.1, 'Formule sandwich ou panini + boisson': 6.2, 'Formule sandwich ou panini + boisson + dessert': 8.5,
   'Formule Tartine': 4.4, 'Ice Tea 33 cl': 2, 'Ice Tea pêche 1,5 L': 3.5,
@@ -100,7 +100,7 @@ const AFFICHES = {
   'Pizza ronde chèvre-miel': 3.9, 'Pizza ronde poulet-pesto': 3.9, 'Pizza ronde Reine': 3.9,
   'Sacristain': 3.55, 'Salade italienne': 5.4, 'Salade poulet-feta': 5.2,
   'Salade saumon': 6, 'Tarte aux pommes': 3.8, 'Tartelette citron meringuée': 3.8,
-  'Thé': 2, 'Tiramisu individuel': 4.25, 'Tropézienne individuelle': 3.8,
+  'Thé': 2, 'Tiramisu individuel': 3.8, 'Tropézienne individuelle': 3.8,
 }
 // « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
 // SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent

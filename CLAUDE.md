@@ -7283,6 +7283,46 @@ relevés sur un panneau, et `AFFICHES` est la liste de ce qui est IMPRIMÉ.
 Contrôles : carte conforme **171/171, 0 écart** · `test-carte-fournil` 13/13
 · `test-reassort` 76/76 · `test-cibles-stock` 31/31.
 
+### Prix par FAMILLE — pâtisseries 3,80 €, desserts salle 5,90 € (11/10/2026)
+
+`node scripts/prix-familles-1110.mjs [--ecrire]`. Décision du gérant : une
+famille, un prix. **12 prix changés sur 17** — six étaient déjà à la cible.
+
+Une vitrine à prix unique se lit d'un coup d'œil et ne se tape pas de travers
+au comptoir. C'est le gain, et il justifie qu'un produit cher à produire perde
+de la marge pendant qu'un bon marché en gagne : **c'est le panier moyen qu'on
+arbitre, pas la ligne.**
+
+⚠️⚠️ **MAIS UN ALIGNEMENT PAR FAMILLE DÉPLACE LES FOOD COSTS DANS LES DEUX
+SENS, et le script le DIT ligne à ligne.** Un ratio qui passe de 45 à 50 %
+sans que personne le voie finit par surprendre au bilan. Trois pâtisseries
+sortent au-dessus de 40 % à 3,80 € : **tiramisu 50 %** (coût 1,80 €, le plus
+lourd de la carte), Paris-Brest 45 %, tartelette citron 41 %. Dits, pas
+corrigés — c'est une décision, pas un défaut.
+
+Les huit desserts en salle restent sains (20 à 37 %). Quatre BAISSENT —
+tiramisu, moelleux et Paris-Brest de 6,50 €, tartelette de 6,00 € — et le
+flan monte de 5,00 €.
+
+⚠️ **Le « Café gourmand » est dans la famille Dessert**, donc il suit : 5,50 →
+5,90 €. Ce n'est pas une pâtisserie, mais il est sur le même écran de caisse,
+et l'exclure casserait l'uniformité qui fait tout l'intérêt du geste. Son food
+cost s'améliore (39 → 37 %).
+
+⚠️ **Le script REFUSE d'agir si un produit porte un `prix_sur_place_ttc`
+distinct** : écraser le tarif de la salle avec celui de l'emporter se
+découvrirait sur un ticket. Vérifié avant : aucun des 17 n'en porte, donc un
+seul prix part des deux côtés (`price` ET `price_togo` — n'en changer qu'un
+laisserait le comptoir à l'ancien prix).
+
+⚠️ **`AFFICHES` a été mis à jour DANS LE MÊME COMMIT** que les prix — éclair
+au chocolat 3,60 → 3,80, tiramisu 4,25 → 3,80. C'est la règle du 04/10 : la
+liste de référence bouge EN MÊME TEMPS que le prix, jamais après coup, sinon
+elle redevient un décor. Le Paris-Brest est dans `HORS_AFFICHE`, donc sans
+prix gardé.
+
+Contrôles : carte **171/171, 0 écart** · `test-carte-fournil` 13/13.
+
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
 Demande du gérant : « prendre un fournisseur, une catégorie de produits de
@@ -7449,6 +7489,7 @@ PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (c
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
+node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
