@@ -177,9 +177,13 @@ const PORTION_SUPP = {
 // Les desserts du Fournil sont de l'achat-revente : AUCUNE fiche chiffrée,
 // donc rien à dériver. Les suppléments sucrés sont pris sur la carte des
 // pizzas sucrées + la coupe de glace, qui sont les seules fiches sucrées.
-const DESSERT_DEPUIS_CARTE = ['Glace (boule)', 'Nutella (kg)', 'Banane (pièce)',
+// ⚠️ « Boule de glace » est SORTIE le 11/10/2026 : le gérant a retiré toutes
+// les glaces de la carte (les quatre du Fournil et la coupe de glace en
+// salle). Un supplément dont plus aucun produit n'est vendu se tape au
+// comptoir, se facture, et la cuisine n'a rien à servir.
+const DESSERT_DEPUIS_CARTE = ['Nutella (kg)', 'Banane (pièce)',
   'Noix de coco râpée', 'Cerneaux de noix (kg)', 'Miel liquide']
-const PORTION_DESSERT = { 'Glace (boule)': 1, 'Nutella (kg)': 0.05, 'Banane (pièce)': 1,
+const PORTION_DESSERT = { 'Nutella (kg)': 0.05, 'Banane (pièce)': 1,
   'Noix de coco râpée': 0.01, 'Cerneaux de noix (kg)': 0.015, 'Miel liquide': 0.015 }
 
 // ⚠️ HORS FICHES, et assumé : personne ne les a mises dans une recette, mais

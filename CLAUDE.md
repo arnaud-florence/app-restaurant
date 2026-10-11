@@ -7193,6 +7193,96 @@ gérant pose la sienne — 26 lignes. Il vérifie désormais que SES lignes sont
 parties, pas que la production est vide. Même famille d'erreur que
 `test-zelty-webhook.mjs`, qui effaçait tous les événements au lieu des siens.
 
+### Corrections de carte du 11/10/2026 — 23 retraits, 2 créations
+
+`node scripts/carte-corrections-1110.mjs [--ecrire]`, essai à blanc par
+défaut. Décisions du gérant, chacune avec sa RAISON écrite dans le script :
+dans six mois, « pourquoi la madeleine n'est plus là » ne se retrouve nulle
+part ailleurs.
+
+**Retirés (23)** : le « Cappuccino ou chocolat chaud » à 2,24 € (il
+DOUBLONNAIT le Cappuccino et le Chocolat chaud, tous deux à 2,50 €), tarte
+aux pommes, madeleine, les deux muffins, sacristain, **les quatre glaces**
+(cône vanille, fusée, Mario, Sunroll) **et la coupe de glace en salle**, les
+**deux pizzas à la plaque**, Red Bull Ice, et **les neuf formules** — les six
+vendues plus les trois composants « Formule — … », qui n'ont plus d'objet.
+
+**Prix** : Panuozzi 4,50 → **5,90 €**.
+
+**Créés (2)** : Éclair au café **3,60 €**, Gâteau fraise fromage blanc
+**3,80 €** — Pâtisserie, FOURNIL, TVA 5,5 %.
+
+⚠️ **Les deux prix sont ANCRÉS, pas inventés** : l'éclair au café est le même
+produit que l'éclair au chocolat dans un autre parfum ; 3,80 € est le palier
+de la famille (tropézienne, tartelette citron, flan, fondant y sont tous). À
+confirmer par le gérant.
+
+⚠️ **Aucun coût d'achat** : ils n'ont jamais été facturés, donc ils
+s'affichent en « coût inconnu » (0150), gris. Un zéro se lirait « gratuit ».
+
+⚠️ **Allergènes par DÉFINITION, non validés** : gluten sur les deux, lait sur
+le gâteau (« fromage blanc » est dans son nom). `allergenes_valides_le` reste
+NULL — personne n'a lu l'emballage, et le public lira « information non
+disponible » (0138).
+
+⚠️ **ON GARDE `nom_caisse` sur un retrait.** C'est la règle du miroir : un
+produit désactivé exprès doit être RETROUVÉ par un ticket tardif, pas recréé
+en double. On ne l'efface QUE dans une FUSION, où deux fiches rivalisent.
+Les deux règles se ressemblent et disent le contraire ; c'est le nombre de
+fiches en lice qui tranche.
+
+⚠️ **TVA des créations : 1000 sur place, 550 à emporter.** Notre `tva` est
+celle de l'emporter ; la recopier des deux côtés sous-déclarerait un gâteau
+mangé à table. Et c'est en MILLIÈMES.
+
+⚠️⚠️ **J'AI ANNONCÉ UN CHIFFRE FAUX AVANT DE LE CORRIGER** : la marge du demi
+Affligem à 2,80 €, calculée en divisant par 1,10. **La bière est à 20 %.**
+1,06 € annoncé au lieu de 0,85 € — l'écart décidait dans l'autre sens. Le
+taux se LIT sur la fiche, il ne se suppose pas depuis la famille.
+
+**« Mettre la demi Affligem au même prix que la Poretti » n'a PAS été
+appliqué**, et le gérant a confirmé le maintien à 3,90 €. **Aucune Poretti
+n'existe** — ni en produit, ni en matière, ni dans les 4 888 références des
+sept catalogues. La seule pression de la maison est le fût MORETTI (« Demi
+pression », 2,80 €). Le fût Affligem coûte **60 % de plus** : à 2,80 €, le
+demi tomberait à **0,85 € de marge et 64 % de food cost**, sous le coût de
+service (1,15 € à 15 consos/heure) — le bar paierait pour servir cette
+bière. Le prix à marge ÉGALE au demi pression serait 3,50 €.
+
+**Les conséquences, traitées plutôt que découvertes :**
+
+⚠️ **La matière « Glace (boule) » restait suivie avec une cible de 34** : le
+réassort aurait commandé des boules pour une maison qui n'en vend plus.
+Passée `stocke = false`, cible effacée. Réversible — la fiche « Coupe de
+glace (salle) » la garde dans sa composition et la ramènera avec elle.
+
+⚠️ **Le supplément dessert « Boule de glace » est sorti** de
+`supplements-caisse.mjs` (6 → 5 valeurs). Un supplément dont plus aucun
+produit n'est vendu se tape au comptoir, se facture, et la cuisine n'a rien
+à servir.
+
+⚠️ **« PLAQUE PIZZA CRUE » n'est plus portée par aucun produit actif** : la
+matière sort du réassort toute seule, ce qui est juste.
+
+⚠️ **TROIS FAMILLES SONT VIDES** — `Glace`, `Formule`, `Formule
+petit-déjeuner`. Ce sont des groupes de boutons sans rien dedans sur la
+caisse. Les tags Zelty subsistent : à retirer si le gérant le veut, mais une
+famille vide ne casse rien et la rouvrir coûte un clic.
+
+⚠️ **`--nom=` a été ajouté à `generer-visuels-sans-photo.mjs`**, et il
+fallait l'ajouter : sans lui le script touche TOUS les produits sans photo
+(17 ce jour-là) et **réécrit `vendable_online` selon sa règle de famille** —
+un lancement pour deux pâtisseries aurait remis une vingtaine de références
+du bar en ligne au passage. On ne corrige pas ce qu'on n'a pas regardé.
+
+✅ **Le garde-fou `AFFICHES` a fait son travail** : les deux créations l'ont
+fait rougir aussitôt (« produits hors référence »). Elles sont entrées dans
+`HORS_AFFICHE` — leurs prix sont ancrés sur des produits existants, pas
+relevés sur un panneau, et `AFFICHES` est la liste de ce qui est IMPRIMÉ.
+
+Contrôles : carte conforme **171/171, 0 écart** · `test-carte-fournil` 13/13
+· `test-reassort` 76/76 · `test-cibles-stock` 31/31.
+
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
 Demande du gérant : « prendre un fournisseur, une catégorie de produits de
@@ -7358,6 +7448,7 @@ node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, s
 PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
+node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)

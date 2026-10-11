@@ -142,6 +142,12 @@ const HORS_AFFICHE = new Set([
   // Remis en vente le 28/08/2026. Il n'a pas d'affiche : les trois pains aux
   // céréales imprimés sont le bâtard, le campestre et le pavé.
   'Pain aux céréales',
+  // Ajoutés à la carte par le gérant le 11/10/2026. Pas d'affiche : leurs
+  // prix sont ancrés sur des produits existants (l'éclair au chocolat pour
+  // le premier, le palier de la famille Pâtisserie pour le second), pas
+  // relevés sur un panneau — donc ils n'ont rien à faire dans AFFICHES, qui
+  // est la liste de ce qui est IMPRIMÉ.
+  'Éclair au café', 'Gâteau fraise fromage blanc',
 ])
 
 // Retirés du click & collect par la 0115 : une tasse ne voyage pas, et une

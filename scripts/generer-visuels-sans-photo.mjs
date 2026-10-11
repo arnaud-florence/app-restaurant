@@ -124,7 +124,18 @@ function plaque(nom, format, destination) {
 const q = async p => (await fetch(`${U}/rest/v1/${p}`, { headers: H })).json()
 
 const sans = await q('recettes?select=id,nom,categorie,contient_alcool,tag_destination&actif=eq.true&image_url=is.null&order=categorie,nom')
+// ⚠️ `--nom=` BORNE LE PASSAGE À CE QU'ON VISE. Sans lui, le script touche
+// TOUS les produits sans photo — et comme il réécrit `vendable_online` selon
+// sa règle de famille, un lancement pour deux pâtisseries remettrait une
+// vingtaine de références du bar en ligne au passage (vécu le 21/09 sur la
+// brasserie). On ne corrige pas ce qu'on n'a pas regardé.
+const SEULS = process.argv.filter(a => a.startsWith('--nom=')).map(a => a.slice(6))
 const cibles = sans.filter(r => !EXCLUS.test(r.nom))
+  .filter(r => SEULS.length === 0 || SEULS.includes(r.nom))
+if (SEULS.length) {
+  const absents = SEULS.filter(n => !cibles.some(r => r.nom === n))
+  if (absents.length) { console.error('✗ sans photo à générer : ' + absents.join(' · ')); process.exit(1) }
+}
 const ignores = sans.filter(r => EXCLUS.test(r.nom))
 
 console.log(`${sans.length} produit(s) sans photo · ${cibles.length} à traiter · ${ignores.length} ignoré(s)\n`)
