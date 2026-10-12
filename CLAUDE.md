@@ -7596,6 +7596,75 @@ c'était un 500.
 Contrôles : carte **179/179, 0 écart** · `test-carte-fournil` **13/13** ·
 `test-matieres-bar` **18/18** · affichage légal **8/8 rubriques servies**.
 
+### La cuisson des viandes en caisse (12/10/2026)
+
+`node scripts/cuisson-viandes.mjs [--ecrire]`. Une entrecôte envoyée au grill
+sans cuisson est une assiette qui revient. Le serveur la demande au client de
+toute façon : si la caisse ne sait pas la taper, l'information se transmet à
+la voix, et elle se perd.
+
+⚠️ **CE N'EST PAS UN SUPPLÉMENT, et les trois réglages sont à l'opposé** :
+prix **0** (une cuisson ne se facture pas), **`min_choices: 1`** — elle est
+OBLIGATOIRE, là où un supplément est à 0 parce qu'on peut ne rien ajouter —
+et `max_choices: 1` sans `pick_same_value` : on ne commande pas « deux fois
+saignant » sur la même pièce.
+
+⚠️⚠️ **DEUX GROUPES, PARCE QU'UN STEAK HACHÉ N'EST PAS UNE ENTRECÔTE.** Le
+hachage répartit dans toute la masse ce qui n'était qu'en surface sur une
+pièce entière ; la DGCCRF recommande une cuisson à cœur pour le bœuf haché, et
+« bleu » ne se sert pas sur un burger. Un seul groupe aurait mis **« Bleu » sur
+les trois burgers** — un choix qu'on n'aurait pas voulu voir tapé, offert par
+l'écran lui-même.
+
+| Groupe | Degrés | Plats |
+|---|---|---|
+| **Cuisson** #300960 | Bleu · Saignant · À point · Bien cuit | Entrecôte grillée |
+| **Cuisson du burger** #300961 | Saignant · À point · Bien cuit | les 3 burgers |
+
+⚠️ **Le MENU ENFANT porte le même steak haché 150 g et ne reçoit AUCUN
+groupe** : l'enfant est précisément le public à risque, sa cuisson à cœur
+n'est pas une option. Proposer le choix serait proposer de mal faire.
+
+⚠️ Écartés aussi, chacun pour une raison nommée : **tartare et carpaccio sont
+CRUS**, l'andouillette et La Naples cuisent à cœur par construction, la
+friture de la mer n'a pas de degré. L'ordre des degrés est celui du **GRILL**,
+pas l'alphabet — c'est celui que le serveur a dans la tête.
+
+⚠️⚠️ **DEUX BURGERS SUR TROIS SONT EN PAUSE pour l'ardoise, et `show_all=true`
+est donc vital** : sans lui ils ne recevaient pas leur cuisson et seraient
+revenus **amputés** le jour où le gérant rallume sa brasserie — la panne exacte
+qu'`ardoise-pause --reprendre` avait déjà (10/10).
+
+⚠️⚠️ **ON FUSIONNE LES GROUPES D'UN PLAT, on ne les remplace pas.** Les quatre
+portaient déjà « Suppléments » : écrire `options: [cuisson]` leur aurait retiré
+les 35 suppléments, sans un message. Vérifié après coup par relecture — 1 → 2
+groupes sur chacun, et la carte reste **179/179 conformes, 0 écart**.
+
+✅✅ **MESURÉ, ET ÇA BORNE LE DANGER DE `POST /catalog/dishes` :
+un upsert qui OMET un champ le PRÉSERVE.** Essai fait sur « Burger
+CasaTasia » — en pause, donc sans impact sur le service : charge
+`{id, name, price, tax, disable}` sans `options`, et les deux groupes
+`[300913, 300961]` sont intacts après relecture.
+
+Conséquence pratique : les **treize** scripts qui écrivent des plats
+(`pousser-familles-zelty`, `ardoise-pause`, `postes-production-zelty`,
+`prix-familles-1110`, `tarif-bar-village`…) **n'ont PAS à être patchés**, et on
+n'a pas eu à les toucher un jour d'ouverture. Le danger de cet endpoint est
+sur les champs qu'on ENVOIE — `name`, `price`, `tax` recopiés tels quels, jamais
+recalculés — pas sur ceux qu'on tait.
+
+⚠️ **La règle est l'INVERSE pour les `values` d'une OPTION** : là, Zelty
+REMPLACE le tableau (vérifié le 10/10 en passant la grille de 34/24/8 à
+31/35/6, aucune ancienne valeur survivante). Deux comportements opposés sur le
+même verbe : un plat préserve ce qu'on omet, une option écrase ce qu'on
+n'énumère pas. Une relance avec une liste de degrés amputée EFFACERAIT les
+manquants sans rien dire.
+
+⚠️ La fenêtre **s'affiche à chaque vente** (`donotpresent` non posé) : pour un
+choix obligatoire c'est la seule forme possible.
+
+Pas de migration. Aucun code applicatif touché, donc `CACHE_VERSION` inchangée.
+
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
 Demande du gérant : « prendre un fournisseur, une catégorie de produits de
@@ -7768,6 +7837,9 @@ node scripts/bar-ajustements-1210.mjs          # monaco, pinte Affligem, Heineke
 node scripts/matieres-vins-invino.mjs          # les bouteilles In Vino entrent au stock
 node scripts/heineken-canette-1210.mjs         # Heineken canette 2,50 € au bar
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
+node scripts/cuisson-viandes.mjs               # cuisson entrecôte + burgers (essai à blanc)
+node scripts/ocb-slim-premium.mjs              # feuilles OCB 1,20 € au comptoir (essai à blanc)
+node scripts/renommer-heineken-bouteille.mjs   # bouteille / canette, des DEUX côtés
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
 PORT=3000 node scripts/test-bon-commande.mjs   # bon de commande envoyable (0160)
