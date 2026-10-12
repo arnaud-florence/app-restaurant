@@ -7450,6 +7450,26 @@ l'autre échoue. Vérifié avant d'écrire : **zéro vente** sous l'ancien nom
 résolvent toutes — café 1,40 €, demi 2,80 €, **Heineken 3,80 €**, jus
 d'orange, soda, eau, pastis.
 
+**Heineken canette 33 cl à 2,50 €** (`scripts/heineken-canette-1210.mjs`),
+créée au **BAR** : le Fournil ne vend aucun alcool, vérifié avant de choisir
+le point de vente. `vendable_online: false` (0144).
+
+⚠️ **Aucun coût d'achat, et reporter celui de la bouteille aurait été faux
+DEUX fois** : ce n'est ni le même contenant ni le même fournisseur — la
+bouteille vient de France Boissons en verre consigné à 1,5088 €, la canette
+d'Euro-Cash. Or **Euro-Cash a neuf références Heineken, toutes à « N.C. »** :
+le rayon Bières est l'un des 18 qu'ils n'ont jamais chiffrés depuis la
+demande du 23/09. Elle sort en « coût inconnu ».
+
+⚠️ **DEUX HEINEKEN 33 CL SUR LE MÊME ÉCRAN**, à 3,80 € et 2,50 €, et seul le
+mot « canette » les distingue. La bouteille s'appelle « Heineken 33 cl » :
+la renommer « Heineken bouteille 33 cl » rendrait la paire symétrique et
+lisible d'un coup d'œil. À trancher — une hésitation d'une seconde au
+comptoir, répétée, finit en erreur de caisse.
+
+⚠️ Le format **33 cl est une hypothèse** : le gérant a dit « en canette »
+sans taille. C'est le format courant, mais une 50 cl existe.
+
 **Pinte Affligem créée à 6,90 €.** ⚠️ Son coût est **DÉRIVÉ, pas inventé** :
 une pinte vaut deux demis du même fût, et la maison le vérifie déjà — Demi
 pression 0,9159 €, Pinte pression 1,8318 €, exactement le double, 80 demis
@@ -7652,6 +7672,7 @@ node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à 
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
 node scripts/bar-ajustements-1210.mjs          # monaco, pinte Affligem, Heineken (essai à blanc)
 node scripts/matieres-vins-invino.mjs          # les bouteilles In Vino entrent au stock
+node scripts/heineken-canette-1210.mjs         # Heineken canette 2,50 € au bar
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
