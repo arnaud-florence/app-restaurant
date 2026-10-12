@@ -7461,11 +7461,35 @@ d'Euro-Cash. Or **Euro-Cash a neuf références Heineken, toutes à « N.C. »**
 le rayon Bières est l'un des 18 qu'ils n'ont jamais chiffrés depuis la
 demande du 23/09. Elle sort en « coût inconnu ».
 
-⚠️ **DEUX HEINEKEN 33 CL SUR LE MÊME ÉCRAN**, à 3,80 € et 2,50 €, et seul le
-mot « canette » les distingue. La bouteille s'appelle « Heineken 33 cl » :
-la renommer « Heineken bouteille 33 cl » rendrait la paire symétrique et
-lisible d'un coup d'œil. À trancher — une hésitation d'une seconde au
-comptoir, répétée, finit en erreur de caisse.
+✅ **DEUX HEINEKEN 33 CL SUR LE MÊME ÉCRAN — tranché le 12/10/2026 :** la
+bouteille devient **« Heineken bouteille 33 cl »**, la paire est symétrique
+(`scripts/renommer-heineken-bouteille.mjs`). Elle s'appelait « Heineken
+33 cl » tout court et seul le mot « canette » distinguait l'autre : une
+hésitation d'une seconde au comptoir, répétée cent fois, finit en erreur de
+caisse.
+
+⚠️⚠️ **LE PIÈGE DE CE RENOMMAGE N'EST PAS DANS LA CAISSE, IL EST DANS
+L'AFFICHAGE LÉGAL.** `src/app/print/carte-bar/page.tsx` construit
+l'affichage extérieur obligatoire (arrêté du 27 mars 1987, art. 2) en
+cherchant un produit RÉEL **par son nom exact** : `['Bière bouteille',
+trouve('Heineken 33 cl')]`. Renommer sans toucher cette ligne fait rendre
+`undefined` à `trouve()`, et la rubrique **« Bière bouteille » disparaît de
+l'affichage** — une mention imposée par arrêté, évaporée sans la moindre
+erreur. **Le grep des références passe AVANT le renommage, jamais après.**
+Sept fichiers portaient le nom ; le contrôle des huit rubriques est rejoué
+après coup (8/8).
+
+⚠️ **`nom_matiere` N'EST PAS TOUCHÉ, et c'est la règle des trois champs**
+(0131/0132) : la matière est « Heineken VC 33 cl », le libellé France
+Boissons qu'on retrouvera sur la facture, pas le nom de vitrine. Au passage,
+`matieres-bar.mjs` et `couts-france-boissons.mjs` écrivaient deux
+`nom_matiere` CONTRADICTOIRES pour ce produit — le nom du produit contre le
+libellé fournisseur — et le dernier script lancé gagnait. Alignés sur le
+libellé fournisseur.
+
+⚠️ Aucune vente n'existait sur ce produit (ouverture le matin même) : un
+renommage ne déplace pas l'historique, il n'y avait rien à déplacer. Avec
+des ventes, c'est le contrôle à faire avant.
 
 ⚠️ Le format **33 cl est une hypothèse** : le gérant a dit « en canette »
 sans taille. C'est le format courant, mais une 50 cl existe.
@@ -7501,6 +7525,76 @@ texte littéral d'In Vino pour reconnaître la prochaine facture,
 `reference_fournisseur` l'identifiant qui passe avant le libellé (0142).
 
 Contrôles : carte **177/177, 0 écart** · `test-matieres-bar` **18/18**.
+
+### Le premier article NON ALIMENTAIRE de la carte (12/10/2026)
+
+**Feuilles OCB Slim Premium, 1,20 € TTC** — `node
+scripts/ocb-slim-premium.mjs [--ecrire]`. Trois décisions, et chacune aurait
+pu se tromper en silence.
+
+⚠️⚠️ **ELLES VONT AU FOURNIL, PAS À L'ÉTABLISSEMENT « TABAC ».** Celui-ci
+existe, et il porte **`inclus_ca_principal = false`** : il est modélisé pour
+la COMMISSION, la remise du buraliste sur un prix imposé par l'État (0093).
+Les feuilles à rouler, elles, ne sont pas sous monopole — on les achète et
+on les revend avec NOTRE marge. Les rattacher au Tabac les aurait **sorties
+du chiffre d'affaires**, et c'est exactement le genre de disparition que
+personne ne remarque. Même raison pour `type_revenu = 'vente'` : rien n'est
+imposé ici. Le script REFUSE d'écrire sur un point de vente hors CA
+principal.
+
+⚠️ **TVA 20 %, et c'est le cas où elle est JUSTE.** Ce fichier avertit que
+« 20 % sur une denrée alimentaire est presque toujours une erreur de
+caisse » — 7 produits du Fournil y étaient passés par SumUp, 8,13 €
+sur-collectés. Des feuilles n'en sont pas une. `prix_vente_ht` tombe à
+1,0000 € pile.
+
+⚠️ **UNE FAMILLE NOUVELLE, et il en fallait une.** Aucune famille du
+comptoir ne les accueille, et les ranger en « Gourmandise » (5,5 %) aurait
+fait rougir le contrôle de **cohérence des taux par famille**. Une famille à
+un seul produit n'a normalement pas sa place sur une caisse (règle posée en
+rangeant la Focaccia en Sandwich) — « Tabac » est l'exception assumée : le
+rayon pipier d'Euro-Cash (briquets, allumettes) viendra la remplir. Déclarée
+en **FIN** de `ORDRE` dans `pousser-familles-zelty.mjs` : sans ça, le
+prochain passage aurait REFUSÉ le produit (« famille inconnue de la
+caisse »), et elle ne décale pas les familles existantes — à 6 h 20 on vend
+du pain, pas des feuilles.
+
+⚠️⚠️ **`verifier-carte-zelty.mjs` A CRIÉ, ET IL AVAIT RAISON DE CRIER** —
+c'est sa RÉFÉRENCE qui était devenue trop étroite. Il appliquait la règle
+du 10 % sur place à TOUT, alors qu'elle ne vise que la consommation d'une
+denrée. D'où `NON_ALIMENTAIRE`, **explicite et par FAMILLE** :
+
+- **explicite**, parce qu'on ne peut PAS déduire « non alimentaire » d'un
+  taux de 20 % — c'est précisément la signature de l'erreur de caisse d'août.
+  Une liste écrite à la main se trompe moins qu'une déduction ;
+- **par famille**, pour que les briquets et les allumettes en héritent sans
+  qu'on y repense. Troisième fois qu'une liste de familles se fait déborder
+  par une catégorie nouvelle (après `CATEGORIES_ASSEMBLEES`, deux fois).
+
+⚠️ **`cout_achat_ht` reste NULL.** Euro-Cash porte quatre références OCB,
+**toutes à « prix sur demande »**, et aucune n'est une Slim Premium : le
+rayon pipier est l'un des 18 sur 21 qu'ils n'ont jamais chiffrés depuis la
+demande du 23/09. Le produit sort en « coût inconnu » — un coût inventé
+ferait un food cost faux qui ne se signale pas (0150). **Pas de fournisseur
+attitré non plus** : il apparaît donc « sans interlocuteur » au bas du
+réassort, ce qui est la vérité, pas un trou.
+
+⚠️ `nom_matiere` posé et `unites_par_achat: 1` — on compte des CARNETS. Le
+colisage s'apprendra à la première facture ; 1 est la seule valeur qu'on
+n'invente pas. Et « Tabac » n'entre PAS dans `CATEGORIES_ASSEMBLEES` : c'est
+de l'achat-revente, donc ça se stocke et ça se commande.
+
+⚠️⚠️ **ZELTY A RÉPONDU 429 ENTRE LA CRÉATION DE LA FAMILLE ET CELLE DU
+PLAT**, laissant le produit **en base et absent de la caisse** — invisible du
+comptoir. C'est la panne exacte des six jus Euro-Cash du matin. Le script
+reprend donc sur la **CORRESPONDANCE DE CAISSE, pas sur le nom** : juger sur
+le nom l'aurait fait sortir en « existe déjà » à chaque relance, pour
+toujours. Et son helper réessaie sur 429 **en annonçant le code** — un helper
+qui avale le statut m'a déjà fait soupçonner un plafond de débit là où
+c'était un 500.
+
+Contrôles : carte **179/179, 0 écart** · `test-carte-fournil` **13/13** ·
+`test-matieres-bar` **18/18** · affichage légal **8/8 rubriques servies**.
 
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 

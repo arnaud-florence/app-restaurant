@@ -52,7 +52,7 @@ const LIENS = [
   ['Demi ambrée',             'Fût d\'ambrée 30 L',        120],
 
   // ── Bouteilles revendues telles quelles ──────────────────────────
-  ['Heineken 33 cl',          'Heineken 33 cl',              1],
+  ['Heineken bouteille 33 cl', 'Heineken VC 33 cl',          1],
   ['Bière sans alcool 33 cl', 'Bière sans alcool 33 cl',     1],
   ['Desperados 33 cl',        'Desperados 33 cl',            1],
   ['Perrier 33 cl',           'Perrier 33 cl',               1],

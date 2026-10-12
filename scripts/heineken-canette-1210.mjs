@@ -25,7 +25,7 @@ const zelty = async (path,init={}) => { for(let t=0;t<5;t++){ let r
   const x=await r.text(); let b; try{b=JSON.parse(x)}catch{b=x}; return {status:r.status,body:b} }
   throw new Error('Zelty a refusé '+(init.method??'GET')+' '+path) }
 
-const NOM='Heineken canette 33 cl', TTC=2.50, GABARIT='Heineken 33 cl'
+const NOM='Heineken canette 33 cl', TTC=2.50, GABARIT='Heineken bouteille 33 cl'
 const [dejala] = await sb(`recettes?select=id&nom=eq.${encodeURIComponent(NOM)}`)
 if(dejala){ console.log('= « '+NOM+' » existe déjà'); process.exit(0) }
 const [g] = await sb(`recettes?select=*&nom=eq.${encodeURIComponent(GABARIT)}`)

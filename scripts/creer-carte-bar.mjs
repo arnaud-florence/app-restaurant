@@ -29,7 +29,7 @@ const BAR = [
   ['Panaché',                  'Bière',   2.50, 20, A, 0.40],
   ['Monaco',                   'Bière',   2.80, 20, A, 0.55],
   ['Picon bière',              'Bière',   3.20, 20, A, 0.70],
-  ['Heineken 33 cl',           'Bière',   3.00, 20, A, 1.00],
+  ['Heineken bouteille 33 cl', 'Bière',   3.00, 20, A, 1.00],
   ['Desperados 33 cl',         'Bière',   4.00, 20, A, 1.40],
   ['Bière sans alcool 33 cl',  'Bière',   2.80, 10, S, 0.80],
 

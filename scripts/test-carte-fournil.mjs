@@ -126,6 +126,9 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Premier article non alimentaire du comptoir (12/10/2026) : aucune affiche
+  // ne le porte, et sa TVA de 20 % est juste — ce n'est pas une denrée.
+  'Feuilles OCB Slim Premium',
   'Oasis 33 cl', 'Fanta 33 cl', 'Coca-Cola Cherry 33 cl', 'Ciao 33 cl',
   'Red Bull 25 cl', 'Salade',
   'Formule — sandwich ou panini', 'Formule — boisson', 'Formule — dessert',

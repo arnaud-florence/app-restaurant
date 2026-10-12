@@ -82,7 +82,7 @@ const PLAN = [
   ['Demi ambrée',     L.ambree * 0.25, 'Fût Affligem ambrée 20 L', 80, 'ambrée Affligem 20L'],
 
   // ── Bouteilles, à l'unité (le colisage viendra de la facture, C=N) ─────
-  ['Heineken 33 cl',          achat('bière Heineken VC33') / 24, 'Heineken VC 33 cl', 1, 'bière Heineken VC33'],
+  ['Heineken bouteille 33 cl', achat('bière Heineken VC33') / 24, 'Heineken VC 33 cl', 1, 'bière Heineken VC33'],
   ['Bière sans alcool 33 cl', achat('sans alcool Hnk 0.0 33') / 24, 'Heineken 0.0 33 cl', 1, 'sans alcool Hnk 0.0 33',
     'renommé 33 cl le 21/09 — seul format disponible chez France Boissons'],
   ['Desperados 33 cl',        achat('Desperados VC33') / 24, 'Desperados VC 33 cl', 1, 'Desperados VC33'],

@@ -39,9 +39,22 @@ const sb = async p => (await fetch(`${U}/rest/v1/${p}`,
   { headers: { apikey: K, Authorization: `Bearer ${K}` } })).json()
 const nous = await sb('recettes?select=id,nom,nom_caisse,categorie,prix_vente_ht,prix_sur_place_ttc,tva,contient_alcool,image_url,actif,tag_destination&actif=eq.true')
 
+// ⚠️ LES FAMILLES NON ALIMENTAIRES — la règle du 10 % sur place ne les
+// concerne PAS : elle vise la restauration sur place d'une denrée. Des
+// feuilles à rouler sont à 20 % qu'on les emporte ou non.
+//
+// La liste est EXPLICITE, et par FAMILLE, pour deux raisons. On ne peut pas
+// déduire « non alimentaire » d'un taux de 20 % : c'est exactement la
+// signature de l'erreur de caisse documentée en août (7 produits du Fournil
+// passés à 20 % par SumUp, 8,13 € sur-collectés). Et par famille plutôt que
+// par produit, pour que les briquets et les allumettes du rayon pipier en
+// héritent sans qu'on y repense.
+const NON_ALIMENTAIRE = new Set(['Tabac'])
+
 // La TVA sur place suit la LOI, pas le panneau : un croissant mangé à table
 // est à 10 %, pas à 5,5 %. L'alcool reste à 20 %, la presse à 2,1 %.
-const tvaSurPlace = r => r.contient_alcool ? 20 : (Number(r.tva) === 2.1 ? 2.1 : 10)
+const tvaSurPlace = r => NON_ALIMENTAIRE.has(r.categorie) ? Number(r.tva)
+  : r.contient_alcool ? 20 : (Number(r.tva) === 2.1 ? 2.1 : 10)
 const ttc = r => Math.round(Number(r.prix_vente_ht) * (1 + Number(r.tva) / 100) * 100)
 
 const parId = new Map(plats.map(p => [String(p.remote_id ?? ''), p]))
