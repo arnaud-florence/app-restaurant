@@ -151,7 +151,10 @@ const HORS_AFFICHE = new Set([
   // Jus Euro-Cash ajoutés le 12/10/2026 : ils n'ont pas d'affiche, leur prix
   // est CLONÉ du « Jus d'orange 33 cl » qui en a une. Les mettre dans
   // AFFICHES ferait croire à un panneau qui n'existe pas.
-  'Jus ACE 33 cl', 'Jus de fraise 33 cl', 'Jus d\'abricot 33 cl',
+  // Liste arrêtée par le gérant le 12/10 : orange, pomme, poire, fraise,
+  // abricot, ACE. Ananas, multifruits et pêche étaient mes suppositions et
+  // ont été retirés — ils restent listés, inactifs, et le test les ignore.
+  'Jus ACE 33 cl', 'Jus de fraise 33 cl', 'Jus d\'abricot 33 cl', 'Jus de poire 33 cl',
   'Jus d\'ananas 33 cl', 'Jus multifruits 33 cl', 'Jus de pêche 33 cl',
 ])
 

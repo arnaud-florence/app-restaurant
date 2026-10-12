@@ -87,7 +87,22 @@ const GABARIT = "Jus d'orange 33 cl"
 // Les parfums nommés par le gérant (ACE, fraise) plus la gamme courante d'un
 // cash & carry au même format. À corriger d'une ligne : c'est une liste, pas
 // une déduction.
-const PARFUMS = ['ACE', 'fraise', 'abricot', 'ananas', 'multifruits', 'pêche']
+// ⚠️ LISTE DONNÉE PAR LE GÉRANT le 12/10/2026 : « orange, pomme, poire,
+// fraise, abricot, ace ». Orange et pomme existaient déjà, les autres sont
+// créés ici. Ce n'est PAS une déduction du catalogue — ses 67 lignes « jus »
+// sont toutes à N.C. et leurs libellés sont tronqués.
+const PARFUMS = ['ACE', 'fraise', 'abricot', 'poire']
+
+// ⚠️ MES TROIS SUPPOSITIONS, RETIRÉES. Une première version avait deviné la
+// gamme d'un cash & carry : ananas, multifruits, pêche. Le gérant a donné sa
+// liste, et elle ne les contient pas. Les laisser mettrait trois boutons au
+// comptoir pour des jus qui ne sont pas dans le frigo — et c'est le client
+// qui l'apprendrait. On retire des DEUX côtés, caisse d'abord (0141).
+const RETRAITS = [
+  ["Jus d'ananas 33 cl",   'hors de la liste du gérant — supposition retirée'],
+  ['Jus multifruits 33 cl', 'hors de la liste du gérant — supposition retirée'],
+  ['Jus de pêche 33 cl',    'hors de la liste du gérant — supposition retirée'],
+]
 // ⚠️ L'ordre des cas compte, et une première version l'avait inversé :
 // « ACE » commence par une voyelle, donc l'élision passait AVANT et sortait
 // « Jus d'ACE ». Et « multifruits » s'accole sans article. Un nom de bouton
@@ -136,7 +151,15 @@ async function main() {
   console.log('\n  ⚠ aucun coût d’achat : ils sortiront en « coût inconnu », pas à zéro.')
   console.log('    La première facture Euro-Cash scannée les remplira.')
 
-  if (!aCreer.length && !aRattacher.length) { console.log('\n  rien à faire.\n'); return }
+  const partent = RETRAITS
+    .map(([nom, raison]) => ({ r: recs.find(x => x.nom === nom && x.actif), raison, nom }))
+    .filter(x => x.r)
+  if (partent.length) {
+    console.log('\n╔══ À RETIRER ' + '═'.repeat(58))
+    for (const x of partent) console.log('  − ' + x.nom.padEnd(28) + x.raison)
+  }
+
+  if (!aCreer.length && !aRattacher.length && !partent.length) { console.log('\n  rien à faire.\n'); return }
   if (!ECRIRE) { console.log('\n  ── essai à blanc. Rien n’a été écrit. `--ecrire` pour appliquer.\n'); return }
 
   // ─── base ─────────────────────────────────────────────────────────────
@@ -185,8 +208,10 @@ async function main() {
     // toute façon celui du Fournil ; il se pose après coup par
     // postes-production-zelty.mjs si besoin.
   }))
-  const rep = await zelty('/catalog/dishes', { method: 'POST', body: JSON.stringify(nouveaux) })
-  if (rep.status !== 200) { console.error('✗ caisse : ' + rep.status + ' ' + JSON.stringify(rep.body).slice(0, 400)); process.exit(1) }
+  if (nouveaux.length) {
+    const rep = await zelty('/catalog/dishes', { method: 'POST', body: JSON.stringify(nouveaux) })
+    if (rep.status !== 200) { console.error('✗ caisse : ' + rep.status + ' ' + JSON.stringify(rep.body).slice(0, 400)); process.exit(1) }
+  }
 
   // ⚠️ les identifiants rendus sont enregistrés IMMÉDIATEMENT : sans ça un
   // second lancement recréerait toute la gamme en double.
@@ -198,7 +223,32 @@ async function main() {
     liens.push({ systeme: 'zelty', identifiant_externe: String(p.id), recette_id: l.id, libelle_externe: l.nom })
   }
   if (liens.length) await sb('correspondances_catalogue', { method: 'POST', body: JSON.stringify(liens) })
-  console.log(`  ✓ caisse : ${nouveaux.length} plat(s) créé(s), ${liens.length} lien(s) enregistré(s)\n`)
+  if (nouveaux.length) console.log(`  ✓ caisse : ${nouveaux.length} plat(s) créé(s), ${liens.length} lien(s) enregistré(s)`)
+
+  // ─── les retraits, caisse d'abord ─────────────────────────────────────
+  if (partent.length) {
+    const zid = new Map(corr.map(c => [c.recette_id, Number(c.identifiant_externe)]))
+    const parZ = new Map(apres.map(p => [Number(p.id), p]))
+    const charge = []
+    for (const x of partent) {
+      const p = parZ.get(zid.get(x.r.id))
+      if (!p) { console.log('  ⚠ ' + x.nom + ' : sans contrepartie caisse'); continue }
+      if (p.disable === true) continue
+      // les trois champs obligatoires, RECOPIÉS — jamais inventés (0141)
+      if (!p.name || p.price == null || p.tax == null) { console.error('✗ ' + x.nom + ' : champ obligatoire absent — refus'); process.exit(1) }
+      charge.push({ id: Number(p.id), name: p.name, price: Number(p.price), tax: Number(p.tax), disable: true })
+    }
+    if (charge.length) {
+      const rr = await zelty('/catalog/dishes', { method: 'POST', body: JSON.stringify(charge) })
+      if (rr.status !== 200) { console.error('✗ caisse (retraits) : ' + rr.status + ' ' + JSON.stringify(rr.body).slice(0, 300)); process.exit(1) }
+      console.log(`  ✓ caisse : ${charge.length} plat(s) éteint(s)`)
+    }
+    // ⚠️ `nom_caisse` est CONSERVÉ : un ticket tardif doit retrouver le
+    // produit désactivé, pas en recréer un double.
+    for (const x of partent) await sb(`recettes?id=eq.${x.r.id}`, { method: 'PATCH', body: JSON.stringify({ actif: false }) })
+    console.log(`  ✓ base : ${partent.length} produit(s) désactivé(s)`)
+  }
+  console.log('')
 }
 
 main().catch(e => { console.error('✗ ' + e.message); process.exit(1) })

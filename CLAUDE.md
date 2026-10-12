@@ -7325,10 +7325,22 @@ Contrôles : carte **171/171, 0 écart** · `test-carte-fournil` 13/13.
 
 ### Les jus Euro-Cash manquants en caisse (12/10/2026)
 
-`node scripts/jus-eurocash-1210.mjs [--ecrire]`. Le gérant : « tous les jus
-de Euro-Cash ne sont pas rentrés dans la caisse, jus ACE, jus de fraise
-etc ». **Six créés** — ACE, fraise, abricot, ananas, multifruits, pêche — en
-33 cl, **2,20 € à emporter / 2,80 € sur place**, Boisson fraîche, FOURNIL.
+`node scripts/jus-eurocash-1210.mjs [--ecrire]`. **Six jus actifs au
+comptoir** — orange, pomme, poire, fraise, abricot, ACE — en 33 cl,
+**2,20 € à emporter / 2,80 € sur place**, Boisson fraîche, FOURNIL.
+
+⚠️⚠️ **J'AI D'ABORD DEVINÉ LA GAMME, ET J'AI EU TORT SUR LA MOITIÉ.** Le
+gérant avait dit « jus ACE, jus de fraise **etc** » ; j'ai complété avec
+ananas, multifruits et pêche — la gamme type d'un cash & carry. Sa liste
+réelle était « orange, pomme, poire, fraise, abricot, ace » : orange et
+pomme existaient déjà, **poire manquait**, et mes trois suppositions
+n'étaient pas là. Elles ont été **retirées des deux côtés** dès qu'il a
+donné la liste. Trois boutons au comptoir pour des jus absents du frigo,
+c'est le client qui l'apprend.
+
+Le « etc » d'un gérant pressé n'est pas une liste. Demander six parfums
+coûtait un aller-retour ; les inventer a coûté une création, un retrait et
+un doute sur les doublons.
 
 ⚠️⚠️ **LE CATALOGUE EURO-CASH NE POUVAIT PAS SERVIR DE SOURCE.** Ses 99
 lignes « jus » sont des désignations TRONQUÉES par l'import : « Ace »,
@@ -7379,11 +7391,19 @@ interrompu. Tout script qui crée des deux côtés doit faire pareil.
 donc l'élision passait avant et sortait « Jus d'ACE ». Un nom de bouton se
 lit au comptoir, il ne se devine pas.
 
-⚠️ **À regarder : les jus 25 cl du BAR sont DÉSACTIVÉS** — abricot, ananas,
-tomate, à 2,80 €. Si le bar en sert, ils sont à rallumer ; sinon la gamme
-jus vit uniquement au comptoir.
+⚠️ **Contrôle fait après coup, et il fallait le faire** : le gérant a dit
+« attends, je crois qu'il y était déjà dans la caisse ». Vérification des
+16 plats « jus » de Zelty, lien par lien — **aucun doublon**, chacun pointe
+sur une fiche unique. Ce qu'il avait vu, ce sont les **désactivés** : les
+quatre **Pago** (orange/pomme, 20 et 33 cl), ancien nommage remplacé par
+« Jus de … 33 cl » à la purge d'août, et les trois **25 cl du BAR**
+(abricot, ananas, tomate). Une gamme éteinte reste visible au back-office,
+et elle se confond avec une gamme absente.
 
-Contrôles : carte **177/177, 0 écart** · `test-carte-fournil` 13/13.
+⚠️ **Les jus 25 cl du BAR restent DÉSACTIVÉS** — à 2,80 €. Si le bar en
+sert, ils sont à rallumer ; sinon la gamme jus vit uniquement au comptoir.
+
+Contrôles : carte **175/175, 0 écart** · `test-carte-fournil` 13/13.
 
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
