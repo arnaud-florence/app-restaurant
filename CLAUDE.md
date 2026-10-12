@@ -7405,6 +7405,57 @@ sert, ils sont à rallumer ; sinon la gamme jus vit uniquement au comptoir.
 
 Contrôles : carte **175/175, 0 écart** · `test-carte-fournil` 13/13.
 
+### Trois ajustements du bar, et un oubli trouvé au passage (12/10/2026)
+
+`node scripts/bar-ajustements-1210.mjs [--ecrire]`. Demande du gérant :
+« rajoute le monaco à 3,00, pinte affligem 6,90, change le prix heineken
+mets-le à 3,80 ».
+
+⚠️⚠️ **LE MONACO N'ÉTAIT PAS À CRÉER : IL EXISTAIT, à 3,00 € pile, avec son
+coût (0,8729 €) — seulement DÉSACTIVÉ.** Le créer aurait fait un doublon,
+coupé sa série de ventes et perdu son coût. **On regarde la base AVANT de
+créer** : une bonne part des « ajouts » demandés sont des réveils. C'est la
+troisième fois dans la journée qu'un produit demandé existait déjà (orange
+et pomme pour les jus, le Monaco ici).
+
+⚠️ **« Heineken » s'appelle « Bière bouteille 33 cl » en caisse** — sa
+matière est bien `Heineken VC 33 cl`. Le gérant la nomme par sa marque, la
+caisse par sa catégorie : un bouton qu'on ne reconnaît pas sous le nom qu'on
+lui donne est un bouton qu'on cherche en plein service. À renommer un jour.
+4,00 → **3,80 €** : marge 1,82 → 1,66 €, food cost 45 → 48 %.
+
+**Pinte Affligem créée à 6,90 €.** ⚠️ Son coût est **DÉRIVÉ, pas inventé** :
+une pinte vaut deux demis du même fût, et la maison le vérifie déjà — Demi
+pression 0,9159 €, Pinte pression 1,8318 €, exactement le double, 80 demis
+ou 40 pintes par fût de 20 L. Donc 2 × 1,4830 = **2,9660 €**,
+`unites_par_achat` 40. Marge 2,78 €, **food cost 52 %** — c'est haut, et
+c'est dit : le fût Affligem coûte 60 % de plus que le Moretti.
+
+⚠️ `vendable_online: false` — l'alcool n'est JAMAIS en ligne (0144).
+
+**⚠️⚠️ L'OUBLI TROUVÉ PAR LE TEST : SIX BOUTEILLES DE VIN SANS MATIÈRE.**
+`test-matieres-bar.mjs` est sorti rouge sur les six In Vino créées le matin
+même (Pol Cochet, Toulouse-Lautrec, les trois Château La Lieue, Lucien
+Tramier). Elles avaient leur prix et leur coût, mais pas de `nom_matiere`.
+
+Au bar, un produit sans `nom_matiere` est **EXCLU** de
+`(ops)/inventaire?poste=bar` — règle juste pour « Kir » ou « Spritz », qui
+mélangent deux matières. Mais **une bouteille vendue entière EST sa propre
+matière** : sans ce champ, ces six vins n'étaient comptés nulle part et ne
+remontaient dans aucune commande. Prix juste, coût juste, **stock
+invisible** — et rien ne le signalait, sauf ce test.
+
+`node scripts/matieres-vins-invino.mjs [--ecrire]` les rattache.
+⚠️ **Le rapprochement est DOUBLEMENT confirmé, jamais déduit d'un nom** :
+les six coûts concordent AU CENTIME avec les lignes du catalogue In Vino
+(18,90 / 7,50 / 7,35 / 6,00 / 9,90 / 9,00), et le script REFUSE d'écrire si
+l'écart dépasse le centime. Les trois champs reçoivent leurs trois rôles
+(0131/0132) : `nom_matiere` ce qu'on affiche en comptant, `libelle_achat` le
+texte littéral d'In Vino pour reconnaître la prochaine facture,
+`reference_fournisseur` l'identifiant qui passe avant le libellé (0142).
+
+Contrôles : carte **177/177, 0 écart** · `test-matieres-bar` **18/18**.
+
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
 Demande du gérant : « prendre un fournisseur, une catégorie de produits de
@@ -7573,6 +7624,8 @@ node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEU
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
+node scripts/bar-ajustements-1210.mjs          # monaco, pinte Affligem, Heineken (essai à blanc)
+node scripts/matieres-vins-invino.mjs          # les bouteilles In Vino entrent au stock
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
