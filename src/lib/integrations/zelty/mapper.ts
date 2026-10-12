@@ -103,8 +103,11 @@ function mapperLigne(l: LigneZelty, div: number): {
   // `price` est un OBJET. `final_amount_inc_tax` est le prix retenu après
   // remise et suppléments — c'est celui qui a été payé.
   const p = l.price
+  // `amount_inc_tax` est la forme du WEBHOOK ; il vient après les deux formes
+  // du GET (« après remise »), avant les montants d'AVANT remise.
   const montant = premier(
     p?.final_amount_inc_tax, p?.discounted_amount_inc_tax,
+    p?.amount_inc_tax,
     p?.original_amount_inc_tax, p?.base_original_amount_inc_tax,
   )
   if (montant == null) return { raison: `aucun prix exploitable pour « ${nom} »` }
@@ -113,7 +116,8 @@ function mapperLigne(l: LigneZelty, div: number): {
   const prixUnitaireTtc = (Number(montant) / div) / quantite
   if (!Number.isFinite(prixUnitaireTtc)) return { raison: `prix illisible pour « ${nom} »` }
 
-  const taux = normaliserTaux(l.tax?.tax_rate)
+  // La TVA est dans `tax` sur GET, DANS `price` sur le webhook.
+  const taux = normaliserTaux(premier(l.tax?.tax_rate, p?.tax_rate))
   return {
     avertissement,
     ligne: {
@@ -159,7 +163,8 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
       continue
     }
 
-    const totalBrut = c.total
+    // `total` sur GET, `price` sur le webhook — jamais les deux.
+    const totalBrut = premier(c.total, c.price)
     if (totalBrut == null) {
       rejets.push({ reference: String(ref), raison: 'aucun montant total' })
       continue
@@ -184,8 +189,8 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
     // ── TVA reconstituée depuis les lignes ──────────────────────────
     const ventilation: Record<string, number> = {}
     for (const l of lignesBrutes) {
-      const taux = normaliserTaux(l.tax?.tax_rate)
-      const montantTaxe = l.tax?.tax_amount
+      const taux = normaliserTaux(premier(l.tax?.tax_rate, l.price?.tax_rate))
+      const montantTaxe = premier(l.tax?.tax_amount, l.price?.tax_amount)
       if (taux == null || montantTaxe == null) continue
       const k = String(taux)
       ventilation[k] = arrondi((ventilation[k] ?? 0) + Number(montantTaxe) / div)

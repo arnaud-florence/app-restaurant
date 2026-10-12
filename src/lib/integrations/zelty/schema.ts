@@ -32,6 +32,16 @@ const prixLigneSchema = z.object({
   discounted_amount_inc_tax: nombre.optional(),
   original_amount_inc_tax:   nombre.optional(),
   base_original_amount_inc_tax: nombre.optional(),
+  // ⚠️⚠️ LE WEBHOOK NE PARLE PAS COMME LE GET (relevé sur les ventes RÉELLES
+  // du 12/10/2026, jour d'ouverture). `order.ended` rend un prix de ligne
+  // APLATI — `amount_inc_tax`, et la TVA DANS ce même objet :
+  //     "price": { "tax_rate": 550, "tax_amount": 7, "amount_inc_tax": 140 }
+  // là où `GET /orders` rend `price.final_amount_inc_tax` et un objet `tax`
+  // séparé. Sans ces trois champs, un ticket entrait avec des lignes à
+  // ZÉRO et sans TVA — pire qu'un rejet, parce qu'un zéro ne se signale pas.
+  amount_inc_tax: nombre.optional(),
+  tax_rate:       nombre.optional(),
+  tax_amount:     nombre.optional(),
 }).passthrough()
 
 const taxeLigneSchema = z.object({
@@ -70,15 +80,28 @@ export const commandeZeltySchema = z.object({
 
   /** Total TTC en centimes. */
   total:       nombre.optional(),
+  // ⚠️⚠️ LE WEBHOOK NOMME LE TOTAL `price`, PAS `total` — et `total` est tout
+  // simplement ABSENT de sa charge utile. Mesuré le 12/10/2026 : 54 ventes
+  // terminées, 300,10 € de CA, toutes rejetées « aucun montant total ».
+  // Vérifié avant d'y toucher : `price` concorde AU CENTIME avec la somme des
+  // lignes sur les 58 tickets qui en portent. `total` reste prioritaire —
+  // sur GET c'est lui qui fait foi.
+  price:       nombre.optional(),
 
   created_at:  z.string().optional(),
   closed_at:   z.string().optional(),
   due_date:    z.string().optional(),
 
+  // ⚠️⚠️ C'EST CE QUI FAISAIT REJETER CHAQUE TICKET. La doc décrit `mode` et
+  // `source` comme des chaînes ; le webhook envoie des ENTIERS (`mode: 1`,
+  // `source: 1`). Un `z.string()` strict fait alors LEVER zod sur la commande
+  // ENTIÈRE — « format inattendu : Invalid input » — et pas seulement ignorer
+  // le champ : tous les autres étaient pourtant `.optional()`, donc c'est
+  // bien la rigidité de ces deux-là qui perdait la vente.
   /** eat_in | takeaway | delivery — décide du taux de TVA côté français. */
-  mode:        z.string().optional(),
+  mode:        texte.optional(),
   /** web | mobile | kiosk | pos | remote_pos | ubereats | … */
-  source:      z.string().optional(),
+  source:      texte.optional(),
   /** L'exemple officiel montre « opened » (chaîne). Voir mapper.ts. */
   status:      z.union([z.string(), z.number()]).optional(),
 
