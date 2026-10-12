@@ -7596,6 +7596,99 @@ c'était un 500.
 Contrôles : carte **179/179, 0 écart** · `test-carte-fournil` **13/13** ·
 `test-matieres-bar` **18/18** · affichage légal **8/8 rubriques servies**.
 
+### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
+
+« Pourquoi j'ai pas le pouls en direct avec le chiffre sur l'outil alors qu'on
+a commencé à travailler ? » — question du gérant à 10 h 20, jour d'ouverture.
+
+**Réponse mesurée : 54 ventes réelles depuis 4 h du matin, 300,10 €, TOUTES
+rejetées** par le schéma du webhook en « format inattendu : Invalid input ».
+Le CA affichait zéro pendant que la caisse tournait.
+
+✅ **Rien n'était perdu, et c'est le journal des échanges (0137) qui l'a
+sauvé.** Les 67 charges utiles brutes étaient en base : « le brut permet de
+REJOUER » n'était pas une précaution de style, c'est ce qui a permis de
+récupérer la matinée entière sans rien redemander à la caisse.
+
+⚠️⚠️ **LA CAUSE : `null` N'EST PAS `undefined`, ET LA LEÇON AVAIT DÉJÀ ÉTÉ
+PAYÉE AILLEURS.** Le banc d'essai local sur la charge réelle le dit en deux
+lignes :
+
+    remote_id : Invalid input (reçu null)
+    due_date  : expected string, received null
+
+Zelty renvoie `null`, pas l'absence — `remote_id: null`, `due_date: null`,
+`customer: null` sur un ticket de comptoir. En zod, `.optional()` accepte
+`undefined` mais **REJETTE `null`**, et **un seul champ nul fait tomber la
+commande ENTIÈRE**. C'est le piège EXACT que le miroir du catalogue avait déjà
+payé le 28/08/2026 (« 84 plats reçus, 84 rejetés »), corrigé alors en
+`.nullish()` dans `catalogue.ts`. **La leçon n'a jamais été reportée sur le
+schéma des COMMANDES**, donc elle n'a rien protégé. Les 41 champs y sont
+désormais en `.nullish()`.
+
+→ **Quand un schéma de cette API tombe en « Invalid input », chercher un
+`null` AVANT de chercher un nom de champ.**
+
+⚠️⚠️ **ET LE WEBHOOK NE PARLE PAS COMME LE `GET`** — trois écarts, relevés sur
+les ventes réelles. Aucun n'aurait fait d'erreur : ils auraient fait entrer
+des tickets à **zéro euro**, ce qui est pire qu'un rejet.
+
+| | `GET /orders` | webhook `order.ended` |
+|---|---|---|
+| total de l'en-tête | `total` | **`price`** — `total` est ABSENT |
+| prix d'une ligne | `price.final_amount_inc_tax` | **`price.amount_inc_tax`** |
+| TVA d'une ligne | objet `tax` séparé | **DANS `price`** (`price.tax_rate`, `price.tax_amount`) |
+| `mode` / `source` | chaînes (doc) | **ENTIERS** (`mode: 1`) |
+
+⚠️ **`price` n'a PAS été pris pour le total sur sa seule vraisemblance** : il
+concorde **AU CENTIME** avec la somme des lignes sur les 58 tickets qui en
+portent. Les 9 écarts sont tous des ANNULÉES à 0 ligne — elles portent un
+montant sans contenu, et le mapper les refuse de toute façon (statut 192).
+
+⚠️ Les formes du `GET` restent **PRIORITAIRES** partout (`total` avant `price`,
+`final_amount` avant `amount`) : le sondage horaire ne change pas de
+comportement.
+
+**Rejeu : `node scripts/rejouer-webhooks-zelty.mjs [--un] [--ecrire]`.** Il
+relit le journal et re-POSTe les charges sur la **VRAIE route**, signature
+comprise — réécrire les encaissements à la main validerait un code que la
+production n'emprunte pas.
+
+⚠️ **C'est SÛR parce que la chaîne est idempotente** :
+`encaissements_externes` porte `unique (source_caisse, ticket_externe)`.
+Vérifié AVANT de rejouer, et vérifié APRÈS : le ticket #35 est parti **neuf
+fois** (les essais d'attente du déploiement) et il n'existe qu'**une** fois.
+**54 lignes, 54 tickets distincts, zéro doublon.** Sans cette garantie,
+rejouer aurait été pire que de n'avoir rien — un CA doublé ne se signale pas.
+
+⚠️ Il ne rejoue que les ventes **terminées** (255) : renvoyer les annulées ne
+ferait que du bruit dans le journal.
+
+**Résultat** : 300,10 € dont **253,80 € sur aujourd'hui** (le solde est un
+ticket du 11/10), 54 encaissements tous rattachés à une commande,
+**167 lignes de vente, 167 rattachées à un produit** — donc stock, food cost
+et marges voient enfin la matinée. TVA reconstituée 23,07 € (85 lignes à
+5,5 %, 77 à 10 %, 5 à 20 %). ✅ Les cinq lignes à 20 % ont été vérifiées une
+par une, puisque « 20 % sur une denrée est presque toujours une erreur de
+caisse » : quatre **Feuilles OCB** (non alimentaire) et un **demi pression**
+(alcool). Aucune anomalie.
+
+⚠️⚠️ **SECOND DÉFAUT, DISTINCT, ENCORE OUVERT : `GET /orders` REND 0 COMMANDE
+POUR AUJOURD'HUI**, quelle que soit la fenêtre de dates (`to` inclusif ou
+exclusif, `opened`, `include_cancelled` — tout testé). Le cron horaire tourne
+bien (`recues: 0`, `configure: true`, url correcte) : il ne voit simplement
+rien.
+
+Conséquence à connaître : **le webhook est aujourd'hui le SEUL chemin
+d'entrée du chiffre d'affaires, et un webhook n'a pas de mémoire.** Une
+livraison ratée = une vente perdue, sans filet. C'est exactement ce que le
+sondage existait pour couvrir. À instruire avec Zelty — et en attendant, le
+rejeu depuis le journal est le filet manuel.
+
+⚠️ Le diagnostic a été possible **sans les logs Vercel**, dont le jeton est
+expiré depuis mai : tout est venu du journal applicatif et du banc d'essai
+local. C'est l'argument pour ne jamais retirer ces deux-là.
+
 ### La cuisson des viandes en caisse (12/10/2026)
 
 `node scripts/cuisson-viandes.mjs [--ecrire]`. Une entrecôte envoyée au grill
@@ -7838,6 +7931,7 @@ node scripts/matieres-vins-invino.mjs          # les bouteilles In Vino entrent 
 node scripts/heineken-canette-1210.mjs         # Heineken canette 2,50 € au bar
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cuisson-viandes.mjs               # cuisson entrecôte + burgers (essai à blanc)
+node scripts/rejouer-webhooks-zelty.mjs        # rejouer les ventes rejetées (essai à blanc)
 node scripts/ocb-slim-premium.mjs              # feuilles OCB 1,20 € au comptoir (essai à blanc)
 node scripts/renommer-heineken-bouteille.mjs   # bouteille / canette, des DEUX côtés
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
