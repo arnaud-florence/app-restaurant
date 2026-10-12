@@ -148,6 +148,11 @@ const HORS_AFFICHE = new Set([
   // relevés sur un panneau — donc ils n'ont rien à faire dans AFFICHES, qui
   // est la liste de ce qui est IMPRIMÉ.
   'Éclair au café', 'Gâteau fraise fromage blanc',
+  // Jus Euro-Cash ajoutés le 12/10/2026 : ils n'ont pas d'affiche, leur prix
+  // est CLONÉ du « Jus d'orange 33 cl » qui en a une. Les mettre dans
+  // AFFICHES ferait croire à un panneau qui n'existe pas.
+  'Jus ACE 33 cl', 'Jus de fraise 33 cl', 'Jus d\'abricot 33 cl',
+  'Jus d\'ananas 33 cl', 'Jus multifruits 33 cl', 'Jus de pêche 33 cl',
 ])
 
 // Retirés du click & collect par la 0115 : une tasse ne voyage pas, et une

@@ -7323,6 +7323,68 @@ prix gardé.
 
 Contrôles : carte **171/171, 0 écart** · `test-carte-fournil` 13/13.
 
+### Les jus Euro-Cash manquants en caisse (12/10/2026)
+
+`node scripts/jus-eurocash-1210.mjs [--ecrire]`. Le gérant : « tous les jus
+de Euro-Cash ne sont pas rentrés dans la caisse, jus ACE, jus de fraise
+etc ». **Six créés** — ACE, fraise, abricot, ananas, multifruits, pêche — en
+33 cl, **2,20 € à emporter / 2,80 € sur place**, Boisson fraîche, FOURNIL.
+
+⚠️⚠️ **LE CATALOGUE EURO-CASH NE POUVAIT PAS SERVIR DE SOURCE.** Ses 99
+lignes « jus » sont des désignations TRONQUÉES par l'import : « Ace »,
+« Fraise », « Abricot Pêche » — sans marque, sans format, et « Fraise »
+apparaît **six fois** sous six références à six prix. Créer des boutons de
+caisse là-dessus aurait mis au comptoir des produits que personne ne sait
+identifier. C'est un défaut de l'import de la 0158 à corriger un jour.
+
+⚠️⚠️ **ET AUCUN DOCUMENT EURO-CASH N'EST ENREGISTRÉ** — ni facture ni BL,
+alors que la commande a été reçue (gérant, 08/10). On ignore donc
+FACTUELLEMENT quels parfums sont en réserve. **Scanner ce bon de livraison
+est la vraie correction** : il remplirait le stock ET les coûts d'un coup.
+La liste des six parfums est donc une LISTE, pas une déduction — elle se
+corrige d'une ligne dans `PARFUMS`.
+
+**On CLONE la fiche « Jus d'orange 33 cl »** plutôt que de reconstruire : elle
+porte déjà Euro-Cash comme fournisseur, le bon format, les deux prix et les
+deux taux. Côté caisse, `tax` et `tax_takeaway` sont RECOPIÉS du plat modèle,
+jamais recalculés — le taux sur place suit la loi et pas le panneau.
+
+⚠️ **Aucun coût d'achat n'est posé.** Le jus d'orange coûte 0,90 € et il
+serait tentant de le reporter : ce serait inventer un chiffre qui
+ressemblerait à un relevé, et `recettes` n'a pas de drapeau `prix_estime`
+(0165) pour dire le contraire. Ils sortent en « coût inconnu » (0150).
+
+⚠️⚠️ **`id_fabrication_place` SUR UNE CRÉATION FAIT RÉPONDRE 500 À ZELTY.**
+« Erreur interne. Veuillez contacter le support » — cinq fois, charge
+identique, pendant que `GET /info` répondait 200 en 142 ms. Les deux
+pâtisseries créées une heure plus tôt SANS ce champ étaient passées du
+premier coup. Le retirer a suffi. Le poste se pose après coup par
+`postes-production-zelty.mjs`, qui fait un upsert sur un plat EXISTANT.
+
+⚠️ **Une aide qui avale le code de retour rend le diagnostic impossible.**
+La première version levait « Zelty injoignable » après quatre essais sans
+jamais dire si c'était un 429, un 500 ou une coupure — et j'ai d'abord
+soupçonné le plafond de débit, à tort. Elle imprime désormais le statut à
+chaque tour et le corps du dernier. Dix minutes perdues sur un message qui
+ne disait rien.
+
+⚠️⚠️ **UN PRODUIT PEUT EXISTER CHEZ NOUS SANS EXISTER EN CAISSE**, et c'est
+arrivé ici : la base a été écrite, puis le POST a échoué. Un script qui ne
+teste que « le nom existe-t-il ? » ne repasse jamais sur ces lignes, et
+elles restent invisibles du comptoir sans que rien ne le signale. Le script
+regarde donc la **CORRESPONDANCE**, pas l'existence — il reprend un passage
+interrompu. Tout script qui crée des deux côtés doit faire pareil.
+
+⚠️ L'ordre des cas de `nomDe()` compte : « ACE » commence par une voyelle,
+donc l'élision passait avant et sortait « Jus d'ACE ». Un nom de bouton se
+lit au comptoir, il ne se devine pas.
+
+⚠️ **À regarder : les jus 25 cl du BAR sont DÉSACTIVÉS** — abricot, ananas,
+tomate, à 2,80 €. Si le bar en sert, ils sont à rallumer ; sinon la gamme
+jus vit uniquement au comptoir.
+
+Contrôles : carte **177/177, 0 écart** · `test-carte-fournil` 13/13.
+
 ### Comparer un fournisseur à tous les autres (04/10/2026)
 
 Demande du gérant : « prendre un fournisseur, une catégorie de produits de
@@ -7490,6 +7552,7 @@ node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (e
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
+node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
 node scripts/diagnostic-commandes.mjs          # peut-on commander ? (lecture seule)
