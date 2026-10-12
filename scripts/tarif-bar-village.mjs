@@ -42,7 +42,7 @@ const GRILLE = {
   'Pinte pression': 5.20,
   'Demi ambrée': 3.30,            // +0,50 € sur la blonde, l'usage
   'Picon bière': 3.30,
-  'Bière bouteille 33 cl': 4.00,
+  'Heineken 33 cl': 4.00,
   'Desperados 33 cl': 4.50,
   // Payer une bière SANS alcool plus cher qu'un demi choque le client.
   'Bière sans alcool 33 cl': 3.20,

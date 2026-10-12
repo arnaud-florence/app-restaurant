@@ -7418,11 +7418,37 @@ créer** : une bonne part des « ajouts » demandés sont des réveils. C'est la
 troisième fois dans la journée qu'un produit demandé existait déjà (orange
 et pomme pour les jus, le Monaco ici).
 
-⚠️ **« Heineken » s'appelle « Bière bouteille 33 cl » en caisse** — sa
-matière est bien `Heineken VC 33 cl`. Le gérant la nomme par sa marque, la
-caisse par sa catégorie : un bouton qu'on ne reconnaît pas sous le nom qu'on
-lui donne est un bouton qu'on cherche en plein service. À renommer un jour.
-4,00 → **3,80 €** : marge 1,82 → 1,66 €, food cost 45 → 48 %.
+**« Bière bouteille 33 cl » est renommée « Heineken 33 cl »** (décision du
+gérant le jour même). Le gérant la nommait par sa marque, la caisse par sa
+catégorie : un bouton qu'on ne reconnaît pas sous le nom qu'on lui donne est
+un bouton qu'on cherche en plein service. 4,00 → **3,80 €** : marge 1,82 →
+1,66 €, food cost 45 → 48 %.
+
+⚠️⚠️ **RENOMMER UN PRODUIT CASSE CE QUI LE CHERCHE PAR SON NOM, et l'un des
+chercheurs est une OBLIGATION LÉGALE.** `src/app/print/carte-bar/page.tsx`
+construit l'affichage extérieur imposé par l'arrêté du 27 mars 1987 en
+cherchant un produit RÉEL par rubrique : `['Bière bouteille', trouve('Bière
+bouteille 33 cl')]`. Renommer sans toucher cette ligne aurait fait
+**disparaître une mention obligatoire de l'affichage**, sans la moindre
+erreur — `trouve()` rend `undefined` et la ligne s'efface.
+
+Six fichiers alignés dans le même commit : la page d'affichage (le libellé
+de rubrique reste imposé, seule la cible change) et cinq scripts rejouables
+qui le désignaient par son nom — `tarif-bar-village`, `matieres-bar`,
+`couts-france-boissons`, `creer-carte-bar`, `bar-ajustements-1210`.
+⚠️ `creer-carte-bar` était le plus dangereux : relancé, il aurait **recréé**
+un « Bière bouteille 33 cl » en doublon du Heineken renommé.
+
+⚠️ `nom` ET `nom_caisse` bougent ensemble. Le rapprochement d'un ticket
+passe d'abord par l'identifiant Zelty (0137), mais le libellé reste le
+chemin de secours : le laisser à l'ancien nom le rendrait muet le jour où
+l'autre échoue. Vérifié avant d'écrire : **zéro vente** sous l'ancien nom
+(le bar n'a jamais ouvert), donc aucun historique à déplacer — contrairement
+à une fusion (les six focaccias), où il faut d'abord bouger les ventes.
+
+✅ Contrôle d'après-coup : les **sept** mentions de l'affichage extérieur
+résolvent toutes — café 1,40 €, demi 2,80 €, **Heineken 3,80 €**, jus
+d'orange, soda, eau, pastis.
 
 **Pinte Affligem créée à 6,90 €.** ⚠️ Son coût est **DÉRIVÉ, pas inventé** :
 une pinte vaut deux demis du même fût, et la maison le vérifie déjà — Demi

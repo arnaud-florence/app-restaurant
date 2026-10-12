@@ -56,7 +56,11 @@ export default async function CarteBarPage() {
   const obligatoire: Array<[string, R | undefined]> = [
     ['Café', trouve('Café expresso')],
     ['Demi pression', trouve('Demi pression')],
-    ['Bière bouteille', trouve('Bière bouteille 33 cl')],
+    // ⚠️ Le LIBELLÉ de la rubrique est imposé par l'arrêté du 27 mars 1987 ;
+    // seul le produit qui l'incarne a été renommé (12/10/2026). Renommer un
+    // produit sans toucher cette ligne ferait DISPARAÎTRE une mention légale
+    // de l'affichage extérieur, sans la moindre erreur.
+    ['Bière bouteille', trouve('Heineken 33 cl')],
     ['Jus de fruit', trouve("Jus d'orange 33 cl")],
     ['Soda', trouve('Coca-Cola 33 cl')],
     ['Eau minérale', trouve('Eau plate 50 cl')],

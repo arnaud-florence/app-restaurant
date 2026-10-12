@@ -68,7 +68,7 @@ const zelty = async (path, init = {}) => {
 
 // ═══════════════════════════════════════════════════════════════════════
 const REVEIL  = [['Monaco', 3.00]]                       // existe, désactivé
-const PRIX    = [['Bière bouteille 33 cl', 3.80, 'la Heineken bouteille']]
+const PRIX    = [['Heineken 33 cl', 3.80, 'la Heineken bouteille']]
 const CREER   = [{ nom: 'Pinte Affligem', gabarit: 'Demi Affligem', ttc: 6.90,
                    facteur: 2, parAchat: 40 }]           // 2 demis, 40 par fût
 // ═══════════════════════════════════════════════════════════════════════
