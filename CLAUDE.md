@@ -7690,6 +7690,63 @@ y a 544 commandes caisse. **Une limite sans tri stable ne promet aucun ordre**,
 et c'est écrit trois fois dans ce fichier. On FILTRE (`client_id=not.is.null`),
 on ne ramène pas pour trier ensuite.
 
+### Quatre desserts de plus (13/10/2026)
+
+`node scripts/desserts-1310.mjs [--ecrire]`. Demande du gérant.
+
+| Famille | Produits | Prix |
+|---|---|---|
+| **Pâtisserie** (FOURNIL, TVA 5,5 %) | Gâteau pomme noix · Brownie | 3,80 € |
+| **Dessert** (CUISINE, TVA 10 %) | les deux « (salle) », + Gâteau fraise fromage blanc (salle) | 5,90 € |
+| **Dessert** | Assiette de fromages | **6,00 €** |
+
+La convention des doublons de salle existait déjà — même gâteau, nom suffixé
+**« (salle) »**, famille Dessert, TVA 10 %, prix de la famille. On la suit
+plutôt que d'en inventer une autre. Le gâteau fraise fromage blanc, créé le
+11/10 en pâtisserie seulement, reçoit enfin son doublon de salle.
+
+⚠️ **6,00 € casse le « une famille, un prix » du Dessert** (5,90 €) : c'est le
+prix donné par le gérant, et une assiette de fromages n'est pas une
+pâtisserie — elle n'a pas de raison de suivre leur palier.
+
+⚠️⚠️ **ON EFFACE `libelle_achat`, `cout_achat_ht` ET `reference_fournisseur`
+DU GABARIT.** Le modèle (« Éclair au chocolat ») porte « ECLAIR CHOCOLAT
+ARTISANAL 16CM 120G ARTIPAT C=12 » : copié tel quel, le prochain scan de
+facture aurait écrit **le prix de l'éclair sur un brownie**, et une marge
+fausse ne se signale pas. C'est la leçon du croissant à 40 € (22/08) et celle
+du Gommé, qui avait hérité des sulfites du Martini le matin même. **Tout
+produit créé par copie doit voir ses trois champs d'achat ET ses allergènes
+relus.**
+
+⚠️ **Les allergènes sont ceux qui sont vrais PAR DÉFINITION**, jamais par
+probabilité, et `allergenes_valides_le` reste **NULL** — personne n'a lu
+d'emballage, donc le public lira « information non disponible » (0138) :
+`gluten` là où la farine est définitionnelle, **`fruits_a_coque` sur le gâteau
+pomme NOIX** (c'est dans son nom), `lait` sur l'assiette de fromages et le
+gâteau au fromage blanc. Un brownie contient d'ordinaire œufs et beurre, mais
+ce n'est pas définitionnel : ça s'ajoutera en lisant l'emballage.
+
+⚠️ **Aucun coût d'achat** : jamais facturés, ils sortent en « coût inconnu »
+(gris). Un zéro se lirait « gratuit » et les ferait passer pour les meilleurs
+de la carte (0150).
+
+⚠️ **`unites_par_achat` est NOT NULL** — piège rencontré sur le Gommé le matin
+même : lister les colonnes à la main bute sur une contrainte invisible. On
+copie le gabarit et on n'écrase que ce qui doit l'être.
+
+⚠️ Les deux pâtisseries sont `vendable_online` et reçoivent une **plaque
+typographique** (`generer-visuels-sans-photo.mjs --nom=…`) : sans photo, le
+menu public les ignore — il exige famille ET image. ⚠️ Le filtre `--nom=` est
+indispensable, sans lui le script touche les 23 produits sans photo et
+**réécrit leur `vendable_online`**.
+
+⚠️ Les deux nouvelles pâtisseries sont déclarées dans `HORS_AFFICHE` de
+`test-carte-fournil.mjs`, **dans le même commit** que leur création : la liste
+de référence bouge en même temps que la carte, jamais après coup (règle du
+04/10).
+
+Contrôles : carte **189/189 conformes, 0 écart** · `test-carte-fournil` 13/13.
+
 ### Les anisés, et deux familles de boissons (13/10/2026)
 
 `node scripts/bar-anises-1310.mjs [--ecrire]`. Demande du gérant.

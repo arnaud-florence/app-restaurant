@@ -126,6 +126,9 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Desserts ajoutés le 13/10/2026 à la demande du gérant — aucune affiche ne
+  // les porte, leur prix est le palier de la famille Pâtisserie (3,80 €).
+  'Gâteau pomme noix', 'Brownie',
   // Premier article non alimentaire du comptoir (12/10/2026) : aucune affiche
   // ne le porte, et sa TVA de 20 % est juste — ce n'est pas une denrée.
   'Feuilles OCB Slim Premium',
