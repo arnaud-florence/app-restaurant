@@ -42,6 +42,22 @@ async function traiter(req: Request) {
 
   const sb = await createClient()
   const avertissements: string[] = []
+  // ⚠️⚠️ UNE INFORMATION N'EST PAS UNE PANNE, et les confondre a rendu ce
+  // cron ROUGE EN PERMANENCE depuis le 11/10/2026. Le verdict était
+  // `avertissements.length === 0 ? 'succes' : 'echec'` : or cinq fiches de
+  // sonde laissées chez Zelty en septembre (« SONDE-A-SUPPRIMER »…) n'ont ni
+  // email ni téléphone, et Zelty NE SAIT PAS SUPPRIMER UN CLIENT — elles
+  // produiront donc cinq refus corrects, chaque nuit, pour toujours.
+  //
+  // Le monitoring compte tout code ≠ 200 comme une panne : le jour où un
+  // VRAI client ne se synchronise pas, l'alerte serait noyée dans le bruit et
+  // personne ne la verrait. C'est la leçon déjà payée trois fois sur les
+  // tests rouges en permanence (test-rh, test-rbac-snack-livreur, test-stock).
+  //
+  // `infos` porte donc ce qui est NORMAL et définitif — un refus de
+  // rapprochement sur une fiche muette ; `avertissements` ne garde que ce qui
+  // demande une action : lecture impossible, écriture refusée, envoi échoué.
+  const infos: string[] = []
   const miroir = { lus: 0, crees: 0, rapproches: 0, ignores: 0 }
   const emission = { candidats: 0, envoyes: 0, refuses: 0 }
 
@@ -74,8 +90,8 @@ async function traiter(req: Request) {
       for (const brut of parsed.data.customers) {
         miroir.lus++
         const n = normaliser(brut)
-        if (!n.ok) { avertissements.push(n.motif); miroir.ignores++; continue }
-        avertissements.push(...n.avertissements)
+        if (!n.ok) { infos.push(n.motif); miroir.ignores++; continue }
+        infos.push(...n.avertissements)
         const entrant = n.client
 
         // ⚠️ Un client sans email ni téléphone n'est rapprochable de personne.
@@ -142,7 +158,10 @@ async function traiter(req: Request) {
       email: (c.email as string) ?? null,
       telephone: (c.telephone as string) ?? null,
     })
-    if (!corps.ok) { avertissements.push(`client ${c.id} : ${corps.motif}`); emission.refuses++; continue }
+    // Un client de chez nous sans contact ne PEUT pas partir (la fiche serait
+    // muette) : c'est une information à voir dans le compteur `refuses`, pas
+    // une panne du pont.
+    if (!corps.ok) { infos.push(`client ${c.id} : ${corps.motif}`); emission.refuses++; continue }
     if (dry) { emission.envoyes++; continue }
 
     const r = await appelZelty('/customers', { method: 'POST', body: corps.corps })
@@ -164,7 +183,11 @@ async function traiter(req: Request) {
     emission.envoyes++
   }
 
-  const resultat = { dry, miroir, emission, avertissements: avertissements.slice(0, 40) }
+  const resultat = {
+    dry, miroir, emission,
+    avertissements: avertissements.slice(0, 40),
+    infos: infos.slice(0, 40),
+  }
   await journaliser({
     sens: 'entrant', systeme: 'zelty', type: 'clients',
     statut: avertissements.length === 0 ? 'succes' : 'echec',

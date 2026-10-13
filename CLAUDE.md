@@ -7596,6 +7596,82 @@ c'était un 500.
 Contrôles : carte **179/179, 0 écart** · `test-carte-fournil` **13/13** ·
 `test-matieres-bar` **18/18** · affichage légal **8/8 rubriques servies**.
 
+### Les comptes clients en caisse (13/10/2026)
+
+**« La Supérette de l'Issole » créée des DEUX côtés, liées exactement** —
+caisse **#37579450** ↔ outil `c16c54a9…`.
+`node scripts/client-superette-issole.mjs [--ecrire]`.
+
+**La forme RÉELLE d'une fiche** (relevée sur `GET /customers`, jamais
+devinée) — et les noms ne sont pas ceux qu'on suppose :
+
+| Ce qu'on croit | Le vrai champ |
+|---|---|
+| `last_name` | **`name`** |
+| `first_name` | **`fname`** |
+| `email` | **`mail`** |
+| — | **`company`** — c'est lui qui marque une ENTREPRISE |
+| — | `nice_name` = `fname` + `name`, **dérivé**, non writable |
+| — | `balance` (ardoise), `vip`, `turnover`, `nb_orders`, `loyalty` |
+
+Charge de création, éprouvée depuis le 24/09/2026 (`versZelty()`) :
+`{ name, fname?, mail?, phone?, remote_id }`, plus `company` pour un
+professionnel — accepté, vérifié par relecture.
+
+⚠️⚠️ **ZELTY NE SAIT PAS SUPPRIMER UN CLIENT** : ni bouton sur la fiche, ni
+`DELETE /customers/{id}` (404). Le seul chemin est une « Suppression
+groupée » par export/réimport Excel. **Une fiche créée de travers ne se
+défait pas** — donc on relit la forme avant d'écrire, et on n'écrit qu'une
+fois. La preuve est dans le compte : **cinq fiches « SONDE-A-SUPPRIMER » /
+« TEST-CLAUDE-A-SUPPRIMER »** y traînent depuis septembre, inextirpables.
+C'est la raison de ne jamais créer de fiche d'essai ici.
+
+⚠️ **On crée les DEUX côtés, liés dès la naissance** (0156) : notre uuid dans
+leur `remote_id`, leur identifiant dans notre `caisse_externe_id`. Créée en
+caisse SEULEMENT, la fiche serait restée invisible du CRM, de la fidélité et
+de la facturation — et le pont ne l'aurait jamais rapprochée, faute de
+contact.
+
+⚠️ **Aucun consentement n'est envoyé**, et `opt_in_marketing` reste `false` :
+personne n'a rien accepté. Zelty pose `accept_marketing: true` par défaut sur
+toute fiche créée par l'API — c'est une valeur par défaut, pas un
+consentement recueilli.
+
+⚠️ La supérette n'a **ni téléphone ni email** : la fiche est muette côté
+contact. Conséquences dites plutôt que masquées — aucune relance, aucune
+facture envoyable, et le pont ne saurait pas la rapprocher s'il devait la
+relire. À compléter (téléphone, email, adresse de facturation, SIRET), c'est
+noté dans `notes_internes`.
+
+**Les trois chemins pour créer un compte, vérifiés :**
+
+| Chemin | Ce qu'il faut savoir |
+|---|---|
+| **la caisse**, en cours de ticket | le geste du comptoir ; la fiche naît côté Zelty, donc **sans lien** avec l'outil tant qu'elle n'a pas email ou téléphone |
+| **`bo.zelty.fr/customers`** | la page existe (302 vers la connexion) ; `/clients`, `/crm`, `/customer` rendent **404**. ⚠️ Elle n'est dans aucun menu |
+| **`/admin/clients`** (module 20) | le bon chemin : `creerClient` / `creerClientRapide`, puis le cron **`zelty-clients` à 4 h 40** pousse vers la caisse et écrit le lien |
+
+⚠️ **Le chemin par l'outil est le seul qui lie les deux côtés tout seul**, et
+il EXIGE un email ou un téléphone — `versZelty()` refuse sinon (« la fiche
+serait muette »). Pour un compte sans contact, il faut le script, qui pose le
+lien à la main.
+
+⚠️⚠️ **CE CRON ÉTAIT ROUGE EN PERMANENCE DEPUIS LE 11/10/2026**, et c'est le
+défaut trouvé en répondant à la question. Son verdict était
+`avertissements.length === 0 ? 'succes' : 'echec'` : les cinq fiches de sonde
+sans contact produisaient cinq refus CORRECTS, chaque nuit, pour toujours.
+
+Le monitoring comptant tout code ≠ 200 comme une panne, **le jour où un VRAI
+client ne se synchronise pas, l'alerte serait noyée dans le bruit**. Quatrième
+occurrence du même motif après `test-rh`, `test-rbac-snack-livreur` et
+`test-stock` — un rouge permanent finit par être ignoré, et ce jour-là il ne
+protège plus rien.
+
+`infos[]` porte désormais ce qui est NORMAL et définitif (un refus de
+rapprochement sur une fiche muette) ; `avertissements[]` ne garde que ce qui
+demande une action — lecture impossible, écriture refusée, envoi échoué. Les
+deux sont rendus dans le résultat : on sépare, on ne masque pas.
+
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
 « Pourquoi j'ai pas le pouls en direct avec le chiffre sur l'outil alors qu'on
@@ -7932,6 +8008,7 @@ node scripts/heineken-canette-1210.mjs         # Heineken canette 2,50 € au ba
 node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en caisse (essai à blanc)
 node scripts/cuisson-viandes.mjs               # cuisson entrecôte + burgers (essai à blanc)
 node scripts/rejouer-webhooks-zelty.mjs        # rejouer les ventes rejetées (essai à blanc)
+node scripts/client-superette-issole.mjs       # compte client pro, les deux côtés liés
 node scripts/ocb-slim-premium.mjs              # feuilles OCB 1,20 € au comptoir (essai à blanc)
 node scripts/renommer-heineken-bouteille.mjs   # bouteille / canette, des DEUX côtés
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
