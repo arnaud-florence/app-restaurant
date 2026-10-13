@@ -7783,11 +7783,28 @@ la brasserie en septembre.
 le doublon devient légitime avec deux familles, mais le libellé du ticket ne
 les distingue pas. À renommer si ça gêne au comptoir.
 
-⚠️ **RESTE À TRANCHER : les 12 `prix_sur_place_ttc` du Fournil sont devenus
-redondants.** Un Coca a désormais trois prix possibles — 2,00 € emporter,
-2,80 € « sur place » sur la fiche Fournil, 3,00 € sur la fiche Bar. Les
-effacer, ou les garder pour une consommation aux tables du comptoir ? C'est
-une décision de prix, donc elle n'a pas été prise.
+✅ **TRANCHÉ PAR LE GÉRANT : « 2 € à emporter, 2,80 € sur place ».**
+`node scripts/prix-boissons-salle-1310.mjs [--ecrire]`. Les trois prix
+possibles d'un Coca deviennent deux, et **il n'y a plus qu'un seul prix de
+salle dans la maison** : les 9 softs du BAR descendent de 3,00 € à 2,80 €
+(leur prix EST le prix de salle depuis qu'ils ont leur famille), et les
+6 sodas 33 cl du Fournil qui n'en avaient pas reçoivent `prix_sur_place_ttc
+= 2,80 €`, comme les 12 qui l'avaient déjà.
+
+⚠️ **La convention de la caisse est VÉRIFIÉE sur un témoin, pas supposée** :
+« Orangina 33 cl » porte `price: 280` et `price_togo: 200`, donc `price` est
+le prix de SALLE. Se tromper de champ aurait affiché le tarif de salle au
+comptoir, sur tous les sodas d'un coup. Le script REFUSE d'écrire si le
+témoin ne confirme pas.
+
+⚠️ **« 2,80 sur place » vise les SODAS, et ce qui reste à l'écart est nommé** :
+eaux 75 cl (3,50 € — bouteille de TABLE, autre format), Diabolo 3,20 € et
+Sirop à l'eau 1,80 € (composites à leur prix), bouteilles 1,5 L (format
+d'emporter, elles ne se servent pas au verre), Eau plate 50 cl (salle 2,50 € —
+l'eau est volontairement sous le soda), Red Bull (salle 3,00 € — une
+énergisante se tarife à part), et les **jus 33 cl à 2,20 €**, posés deux jours
+plus tôt sur la liste du gérant : les ramener à 2,00 € serait une baisse de
+prix qu'il n'a pas demandée.
 
 Contrôles : carte **183/183 conformes, 0 écart** · `test-matieres-bar` 19/19 ·
 `test-carte-fournil` 13/13 · tsc propre.
