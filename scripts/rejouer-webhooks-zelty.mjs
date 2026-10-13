@@ -58,6 +58,15 @@ for (const e of ev) {
   if (Number(d.status) !== 255) continue
   aRejouer.push({ e, p, d })
 }
+// ⚠️⚠️ CHAQUE REJEU LAISSE SA PROPRE TRACE DANS LE JOURNAL, donc le lot
+// GROSSIT à chaque passage — 54 tickets au premier, 185 au troisième, et une
+// commande qui dépasse les cinq minutes. On déduplique sur l'identifiant du
+// TICKET, en gardant la trace la plus RÉCENTE : c'est elle qui porte l'état
+// final de la commande.
+const parTicket = new Map()
+for (const x of aRejouer) parTicket.set(String(x.d.id), x)
+aRejouer.length = 0
+aRejouer.push(...parTicket.values())
 console.log(`   ventes terminées à rejouer : ${aRejouer.length} · ` +
   `${(aRejouer.reduce((s,x)=>s+Number(x.d.price??x.d.total??0),0)/100).toFixed(2)} €\n`)
 

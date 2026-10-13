@@ -247,6 +247,12 @@ export async function POST(req: Request) {
           // écraser par un passage automatique (même règle que le pont client).
           const rattrape = trouverClient(l.client)
           if (rattrape) {
+            // ⚠️ Le total est repris DÈS QUE le ticket désigne ce client, même
+            // s'il était déjà rattaché. Ne le faire que sur un rattachement
+            // NEUF laissait la fiche périmée pour toujours : le premier
+            // passage attachait, le suivant passait à côté sans rien reprendre
+            // — vécu sur la fiche Ceccherini, restée à son total de mai.
+            aRecalculer.add(rattrape)
             const { data: cmd } = await sb.from('commandes')
               .select('client_id').eq('id', commandeId).maybeSingle()
             if (cmd && !cmd.client_id) {
@@ -257,7 +263,6 @@ export async function POST(req: Request) {
                 client_telephone: l.client?.telephone ?? null,
               }).eq('id', commandeId)
               clientsRattaches++
-              aRecalculer.add(rattrape)
             }
           } else if (l.client?.nom || l.client?.identifiant_externe) {
             clientsInconnus.push(l.client.nom ?? `#${l.client.identifiant_externe}`)
