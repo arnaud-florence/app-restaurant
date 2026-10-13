@@ -20,7 +20,11 @@ export const metadata = { title: 'Carte des boissons — CasaTasia' }
 
 type R = { nom: string; categorie: string; prix_vente_ht: number; tva: number; prix_sur_place_ttc: number | null }
 
-const PRESSION = ['Demi pression', 'Pinte pression', 'Demi ambrée', 'Panaché', 'Monaco', 'Picon bière']
+// ⚠️ TROISIÈME FOIS QUE CE FICHIER DOIT SUIVRE LA CARTE. Les pressions sont
+// listées PAR LEUR NOM : une bière pression absente d'ici tombe dans la
+// section « Bières bouteille » de la carte imprimée, sans erreur.
+const PRESSION = ['Demi pression', 'Pinte pression', 'Demi Affligem', 'Pinte Affligem',
+  'Demi ambrée', 'Panaché', 'Monaco', 'Picon bière', 'Pinte Picon']
 
 export default async function CarteBarPage() {
   const supabase = await createClient()

@@ -7690,6 +7690,63 @@ y a 544 commandes caisse. **Une limite sans tri stable ne promet aucun ordre**,
 et c'est écrit trois fois dans ce fichier. On FILTRE (`client_id=not.is.null`),
 on ne ramène pas pour trier ensuite.
 
+### Chocolat chaud en deux tailles, et une Pinte Picon (13/10/2026)
+
+`node scripts/choco-picon-1310.mjs [--ecrire]`. Demande du gérant.
+
+| | prix | coût | food cost |
+|---|---|---|---|
+| **Chocolat chaud petit** (ex-« Chocolat chaud ») | 2,50 → **2,30 €** | 0,5705 € | 27 % |
+| **Chocolat chaud grand** | **2,80 €** | **inconnu** | — |
+| **Pinte Picon** | **5,80 €** | 2,0425 € *dérivé* | **42 %** |
+
+⚠️ **Le petit HÉRITE de la fiche existante**, il n'est pas recréé : elle porte
+son coût MESURÉ (25 g de poudre + 20 cl de lait, dose écrite dans
+`cafe-grains.mjs`), sa matière, ses allergènes et son historique de ventes.
+Créer deux fiches neuves et désactiver l'ancienne aurait jeté tout ça — et
+Zelty ne sait pas supprimer un plat.
+
+⚠️⚠️ **LE GRAND N'A PAS DE COÛT, ET C'EST VOULU.** Sa dose n'est pas fixée :
+30 cl ? 35 cl ? Le coût du petit se dérive d'une dose PESÉE ; celui du grand
+demanderait d'inventer un volume, et « une pondération inventée aurait l'air
+d'un savoir ». Il sort en « coût inconnu » (gris) jusqu'à ce que la dose soit
+pesée — même discipline que les 8 g de café, « réglage de départ qui se
+vérifie à la balance au premier service ». Sa **matière et son rendement sont
+ceux du petit** : les deux tailles puisent la même boîte de poudre, donc une
+seule ligne de stock et de commande.
+
+⚠️ **La Pinte Picon est DÉRIVÉE de chiffres mesurés, et la dérivation est
+CONTRÔLÉE avant d'écrire** :
+
+    Picon bière 1,1266 − Demi pression 0,9159 = 0,2107 de Picon
+    ≈ la moitié d'un Picon 4 cl (0,4102) — ça concorde ✓
+    Pinte Picon = Pinte pression 1,8318 + 0,2107 = 2,0425 €
+
+Le dosage de Picon **ne double PAS** avec la bière : c'est l'hypothèse, et
+elle est dite. Food cost 42 % — exactement celui de la Pinte pression, donc
+dans la norme de la maison pour une pinte.
+
+⚠️⚠️ **J'AI ÉCRIT UNE SOUS-COLLECTE DE TVA, et c'est le contrôle qui l'a
+attrapée** — avant toute vente. Mon script posait `tax: 1000` pour les deux
+créations, recopié du script des desserts : juste pour une denrée, **FAUX pour
+une bière**, qui est à **20 % dans les deux modes**. Un taux trop BAS est le
+seul qui ne se rattrape pas — on ne réclame pas après coup au client. Le
+script choisit désormais le taux sur `contient_alcool`.
+**Tout script qui CRÉE un plat doit poser `tax` depuis l'alcool, pas en dur.**
+
+⚠️⚠️ **TROISIÈME FOIS QUE `print/carte-bar/page.tsx` DOIT SUIVRE LA CARTE** —
+après la Heineken et le Pastis, tous deux dans l'affichage légal. Ici c'est sa
+liste `PRESSION`, qui range les bières **par leur nom** : une pression absente
+tombe dans la section « Bières bouteille » de la carte imprimée, sans erreur.
+Au passage, **« Demi Affligem » et « Pinte Affligem » y manquaient déjà** et
+étaient donc imprimées parmi les bouteilles depuis leur création.
+
+⚠️ `AFFICHES`, `HORS_LIGNE_VOULU` et `HORS_AFFICHE` de
+`test-carte-fournil.mjs` sont mis à jour **dans le même commit** : la liste de
+référence bouge avec la carte, jamais après coup.
+
+Contrôles : carte **191/191 conformes, 0 écart** · `test-carte-fournil` 13/13.
+
 ### Quatre desserts de plus (13/10/2026)
 
 `node scripts/desserts-1310.mjs [--ecrire]`. Demande du gérant.

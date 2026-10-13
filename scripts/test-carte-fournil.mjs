@@ -82,7 +82,7 @@ const AFFICHES = {
   'Baguette classique': 1.2, 'Baguette Victoire': 1.5, 'Bâtard céréales': 3.2,
   'Bâtard maïs et graines': 3.2, 'Café allongé': 1.4, 'Café expresso': 1.4,
   'Café noisette': 1.5, 'Campestre multicéréales': 1.9, 'Cannelé': 1.5,
-  'Cappuccino': 2.5, 'Chausson aux pommes': 1.4, 'Chocolat chaud': 2.5,
+  'Cappuccino': 2.5, 'Chausson aux pommes': 1.4, 'Chocolat chaud petit': 2.3,
   'Coca-Cola 1,5 L': 3.5, 'Coca-Cola 33 cl': 2, 'Coca-Cola Zéro 1,5 L': 3.5,
   'Coca-Cola Zéro 33 cl': 2, 'Cookie chocolat': 2.9, 'Croissant': 1.4,
   'Eau gazeuse 50 cl': 2, 'Eau plate 50 cl': 1, 'Éclair au chocolat': 3.8,
@@ -126,6 +126,9 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Le chocolat chaud passe en deux tailles le 13/10/2026 (2,30 / 2,80 €) :
+  // aucune affiche ne porte le grand.
+  'Chocolat chaud grand',
   // Desserts ajoutés le 13/10/2026 à la demande du gérant — aucune affiche ne
   // les porte, leur prix est le palier de la famille Pâtisserie (3,80 €).
   'Gâteau pomme noix', 'Brownie',
@@ -168,7 +171,7 @@ const HORS_AFFICHE = new Set([
 // formule « salade + boisson » ne dit pas laquelle.
 const HORS_LIGNE_VOULU = new Set([
   'Café expresso', 'Café allongé', 'Café noisette', 'Cappuccino',
-  'Chocolat chaud', 'Thé',
+  'Chocolat chaud petit', 'Chocolat chaud grand', 'Thé',
   'Formule salade + boisson', 'Formule sandwich ou panini + boisson',
   'Formule salade + boisson + dessert', 'Formule sandwich ou panini + boisson + dessert',
   'Formule Express', 'Formule Douceur chaude',
