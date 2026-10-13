@@ -744,7 +744,7 @@ export const RAYONS: Rayon[] = [
   { cle: 'epicerie', nom: 'Épicerie', emoji: '🧂', teinte: 'bg-lime-500',
     categories: ['Épicerie'] },
   { cle: 'boissons', nom: 'Boissons', emoji: '🥤', teinte: 'bg-sky-400',
-    categories: ['Boisson fraîche', 'Boisson chaude'] },
+    categories: ['Boisson fraîche', 'Boisson salle', 'Boisson chaude'] },
   { cle: 'cave', nom: 'Cave & bar', emoji: '🍷', teinte: 'bg-violet-500',
     categories: ['Alcool', 'Apéritif', 'Bière', 'Vin'] },
   { cle: 'glaces', nom: 'Glaces', emoji: '🍦', teinte: 'bg-cyan-300',

@@ -25,7 +25,7 @@ export default async function InvendusPage() {
     supabase.from('recettes')
       .select('id, nom, categorie, cout_achat_ht')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
-      .not('categorie', 'in', '("Boisson fraîche","Boisson chaude","Formule","À classer")')
+      .not('categorie', 'in', '("Boisson fraîche","Boisson salle","Boisson chaude","Formule","À classer")')
       .order('categorie').order('nom'),
     supabase.from('invendus')
       .select('recette_id, quantite')

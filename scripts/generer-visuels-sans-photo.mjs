@@ -41,7 +41,11 @@ const BASE_URL = 'https://app-restaurant-livid.vercel.app/produits'
 // Familles jamais commandables en ligne — règle établie par la 0115 et
 // vérifiée sur les 66 produits déjà photographiés : 0 sur 6 pour les boissons
 // chaudes, 0 sur 8 pour les formules, 100 % partout ailleurs.
-const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Formule', 'Formule petit-déjeuner'])
+// ⚠️ « Boisson salle » DOIT y être : les softs du bar se servent en verre
+// consigné à une table, ils ne sont pas du click & collect. Absente de cette
+// liste, la règle de ce script les aurait mis EN LIGNE au premier passage —
+// exactement ce qui est arrivé à la brasserie en septembre.
+const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Boisson salle', 'Formule', 'Formule petit-déjeuner'])
 
 // ⚠️ Une règle par FAMILLE ne suffit plus depuis la carte du bar (28/08/2026).
 // Les familles Bière, Apéritif, Alcool et Vin n'y figuraient pas, donc le

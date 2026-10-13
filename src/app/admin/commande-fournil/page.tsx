@@ -29,7 +29,7 @@ export default async function CommandeFournilPage({
     sb.from('recettes')
       .select('id, nom, nom_caisse, categorie, cout_achat_ht, libelle_achat, unites_par_achat, nom_matiere')
       .eq('tag_destination', 'FOURNIL').eq('actif', true)
-      .not('categorie', 'in', '("Boisson fraîche","Boisson chaude","Formule","À classer")')
+      .not('categorie', 'in', '("Boisson fraîche","Boisson salle","Boisson chaude","Formule","À classer")')
       .order('categorie').order('nom'),
     sb.from('commandes').select('id')
       .eq('statut', 'encaisse').gte('created_at', debut.toISOString()),

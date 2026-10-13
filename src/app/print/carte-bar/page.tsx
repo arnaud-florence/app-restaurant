@@ -27,7 +27,7 @@ export default async function CarteBarPage() {
   const { data } = await supabase.from('recettes')
     .select('nom, categorie, prix_vente_ht, tva, prix_sur_place_ttc')
     .eq('actif', true)
-    .or('tag_destination.eq.BAR,categorie.in.("Boisson fraîche","Boisson chaude")')
+    .or('tag_destination.eq.BAR,categorie.in.("Boisson fraîche","Boisson salle","Boisson chaude")')
     .order('nom')
   const rows = ((data ?? []) as R[])
     // Les composants de formule (« Cappuccino ou chocolat chaud ») ne se
@@ -48,7 +48,9 @@ export default async function CarteBarPage() {
     ['Apéritifs', rows.filter(r => r.categorie === 'Apéritif')],
     ['Vins', rows.filter(r => r.categorie === 'Vin')],
     ['Alcools', rows.filter(r => r.categorie === 'Alcool')],
-    ['Sans alcool', rows.filter(r => r.categorie === 'Boisson fraîche')],
+    // ⚠️ Les deux familles, sinon les 17 softs du BAR disparaissent de la
+    // carte imprimée — ils sont passés en « Boisson salle » le 13/10/2026.
+    ['Sans alcool', rows.filter(r => r.categorie === 'Boisson fraîche' || r.categorie === 'Boisson salle')],
     ['Boissons chaudes', rows.filter(r => r.categorie === 'Boisson chaude')],
   ]
 

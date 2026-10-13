@@ -33,6 +33,9 @@ const zl = async (p, o = {}) => {
 const ORDRE = ['Pain', 'Viennoiserie', 'Boisson chaude', 'Formule petit-déjeuner',
   'Pâtisserie', 'Gourmandise', 'Glace', 'Sandwich', 'Panini', 'Salade', 'Pizza',
   'Formule', 'Boisson fraîche',
+  // Le bar sert ses softs en verre consigné, à un autre prix : famille à part
+  // pour que le comptoir ne confonde pas les deux (13/10/2026).
+  'Boisson salle',
   // ── Bar (septembre 2026) — après le Fournil : le comptoir sert le pain
   //    à 6 h 20, l'apéritif ne commence qu'à midi.
   'Bière', 'Apéritif', 'Vin', 'Alcool',

@@ -7690,6 +7690,108 @@ y a 544 commandes caisse. **Une limite sans tri stable ne promet aucun ordre**,
 et c'est écrit trois fois dans ce fichier. On FILTRE (`client_id=not.is.null`),
 on ne ramène pas pour trier ensuite.
 
+### Les anisés, et deux familles de boissons (13/10/2026)
+
+`node scripts/bar-anises-1310.mjs [--ecrire]`. Demande du gérant.
+
+**Cinq anisés, tous sur base RICARD** — Ricard 2 cl 2,50 €, Mauresque,
+Tomate, Perroquet et **Gommé** à 2,80 €, plus le Pastis 51 à 2,50 €.
+
+⚠️ **« Pastis 2 cl » ÉTAIT DÉJÀ DU RICARD** (sa matière est « Ricard 1 L ») et
+voisinait « Pastis 51 2 cl » au MÊME prix : deux boutons « Pastis » à 2,50 €
+qu'aucun serveur ne peut départager. Renommé **« Ricard 2 cl »** — au comptoir
+on commande un Ricard ou un 51, jamais « un pastis ». Et « Martini 4 cl »
+devient **« Martini blanc 4 cl »**, par symétrie avec le rouge déjà à la carte.
+
+⚠️ **Les coûts sont DÉRIVÉS, pas inventés** : la part de sirop se LIT sur les
+coûts existants (Mauresque 0,5058 − Pastis 51 0,3755 = 0,1303 d'orgeat), et le
+script **CONTRÔLE** cette part contre la base avant de dériver — un coût de
+départ qui aurait bougé invaliderait le calcul sans rien dire. Food cost 19 à
+23 %.
+
+⚠️ **« GOMMÉ » EST UN ANISÉ, PAS UN MARTINI** — j'avais lu « martini blanc
+gommé » comme UN produit alors que la liste du gérant en portait deux. La
+fiche créée à tort a été **REPRISE** plutôt que laissée morte : **Zelty ne
+sait pas supprimer un plat**, seulement le désactiver, et un plat mort dans un
+catalogue y reste.
+
+⚠️⚠️ **COPIER UNE FICHE MODÈLE A COPIÉ SA DÉCLARATION D'ALLERGÈNES.** Le
+Martini porte « sulfites » (c'est un vermouth) ; un pastis gommé n'en a pas.
+Si la date de validation avait suivi, on aurait **SIGNÉ une déclaration fausse**
+sur un produit que personne n'a lu — ce que la 0138 interdit. Les deux sont
+remis à zéro. **Tout produit créé par copie doit voir ses allergènes relus.**
+
+⚠️ **Le Gommé est aligné sur ses trois frères : AUCUN `nom_matiere`.** La
+doctrine est explicite — un composite qui mélange deux matières n'en porte
+aucune, « les rattacher à une seule en perdrait l'autre ». Quatre boissons
+identiques doivent se compter de la même façon. ⚠️ Conséquence connue : la
+bouteille de Ricard **ne baisse pas** quand un anisé de couleur est vendu, donc
+le réassort ne la voit pas partir. Vrai depuis l'origine pour les trois autres.
+
+⚠️⚠️ **DEUXIÈME FOIS QUE L'AFFICHAGE LÉGAL EST CASSÉ PAR UN RENOMMAGE** (la
+Heineken la veille). La rubrique « Apéritif anisé » de
+`print/carte-bar/page.tsx` cherchait « Pastis 2 cl » **par son nom exact** :
+sans recâblage, une mention imposée par l'arrêté du 27 mars 1987 **disparaît**
+de l'affiche extérieure, sans erreur. Attrapé par le contrôle, pas à l'œil.
+**Tout renommage de produit du bar passe par un grep de ce fichier.**
+
+⚠️⚠️ **ET L'ORDRE DU SCRIPT ÉTAIT FAUX, ce qui a produit une panne
+silencieuse.** Il rallumait en BASE puis en caisse, et il a planté entre les
+deux : les trois produits sont restés actifs chez nous et éteints en caisse,
+donc **le miroir du catalogue a relu « inactif » et les a RE-ÉTEINTS** — la
+boucle de la 0141, par l'autre bout. **La caisse passe en PREMIER** : si elle
+refuse, rien n'est désynchronisé.
+
+⚠️ **L'ORGEAT n'est dans AUCUN des 4 888 tarifs fournisseurs**, contrairement
+à la menthe et la grenadine Teisseire (4,98 €/L) : le réassort ne saura pas le
+commander. La mauresque dépend donc d'un approvisionnement hors outil.
+
+**DEUX FAMILLES DE BOISSONS — décision du gérant.** La carte portait **deux
+modèles contradictoires** pour la même idée :
+
+| Modèle | Exemple | Combien |
+|---|---|---|
+| un produit, deux prix (`prix_sur_place_ttc`) | Coca 33 cl : 2,00 € / 2,80 € salle | 12 + 3 vins |
+| deux produits séparés | Coca 33 cl (Fournil 2,00 €) **et** Coca 25 cl (Bar 3,00 €) | ~10 |
+
+Le gérant a tranché pour **deux familles explicites** : les **17 softs du BAR**
+passent en **« Boisson salle »**, les 32 du Fournil restent « Boisson
+fraîche ». Deux boutons, deux familles, aucune dépendance au mode du ticket.
+
+⚠️ **ON AJOUTE une catégorie, on n'en RENOMME aucune** : renommer « Boisson
+fraîche » aurait touché huit consommateurs ; en ajouter une n'en touche que
+cinq, et aucun produit du Fournil ne bouge.
+
+⚠️⚠️ **LES CINQ CONSOMMATEURS, trouvés par grep AVANT de déplacer** — chacun
+cassait en silence :
+
+| Où | Ce qui cassait |
+|---|---|
+| `(ops)/invendus` | les 17 softs du bar seraient apparus au comptage du soir |
+| `/admin/commande-fournil` | idem dans la commande conseillée |
+| `print/carte-bar` | section « Sans alcool » : les 17 softs **disparaissaient de la carte imprimée** |
+| `lib/catalogue-achats.ts` | rayon : ils tombaient dans « Autres » |
+| `pousser-familles-zelty.mjs` | famille inconnue → **bouton sans famille**, introuvable au comptoir |
+
+⚠️⚠️ **ET LE SIXIÈME ÉTAIT LE PLUS DANGEREUX** :
+`generer-visuels-sans-photo.mjs` met en ligne **toute famille absente** de sa
+liste noire. « Boisson salle » y manquant, un seul passage aurait mis les
+17 softs du bar **en vente sur casatasia.fr** — exactement ce qui est arrivé à
+la brasserie en septembre.
+
+⚠️ **« Perrier 33 cl » existe des DEUX côtés** (Fournil 2,00 €, Bar 3,00 €) :
+le doublon devient légitime avec deux familles, mais le libellé du ticket ne
+les distingue pas. À renommer si ça gêne au comptoir.
+
+⚠️ **RESTE À TRANCHER : les 12 `prix_sur_place_ttc` du Fournil sont devenus
+redondants.** Un Coca a désormais trois prix possibles — 2,00 € emporter,
+2,80 € « sur place » sur la fiche Fournil, 3,00 € sur la fiche Bar. Les
+effacer, ou les garder pour une consommation aux tables du comptoir ? C'est
+une décision de prix, donc elle n'a pas été prise.
+
+Contrôles : carte **183/183 conformes, 0 écart** · `test-matieres-bar` 19/19 ·
+`test-carte-fournil` 13/13 · tsc propre.
+
 ### Les comptes clients en caisse (13/10/2026)
 
 **« La Supérette de l'Issole » créée des DEUX côtés, liées exactement** —
