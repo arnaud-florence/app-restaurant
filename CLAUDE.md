@@ -7745,7 +7745,24 @@ indispensable, sans lui le script touche les 23 produits sans photo et
 de référence bouge en même temps que la carte, jamais après coup (règle du
 04/10).
 
-Contrôles : carte **189/189 conformes, 0 écart** · `test-carte-fournil` 13/13.
+⚠️⚠️ **UNE PHOTO POSÉE EN BASE N'EST PAS UNE PHOTO EN CAISSE, et j'ai
+annoncé « 0 écart » alors qu'il y en avait deux.** Les plaques écrites dans
+`recettes.image_url` ne partent pas toutes seules : il faut les POUSSER.
+C'est le contrôle qui l'a dit, pas moi — et le commit qui l'accompagnait
+portait un chiffre faux.
+
+⚠️ **Le champ s'appelle `image`, pas `img`** — relevé sur un plat qui en porte
+une (`Café allongé`) après qu'un premier essai avec `img` soit passé en 200
+**sans rien écrire**. Zelty expose aussi `thumb`, qu'il dérive seul. Un nom de
+champ inconnu ne lève AUCUNE erreur sur cette API : il est simplement ignoré.
+La seule preuve est la relecture.
+
+⚠️ **L'ordre compte : déployer AVANT de pousser l'image.** Zelty va CHERCHER
+l'URL ; poussée avant le déploiement, elle enregistrerait un 404. Le script
+vérifie le `HTTP 200` de chaque image avant de l'envoyer et refuse sinon.
+
+Contrôles : carte **189/189 conformes, 0 écart** (après la poussée des deux
+images) · `test-carte-fournil` 13/13.
 
 ### Les anisés, et deux familles de boissons (13/10/2026)
 
