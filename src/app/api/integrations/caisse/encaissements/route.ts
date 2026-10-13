@@ -33,6 +33,13 @@ import { chargerCorrespondances, noterCorrespondance } from '@/lib/integrations/
 // par rapprocher autrement que le pont client — donc par afficher deux
 // totaux pour la même personne.
 import { telephoneComparable, emailComparable } from '@/lib/integrations/zelty/clients'
+// ⚠️ Le total d'un client vit dans une COLONNE (`clients.total_depense`), que
+// `/admin/clients` lit telle quelle — il ne recalcule rien à l'affichage.
+// Jusqu'ici seul un clic « Recalculer » sur la fiche la mettait à jour : un
+// ticket rattaché laissait donc le total FAUX, et la facture de fin de mois
+// avec. On réutilise le calcul existant plutôt que d'en écrire un second —
+// deux sommes du même chiffre finissent par en afficher deux.
+import { recalculerStatsClient } from '@/app/admin/clients/actions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -184,6 +191,9 @@ export async function POST(req: Request) {
   }
   let clientsRattaches = 0
   const clientsInconnus: string[] = []
+  /** Les fiches dont le total doit être repris, une seule fois en fin
+   *  d'import même si le client a plusieurs tickets dans le lot. */
+  const aRecalculer = new Set<string>()
 
   const tauxSuspects: string[] = []
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
@@ -247,6 +257,7 @@ export async function POST(req: Request) {
                 client_telephone: l.client?.telephone ?? null,
               }).eq('id', commandeId)
               clientsRattaches++
+              aRecalculer.add(rattrape)
             }
           } else if (l.client?.nom || l.client?.identifiant_externe) {
             clientsInconnus.push(l.client.nom ?? `#${l.client.identifiant_externe}`)
@@ -254,7 +265,7 @@ export async function POST(req: Request) {
         } else {
           const encaisseLe = l.encaisse_at ?? new Date().toISOString()
           const clientTrouve = trouverClient(l.client)
-          if (clientTrouve) clientsRattaches++
+          if (clientTrouve) { clientsRattaches++; aRecalculer.add(clientTrouve) }
           else if (l.client?.nom || l.client?.identifiant_externe) {
             clientsInconnus.push(l.client.nom ?? `#${l.client.identifiant_externe}`)
           }
@@ -414,6 +425,16 @@ export async function POST(req: Request) {
     }
   }
 
+  // ─── Les totaux des clients touchés ──────────────────────────────────
+  // ⚠️ JAMAIS bloquant : un total non repris est un chiffre à rafraîchir,
+  // une ingestion perdue est du chiffre d'affaires évaporé. On compte les
+  // échecs plutôt que de les lever.
+  let totauxRepris = 0
+  for (const id of aRecalculer) {
+    try { await recalculerStatsClient(id); totauxRepris++ }
+    catch { /* le clic « Recalculer » de la fiche reste le filet */ }
+  }
+
   const bilan = {
     ok: erreurs.length === 0,
     source_caisse,
@@ -437,6 +458,7 @@ export async function POST(req: Request) {
     // comptés en silence : chacun est une fiche à créer dans /admin/clients,
     // et sans cette liste on ne saurait pas laquelle.
     clients_rattaches: clientsRattaches,
+    clients_totaux_repris: totauxRepris,
     ...(clientsInconnus.length > 0
       ? { clients_inconnus: [...new Set(clientsInconnus)].slice(0, 40) } : {}),
     erreurs,
