@@ -7746,6 +7746,35 @@ refuse, rien n'est désynchronisé.
 à la menthe et la grenadine Teisseire (4,98 €/L) : le réassort ne saura pas le
 commander. La mauresque dépend donc d'un approvisionnement hors outil.
 
+**LES ANISÉS À 2,00 €, AVEC SIROP 2,20 € — décision du gérant (13/10/2026).**
+`node scripts/prix-anises-1310.mjs [--ecrire]`. Ricard et Pastis 51 passent de
+2,50 à **2,00 €** ; Mauresque, Tomate, Perroquet et Gommé de 2,80 à **2,20 €**.
+
+⚠️⚠️ **CE CHANGEMENT CASSE UN REPÈRE QUE LE PROJET S'ÉTAIT DONNÉ, et il doit
+être dit plutôt que contourné.** La carte du bar (0144) a été bâtie sur
+« rien ne rapporte moins que le demi » — 1,42 € de marge HT — avec un
+plancher de service de 1,15 € par verre (17,23 €/h chargés ÷ 15 consos/h).
+
+| | marge HT | food cost |
+|---|---|---|
+| Ricard · Pastis 51 à 2,00 € | **1,27 € · 1,29 €** | 24 % · 23 % |
+| Gommé à 2,20 € | 1,39 € | 24 % |
+| Perroquet · Tomate à 2,20 € | 1,32 € | 28 % |
+| Mauresque à 2,20 € | 1,31 € | 29 % |
+
+Les six restent **au-dessus du plancher de service** et le food cost reste
+sain, mais **l'anisé devient la consommation la moins rentable du bar**, sous
+le demi. C'est un choix de RÉPUTATION, pas une erreur : le pastis est l'un des
+trois prix qu'un village compare, avec le café et le demi. Le repère
+« rien sous le demi » est donc **périmé** — ne pas le rejouer comme une règle.
+
+⚠️ Le script VÉRIFIE qu'aucun de ces six ne porte de `prix_sur_place_ttc` :
+au bar le sur place EST le prix, et un tarif de salle distinct changerait la
+nature du geste. Il refuse d'écrire sinon.
+
+⚠️ L'affichage extérieur obligatoire suit tout seul — sa rubrique « Apéritif
+anisé » lit « Ricard 2 cl » en base, elle affichera 2,00 €.
+
 **DEUX FAMILLES DE BOISSONS — décision du gérant.** La carte portait **deux
 modèles contradictoires** pour la même idée :
 
