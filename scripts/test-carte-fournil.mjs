@@ -126,6 +126,9 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Comptoir, 13/10/2026 : aucune affiche ne les porte. Le briquet n'est pas
+  // alimentaire (20 %), le paquet de bonbons en est une (5,5 %).
+  'Paquet de bonbons', 'Briquet',
   // Le chocolat chaud passe en deux tailles le 13/10/2026 (2,30 / 2,80 €) :
   // aucune affiche ne porte le grand.
   'Chocolat chaud grand',

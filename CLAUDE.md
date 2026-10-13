@@ -7690,6 +7690,53 @@ y a 544 commandes caisse. **Une limite sans tri stable ne promet aucun ordre**,
 et c'est écrit trois fois dans ce fichier. On FILTRE (`client_id=not.is.null`),
 on ne ramène pas pour trier ensuite.
 
+### Bonbons et briquet au comptoir — et le puff NON créé (13/10/2026)
+
+`node scripts/comptoir-bonbons-briquet-1310.mjs [--ecrire]`.
+**Paquet de bonbons 3,75 €** et **Briquet 1,00 €**.
+
+⚠️⚠️ **LE PUFF N'A PAS ÉTÉ CRÉÉ, ET CE N'EST PAS UN OUBLI.** La vente des
+cigarettes électroniques **JETABLES** (« puffs ») est **INTERDITE en France** :
+la loi a été définitivement adoptée en février 2025 et son interdiction est
+entrée en application la même année. Créer le bouton rendrait la vente
+tapable par n'importe qui au comptoir, **sans que l'équipe sache que c'est
+prohibé** — et c'est l'établissement qui est exposé, pas le serveur.
+
+Ce fichier le notait déjà en septembre, en sélectionnant les rayons Euro-Cash :
+« CBD, e-liquides et cigarettes électroniques partent AVEC le rayon pipier
+mais **restent à trancher avant vitrine** ». → À confirmer par le gérant : si
+c'est un modèle **rechargeable** (hors interdiction), le produit se crée en
+une ligne, famille « Tabac », 20 %.
+
+⚠️ **LA TVA DÉCIDE DE LA FAMILLE, pas le rayon du magasin.** Un bonbon est une
+denrée à **5,5 %**, un briquet n'est pas alimentaire et reste à **20 %** :
+`verifier-carte-zelty.mjs` refuse deux taux dans une même famille — c'est ce
+contrôle qui avait trouvé le Pago à 5,5 % parmi seize boissons à 10 %. Les
+ranger ensemble l'aurait fait rougir, à raison. Donc bonbons → **Gourmandise**,
+briquet → **Tabac**.
+
+⚠️ **On n'a PAS créé de famille « Confiserie » pour un seul article** :
+Gourmandise porte déjà les sucreries du comptoir au même taux, et une famille
+à un produit n'a pas sa place sur une caisse (règle posée en rangeant la
+Focaccia en Sandwich). Le jour où le rayon confiserie s'ouvre pour de bon —
+94 pages du catalogue Euro-Cash, et c'est là que se joue le panier moyen d'un
+tabac — il méritera sa famille.
+
+⚠️ **Aucun coût d'achat** : Euro-Cash porte bien quatre briquets à son
+catalogue, **tous à « prix sur demande »** (le rayon pipier est l'un des 18
+sur 21 jamais chiffrés), et les bonbons n'y sont pas du tout. Les deux sortent
+en « coût inconnu ».
+
+⚠️⚠️ **ET « TABAC » MANQUAIT DANS `JAMAIS_EN_LIGNE`** depuis la création de la
+famille la veille, pour les feuilles OCB. `generer-visuels-sans-photo.mjs` met
+en ligne **toute famille absente** de cette liste : un seul passage aurait mis
+les feuilles à rouler et les briquets **en vente sur casatasia.fr**, sans
+contrôle d'âge et sans que rien ne le signale. Deuxième fois en deux jours que
+cette liste se fait déborder par une famille créée après elle (« Boisson
+salle » le matin) — **toute famille nouvelle doit y être examinée.**
+
+Contrôles : carte **193/193 conformes, 0 écart** · `test-carte-fournil` 13/13.
+
 ### Chocolat chaud en deux tailles, et une Pinte Picon (13/10/2026)
 
 `node scripts/choco-picon-1310.mjs [--ecrire]`. Demande du gérant.

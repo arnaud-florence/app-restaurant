@@ -45,7 +45,11 @@ const BASE_URL = 'https://app-restaurant-livid.vercel.app/produits'
 // consigné à une table, ils ne sont pas du click & collect. Absente de cette
 // liste, la règle de ce script les aurait mis EN LIGNE au premier passage —
 // exactement ce qui est arrivé à la brasserie en septembre.
-const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Boisson salle', 'Formule', 'Formule petit-déjeuner'])
+// ⚠️ « Tabac » MANQUAIT depuis la création de la famille hier (les feuilles
+// OCB) : ce script met en ligne toute famille absente d'ici, donc un seul
+// passage aurait mis les feuilles à rouler et les briquets en vente sur
+// casatasia.fr — sans contrôle d'âge, et sans que rien ne le signale.
+const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Boisson salle', 'Tabac', 'Formule', 'Formule petit-déjeuner'])
 
 // ⚠️ Une règle par FAMILLE ne suffit plus depuis la carte du bar (28/08/2026).
 // Les familles Bière, Apéritif, Alcool et Vin n'y figuraient pas, donc le
