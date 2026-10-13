@@ -7596,6 +7596,100 @@ c'était un 500.
 Contrôles : carte **179/179, 0 écart** · `test-carte-fournil` **13/13** ·
 `test-matieres-bar` **18/18** · affichage légal **8/8 rubriques servies**.
 
+### Le client du ticket entre dans l'outil (13/10/2026)
+
+⚠️⚠️ **LA CAISSE SAVAIT QUI ACHETAIT, LE CONNECTEUR LE JETAIT.** Le webhook
+`order.ended` transporte un objet client COMPLET (id, name, fname, company,
+mail, phone, balance) ; le mapper n'en lisait rien. Mesuré : **0 commande sur
+93 avec un `client_id`**, alors que `commandes` porte la colonne depuis
+toujours et que `recalculerStatsClient()` n'attendait qu'elle. Sans ce
+maillon, le total par client ne se calculait nulle part — donc pas de facture
+de fin de mois, qui était tout l'objet de la demande.
+
+Trois maillons, trois responsabilités :
+
+| Où | Quoi |
+|---|---|
+| `zelty/schema.ts` | `customer` relevé sur les charges RÉELLES, tout en `.nullish()` |
+| `zelty/mapper.ts` | **TRANSPORTE** le client, ne le rapproche pas — il est PUR et ne voit pas notre fichier |
+| `caisse/encaissements` | **RAPPROCHE** — le seul qui voit nos fiches |
+
+⚠️ **Pour une ENTREPRISE, `company` est le nom qui parle ; `name` porte le
+contact.** La supérette a les deux, un particulier n'a que `name`.
+
+⚠️ **`""` n'est pas une donnée.** La caisse écrit des chaînes vides là où il
+n'y a rien (`mail: ""`, `fname: ""` sur les fiches créées au comptoir) : les
+prendre pour des valeurs ferait rapprocher sur du vide.
+
+⚠️ **Ni solde, ni fidélité, ni consentement ne traversent.** Un consentement
+qui voyagerait dans un ticket de caisse serait une infraction, pas une
+fonctionnalité — même règle que le pont client.
+
+⚠️ **Rapprochement par ordre de FIABILITÉ** : identifiant de caisse (exact) →
+email → téléphone (peut être celui du conjoint). Le **MÊME** ordre que le pont
+client, avec ses normaliseurs RÉUTILISÉS (`+33767453444` et `0767453444` sont
+le même client) — deux ordres différents finiraient par désigner deux fiches
+pour le même ticket. ✅ Vérifié sur le seul ticket réel qui portait un client :
+rattaché **par téléphone**, comme prévu.
+
+⚠️⚠️ **ON NE CRÉE JAMAIS DE CLIENT DEPUIS UNE VENTE.** Un ticket qui porte un
+inconnu est **NOMMÉ** dans le bilan (`clients_inconnus`), pas inventé. Créer à
+l'aveugle remplirait le CRM de fiches muettes, et une fiche porte des
+consentements que seul le pont client (4 h 40) sait recueillir : **un ticket de
+caisse n'est pas un formulaire d'inscription.**
+
+⚠️ **Le rattachement ne peut JAMAIS faire échouer la vente** : client
+introuvable → `client_id` reste NULL et le ticket entre quand même. Perdre du
+chiffre d'affaires pour un rapprochement raté serait le pire des deux maux.
+Les coordonnées du ticket sont gardées même sans fiche : elles DISENT qui a
+acheté.
+
+⚠️⚠️ **UN TICKET DÉJÀ INGÉRÉ N'EST PAS UN TICKET COMPLET.** Les 93 ventes du
+12/10 sont entrées avant ce correctif : la route réutilise la commande
+existante, donc un rejeu depuis le journal serait passé **à côté sans rien
+écrire**. Un rattrapage complète un `client_id` encore nul — et **seulement**
+nul : un rattachement corrigé à la main ne doit pas se faire écraser par un
+passage automatique.
+
+⚠️⚠️ **LE TOTAL EST UNE COLONNE, PAS UN CALCUL À L'AFFICHAGE.**
+`/admin/clients` lit `clients.total_depense` telle quelle, et seul un clic
+« Recalculer » sur la fiche la mettait à jour. Un ticket rattaché laissait donc
+le total **FAUX**, et la facture avec. `recalculerStatsClient()` est appelé à
+l'ingestion — **réutilisé, jamais réécrit** : deux sommes du même chiffre
+finissent par en afficher deux.
+
+⚠️ **Et mon premier branchement ne déclenchait le recalcul que sur un
+rattachement NEUF** : le premier passage attachait, le suivant passait à côté
+sans rien reprendre. La fiche Ceccherini est restée à son total de **mai**
+(78,45 €, 3 visites) alors qu'un ticket du 11/10 à 46,30 € lui était rattaché
+— un chiffre faux affiché comme un chiffre juste. Le total est repris dès que
+le ticket **DÉSIGNE** le client, attaché ou non. ✅ Après correction :
+**42,08 €, 1 visite, 11/10** — et au passage le recalcul a **corrigé** un
+total qui comptait des commandes de démonstration purgées depuis.
+
+⚠️ **`total_depense` somme le HT**, par choix du calcul de fidélité
+(`lib/fidelite.ts`). Pour facturer un professionnel c'est la bonne base ; pour
+un particulier, ça sous-dit ce qu'il a réellement payé (42,08 € HT pour un
+ticket de 46,30 € TTC). À savoir avant de lire ce chiffre.
+
+⚠️ **CE QUI MANQUE ENCORE : un total par client et par MOIS.**
+`total_depense` est un cumul depuis toujours, et il n'existe aucune vue du
+détail des ventes d'un client. Pour facturer la supérette en fin de mois, le
+rapport reste à écrire — les données, elles, sont désormais là.
+
+⚠️ **Le script de rejeu grossissait à chaque passage** : chaque rejeu laisse sa
+propre trace dans le journal, donc 54 tickets au premier tour, 185 au
+troisième, et une commande qui dépasse cinq minutes. Dédoublonné sur
+l'identifiant du TICKET, la trace la plus récente gagne.
+
+⚠️ **Et je me suis trompé deux fois en vérifiant, les deux fois par la même
+faute** : j'ai annoncé « 10 tickets sur 80 portent un client » (c'était UN
+ticket, compté dix fois à cause de mes propres rejeux dans le journal), puis
+lu « 0 commande rattachée sur 300 » sur un `limit` SANS `order` — alors qu'il
+y a 544 commandes caisse. **Une limite sans tri stable ne promet aucun ordre**,
+et c'est écrit trois fois dans ce fichier. On FILTRE (`client_id=not.is.null`),
+on ne ramène pas pour trier ensuite.
+
 ### Les comptes clients en caisse (13/10/2026)
 
 **« La Supérette de l'Issole » créée des DEUX côtés, liées exactement** —
