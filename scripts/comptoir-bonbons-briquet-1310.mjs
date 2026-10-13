@@ -32,6 +32,13 @@ const ECRIRE = process.argv.includes('--ecrire')
 const NOUVEAUX = [
   { nom: 'Paquet de bonbons', gabarit: 'Donuts',                    ttc: 3.75, allerg: [] },
   { nom: 'Briquet',           gabarit: 'Feuilles OCB Slim Premium', ttc: 1.00, allerg: [] },
+  // ⚠️ « RECHARGEABLE » EST DANS LE NOM, ET C'EST VOLONTAIRE. Le gérant a
+  // confirmé que ce n'est pas un jetable — donc hors de l'interdiction de
+  // 2025. Mais le mot « puff » désigne couramment le produit PROHIBÉ : sur un
+  // ticket, un Z ou un écran de caisse, le libellé seul ferait croire à la
+  // vente d'un article interdit, et c'est à l'établissement de prouver le
+  // contraire. Le nom documente la conformité au moment où elle se lit.
+  { nom: 'Puff rechargeable',  gabarit: 'Feuilles OCB Slim Premium', ttc: 12.00, allerg: [] },
 ]
 
 const env = {}
@@ -124,17 +131,18 @@ for (const c of corps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// ⚠️⚠️ LE PUFF N'EST PAS CRÉÉ, ET CE N'EST PAS UN OUBLI.
-// La vente des cigarettes électroniques JETABLES (« puffs ») est INTERDITE
-// en France : la loi visant à les interdire a été définitivement adoptée en
-// février 2025 et son interdiction est entrée en application la même année.
-// Créer le bouton rendrait la vente tapable par n'importe qui au comptoir,
-// sans que l'équipe sache que c'est prohibé.
-// Ce fichier projet notait déjà, en septembre, que « CBD, e-liquides et
-// cigarettes électroniques restent à trancher avant vitrine ».
-// → À confirmer par le gérant. S'il s'agit d'un modèle RECHARGEABLE (donc
-//   hors interdiction) ou d'un stock antérieur dont la revente lui est
-//   confirmée possible, le produit se crée en une ligne dans NOUVEAUX,
-//   famille « Tabac », 20 %.
+// ⚠️⚠️ LE PUFF : TRANCHÉ PAR LE GÉRANT LE 13/10/2026 — « c'est pas jetable,
+// c'est avec recharge possible ». Il sort donc de l'interdiction de 2025, qui
+// ne vise que les dispositifs de vapotage À USAGE UNIQUE.
+//
+// ⚠️ MAIS LA VENTE AUX MINEURS RESTE INTERDITE (art. L3513-5 du code de la
+// santé publique), comme pour le tabac et l'alcool. Deux conséquences, les
+// deux appliquées :
+//   · `vendable_online: false` — aucun contrôle d'âge sur le click & collect,
+//     exactement la règle qui tient l'alcool hors du site depuis la 0144 ;
+//   · l'affichage « interdiction de vente aux mineurs » doit couvrir le
+//     vapotage, pas seulement l'alcool — à vérifier dans /admin/legal.
+//
+// ⚠️ La publicité et l'affichage des produits de vapotage sont par ailleurs
+// restreints : ne pas le pousser en vitrine ni sur les réseaux.
 // ─────────────────────────────────────────────────────────────────────
-console.log('\n⚠ Le puff n\'est pas créé — voir l\'avertissement en fin de fichier.\n')

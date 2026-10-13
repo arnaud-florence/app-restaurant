@@ -7695,18 +7695,36 @@ on ne ramène pas pour trier ensuite.
 `node scripts/comptoir-bonbons-briquet-1310.mjs [--ecrire]`.
 **Paquet de bonbons 3,75 €** et **Briquet 1,00 €**.
 
-⚠️⚠️ **LE PUFF N'A PAS ÉTÉ CRÉÉ, ET CE N'EST PAS UN OUBLI.** La vente des
-cigarettes électroniques **JETABLES** (« puffs ») est **INTERDITE en France** :
-la loi a été définitivement adoptée en février 2025 et son interdiction est
-entrée en application la même année. Créer le bouton rendrait la vente
-tapable par n'importe qui au comptoir, **sans que l'équipe sache que c'est
-prohibé** — et c'est l'établissement qui est exposé, pas le serveur.
+**LE PUFF — tranché par le gérant : « c'est pas jetable, c'est avec recharge
+possible ».** Il sort donc de l'interdiction de 2025, qui ne vise que les
+dispositifs de vapotage **à usage unique**. Créé à **12,00 €**, famille
+« Tabac », 20 % dans les deux modes.
 
-Ce fichier le notait déjà en septembre, en sélectionnant les rayons Euro-Cash :
-« CBD, e-liquides et cigarettes électroniques partent AVEC le rayon pipier
-mais **restent à trancher avant vitrine** ». → À confirmer par le gérant : si
-c'est un modèle **rechargeable** (hors interdiction), le produit se crée en
-une ligne, famille « Tabac », 20 %.
+⚠️ **Il s'appelle « Puff RECHARGEABLE », et le mot n'est pas décoratif.** Le
+mot « puff » désigne couramment le produit PROHIBÉ : sur un ticket, un Z ou un
+écran de caisse, le libellé seul ferait croire à la vente d'un article
+interdit, et c'est à l'établissement de prouver le contraire. **Le nom
+documente la conformité à l'endroit où elle se lit.**
+
+⚠️ **La vente aux mineurs reste interdite** (art. L3513-5 CSP), donc
+`vendable_online: false` — aucun contrôle d'âge sur le click & collect, la
+règle exacte qui tient l'alcool hors du site depuis la 0144. Et la publicité
+des produits de vapotage est restreinte : ne pas le pousser en vitrine ni sur
+les réseaux.
+
+⚠️⚠️ **ET LE REGISTRE DES AFFICHAGES NE PORTAIT AUCUNE MENTION DE LA VENTE AUX
+MINEURS** — constaté en créant ce produit. Les 14 affichages suivis couvrent
+l'interdiction de FUMER, les horaires, la convention collective, l'origine des
+viandes… mais rien sur les mineurs, alors que la maison vend **les trois**
+catégories concernées : alcool (licence IV, art. L3342-4), tabac et
+accessoires (L3512-12), vapotage (L3513-5).
+
+`node scripts/affichage-mineurs-1310.mjs [--ecrire]` l'ajoute, **marqué
+ABSENT et sans date de vérification** : on ne déclare pas présent un affichage
+que personne n'a vu au mur, et « une échéance fausse dans un registre légal
+est pire que pas d'échéance — elle rassure » (0147). **À imprimer, poser au
+comptoir, puis cocher dans `/admin/legal`.** Le registre compte désormais
+15 affichages, 7 présents.
 
 ⚠️ **LA TVA DÉCIDE DE LA FAMILLE, pas le rayon du magasin.** Un bonbon est une
 denrée à **5,5 %**, un briquet n'est pas alimentaire et reste à **20 %** :

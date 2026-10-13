@@ -128,7 +128,7 @@ const actifs = carte.filter(r => r.actif)
 const HORS_AFFICHE = new Set([
   // Comptoir, 13/10/2026 : aucune affiche ne les porte. Le briquet n'est pas
   // alimentaire (20 %), le paquet de bonbons en est une (5,5 %).
-  'Paquet de bonbons', 'Briquet',
+  'Paquet de bonbons', 'Briquet', 'Puff rechargeable',
   // Le chocolat chaud passe en deux tailles le 13/10/2026 (2,30 / 2,80 €) :
   // aucune affiche ne porte le grand.
   'Chocolat chaud grand',
