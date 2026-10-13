@@ -23,7 +23,7 @@ const CERTAIN = [
   // Tout vin du commerce dépasse le seuil de 10 mg/l de sulfites.
   { test: r => r.categorie==='Vin',                            a:['sulfites'] },
   // Apéritifs à base de vin : vermouth, kir, porto, muscat, spritz.
-  { test: r => ['Martini 4 cl','Kir','Kir royal','Porto 6 cl','Muscat 6 cl','Spritz'].includes(r.nom), a:['sulfites'] },
+  { test: r => ['Martini blanc 4 cl','Kir','Kir royal','Porto 6 cl','Muscat 6 cl','Spritz'].includes(r.nom), a:['sulfites'] },
   // Boissons lactées.
   { test: r => ['Cappuccino','Chocolat chaud','Café noisette','Cappuccino ou chocolat chaud'].includes(r.nom), a:['lait'] },
 
@@ -43,7 +43,7 @@ const CERTAIN = [
 // Certain qu'il n'y en a PAS : les distillats sont exemptés d'étiquetage
 // gluten, et un café ou un soda n'a aucun des 14. Laisser vide serait
 // ambigu — c'est la validation humaine qui fera dire « aucun ».
-const AUCUN = ['Café expresso','Café allongé','Thé','Pastis 2 cl','Whisky 4 cl',
+const AUCUN = ['Café expresso','Café allongé','Thé','Ricard 2 cl','Gommé','Whisky 4 cl',
   'Whisky premium 4 cl','Rhum 4 cl','Vodka 4 cl','Gin 4 cl']
 
 const r = await sb('recettes?select=id,nom,categorie,allergenes_complementaires&actif=eq.true')

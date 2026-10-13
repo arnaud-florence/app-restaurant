@@ -33,8 +33,8 @@ const BAR = [
   ['Desperados 33 cl',         'Bière',   4.00, 20, A, 1.40],
   ['Bière sans alcool 33 cl',  'Bière',   2.80, 10, S, 0.80],
 
-  ['Pastis 2 cl',              'Apéritif',2.50, 20, A, 0.45],
-  ['Martini 4 cl',             'Apéritif',3.00, 20, A, 0.70],
+  ['Ricard 2 cl',              'Apéritif',2.50, 20, A, 0.45],
+  ['Martini blanc 4 cl',       'Apéritif',3.00, 20, A, 0.70],
   ['Suze 4 cl',                'Apéritif',3.00, 20, A, 0.70],
   ['Picon 4 cl',               'Apéritif',3.00, 20, A, 0.70],
   ['Kir',                      'Apéritif',3.00, 20, A, 0.85],

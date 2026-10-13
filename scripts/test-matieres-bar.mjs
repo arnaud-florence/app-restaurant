@@ -31,7 +31,7 @@ const bar = await q('recettes?select=nom,categorie,nom_matiere,unites_par_achat,
 // Ces produits mélangent deux matières : les rattacher à une seule en
 // oublierait l'autre, qui sortirait du stock sans que rien ne le signale.
 const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière', 'Diabolo', 'Alcool + soft',
-  'Mauresque', 'Tomate', 'Perroquet', 'Rosé pamplemousse', 'Planteur']
+  'Mauresque', 'Tomate', 'Perroquet', 'Gommé', 'Rosé pamplemousse', 'Planteur']
 const A_TRANCHER = ['Pichet 25 cl', 'Pichet 50 cl']
 
 console.log('\n── couverture ──')
@@ -57,7 +57,7 @@ const attendus = [
   // ⚠️ 83,33 et pas 8,33 : 10 L = 1000 cl. Une première version écrivait
   // 8,33 — coût juste, rendement faux ×10. C'est cette ligne qui l'a vu.
   ['Verre de rosé 12 cl', 'Vin rosé BIB 10 L',  83.33, '10 L / 12 cl'],
-  ['Pastis 2 cl',         'Ricard 1 L',         50,    '1 L / 2 cl'],
+  ['Ricard 2 cl',         'Ricard 1 L',         50,    '1 L / 2 cl'],
 ]
 for (const [nom, mat, n, calcul] of attendus) {
   const r = par[nom]

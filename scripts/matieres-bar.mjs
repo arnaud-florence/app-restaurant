@@ -69,8 +69,9 @@ const LIENS = [
   ['Digestif 4 cl',           'Digestif 70 cl',           17.5],
 
   // ── Apéritifs : contenances de service différentes ──────────────
-  ['Pastis 2 cl',             'Pastis 1 L',                 50],
-  ['Martini 4 cl',            'Martini 1 L',                25],
+  ['Ricard 2 cl',             'Ricard 1 L',                 50],
+  ['Martini blanc 4 cl',      'Martini Bianco 1 L',         25],
+
   ['Picon 4 cl',              'Picon 1 L',                  25],
   ['Suze 4 cl',               'Suze 1 L',                   25],
   ['Porto 6 cl',              'Porto 75 cl',              12.5],
@@ -102,6 +103,7 @@ const COMPOSITES = {
   'Mauresque':    'pastis + sirop d\'orgeat',
   'Tomate':       'pastis + sirop de grenadine',
   'Perroquet':    'pastis + sirop de menthe',
+  'Gommé':        'pastis + sirop de gomme',
   'Rosé pamplemousse': 'vin rosé + sirop de pamplemousse',
   'Planteur':     'rhum ambré + jus d\'ananas + nectar d\'orange + grenadine',
 }

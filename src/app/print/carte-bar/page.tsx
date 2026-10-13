@@ -64,7 +64,12 @@ export default async function CarteBarPage() {
     ['Jus de fruit', trouve("Jus d'orange 33 cl")],
     ['Soda', trouve('Coca-Cola 33 cl')],
     ['Eau minérale', trouve('Eau plate 50 cl')],
-    ['Apéritif anisé', trouve('Pastis 2 cl')],
+    // ⚠️⚠️ DEUXIÈME FOIS QUE CE FICHIER EST CASSÉ PAR UN RENOMMAGE (Heineken
+    // le 12/10, « Pastis 2 cl » → « Ricard 2 cl » le 13/10). Le LIBELLÉ de la
+    // rubrique est imposé par l'arrêté ; seul le produit qui l'incarne change.
+    // Sans cette ligne, `trouve()` rend `undefined` et une mention légale
+    // DISPARAÎT de l'affichage extérieur, sans la moindre erreur.
+    ['Apéritif anisé', trouve('Ricard 2 cl')],
   ]
   const { data: sandwich } = await supabase.from('recettes')
     .select('nom, categorie, prix_vente_ht, tva, prix_sur_place_ttc')

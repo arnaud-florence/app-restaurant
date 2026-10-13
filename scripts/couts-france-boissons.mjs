@@ -102,8 +102,8 @@ const PLAN = [
   ['Digestif 4 cl',        achat('digestif Get27 70') / 17.5, 'Get 27 70 cl', 17.5, 'digestif Get27 70'],
 
   // ── Apéritifs ────────────────────────────────────────────────────────
-  ['Pastis 2 cl',  achat('pastis Ricard 1L') / 50, 'Ricard 1 L', 50, 'pastis Ricard 1L'],
-  ['Martini 4 cl', achat('Martini Bianco 1L') / 25, 'Martini Bianco 1 L', 25, 'Martini Bianco 1L', 'droits inclus (CRD)'],
+  ['Ricard 2 cl', achat('pastis Ricard 1L') / 50, 'Ricard 1 L', 50, 'pastis Ricard 1L'],
+  ['Martini blanc 4 cl', achat('Martini Bianco 1L') / 25, 'Martini Bianco 1 L', 25, 'Martini Bianco 1L', 'droits inclus (CRD)'],
   ['Picon 4 cl',   achat('Picon bière 1L') / 25, 'Picon bière 1 L', 25, 'Picon bière 1L'],
   ['Suze 4 cl',    achat('Suze 1L') / 25, 'Suze 1 L', 25, 'Suze 1L', 'droits inclus (CRD)'],
   ['Porto 6 cl',   achat('Porto tawny FB 75') / 12.5, 'Porto tawny 75 cl', 12.5, 'Porto tawny FB 75'],
