@@ -85,6 +85,19 @@ export const transactionZeltySchema = z.object({
 // COMMANDES : elle n'a donc rien protégé le 12/10 à 4 h du matin. Quand un
 // schéma de cette API tombe en « Invalid input », chercher un `null` AVANT de
 // chercher un nom de champ.
+/** Le client attaché au ticket. RELEVÉ sur les webhooks réels du 12/10/2026 :
+ *  l'objet est COMPLET (id, name, fname, company, mail, phone, balance…), pas
+ *  un simple identifiant. Tout en `.nullish()` — la caisse écrit `""` aussi
+ *  bien que `null` selon les champs. */
+const clientCommandeSchema = z.object({
+  id:      texte.nullish(),
+  name:    z.string().nullish(),
+  fname:   z.string().nullish(),
+  company: z.string().nullish(),
+  mail:    z.string().nullish(),
+  phone:   z.string().nullish(),
+}).passthrough()
+
 export const commandeZeltySchema = z.object({
   id:          texte.nullish(),
   remote_id:   texte.nullish(),
@@ -123,6 +136,11 @@ export const commandeZeltySchema = z.object({
   // spec OpenAPI de la doc (28/08/2026), où `contents` est même REQUIS.
   // Ne lire que `items` ferait entrer chaque ticket web sans une seule ligne —
   // CA juste, stock et marges aveugles, et aucune erreur pour le dire.
+  /** ⚠️ Présent sur 10 tickets sur 80 le jour de l'ouverture, et JETÉ par le
+   *  connecteur jusqu'au 13/10/2026 : la caisse savait qui achetait, l'outil
+   *  non — donc aucun total par client, donc aucune facture de fin de mois. */
+  customer:     clientCommandeSchema.nullish(),
+
   items:        z.array(ligneZeltySchema).nullish(),
   contents:     z.array(ligneZeltySchema).nullish(),
   transactions: z.array(transactionZeltySchema).nullish(),

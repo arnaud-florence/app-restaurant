@@ -28,6 +28,11 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { journaliser } from '@/lib/integrations/journal'
 import { chargerCorrespondances, noterCorrespondance } from '@/lib/integrations/correspondances'
+// ⚠️ Deux normaliseurs PURS, réutilisés plutôt que réécrits : `+33767453444`
+// et `0767453444` sont le même client, et une seconde implémentation finirait
+// par rapprocher autrement que le pont client — donc par afficher deux
+// totaux pour la même personne.
+import { telephoneComparable, emailComparable } from '@/lib/integrations/zelty/clients'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -68,6 +73,14 @@ const ligneSchema = z.object({
   /** Pourboire encaissé avec la vente. Il appartient à l'équipe, pas au CA —
    *  il est donc stocké à part et n'entre pas dans montant_total_ttc. */
   pourboire: z.number().optional(),
+  /** Le client du ticket, quand la caisse le connaît. POS-AGNOSTIQUE comme le
+   *  reste : SumUp n'en donne pas, Zelty oui. */
+  client: z.object({
+    identifiant_externe: z.string().optional(),
+    nom: z.string().optional(),
+    email: z.string().optional(),
+    telephone: z.string().optional(),
+  }).optional(),
 })
 const payloadSchema = z.object({
   source_caisse: z.string().min(1),
@@ -129,6 +142,49 @@ export async function POST(req: Request) {
   // caisse. 20 % sur un produit non alcoolisé est presque toujours une erreur
   // de paramétrage côté caisse — vécu sur 7 produits du Fournil, ~270 €/an de
   // TVA sur-collectée, invisibles jusqu'à ce qu'on les cherche.
+  // ─── Le fichier client, chargé UNE fois ──────────────────────────────
+  // ⚠️⚠️ ON NE CRÉE JAMAIS DE CLIENT DEPUIS UNE VENTE. Un ticket qui porte un
+  // inconnu est SIGNALÉ, pas inventé : créer à l'aveugle remplirait le CRM de
+  // fiches muettes et de doublons, et surtout une fiche client porte des
+  // consentements que seul le pont client (cron de 4 h 40) sait recueillir
+  // correctement. Un ticket de caisse n'est pas un formulaire d'inscription.
+  const clientParCaisse = new Map<string, string>()
+  const clientParEmail = new Map<string, string>()
+  const clientParTel = new Map<string, string>()
+  {
+    const { data: cls } = await sb.from('clients')
+      .select('id, email, telephone, caisse_externe_id, caisse_externe_systeme')
+    for (const c of cls ?? []) {
+      const id = String(c.id)
+      // L'identifiant de caisse ne se trompe JAMAIS : il passe en premier.
+      if (c.caisse_externe_id && c.caisse_externe_systeme === source_caisse) {
+        clientParCaisse.set(String(c.caisse_externe_id), id)
+      }
+      const m = emailComparable(c.email as string | null)
+      if (m && !clientParEmail.has(m)) clientParEmail.set(m, id)
+      const t = telephoneComparable(c.telephone as string | null)
+      if (t && !clientParTel.has(t)) clientParTel.set(t, id)
+    }
+  }
+  /** Rapprochement par ordre de FIABILITÉ : l'identifiant de caisse est
+   *  exact, l'email presque toujours, le téléphone peut être celui du
+   *  conjoint. Même ordre que le pont client — deux ordres différents
+   *  finiraient par désigner deux fiches pour le même ticket. */
+  const trouverClient = (cl?: { identifiant_externe?: string; email?: string; telephone?: string }) => {
+    if (!cl) return null
+    if (cl.identifiant_externe) {
+      const v = clientParCaisse.get(String(cl.identifiant_externe))
+      if (v) return v
+    }
+    const m = emailComparable(cl.email)
+    if (m) { const v = clientParEmail.get(m); if (v) return v }
+    const t = telephoneComparable(cl.telephone)
+    if (t) { const v = clientParTel.get(t); if (v) return v }
+    return null
+  }
+  let clientsRattaches = 0
+  const clientsInconnus: string[] = []
+
   const tauxSuspects: string[] = []
   let recus = 0, rapproches = 0, sansCommande = 0, creees = 0
   let lignesPosees = 0
@@ -171,8 +227,37 @@ export async function POST(req: Request) {
 
         if (dejaVu?.commande_id) {
           commandeId = String(dejaVu.commande_id)
+          // ⚠️ UN TICKET DÉJÀ INGÉRÉ N'EST PAS UN TICKET COMPLET. Les 93 ventes
+          // du 12/10 sont entrées avant que le client soit transporté : sans ce
+          // rattrapage, un rejeu depuis le journal ne les corrigerait JAMAIS —
+          // la commande existe, donc on passe à côté sans rien écrire.
+          //
+          // On COMPLÈTE, on ne remplace pas : seul un `client_id` encore nul
+          // est rempli. Un rattachement corrigé à la main ne doit pas se faire
+          // écraser par un passage automatique (même règle que le pont client).
+          const rattrape = trouverClient(l.client)
+          if (rattrape) {
+            const { data: cmd } = await sb.from('commandes')
+              .select('client_id').eq('id', commandeId).maybeSingle()
+            if (cmd && !cmd.client_id) {
+              await sb.from('commandes').update({
+                client_id: rattrape,
+                client_nom: l.client?.nom ?? null,
+                client_email: l.client?.email ?? null,
+                client_telephone: l.client?.telephone ?? null,
+              }).eq('id', commandeId)
+              clientsRattaches++
+            }
+          } else if (l.client?.nom || l.client?.identifiant_externe) {
+            clientsInconnus.push(l.client.nom ?? `#${l.client.identifiant_externe}`)
+          }
         } else {
           const encaisseLe = l.encaisse_at ?? new Date().toISOString()
+          const clientTrouve = trouverClient(l.client)
+          if (clientTrouve) clientsRattaches++
+          else if (l.client?.nom || l.client?.identifiant_externe) {
+            clientsInconnus.push(l.client.nom ?? `#${l.client.identifiant_externe}`)
+          }
           const { data: synth, error: eSynth } = await sb.from('commandes').insert({
             numero: `CAI-${source_caisse.slice(0, 6).toUpperCase()}-${l.ticket_externe}`.slice(0, 60),
             source: 'CAISSE',
@@ -183,6 +268,17 @@ export async function POST(req: Request) {
             ventilation_tva: l.ventilation_tva ?? {},
             mode_paiement: l.mode_paiement ?? 'caisse_agreee',
             pourboire_total: l.pourboire ?? 0,
+            // ⚠️ Le rattachement ne doit JAMAIS faire échouer la vente : un
+            // client introuvable laisse `client_id` à NULL et le ticket entre
+            // quand même. Perdre un chiffre d'affaires pour un rapprochement
+            // raté serait le pire des deux maux.
+            client_id: clientTrouve,
+            // Les coordonnées du ticket sont gardées même sans fiche : elles
+            // DISENT qui a acheté, et `recalculerStatsClient()` sait aussi
+            // rapprocher par email ou téléphone.
+            client_nom: l.client?.nom ?? null,
+            client_email: l.client?.email ?? null,
+            client_telephone: l.client?.telephone ?? null,
             etablissement_id: l.etablissement_slug ? (slugToId.get(l.etablissement_slug) ?? null) : null,
             created_at: encaisseLe,
             notes: `Ticket ${source_caisse} ${l.ticket_externe} — encaissé hors app`,
@@ -337,6 +433,12 @@ export async function POST(req: Request) {
     // toujours un mauvais paramétrage, et il sur-collecte en silence.
     ...(tauxSuspects.length > 0 ? { tva_20_suspecte: tauxSuspects } : {}),
     sans_commande: sansCommande,
+    // Le rattachement au fichier client. ⚠️ Les INCONNUS sont nommés, pas
+    // comptés en silence : chacun est une fiche à créer dans /admin/clients,
+    // et sans cette liste on ne saurait pas laquelle.
+    clients_rattaches: clientsRattaches,
+    ...(clientsInconnus.length > 0
+      ? { clients_inconnus: [...new Set(clientsInconnus)].slice(0, 40) } : {}),
     erreurs,
   }
 

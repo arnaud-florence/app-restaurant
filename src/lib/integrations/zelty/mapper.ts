@@ -41,6 +41,14 @@ export type EncaissementNormalise = {
     prix_unitaire_ttc: number
     tva_taux?: number
   }>
+  /** Le client du ticket, tel que la caisse le connaît. Le RAPPROCHEMENT avec
+   *  notre fichier se fait côté connecteur, qui est le seul à voir nos fiches. */
+  client?: {
+    identifiant_externe?: string
+    nom?: string
+    email?: string
+    telephone?: string
+  }
 }
 
 export type OptionsMapping = {
@@ -200,6 +208,31 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
     // Le mode de paiement vient des transactions (expand[]=transactions.method).
     const paiement = c.transactions?.find(t => t.name)?.name
 
+    // ── Le client du ticket ─────────────────────────────────────────
+    // ⚠️ On TRANSPORTE, on ne rapproche pas : le mapper est PUR et ne voit
+    // pas notre fichier client. Et on ne garde que ce qui sert à rapprocher
+    // plus l'affichage — ni solde, ni fidélité, ni consentement : un
+    // consentement qui traverse un ticket de caisse serait une infraction,
+    // pas une fonctionnalité (même règle que le pont client).
+    const cl = c.customer
+    // ⚠️ Pour une ENTREPRISE, `company` est le nom qui parle ; `name` porte
+    // le contact. La supérette a les deux, un particulier n'a que `name`.
+    const nomClient = [cl?.company, [cl?.fname, cl?.name].filter(Boolean).join(' ')]
+      .map(v => (v ?? '').trim()).find(v => v.length > 0)
+    // ⚠️ `""` n'est pas une donnée : la caisse écrit des chaînes vides là où
+    // il n'y a rien, et les prendre pour des valeurs créerait des
+    // rapprochements sur du vide.
+    const vide = (v: string | null | undefined) => {
+      const t = (v ?? '').trim()
+      return t.length ? t : undefined
+    }
+    const client = cl && (cl.id || nomClient) ? {
+      ...(cl.id ? { identifiant_externe: String(cl.id) } : {}),
+      ...(nomClient ? { nom: nomClient } : {}),
+      ...(vide(cl.mail) ? { email: vide(cl.mail) } : {}),
+      ...(vide(cl.phone) ? { telephone: vide(cl.phone) } : {}),
+    } : undefined
+
     encaissements.push({
       ticket_externe: String(ref),
       etablissement_slug: opts.etablissementSlug,
@@ -207,6 +240,7 @@ export function mapperCommandes(brut: unknown[], opts: OptionsMapping): Resultat
       ...(tvaTotal > 0 ? { tva_total: arrondi(tvaTotal), ventilation_tva: ventilation } : {}),
       ...(tvaTotal > 0 ? { montant_ht: arrondi(montantTtc - tvaTotal) } : {}),
       ...(paiement ? { mode_paiement: normaliserPaiement(paiement) } : {}),
+      ...(client ? { client } : {}),
       ...(quand ? { encaisse_at: new Date(quand).toISOString() } : {}),
       ...(produits.length > 0 ? { produits } : {}),
     })
