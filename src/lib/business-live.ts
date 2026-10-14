@@ -6,6 +6,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+import { libellePaiement } from './paiements'
+
 export type JourCA = { date: string; jour: string; ca: number; tickets: number; aujourdhui: boolean }
 
 export type BusinessLive = {
@@ -19,8 +21,13 @@ export type BusinessLive = {
   /** Sept derniers jours, du plus ancien au plus récent. */
   semaine: JourCA[]
   caSemaine: number
-  especes: number
-  carte: number
+  /**
+   * Ventilation du jour par mode de règlement. ⚠️ `encaisse` dit si l'argent
+   * est rentré : `null` = le ticket ne dit pas comment il a été payé,
+   * `false` = vente à crédit. Les fondre dans « carte » faisait croire la
+   * trésorerie présente (2 253,80 € dans ce cas, mesuré le 14/10/2026).
+   */
+  paiements: Array<{ cle: string; libelle: string; encaisse: true | false | null; ca: number }>
   /** Meilleures ventes du jour, quantité décroissante. */
   topJour: Array<{ nom: string; quantite: number; ca: number }>
   /** Fiches créées automatiquement depuis un libellé de caisse, à relire. */
@@ -56,7 +63,8 @@ export async function getBusinessLive(): Promise<BusinessLive> {
   const parJour = new Map<string, { ca: number; n: number }>()
   for (let i = 6; i >= 0; i--) parJour.set(jourParis(new Date(maintenant.getTime() - i * 86_400_000)), { ca: 0, n: 0 })
 
-  let caJour = 0, ticketsJour = 0, caHierComplet = 0, caHierMemeHeure = 0, especes = 0, carte = 0
+  let caJour = 0, ticketsJour = 0, caHierComplet = 0, caHierMemeHeure = 0
+  const parPaiement = new Map<string, { libelle: string; encaisse: true | false | null; ca: number }>()
   const heureLimite = maintenant.getTime() - 86_400_000
   const idsJour = new Set<string>()
 
@@ -69,9 +77,10 @@ export async function getBusinessLive(): Promise<BusinessLive> {
     if (j === ajd) {
       caJour += montant; ticketsJour++
       idsJour.add(String(c.id))
-      const mp = String(c.mode_paiement ?? '').toLowerCase()
-      if (mp.includes('cash') || mp.includes('espece')) especes += montant
-      else carte += montant
+      const p = libellePaiement(c.mode_paiement)
+      const b = parPaiement.get(p.cle) ?? { libelle: p.libelle, encaisse: p.encaisse, ca: 0 }
+      b.ca += montant
+      parPaiement.set(p.cle, b)
     }
     if (j === hier) {
       caHierComplet += montant
@@ -117,8 +126,9 @@ export async function getBusinessLive(): Promise<BusinessLive> {
     caHierComplet: Math.round(caHierComplet * 100) / 100,
     semaine,
     caSemaine: Math.round(semaine.reduce((s, j) => s + j.ca, 0) * 100) / 100,
-    especes: Math.round(especes * 100) / 100,
-    carte: Math.round(carte * 100) / 100,
+    paiements: [...parPaiement]
+      .map(([cle, v]) => ({ cle, libelle: v.libelle, encaisse: v.encaisse, ca: Math.round(v.ca * 100) / 100 }))
+      .sort((a, b) => b.ca - a.ca),
     topJour,
     aClasser: aClasser ?? 0,
   }

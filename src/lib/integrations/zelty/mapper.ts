@@ -85,6 +85,12 @@ export function normaliserTaux(brut: number | undefined): number | undefined {
 export function normaliserPaiement(brut: string | undefined): string {
   const s = (brut ?? '').toLowerCase()
   if (/esp|cash|liquide/.test(s)) return 'especes'
+  // ⚠️ AVANT la carte, et l'ordre est le point : un mode nommé « À crédit »
+  // contient `credit`, que la branche suivante reconnaît — il serait ingéré
+  // comme PAYÉ PAR CARTE alors que rien n'est encaissé. On ne reconnaît pas
+  // `credit` ici pour autant (« Credit Card » est une carte) : le mode de
+  // règlement de la caisse doit s'appeler « Compte client » ou « Ardoise ».
+  if (/compte|ardoise/.test(s)) return 'en_compte'
   if (/cb|card|carte|credit|bank|tpe/.test(s)) return 'carte'
   if (/ticket|resto|swile|edenred|trd/.test(s)) return 'ticket_resto'
   if (/online|en.?ligne|web|stripe|paypal/.test(s)) return 'en_ligne'

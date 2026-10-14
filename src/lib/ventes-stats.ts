@@ -10,6 +10,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { activiteDe, activiteDef, type Activite } from '@/lib/activites'
+import { libellePaiement } from './paiements'
 
 export type Periode = 'jour' | 'semaine' | 'mois'
 
@@ -181,10 +182,7 @@ export async function getVentesStats(periode: Periode = 'semaine'): Promise<Vent
       parHeureMap.set(h, hb)
     }
 
-    const mp = String(c.mode_paiement ?? 'autre').toLowerCase()
-    const nom = mp.includes('cash') || mp.includes('espece') ? 'Espèces'
-      : mp.includes('pos') || mp.includes('carte') || mp.includes('cb') ? 'Carte'
-      : mp === 'caisse_agreee' ? 'Caisse agréée' : mp
+    const nom = libellePaiement(c.mode_paiement).libelle
     paiements.set(nom, (paiements.get(nom) ?? 0) + montant)
 
     for (const [taux, v] of Object.entries(c.ventilation_tva ?? {})) {

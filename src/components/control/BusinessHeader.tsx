@@ -12,12 +12,21 @@
 //    a qu'une série, le jour se lit sous la barre, et la couleur ne sert qu'à
 //    distinguer aujourd'hui du reste.
 
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { BusinessLive } from '@/lib/business-live'
 
 const eur = (n: number, dec = 0) =>
   n.toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' €'
+
+// Teintes du design system (§6) : emerald = encaissé, amber = en attente,
+// zinc = information absente. On ne colore pas un inconnu comme un acquis.
+const TEINTE_PAIEMENT: Record<string, string> = {
+  true: 'bg-emerald-500',
+  false: 'bg-amber-500',
+  null: 'bg-zinc-600',
+}
 
 export default function BusinessHeader({ b }: { b: BusinessLive }) {
   const delta = b.caJour - b.caHierMemeHeure
@@ -26,7 +35,7 @@ export default function BusinessHeader({ b }: { b: BusinessLive }) {
 
   const maxCa = Math.max(...b.semaine.map(j => j.ca), 1)
   const H = 64          // hauteur utile du graphe, en px
-  const totalPaiements = b.especes + b.carte
+  const totalPaiements = b.paiements.reduce((t, p) => t + p.ca, 0)
 
   return (
     <section className="rounded-3xl bg-zinc-900 text-white p-4 sm:p-6 mb-5 shadow-lg">
@@ -70,16 +79,31 @@ export default function BusinessHeader({ b }: { b: BusinessLive }) {
           {totalPaiements > 0 && (
             <div className="mt-3">
               <div className="flex h-2 rounded-full overflow-hidden bg-zinc-800" role="img"
-                   aria-label={`Espèces ${eur(b.especes, 2)}, carte ${eur(b.carte, 2)}`}>
-                <div className="bg-emerald-500" style={{ width: `${(b.especes / totalPaiements) * 100}%` }} />
-                {/* 2 px de fond entre deux remplissages : sans cet écart, les
-                    deux segments se lisent comme un seul bloc. */}
-                <div className="w-0.5 shrink-0 bg-zinc-900" />
-                <div className="bg-emerald-700" style={{ width: `${(b.carte / totalPaiements) * 100}%` }} />
+                   aria-label={b.paiements.map(p => `${p.libelle} ${eur(p.ca, 2)}`).join(', ')}>
+                {b.paiements.map((p, i) => (
+                  <Fragment key={p.cle}>
+                    {/* 2 px de fond entre deux remplissages : sans cet écart, les
+                        segments se lisent comme un seul bloc. */}
+                    {i > 0 && <div className="w-0.5 shrink-0 bg-zinc-900" />}
+                    <div className={TEINTE_PAIEMENT[String(p.encaisse)]}
+                         style={{ width: `${(p.ca / totalPaiements) * 100}%` }} />
+                  </Fragment>
+                ))}
               </div>
               <p className="mt-1.5 text-[11px] text-zinc-400 tabular-nums">
-                Espèces {eur(b.especes, 2)} · Carte {eur(b.carte, 2)}
+                {b.paiements.map(p => `${p.libelle} ${eur(p.ca, 2)}`).join(' · ')}
               </p>
+              {/* ⚠️ On DIT ce qu'on ne sait pas. « Non ventilé » veut dire que le
+                  ticket n'a pas porté son mode de règlement ; « En compte » que
+                  la vente est faite et l'argent pas encore rentré. Les fondre
+                  dans « Carte » — ce que faisait l'ancienne version — laissait
+                  lire un total carte introuvable sur le relevé bancaire. */}
+              {b.paiements.some(p => p.encaisse !== true) && (
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  {b.paiements.filter(p => p.encaisse === false).length > 0 && 'En compte = vendu, pas encore encaissé. '}
+                  {b.paiements.filter(p => p.encaisse === null).length > 0 && 'Non ventilé = le ticket ne dit pas comment il a été payé.'}
+                </p>
+              )}
             </div>
           )}
         </div>

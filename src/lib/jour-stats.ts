@@ -7,6 +7,7 @@
 // lendemain UTC).
 
 import { createClient } from '@/lib/supabase/server'
+import { libellePaiement } from './paiements'
 
 const PARIS = 'Europe/Paris'
 const fmtJour = new Intl.DateTimeFormat('fr-CA', { timeZone: PARIS, year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -69,12 +70,6 @@ export async function getJourStats(date: string): Promise<JourStats | null> {
   const tvaMap = new Map<string, number>()
   const ticketsListe: JourStats['ticketsListe'] = []
 
-  const libellePaiement = (mp: string | null) => {
-    const v = String(mp ?? 'autre').toLowerCase()
-    return v.includes('cash') || v.includes('espece') ? 'Espèces'
-      : v.includes('pos') || v.includes('carte') || v.includes('cb') ? 'Carte'
-      : v === 'caisse_agreee' ? 'Caisse agréée' : v
-  }
 
   for (const c of cmds) {
     const montant = Number(c.montant_total_ttc ?? 0)
@@ -86,7 +81,7 @@ export async function getJourStats(date: string): Promise<JourStats | null> {
       const b = parHeure.get(h) ?? { ca: 0, n: 0 }
       b.ca += montant; b.n++; parHeure.set(h, b)
     }
-    const pay = libellePaiement(c.mode_paiement)
+    const pay = libellePaiement(c.mode_paiement).libelle
     const pb = paiements.get(pay) ?? { ca: 0, n: 0 }
     pb.ca += montant; pb.n++; paiements.set(pay, pb)
     for (const [taux, v] of Object.entries(c.ventilation_tva ?? {})) {
