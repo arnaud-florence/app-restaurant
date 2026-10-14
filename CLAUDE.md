@@ -8120,9 +8120,39 @@ CB TR, Ticket Restaurant, Tips et Paiement en ligne (désactivé).
 ⚠️ **`POST /transaction-methods` répond 404**, comme `/inventory` et
 `POST /fabrication-places` : l'API sait LIRE les modes, pas les créer.
 `OPTIONS` annonce pourtant « GET, POST, PATCH, DELETE, PUT » — ce message
-mentait déjà sur `/bookings/{id}`. Le mode se crée donc à la main dans
-**`bo.zelty.fr/transaction-methods`** (la page existe, 302 vers la
-connexion ; `/payment-methods` rend 404). ⚠️ Elle n'est dans AUCUN menu.
+mentait déjà sur `/bookings/{id}`.
+
+✅ **CRÉÉ À LA MAIN LE 14/10/2026 : `#36739 · Compte client · type=account`**,
+tiroir fermé, surplus interdit, visible en caisse, ordre 40, icône
+Portefeuille. Vérifié **par l'API, pas par l'écran de confirmation** — la
+leçon du champ `image` : « les modifications ont bien été prises en compte »
+ne prouve rien.
+
+✅✅ **ZELTY A UN TYPE NATIF POUR ÇA, et mon hypothèse était fausse.** J'avais
+prévu de laisser le type vide, comme « CB TR » et « Tips ». Le formulaire
+offre en réalité un **« Type spécial »** dont l'une des valeurs est
+littéralement **« En compte »** (`account`), à côté d'Avoir, Espèces,
+Tickets restaurant, TPE Ingenico, SMS, iZettle, Restoflash, NFC. C'est
+l'écran qui a corrigé la supposition : on lit le formulaire avant de le
+remplir.
+
+⚠️ **Le chemin : `bo.zelty.fr/transaction-methods`** (Configuration →
+Méthodes de paiement y renvoie ; `/payment-methods` rend 404). ⚠️ Elle n'est
+dans AUCUN menu.
+
+⚠️⚠️ **SON TABLEAU S'AFFICHE VIDE alors que l'API rend les sept modes** —
+quel que soit le filtre restaurant (« Tous » comme « Casatasia »), et sans
+une seule erreur en console. On croirait qu'aucun mode n'existe. **Le
+formulaire d'ajout, lui, fonctionne** (`/transaction-methods/add`), et la
+vérification se fait par `GET /transaction-methods`. Ne pas conclure de cet
+écran qu'il n'y a rien : c'est la troncature silencieuse habituelle de cette
+maison, côté back-office cette fois.
+
+⚠️ **L'icône par défaut est « Espèces »**, et la laisser ferait croire à du
+liquide au comptoir sur une vente qui n'encaisse rien. Mise sur
+« Portefeuille ». ⚠️ Le sélecteur d'icônes est un combobox CUSTOM : ni
+`form_input` ni la molette n'y font quoi que ce soit — il s'ouvre au clic
+puis se parcourt aux flèches.
 
 **La fiche cliente porte déjà `balance`** (0 € aujourd'hui, caisse #37579450
 ↔ outil `c16c54a9…`) : Zelty a bien une notion de solde client.
@@ -8166,13 +8196,21 @@ imposé.** Le mode de la caisse s'appelle littéralement **« Espèces »**, et
 plus utilisé de la maison (294 tickets) tombait en « Non ventilé ». Une
 assertion sur le libellé ACCENTUÉ l'a attrapé avant la livraison.
 
+⚠️ **RESTE À VÉRIFIER À LA PREMIÈRE VRAIE NOTE** — aucune vente d'essai n'a
+été passée, elle entrerait dans le CA et dans le Z : que le solde monte bien
+sur `customers.balance` (0 € aujourd'hui sur la supérette), et que le webhook
+transporte `transactions[].name = "Compte client"` — c'est le NOM que notre
+mapper lit, pas le type `account`.
+
 ⚠️ **Ce qui reste à trancher avec le comptable, et qui n'est pas technique** :
 un ticket en compte entre dans le **CA du jour** (la vente est faite) et
 dans le **Z**, sans que l'argent soit rentré. Il faut donc que le mode soit
 DISTINCT des espèces et de la CB — sinon le comptage du tiroir crie un écart
 chaque soir — avec `open_drawer: false`. Et le solde se règle plus tard, par
 un second ticket ou un virement : c'est ce chemin de sortie qu'il faut
-décider avant d'ouvrir des ardoises.
+décider avant d'ouvrir des ardoises. Le **code comptable** du mode est resté
+VIDE — c'est lui qui dira au comptable où ranger ces lignes, et personne ne
+peut l'inventer à sa place.
 
 ⚠️ **Il manque toujours un total par client et par MOIS** :
 `clients.total_depense` est un cumul depuis toujours, en HT. Pour facturer
