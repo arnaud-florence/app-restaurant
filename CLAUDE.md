@@ -8110,6 +8110,77 @@ rapprochement sur une fiche muette) ; `avertissements[]` ne garde que ce qui
 demande une action — lecture impossible, écriture refusée, envoi échoué. Les
 deux sont rendus dans le résultat : on sépare, on ne masque pas.
 
+### La note EN COMPTE, et le faux total « carte » (14/10/2026)
+
+« Je n'arrive pas à faire une note en compte pour la supérette dans la
+caisse. » **C'est factuel : la caisse n'a aucun mode de règlement qui solde
+un ticket sans encaisser.** Les six existants sont Espèces, Carte bancaire,
+CB TR, Ticket Restaurant, Tips et Paiement en ligne (désactivé).
+
+⚠️ **`POST /transaction-methods` répond 404**, comme `/inventory` et
+`POST /fabrication-places` : l'API sait LIRE les modes, pas les créer.
+`OPTIONS` annonce pourtant « GET, POST, PATCH, DELETE, PUT » — ce message
+mentait déjà sur `/bookings/{id}`. Le mode se crée donc à la main dans
+**`bo.zelty.fr/transaction-methods`** (la page existe, 302 vers la
+connexion ; `/payment-methods` rend 404). ⚠️ Elle n'est dans AUCUN menu.
+
+**La fiche cliente porte déjà `balance`** (0 € aujourd'hui, caisse #37579450
+↔ outil `c16c54a9…`) : Zelty a bien une notion de solde client.
+
+⚠️⚠️ **MAIS LE DÉFAUT ÉTAIT CHEZ NOUS, ET IL ÉTAIT DÉJÀ ACTIF.**
+`business-live.ts` — le pouls en direct, l'écran que le gérant ouvre en
+premier — portait :
+
+    if (mp.includes('cash') || mp.includes('espece')) especes += montant
+    else carte += montant
+
+**TOUT ce qui n'est pas espèces était compté en CARTE.** Mesuré sur les
+données réelles : sur **4 610,53 € encaissés, 2 253,80 € (49 %)**
+s'affichaient en carte alors que leur mode est `caisse_agreee`, c'est-à-dire
+INCONNU — la caisse a encaissé, le ticket ne dit pas comment. Le gérant
+lisait un total carte introuvable sur son relevé bancaire.
+
+Carte : **3 177,35 € → 923,55 €**. Les 2 253,80 € sont dits « Non ventilé ».
+
+⚠️ **Et un ticket en compte serait venu grossir ce même faux total.** La
+distinction qui compte n'est pas « quel moyen » mais **« l'argent est-il
+rentré »** : une vente en compte est faite et non encaissée. D'où
+`src/lib/paiements.ts` et son `encaisse: true | false | null`, **corrigé
+AVANT de créer le mode en caisse**, pas après.
+
+⚠️ `jour-stats.ts` et `ventes-stats.ts` portaient chacun leur version —
+correctes toutes les deux, mais distinctes : c'était la troisième
+implémentation qui se profilait. Les trois lisent désormais la même.
+
+⚠️⚠️ **L'ORDRE DES TESTS EST LA RÈGLE : `compte|ardoise` passe AVANT la
+carte.** Un mode nommé « À crédit » contient `credit`, que la branche carte
+reconnaît — il serait ingéré comme **payé par carte**, soit l'inverse exact
+de la vérité, sans une erreur pour le dire. Et on ne reconnaît PAS `credit`
+pour autant : « Credit Card » est une carte. Le nom seul ne tranche pas,
+donc **le mode de règlement doit s'appeler « Compte client », « En compte »
+ou « Ardoise » — jamais « Crédit »**.
+
+⚠️⚠️ **LES ACCENTS SONT RETIRÉS AVANT DE TESTER, et c'est le test qui l'a
+imposé.** Le mode de la caisse s'appelle littéralement **« Espèces »**, et
+`/espece/` ne matche pas « espèces » : le `è` casse le motif. Le mode le
+plus utilisé de la maison (294 tickets) tombait en « Non ventilé ». Une
+assertion sur le libellé ACCENTUÉ l'a attrapé avant la livraison.
+
+⚠️ **Ce qui reste à trancher avec le comptable, et qui n'est pas technique** :
+un ticket en compte entre dans le **CA du jour** (la vente est faite) et
+dans le **Z**, sans que l'argent soit rentré. Il faut donc que le mode soit
+DISTINCT des espèces et de la CB — sinon le comptage du tiroir crie un écart
+chaque soir — avec `open_drawer: false`. Et le solde se règle plus tard, par
+un second ticket ou un virement : c'est ce chemin de sortie qu'il faut
+décider avant d'ouvrir des ardoises.
+
+⚠️ **Il manque toujours un total par client et par MOIS** :
+`clients.total_depense` est un cumul depuis toujours, en HT. Pour facturer
+la supérette en fin de mois, le rapport reste à écrire.
+
+Test : `node scripts/test-paiements.mjs` — 22 assertions.
+⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble.
+
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
 « Pourquoi j'ai pas le pouls en direct avec le chiffre sur l'outil alors qu'on
@@ -8447,6 +8518,7 @@ node scripts/supplements-caisse.mjs            # suppléments d'ingrédients en 
 node scripts/cuisson-viandes.mjs               # cuisson entrecôte + burgers (essai à blanc)
 node scripts/rejouer-webhooks-zelty.mjs        # rejouer les ventes rejetées (essai à blanc)
 node scripts/client-superette-issole.mjs       # compte client pro, les deux côtés liés
+node scripts/test-paiements.mjs                # especes/carte/en compte/non ventilé (pur)
 node scripts/ocb-slim-premium.mjs              # feuilles OCB 1,20 € au comptoir (essai à blanc)
 node scripts/renommer-heineken-bouteille.mjs   # bouteille / canette, des DEUX côtés
 node scripts/cibles-stock.mjs                  # poser les cibles (essai à blanc par défaut)
