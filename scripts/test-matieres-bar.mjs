@@ -30,7 +30,15 @@ const bar = await q('recettes?select=nom,categorie,nom_matiere,unites_par_achat,
 
 // Ces produits mélangent deux matières : les rattacher à une seule en
 // oublierait l'autre, qui sortirait du stock sans que rien ne le signale.
-const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière', 'Diabolo', 'Alcool + soft',
+// ⚠️ « Pinte Picon » y a été AJOUTÉE le 15/10/2026 : créée le 13/10, elle
+// n'avait jamais été déclarée, et ce test était donc ROUGE depuis deux jours
+// — cinquième occurrence du motif, après test-rh, test-rbac-snack-livreur,
+// test-stock et le cron zelty-clients. Un rouge permanent finit par être
+// ignoré, et celui-ci a failli masquer la requalification du Gommé.
+// ⚠️ « Gommé » reste ici : bière citron depuis le 15/10, donc fût + sirop —
+// toujours DEUX matières, même si ce n'est plus du pastis.
+const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière',
+  'Pinte Picon', 'Diabolo', 'Alcool + soft',
   'Mauresque', 'Tomate', 'Perroquet', 'Gommé', 'Rosé pamplemousse', 'Planteur']
 const A_TRANCHER = ['Pichet 25 cl', 'Pichet 50 cl']
 

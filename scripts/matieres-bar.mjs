@@ -103,7 +103,7 @@ const COMPOSITES = {
   'Mauresque':    'pastis + sirop d\'orgeat',
   'Tomate':       'pastis + sirop de grenadine',
   'Perroquet':    'pastis + sirop de menthe',
-  'Gommé':        'pastis + sirop de gomme',
+  'Gommé':        'bière pression + sirop de citron',   // corrigé le 15/10/2026
   'Rosé pamplemousse': 'vin rosé + sirop de pamplemousse',
   'Planteur':     'rhum ambré + jus d\'ananas + nectar d\'orange + grenadine',
 }

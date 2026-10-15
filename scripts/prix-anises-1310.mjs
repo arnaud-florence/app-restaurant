@@ -23,7 +23,11 @@ import { readFileSync } from 'node:fs'
 
 const PRIX = {
   'Ricard 2 cl': 2.00, 'Pastis 51 2 cl': 2.00,
-  'Mauresque': 2.20, 'Tomate': 2.20, 'Perroquet': 2.20, 'Gommé': 2.20,
+  'Mauresque': 2.20, 'Tomate': 2.20, 'Perroquet': 2.20,
+  // ⚠️ « Gommé » EST SORTI DE CETTE LISTE le 15/10/2026 : le gérant a précisé
+  // que c'est une BIÈRE CITRON, pas un anisé. Il est à 3,00 € en famille
+  // Bière (gomme-biere-citron-1510.mjs). Le laisser ici le ramènerait à
+  // 2,20 € au premier rejeu — soit moins cher qu'un demi nature.
 }
 const ECRIRE = process.argv.includes('--ecrire')
 

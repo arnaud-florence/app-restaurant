@@ -43,7 +43,11 @@ const CERTAIN = [
 // Certain qu'il n'y en a PAS : les distillats sont exemptés d'étiquetage
 // gluten, et un café ou un soda n'a aucun des 14. Laisser vide serait
 // ambigu — c'est la validation humaine qui fera dire « aucun ».
-const AUCUN = ['Café expresso','Café allongé','Thé','Ricard 2 cl','Gommé','Whisky 4 cl',
+// ⚠️ « Gommé » EST SORTI DE CETTE LISTE le 15/10/2026 : c'est une BIÈRE
+// citron, donc du GLUTEN. Il y figurait du temps où on le croyait anisé —
+// une fiche « aucun allergène » sur une bière est exactement la faute de
+// la 0138, et celle-ci serait partie sur le QR code de la salle.
+const AUCUN = ['Café expresso','Café allongé','Thé','Ricard 2 cl','Whisky 4 cl',
   'Whisky premium 4 cl','Rhum 4 cl','Vodka 4 cl','Gin 4 cl']
 
 const r = await sb('recettes?select=id,nom,categorie,allergenes_complementaires&actif=eq.true')

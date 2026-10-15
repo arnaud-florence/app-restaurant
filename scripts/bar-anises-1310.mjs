@@ -179,6 +179,19 @@ for (const n of REVEILS) {
 }
 
 // ── le Martini gommé ─────────────────────────────────────────────────
+// ⚠️⚠️ CE BLOC EST PÉRIMÉ (15/10/2026) ET NE DOIT PLUS CRÉER.
+// « Martini blanc gommé 4 cl » était une MAUVAISE LECTURE de la liste du
+// gérant : le produit qu'il voulait est un « Gommé », et c'est une BIÈRE
+// CITRON. La fiche créée ici a été renommée « Gommé » puis requalifiée en
+// famille Bière à 3,00 € — donc ce nom ne correspond plus à rien en base, et
+// un rejeu CRÉERAIT UN DOUBLON (Martini + gomme, Apéritif) à côté du vrai.
+// La garde ci-dessous n'est PAS une précaution de style : sans elle le
+// doublon part aussi en caisse, et Zelty ne sait pas supprimer un plat.
+const CREATION_PERIMEE = true
+if (CREATION_PERIMEE) {
+  console.log(`\n   ⊘ « ${CREATION.nom} » : création PÉRIMÉE, voir gomme-biere-citron-1510.mjs`)
+  process.exit(0)
+}
 const [deja] = await sb(`recettes?nom=eq.${encodeURIComponent(CREATION.nom)}&select=id`)
 let idG = deja?.id
 if (!idG) {

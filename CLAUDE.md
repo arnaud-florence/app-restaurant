@@ -7905,11 +7905,16 @@ script **CONTRÔLE** cette part contre la base avant de dériver — un coût de
 départ qui aurait bougé invaliderait le calcul sans rien dire. Food cost 19 à
 23 %.
 
-⚠️ **« GOMMÉ » EST UN ANISÉ, PAS UN MARTINI** — j'avais lu « martini blanc
-gommé » comme UN produit alors que la liste du gérant en portait deux. La
-fiche créée à tort a été **REPRISE** plutôt que laissée morte : **Zelty ne
-sait pas supprimer un plat**, seulement le désactiver, et un plat mort dans un
+⚠️ **« GOMMÉ » N'EST PAS UN MARTINI** — j'avais lu « martini blanc gommé »
+comme UN produit alors que la liste du gérant en portait deux. La fiche créée
+à tort a été **REPRISE** plutôt que laissée morte : **Zelty ne sait pas
+supprimer un plat**, seulement le désactiver, et un plat mort dans un
 catalogue y reste.
+
+⚠️⚠️ **MAIS CE N'EST PAS UN ANISÉ NON PLUS — affirmation CORRIGÉE le
+15/10/2026.** Le gérant a précisé (deux fois) que son Gommé est une **BIÈRE
+CITRON**. Il est passé en famille Bière à 3,00 €, et tout ce qui suit sur son
+coût dérivé du Ricard est périmé : voir « Le Gommé est une BIÈRE CITRON ».
 
 ⚠️⚠️ **COPIER UNE FICHE MODÈLE A COPIÉ SA DÉCLARATION D'ALLERGÈNES.** Le
 Martini porte « sulfites » (c'est un vermouth) ; un pastis gommé n'en a pas.
@@ -8558,6 +8563,88 @@ des quatre plats à cuisson, 12/10) : ici aucune bière n'en portait, mais
 sans un message. Relecture après coup : 7/7, prix et `tax 2000` intacts.
 ⚠️ Un **429 est tombé entre les deux écritures** et a été absorbé par le
 réessai qui annonce son code.
+
+### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
+
+`node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
+DEUX fois ; je l'ai rangé une fois en Martini, une fois en anisé. La section
+précédente de ce fichier affirme encore « GOMMÉ EST UN ANISÉ » : c'était
+faux, et c'est la carte du gérant qui fait foi, pas ma lecture de sa liste.
+
+| | avant | après |
+|---|---|---|
+| famille | Apéritif | **Bière** |
+| prix | 2,20 € | **3,00 €** |
+| coût | 0,4454 (Ricard + gomme) | **0,9517** |
+| allergènes | **[]** | **gluten** |
+
+⚠️⚠️ **LE PRIX ÉTAIT LE VRAI DÉFAUT, pas la famille.** 2,20 € est le tarif
+des ANISÉS (13/10). Une bière citron contient un **demi entier** : à 2,20 €
+elle était **moins chère qu'un demi nature à 2,80 €** — plus personne
+n'aurait commandé autre chose, et la carte aurait eu l'air d'une erreur.
+
+⚠️ **3,00 € n'est pas inventé, il est ancré DEUX fois** et les deux ancrages
+tombent sur le même nombre : le **Monaco** (bière + limonade + grenadine) est
+à 3,00 €, et notre propre **supplément « Sirop » vaut 0,20 €** sur une bière
+(posé la veille) → demi 2,80 + 0,20 = 3,00. ⚠️ Le gérant n'a pas donné de
+prix : il reste à confirmer, mais laisser 2,20 € était activement nuisible.
+
+⚠️ **Le coût est DÉRIVÉ de chiffres mesurés, et la dérivation est CONTRÔLÉE
+avant écriture** (discipline de la Pinte Picon) :
+
+    Monaco 0,8729 − Panaché 0,8371 = 0,0358   → le trait de sirop
+    Gommé = Demi pression 0,9159 + 0,0358     = 0,9517 €
+
+Le script REFUSE d'écrire si l'un des trois coûts de départ a bougé — sans
+ça la dérivation ne vaut plus rien et personne ne le verrait. Food cost
+**38 %**, soit la norme des bières de la maison (demi 39 %).
+
+⚠️⚠️ **UNE BIÈRE CONTIENT DU GLUTEN, et la fiche disait `[]`** — reste de sa
+vie d'anisé, quand les trois autres bières portent toutes « gluten ». Rien
+n'était SIGNÉ (`allergenes_valides_le` NULL), donc le public lisait
+« information non disponible » et pas « aucun allergène » (0138) : le risque
+n'était pas réalisé, la fiche était fausse quand même. Le script REFUSE
+d'agir si une déclaration signée existe — corriger une signature est une
+décision humaine.
+
+**CINQ FICHIERS LE NOMMAIENT, et deux l'auraient recassé :**
+
+| Fichier | Ce qui serait arrivé au rejeu |
+|---|---|
+| `prix-anises-1310.mjs` | le remettait à **2,20 €** |
+| `bar-anises-1310.mjs` | **recréait un DOUBLON** — il crée « Martini blanc gommé 4 cl », le nom d'avant le renommage, qui n'existe plus en base. Bloc neutralisé par `CREATION_PERIMEE` |
+| `prefill-allergenes.mjs` | le gardait dans `AUCUN` — « aucun allergène » sur une bière |
+| `print/carte-bar/page.tsx` | l'imprimait en **« Bières bouteille »** |
+| `matieres-bar.mjs` | commentaire « pastis + sirop de gomme » |
+
+⚠️⚠️ **QUATRIÈME FOIS QUE `print/carte-bar/page.tsx` DOIT SUIVRE LA CARTE**
+(après Heineken, Pastis et les deux Affligem). Sa liste `PRESSION` range les
+bières **par leur nom** : tout ce qui est en famille « Bière » sans y figurer
+tombe dans « Bières bouteille », sans la moindre erreur. Vérifié après coup —
+le Gommé s'imprime entre le Monaco et le Picon bière, et les **9 rubriques de
+l'affichage légal** résolvent.
+
+⚠️ **PAS de `nom_matiere`, PAS de supplément « Sirop ».** Il mélange deux
+matières (fût + sirop), donc il reste composite comme Monaco et Panaché — et
+il est DÉJÀ aromatisé, exactement la raison qui a écarté ces deux-là du
+supplément la veille. Conséquence connue : le fût ne baisse pas quand on vend
+un Gommé.
+
+⚠️⚠️ **`test-matieres-bar.mjs` ÉTAIT ROUGE DEPUIS LE 13/10** — « Pinte Picon »,
+créée ce jour-là, n'avait jamais été déclarée dans `COMPOSITES`. **Cinquième
+occurrence du motif** après `test-rh`, `test-rbac-snack-livreur`, `test-stock`
+et le cron `zelty-clients` — et cette fois il a failli masquer la
+requalification du Gommé. 27/27 après correction.
+
+⚠️ **TOUJOURS PAS FAITS : « fetus 2,00 € » et « baby 4 € »**, demandés le
+13/10 en même temps que le Gommé. Je ne sais pas ce que ces deux-là désignent
+— un « baby » est un petit verre d'alcool dans certaines régions, « fetus »
+n'évoque rien de sûr — et la TVA dépend de la présence d'alcool. À faire
+préciser plutôt qu'à deviner : le « etc » des jus Euro-Cash a déjà coûté une
+création, un retrait et un doute.
+
+Contrôles : carte **199/199 conformes, 0 écart** · `test-matieres-bar` 27/27 ·
+carte imprimée et affichage légal vérifiés sur la page réelle.
 
 ### Sylvie, et la limite que je ne franchis pas (15/10/2026)
 

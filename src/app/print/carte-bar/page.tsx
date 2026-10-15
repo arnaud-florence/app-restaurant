@@ -23,8 +23,12 @@ type R = { nom: string; categorie: string; prix_vente_ht: number; tva: number; p
 // ⚠️ TROISIÈME FOIS QUE CE FICHIER DOIT SUIVRE LA CARTE. Les pressions sont
 // listées PAR LEUR NOM : une bière pression absente d'ici tombe dans la
 // section « Bières bouteille » de la carte imprimée, sans erreur.
+// ⚠️ Tout ce qui est en famille « Bière » SANS figurer ici est imprimé en
+// « Bières bouteille » (voir plus bas) — un oubli ne lève aucune erreur, il
+// range juste une pression au mauvais endroit. Quatrième fois que ce fichier
+// doit suivre la carte : Heineken, Pastis, les deux Affligem, puis le Gommé.
 const PRESSION = ['Demi pression', 'Pinte pression', 'Demi Affligem', 'Pinte Affligem',
-  'Demi ambrée', 'Panaché', 'Monaco', 'Picon bière', 'Pinte Picon']
+  'Demi ambrée', 'Panaché', 'Monaco', 'Gommé', 'Picon bière', 'Pinte Picon']
 
 export default async function CarteBarPage() {
   const supabase = await createClient()
