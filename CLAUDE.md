@@ -8342,10 +8342,39 @@ suppression d'un règlement et la modification de prix. Elles se décochent sur
 `/roles/edit/18138` — c'est un arbitrage de gestion, pas un défaut, mais il
 doit rester visible.
 
-⚠️ **Le COMPTE, lui, n'est pas créé.** Un compte porte un identifiant et un
-code de déverrouillage : c'est le gérant qui le pose, sur `/users/add`, et la
-personne n'a même pas besoin d'une adresse e-mail (le champ est explicitement
-facultatif sans accès back-office).
+✅ **ET LE COMPTE DE SYLVIE EXISTE (gérant, 15/10/2026)** — le PREMIER compte
+non-propriétaire de la maison : nom « Sylvie », **rôle Caisse**, e-mail
+**vide**, jamais connecté. Le gérant l'a créé lui-même : un compte porte un
+code de déverrouillage, donc un identifiant d'accès, et ça ne se pose pas à
+sa place.
+
+⚠️ **L'E-MAIL VIDE N'EST PAS UN OUBLI, C'EST LA PROTECTION.** Sans adresse,
+aucune invitation ne part et il n'existe aucun chemin vers le back-office :
+le rôle ferme déjà la porte, l'absence d'adresse retire la porte.
+
+⚠️⚠️ **LE PIÈGE DU FORMULAIRE EST LE MENU RÔLE, QUI AFFICHE « Restaurateur »
+EN PREMIER.** Ne pas y toucher donne à l'employé les droits du PROPRIÉTAIRE —
+facturation, licences, clés API. C'est le seul champ de cet écran où ne rien
+faire est une erreur.
+
+⚠️ **Le code de déverrouillage doit être propre à la personne.** C'est lui qui
+signe les annulations, les remises et le Z dans le journal : partagé, les six
+droits sensibles du rôle ne désignent plus personne et l'écart du soir devient
+inexplicable.
+
+⚠️ Le compte s'appelle **« Sylvie »**, pas « Sylvie Violante » — c'est ce nom
+qui signe au journal. Suffisant tant qu'il n'y en a qu'une.
+
+⚠️ **Aucun pont n'existe entre les utilisateurs Zelty et nos `profils`** : ce
+compte ne donne PAS accès à l'outil (stock, inventaire, ruptures). Pour ça, la
+personne s'inscrit elle-même sur `/login` et on rattache ensuite son profil à
+sa fiche employée, comme pour Ambre. Sylvie Violante est en base (employée
+active, poste `polyvalent`, **sans e-mail**) et n'a toujours aucun profil.
+
+⚠️ **Le seul contrôle qui tranche est un essai sur la caisse** : « jamais
+connecté » ne distingue pas un code bien posé d'un code manquant. Et on ne va
+pas le relire dans la fiche — c'est un secret, et ces écrans se pilotent au
+clic à l'aveugle.
 
 ### Le menu enfant était éteint depuis onze jours (15/10/2026)
 
