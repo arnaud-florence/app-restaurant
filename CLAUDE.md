@@ -8219,6 +8219,74 @@ la supérette en fin de mois, le rapport reste à écrire.
 Test : `node scripts/test-paiements.mjs` — 22 assertions.
 ⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble.
 
+### Le menu enfant était éteint depuis onze jours (15/10/2026)
+
+« As-tu ajouté le menu enfant à 11,90 ? » — **non, et il n'y avait rien à
+ajouter** : il existe depuis la création de la carte (21/09), déjà à 11,90 €
+TTC, TVA 10 %, avec sa photo, sa fiche et son point de vente. Il était
+**DÉSACTIVÉ des deux côtés**.
+
+⚠️⚠️ **C'EST `ardoise-pause.mjs` QUI L'A ÉTEINT, LE 04/10, PAR UNE ERREUR DE
+PÉRIMÈTRE.** Sa liste `SALE` contient la famille **« Menu »**, et le menu
+enfant n'était pas dans `ARDOISE` : il est donc tombé avec les 15 plats de
+brasserie. Or il relève exactement de la logique des **desserts et du café à
+table**, délibérément épargnés ce jour-là — ce n'est pas un plat qui tourne,
+c'est un service permanent. **Un restaurant qui ouvre sans menu enfant refuse
+les familles, et rien ne le signale** : le bouton est simplement absent du
+comptoir, et personne ne cherche ce qu'il ne voit pas.
+
+`PERMANENTS` (dans `ardoise-pause.mjs`) porte désormais ce qui ne suit JAMAIS
+l'ardoise. ⚠️ **Distinct d'`ARDOISE`, et la distinction porte du sens** :
+`ARDOISE` est la carte de CETTE semaine, `PERMANENTS` ce qui ne dépend
+d'aucune semaine. Les confondre ferait relire dans six mois « le menu enfant
+était à l'ardoise du 12 octobre », ce qui est faux.
+
+⚠️ **« Formule CasaTasia » (famille Menu, 19,90 €) n'y est PAS**, et c'est
+voulu : c'est une formule entrée/plat/dessert qui sert les plats de
+l'ardoise, elle n'a de sens que s'ils sont servis.
+
+`node scripts/menu-enfant-permanent.mjs [--ecrire]` — caisse d'abord, base
+ensuite, relecture après (0141). Refuse d'agir si la caisse rend moins de
+100 plats, et `show_all=true` est obligatoire : sans lui le plat DÉSACTIVÉ
+qu'on veut rallumer est invisible.
+
+**LE DESSERT EST AU CHOIX (gérant, 15/10/2026), et sa fiche disait autre
+chose.** Elle portait **« 1 boule de glace »** en dur — la matière passée
+`stocke = false` le 11/10 quand les glaces ont quitté la carte. Rallumer le
+menu enfant tel quel, c'était promettre un dessert qu'on n'achète plus.
+
+⚠️⚠️ **ET LA GLACE SOUS-ÉVALUAIT LE MENU.** Elle était chiffrée **0,400 €**
+quand les desserts de la carte coûtent **1,05 à 1,97 €** (8 des 12 chiffrés).
+Le food cost affiché était donc 22 % ; avec un vrai dessert il est de **28 à
+37 %** — le haut de la fourchette dépasse le seuil rouge. À 11,90 €, un menu
+enfant qui donne accès aux desserts adultes n'a pas la marge qu'il paraît
+avoir.
+
+La glace est retirée de la composition — **même règle que « Formule
+CasaTasia » : une formule dont le contenu se choisit ne se chiffre pas sur un
+choix fixe**, sinon le coût ment pour tous les autres. ⚠️ Le coût restant
+(1,979 €, plat seul) est donc INCOMPLET, et `recettes.procedure` le DIT sur
+la fiche : sans cette ligne, un food cost de 18 % se lit comme un bon ratio
+alors qu'il lui manque le dessert — la famille de `statutFoodCost(0)` en vert.
+
+⚠️⚠️ **CE QUI RESTE FAUX, ET QUI N'EST PAS CORRIGÉ : LE RÉASSORT NE COMMANDE
+PAS POUR LES PLATS PERMANENTS.** `cibleMatiere()` (`reassort-donnees.ts`)
+met à **ZÉRO** toute matière de la Restauration absente de l'ardoise —
+règle juste pour la brasserie qui tourne, **fausse pour un permanent**.
+
+Mesuré sur les quatre matières du menu enfant : steak haché, frites et
+graisse de bœuf sont déjà couvertes par les plats de l'ardoise, mais le
+**sirop** ne l'est pas et tombera à zéro. L'enjeu en euros est dérisoire
+(0,2 L, ~1 €) ; **la règle, elle, est fausse pour tout permanent futur** —
+le jour où on en déclare un dont les matières sont à lui seul, on le vendra
+sans jamais l'approvisionner. Le vrai correctif est que
+`chargerLignesReassort()` traite les permanents comme servis, au même titre
+que l'ardoise. ⚠️ Ne pas le bricoler en ajoutant le plat à l'ardoise :
+`portionsSemaine()` répartit les portions UNIFORMÉMENT, ce qui fausserait le
+volume de tous les autres plats.
+
+Contrôles : carte **195/195 conformes, 0 écart** · `test-carte-fournil` 13/13.
+
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
 « Pourquoi j'ai pas le pouls en direct avec le chiffre sur l'outil alors qu'on
@@ -8546,6 +8614,7 @@ node scripts/test-ardoise.mjs                  # l'ardoise de la semaine (pur, s
 PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (crée et retire)
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
+node scripts/menu-enfant-permanent.mjs         # le menu enfant ne suit pas l'ardoise
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)

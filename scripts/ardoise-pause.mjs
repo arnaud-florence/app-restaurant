@@ -54,8 +54,25 @@ const ARDOISE = new Set([
   'Camembert rôti', 'Salade Chèvre chaud', 'Plat du jour',
 ])
 
+// ⚠️⚠️ CE QUI NE SUIT JAMAIS L'ARDOISE, quelle que soit la semaine.
+// Distinct d'`ARDOISE`, et la distinction porte du sens : `ARDOISE` est la
+// carte de CETTE semaine, `PERMANENTS` ce qui ne dépend d'aucune semaine.
+// Les y confondre ferait relire dans six mois « le menu enfant était à
+// l'ardoise du 12 octobre », ce qui est faux.
+//
+// Le menu enfant est tombé en pause le 04/10/2026 parce que sa famille
+// « Menu » est dans `SALE` — alors qu'il relève de la même logique que les
+// desserts et le café à table, délibérément épargnés ce jour-là. Un
+// restaurant qui ouvre sans menu enfant refuse les familles, et rien ne le
+// signale : le bouton est simplement absent du comptoir.
+//
+// ⚠️ « Formule CasaTasia » (famille Menu, 19,90 €) n'y est PAS, et c'est
+// voulu : c'est une formule entrée/plat/dessert qui sert les plats de
+// l'ardoise. Elle n'a de sens que si ces plats sont servis.
+const PERMANENTS = new Set(['Menu enfant'])
+
 const tous = await sb('recettes?select=id,nom,categorie,actif,prix_vente_ht&tag_destination=eq.CUISINE&order=categorie,nom')
-const cible = tous.filter(r => SALE.has(r.categorie) && !ARDOISE.has(r.nom))
+const cible = tous.filter(r => SALE.has(r.categorie) && !ARDOISE.has(r.nom) && !PERMANENTS.has(r.nom))
 const aPauser = cible.filter(r => r.actif)
 const aReprendre = cible.filter(r => !r.actif)
 const liste = REPRENDRE ? aReprendre : aPauser
