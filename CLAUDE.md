@@ -8250,8 +8250,24 @@ indépendantes :
 
 ⚠️ **La liste s'affiche REPLIÉE** : à l'ouverture, le formulaire ne montre que
 ces deux lignes. Les 178 autres cases sont dans le DOM dès le départ — donc
-comptables — mais n'apparaissent à l'écran qu'une fois le parent coché, en
-cascade. Un seul clic suffit pour la branche Caisse.
+comptables — mais n'apparaissent à l'écran qu'une fois le parent coché.
+
+⚠️⚠️ **COCHER UN PARENT NE COCHE PAS SES ENFANTS — DÉCOCHER, SI.** Mesuré le
+15/10/2026, et c'est asymétrique au point d'être un piège :
+
+| geste | effet |
+|---|---|
+| cocher « appli Zelty Caisse » | **1/70** — ça DÉPLIE, ça ne coche pas |
+| « Cocher tout » | 180/180, les deux branches |
+| décocher « backoffice » | 110 → **0**, tous ses descendants suivent |
+
+→ **La seule méthode qui marche pour un rôle de comptoir** : « Cocher tout »,
+puis DÉCOCHER la seule case « Je peux me connecter au backoffice ». Résultat
+mesuré : back-office 0/110, caisse 70/70.
+
+⚠️ Croire à la cascade produit un rôle à **UNE** case cochée — un employé qui
+peut ouvrir l'application et rien y faire, sans qu'aucun message ne le dise.
+J'ai écrit cette erreur dans la version précédente de cette section.
 
 ⚠️⚠️ **« COCHER TOUT » COCHE LES DEUX BRANCHES — mesuré, 180/180.** C'est
 exactement le geste qu'il ne faut pas faire pour un poste de comptoir : il
@@ -8315,10 +8331,21 @@ remise d'un serveur). Non documenté sur l'écran : à faire préciser par le
 support (09 72 53 55 72) plutôt qu'à deviner. Le rôle « Restaurateur » étant
 un rôle système absent de `/roles`, son niveau n'est pas lisible.
 
-⚠️ **Je ne crée ni le rôle, ni le compte, ni le code de déverrouillage.** Un
-code de déverrouillage est un identifiant, et le niveau de droits d'une autre
-personne est une décision du gérant. Le formulaire a été laissé propre
-(0/180 cases).
+✅ **LE RÔLE « Caisse » EST CRÉÉ — #18138, demande du gérant (15/10/2026).**
+Relu depuis le serveur après enregistrement, pas cru sur l'écran de
+confirmation : nom « Caisse », niveau 1, **back-office 0/110, caisse 70/70**,
+rattaché à **0 utilisateur**. C'est le seul rôle de la liste.
+
+⚠️ **LES SIX CASES SENSIBLES SONT COCHÉES**, puisque la demande était « toutes
+les fonctions de la caisse » : les quatre « sans justification », le Z, la
+suppression d'un règlement et la modification de prix. Elles se décochent sur
+`/roles/edit/18138` — c'est un arbitrage de gestion, pas un défaut, mais il
+doit rester visible.
+
+⚠️ **Le COMPTE, lui, n'est pas créé.** Un compte porte un identifiant et un
+code de déverrouillage : c'est le gérant qui le pose, sur `/users/add`, et la
+personne n'a même pas besoin d'une adresse e-mail (le champ est explicitement
+facultatif sans accès back-office).
 
 ### Le menu enfant était éteint depuis onze jours (15/10/2026)
 
