@@ -8219,6 +8219,107 @@ la supérette en fin de mois, le rapport reste à écrire.
 Test : `node scripts/test-paiements.mjs` — 22 assertions.
 ⚠️ Il RECOPIE la règle depuis le TS ; modifier les deux ensemble.
 
+### Les droits de caisse — deux branches, et un piège à un clic (15/10/2026)
+
+Demande du gérant : « mets Sylvie en manager qu'elle puisse avoir accès à
+toutes les fonctions de la caisse ».
+
+⚠️⚠️ **CE N'EST PAS UN RÔLE « MANAGER » QU'IL FAUT, et le seul rôle existant
+est le mauvais.** `bo.zelty.fr/users` ne compte qu'un utilisateur (Arnaud,
+rôle **« Restaurateur »**) et `bo.zelty.fr/roles` affiche **« Aucun rôle »** :
+le seul rôle proposé dans le menu de `/users/add` est celui du PROPRIÉTAIRE —
+facturation, licences, accès API, mode école, gestion des utilisateurs. Donner
+« toutes les fonctions de la caisse » suppose donc de **créer un rôle
+d'abord**.
+
+⚠️ **CORRECTION D'UNE AFFIRMATION QUE J'AI FAITE À TORT** : ces écrans SONT
+dans le menu, contrairement à `/printers`, `/licenses` et `/billing`.
+`bo.zelty.fr/users` et `/roles` redirigent vers **`app.zelty.fr`**, dont le
+menu latéral porte **Utilisateurs → Liste / Rôles / Livreurs / Planning /
+Appareils**. `/employees`, `/staff`, `/team`, `/equipe`, `/utilisateurs` et
+`/permissions` rendent bien 404, mais ce n'est pas la même chose que
+« introuvable ».
+
+**`/roles/add` porte 180 cases, et DEUX cases de premier niveau** qui sont
+indépendantes :
+
+| Branche | Cases | Ce qu'elle ouvre |
+|---|---|---|
+| Je peux me connecter au **backoffice** | **110** | licences, **facturation**, **accès API**, mode école, suppression groupée de clients, gestion des utilisateurs et des rôles |
+| Je peux me connecter à l'appli **Zelty Caisse** | **70** | tout le comptoir |
+
+⚠️ **La liste s'affiche REPLIÉE** : à l'ouverture, le formulaire ne montre que
+ces deux lignes. Les 178 autres cases sont dans le DOM dès le départ — donc
+comptables — mais n'apparaissent à l'écran qu'une fois le parent coché, en
+cascade. Un seul clic suffit pour la branche Caisse.
+
+⚠️⚠️ **« COCHER TOUT » COCHE LES DEUX BRANCHES — mesuré, 180/180.** C'est
+exactement le geste qu'il ne faut pas faire pour un poste de comptoir : il
+donne la facturation Zelty et la création de clés API (« avec un accès api
+une application a accès à toutes vos données », dit leur propre libellé).
+
+⚠️⚠️ **CLIQUER PAR `ref` SUR CES PAGES EST DANGEREUX : LE CLIC ATTERRIT À UNE
+POSITION, PAS SUR L'ÉLÉMENT.** Trois clics l'ont démontré le 15/10/2026 :
+
+1. un clic visant « …appli Zelty Caisse » a coché **le back-office entier**
+   (la ligne juste au-dessus), pendant que j'annonçais « le back-office reste
+   à zéro ». C'est la relecture des cases cochées qui l'a dit, pas moi ;
+2. un clic visant « Décocher tout » a en fait décoché cette même case — même
+   résultat par hasard, ce qui masquait le défaut ;
+3. ⚠️⚠️ **un clic visant « Décocher tout » a touché « Sauvegarder » et CRÉÉ
+   un rôle `manager` portant les 180 droits.** Détecté au changement d'URL
+   (`/roles/add` → `/roles/edit/18137?status=1`), rattaché à **0 utilisateur**
+   donc sans effet sur personne, et **supprimé dans la foulée** — `/roles`
+   est revenu à « Aucun rôle » et `/users` ne contient toujours qu'Arnaud.
+
+**Un rôle nommé « manager » qui porte en réalité la facturation est le pire
+résidu possible** : on l'attacherait à un employé en le croyant limité au
+comptoir. D'où la suppression immédiate plutôt que la correction.
+
+→ **Sur ces écrans : coordonnées lues sur une CAPTURE, relecture de l'état
+après CHAQUE clic, et vérification de l'URL** — un formulaire qui s'enregistre
+ne lève aucune erreur, il change d'adresse. Même famille que le portail
+Infologic, en pire : là-bas on lisait de travers, ici on écrit.
+
+**LES SIX CASES QUI SONT UNE DÉCISION, pas un défaut** — toutes dans l'arbre
+Caisse, donc toutes cochées par la cascade :
+
+- « Je peux faire une remise **sans justification** » — ×2 (commande, article)
+- « Je peux l'annuler **sans justification** » — ×2 (avant et après envoi en
+  préparation)
+- « Je peux annuler une commande **sans justification** »
+- « Je peux effectuer **le Z** » (sous « effectuer le X »)
+- « Je peux **supprimer un règlement** »
+- « Je peux **modifier le prix** d'un article dans une commande »
+
+⚠️ Le back-office a un **onglet « annulations »** et un **onglet « remises »**
+faits pour les relire. « Sans justification » ne les masque pas — il les
+laisse apparaître **sans raison**. Ce n'est pas une question de confiance :
+c'est le seul endroit où comprendre un Z qui ne tombe pas juste.
+
+✅ **Le droit qui gouverne la note EN COMPTE est là** : sous « Je peux
+effectuer un règlement » → **« Je peux rendre un compte client débiteur »**.
+Son voisin « Je peux **créditer** un compte client » est le geste inverse,
+celui qui soldera l'ardoise de la supérette. Les deux comptent pour le
+chantier du mode `Compte client` (#36739).
+
+✅ **Un employé de comptoir n'a pas besoin d'e-mail.** Sur `/users/add`, le
+champ dit « facultatif si pas de connexion au backoffice » : sans adresse,
+aucune invitation n'est envoyée et il n'y a aucun accès back-office. Son
+identification sur la caisse est le **« Code de déverrouillage caisse »** du
+même formulaire (ou une carte NFC / QR).
+
+⚠️ **« Niveau de hiérarchie » est un nombre dont je ne connais pas la
+sémantique** — vraisemblablement qui peut autoriser qui (un manager valide la
+remise d'un serveur). Non documenté sur l'écran : à faire préciser par le
+support (09 72 53 55 72) plutôt qu'à deviner. Le rôle « Restaurateur » étant
+un rôle système absent de `/roles`, son niveau n'est pas lisible.
+
+⚠️ **Je ne crée ni le rôle, ni le compte, ni le code de déverrouillage.** Un
+code de déverrouillage est un identifiant, et le niveau de droits d'une autre
+personne est une décision du gérant. Le formulaire a été laissé propre
+(0/180 cases).
+
 ### Le menu enfant était éteint depuis onze jours (15/10/2026)
 
 « As-tu ajouté le menu enfant à 11,90 ? » — **non, et il n'y avait rien à
@@ -8422,14 +8523,25 @@ réglage « lecture seule » posé dessus est purement ignoré. Ça se fait dans
 `/admin/securite` → Profils, par le gérant, en connaissance de cause.
 
 ✅ **Mais son besoin réel est la CAISSE**, et c'est un autre système.
-⚠️ **`GET /users` répond 200**, alors que ce fichier affirmait que les
-utilisateurs Zelty étaient en 404 (cartographie du 24/09) — c'était faux,
-on avait sondé `/employees`, `/staff` et `/accounts`. Il rend cependant
-**0 utilisateur**, et on connaît le piège : un 200 avec une liste vide ne
-veut pas dire « vide » (`/bookings` sans `?date=`). Donc soit aucun
-utilisateur n'est déclaré, soit il manque un paramètre — **à ne pas
-trancher sur une seule lecture**. Les droits de caisse se posent dans
-`bo.zelty.fr` → Utilisateurs.
+⚠️⚠️ **`GET /users` RÉPOND 200 AVEC UNE LISTE VIDE ALORS QU'UN UTILISATEUR
+EXISTE — tranché le jour même par l'écran.** D'abord, le chemin : il répond
+bien 200, alors que ce fichier affirmait les utilisateurs Zelty en 404
+(cartographie du 24/09) — c'était faux, on avait sondé `/employees`,
+`/staff` et `/accounts`.
+
+Mais il rend **0 utilisateur**, et `bo.zelty.fr/users` en montre **UN**
+(Arnaud, rôle « Restaurateur », dernière connexion le 06/10/2026). Le doute
+est donc levé dans le mauvais sens : ce n'est pas « aucun utilisateur
+déclaré », c'est **une liste tronquée en silence**, comme `/bookings` sans
+`?date=`. Soit un paramètre manque, soit cet endpoint ne sert pas les
+utilisateurs de ce compte.
+
+⚠️ C'est le MIROIR exact du défaut de `/transaction-methods` : là, l'API rend
+les sept modes et c'est **l'écran** du back-office qui s'affiche vide. Les
+deux sources se trompent chacune à leur tour, et **aucune des deux ne lève
+d'erreur** — il faut donc toujours croiser l'écran et l'API avant de conclure
+qu'une chose n'existe pas. Les droits de caisse se posent dans
+`bo.zelty.fr` → Utilisateurs ; voir la section suivante pour les 180 droits.
 
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
