@@ -8287,6 +8287,74 @@ volume de tous les autres plats.
 
 Contrôles : carte **195/195 conformes, 0 écart** · `test-carte-fournil` 13/13.
 
+### Quatre formules snacking à 9,90 € (15/10/2026)
+
+`node scripts/formules-snacking-1510.mjs [--ecrire]` — **Formule Panini ·
+Salade · Focaccia · Sandwich**, chacune `+ boisson CANETTE + dessert`,
+famille « Formule », FOURNIL, TVA 10 %.
+
+⚠️ **On en avait supprimé NEUF le 11/10** : décision du gérant, pas un retour
+en arrière accidentel. Les anciennes étaient six formules vendues plus trois
+composants « Formule — … » devenus sans objet. Les quatre nouvelles portent
+des noms courts et distincts — aucun conflit avec les désactivées, qui
+gardent leur `nom_caisse` (règle du miroir).
+
+⚠️ **TVA 10 %, panier MIXTE.** Un panini à 10 % et une pâtisserie à 5,5 %
+dans le même prix, et `recettes.tva` ne porte qu'un taux : c'est le taux
+HAUT, comme les formules petit-déjeuner — sur-collecter est rattrapable,
+sous-collecter ne l'est pas. 9,90 / 1,10 = **9,0000 € HT pile**, aucun
+arrondi à craindre.
+
+⚠️⚠️ **LA FORMULE N'EST AVANTAGEUSE QUE BORNÉE, et c'est le chiffre qui a
+failli manquer.** Mesuré avant de créer, en comparant à la carte :
+
+| | le moins cher à la carte | face à 9,90 € |
+|---|---|---|
+| sandwich | 5,70 € (croque + eau + mini beignet) | **+4,20 € DE PLUS** |
+| salade | 6,60 € | **+3,30 €** |
+| panini | 6,70 € | **+3,20 €** |
+| focaccia | 7,10 € | **+2,80 €** |
+
+Un client qui compare se sentirait floué. **Bornée à une CANETTE (2,00 €) et
+une PÂTISSERIE (3,80 €)** — ce que le gérant a effectivement dit — elle
+redevient avantageuse partout, sauf sur le croque-monsieur à 3,50 €. La
+borne est écrite dans `recettes.procedure`, donc sur la fiche imprimable, pas
+dans un commentaire que personne n'ouvre.
+
+⚠️⚠️ **AUCUNE COMPOSITION, DONC AUCUN COÛT — et il faut le dire deux fois.**
+Le contenu se CHOISIT : chiffrer sur un panini fixe mentirait pour les deux
+autres, exactement la règle de « Formule CasaTasia » et du menu enfant.
+Et de toute façon **les coûts des composants n'existent pas** : 0/3 paninis,
+0/4 salades, 1/6 sandwichs chiffrés au 15/10/2026. On vend donc quatre
+formules **sans savoir ce qu'elles coûtent**, et l'écran l'affiche en gris
+(« coût inconnu », 0150) plutôt qu'en vert.
+→ **Le vrai chantier est de chiffrer paninis, salades et sandwichs** : treize
+produits du comptoir sans coût d'achat, c'est le trou le plus large de la
+carte.
+
+⚠️ **« Formule Focaccia » et « Formule Sandwich » visent la MÊME famille.**
+La focaccia est rangée en Sandwich depuis la fusion des six du 28/08, et au
+même prix (4,90 €) que « Le Poulet ». Deux boutons pour le même périmètre,
+donc — c'est défendable commercialement (un client demande « la formule
+focaccia ») mais à retirer d'un mot si ça hésite au comptoir.
+
+⚠️ `vendable_online: false` (0115) et « Formule » est déjà dans
+`JAMAIS_EN_LIGNE` comme dans `CATEGORIES_ASSEMBLEES` — rien à ajouter, pour
+une fois : ces deux listes avaient été débordées trois fois en deux jours.
+
+⚠️ La famille existait déjà côté caisse (#656369, ordre 11) : elle était
+VIDE depuis le 11/10, pas supprimée. C'est ce qui a permis de ne pas la
+recréer — et de ne pas rejouer les cinq 429 des familles du 28/08.
+
+Les quatre partent en **UN SEUL POST groupé**, et le script reprend sur la
+**correspondance de caisse**, pas sur le nom : un produit peut exister chez
+nous et pas en caisse (429 au mauvais moment, vécu le 12/10), et juger sur
+le nom le ferait sortir « existe déjà » pour toujours.
+
+Contrôles : carte **199/199 conformes, 0 écart** · `test-carte-fournil` 13/13.
+⚠️ `HORS_AFFICHE` est mis à jour **dans le même commit** — la liste de
+référence bouge avec la carte, jamais après coup.
+
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
 « Pourquoi j'ai pas le pouls en direct avec le chiffre sur l'outil alors qu'on
@@ -8615,6 +8683,7 @@ PORT=3000 node scripts/test-reassort-ardoise.mjs # le réassort lit l'ardoise (c
 node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (essai à blanc)
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
 node scripts/menu-enfant-permanent.mjs         # le menu enfant ne suit pas l'ardoise
+node scripts/formules-snacking-1510.mjs        # 4 formules snacking 9,90 € (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)

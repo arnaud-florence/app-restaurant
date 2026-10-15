@@ -126,6 +126,12 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Les quatre formules snacking à 9,90 € (gérant, 15/10/2026). Aucune
+  // affiche ne les porte encore — le prix vient de lui, pas d'un panneau.
+  // ⚠️ `HORS_LIGNE_VOULU` les reprend par `...HORS_AFFICHE` : les formules
+  // sont hors click & collect depuis la 0115, et le contenu se choisit au
+  // comptoir, donc il n'y a rien à mettre dans un panier en ligne.
+  'Formule Panini', 'Formule Salade', 'Formule Focaccia', 'Formule Sandwich',
   // Comptoir, 13/10/2026 : aucune affiche ne les porte. Le briquet n'est pas
   // alimentaire (20 %), le paquet de bonbons en est une (5,5 %).
   'Paquet de bonbons', 'Briquet', 'Puff rechargeable',
