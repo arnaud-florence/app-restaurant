@@ -21,11 +21,12 @@
 //    ⚠️ Et les coûts des composants manquent de toute façon : 0/3 paninis,
 //    0/4 salades, 1/6 sandwichs sont chiffrés au 15/10/2026.
 //
-// ⚠️ LA BORNE EST DANS LA PROCÉDURE, et elle n'est pas décorative. Avec les
-//    composants les moins chers (croque-monsieur 3,50 + eau 1,00 + mini
-//    beignet 1,20 = 5,70 €), la formule coûterait 4,20 € DE PLUS que la
-//    carte. Bornée à une CANETTE (2,00 €) et une PÂTISSERIE (3,80 €), elle
-//    redevient avantageuse partout sauf sur le croque-monsieur.
+// ⚠️ LA BORNE EST DANS LA PROCÉDURE, et elle vient du gérant : boisson en
+//    CANETTE (2,00 €), dessert de la vitrine (3,80 €). Ainsi bornée, la
+//    formule fait gagner 0,30 à 1,90 € selon le plat choisi.
+//    ⚠️ UNE SEULE EXCEPTION : le croque-monsieur à 3,50 €. Son panier vaut
+//    9,30 € à la carte, donc la formule coûte 0,60 € DE PLUS — à dire au
+//    client plutôt qu'à lui laisser découvrir.
 //
 // ⚠️ `vendable_online: false` — les formules sont hors click & collect
 //    depuis la 0115, et « Formule » est déjà dans `JAMAIS_EN_LIGNE`.
@@ -101,14 +102,19 @@ const tag = tags.find(t => t.name === FAMILLE)
 if (!tag) throw new Error(`famille « ${FAMILLE} » absente de la caisse — la créer avec pousser-familles-zelty`)
 
 const PROC = quoi => [
-  `${quoi[0].toUpperCase()}${quoi.slice(1)} + une boisson en CANETTE + un dessert.`,
+  `${quoi[0].toUpperCase()}${quoi.slice(1)} + une boisson en CANETTE (2,00 €)`,
+  '+ un dessert de la vitrine (3,80 €).',
   '',
-  "⚠️ La formule n'est avantageuse que bornée ainsi. Avec les composants les",
-  'moins chers de la carte (croque-monsieur, eau, mini beignet), le client',
-  'paierait 9,90 € ce qui lui coûterait 5,70 € à la carte.',
+  'À la carte, le même panier coûte 10,20 à 11,80 € : la formule fait gagner',
+  "0,30 à 1,90 € au client, et c'est ce qui la rend lisible au comptoir.",
   '',
-  "⚠️ Le coût n'est PAS chiffré : le contenu se choisit. Le food cost affiché",
-  'est donc inconnu, et non pas bon.',
+  '⚠️ SEULE EXCEPTION — le croque-monsieur à 3,50 € : le panier tombe à',
+  '9,30 € à la carte, donc la formule coûte 0,60 € DE PLUS. Le dire au',
+  'client plutôt que de le lui laisser découvrir.',
+  '',
+  "⚠️ Le coût n'est PAS chiffré : le contenu se choisit, et paninis, salades",
+  "et sandwichs n'ont aucun coût d'achat en base. Le food cost affiché est",
+  'donc inconnu, pas bon.',
 ].join('\n')
 
 // ── base ──────────────────────────────────────────────────────────────

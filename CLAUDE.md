@@ -8305,21 +8305,28 @@ HAUT, comme les formules petit-déjeuner — sur-collecter est rattrapable,
 sous-collecter ne l'est pas. 9,90 / 1,10 = **9,0000 € HT pile**, aucun
 arrondi à craindre.
 
-⚠️⚠️ **LA FORMULE N'EST AVANTAGEUSE QUE BORNÉE, et c'est le chiffre qui a
-failli manquer.** Mesuré avant de créer, en comparant à la carte :
+⚠️ **LA BORNE VIENT DU GÉRANT, ET ELLE TIENT** : boisson en **CANETTE
+(2,00 €)**, dessert **de la vitrine (3,80 €)**. Ainsi bornée, la formule
+fait gagner **0,30 à 1,90 €** selon le plat.
 
-| | le moins cher à la carte | face à 9,90 € |
+| | panier à la carte | face à 9,90 € |
 |---|---|---|
-| sandwich | 5,70 € (croque + eau + mini beignet) | **+4,20 € DE PLUS** |
-| salade | 6,60 € | **+3,30 €** |
-| panini | 6,70 € | **+3,20 €** |
-| focaccia | 7,10 € | **+2,80 €** |
+| salade (4,40 → 6,00) | 10,20 → 11,80 € | 0,30 à 1,90 € offerts |
+| panini (4,50 → 4,90) | 10,30 → 10,70 € | 0,40 à 0,80 € |
+| focaccia (4,90) | 10,70 € | 0,80 € |
+| sandwich (3,50 → 5,50) | 9,30 → 11,30 € | ⚠️ **−0,60 €** à 1,40 € |
 
-Un client qui compare se sentirait floué. **Bornée à une CANETTE (2,00 €) et
-une PÂTISSERIE (3,80 €)** — ce que le gérant a effectivement dit — elle
-redevient avantageuse partout, sauf sur le croque-monsieur à 3,50 €. La
-borne est écrite dans `recettes.procedure`, donc sur la fiche imprimable, pas
-dans un commentaire que personne n'ouvre.
+⚠️ **UNE SEULE EXCEPTION : le croque-monsieur à 3,50 €.** Son panier vaut
+9,30 € à la carte, donc la formule coûte **0,60 € de plus** — à dire au
+client plutôt qu'à lui laisser découvrir. C'est écrit dans
+`recettes.procedure`, donc sur la fiche imprimable.
+
+⚠️⚠️ **ET J'AI PRÉSENTÉ CE CHIFFRE DE TRAVERS LA PREMIÈRE FOIS.** J'avais
+comparé à un panier « croque + eau + mini beignet » à 5,70 € — en concluant
+« +4,20 € de plus » — alors que le gérant avait dit « desserts » et que sa
+carte dessert est à **3,80 €**. L'arithmétique était juste, l'hypothèse
+était la mienne, et elle n'a jamais été la sienne. Mesurer ne suffit pas :
+il faut mesurer le scénario RÉEL.
 
 ⚠️⚠️ **AUCUNE COMPOSITION, DONC AUCUN COÛT — et il faut le dire deux fois.**
 Le contenu se CHOISIT : chiffrer sur un panini fixe mentirait pour les deux
@@ -8354,6 +8361,75 @@ le nom le ferait sortir « existe déjà » pour toujours.
 Contrôles : carte **199/199 conformes, 0 écart** · `test-carte-fournil` 13/13.
 ⚠️ `HORS_AFFICHE` est mis à jour **dans le même commit** — la liste de
 référence bouge avec la carte, jamais après coup.
+
+### Un supplément SIROP sur les bières (15/10/2026)
+
+`node scripts/supplement-sirop-biere-1510.mjs [--ecrire]` — groupe
+**« Suppléments bière » #301378**, une valeur **« Sirop » à 0,20 €**,
+rattaché à **7 bières** : les deux pressions, les deux Affligem, les deux
+Heineken et la Desperados.
+
+⚠️⚠️ **LE PRIX N'EST PAS UN PALIER INVENTÉ : LA CARTE LE DISAIT DÉJÀ.**
+Panaché 2,80 € · Monaco 3,00 € → le sirop dans une bière vaut **0,20 €**.
+Le poser à 0,50 € — le palier habituel des suppléments (10/10) — aurait fait
+payer « demi + sirop » **3,30 €** quand le Monaco est à 3,00 € au même
+comptoir : deux prix pour la même boisson, et c'est le client qui le voit.
+Le coût se lit sur les mêmes fiches : 0,8729 − 0,8371 = **0,0358 €**, soit
+21 % de food cost.
+
+⚠️ **CE QUE ÇA DÉBLOQUE, C'EST LA PINTE.** Il n'existe ni « Pinte Monaco »
+ni « Pinte panachée » : sans ce supplément, une pinte au sirop oblige le
+serveur à bricoler — ou à l'offrir.
+
+⚠️ **QUATRE BIÈRES SONT ÉCARTÉES, toutes pour la même raison : elles sont
+DÉJÀ aromatisées.** Monaco et Panaché existent en produits — y ajouter
+« sirop » créerait un second chemin vers la même boisson, à un autre prix.
+Picon bière et Pinte Picon portent déjà leur Picon.
+
+⚠️ **UN SEUL supplément « Sirop », sans parfum** — comme le « Diabolo », qui
+n'en porte pas non plus. Inventer une liste (grenadine, menthe, pêche…)
+mettrait au comptoir des bouteilles dont rien ne dit qu'elles sont en
+stock : **seule « Sirop (litre) » est une matière suivie**, et le script
+REFUSE de construire un supplément adossé à une matière non suivie.
+
+⚠️ La dose **ne double pas** sur une pinte — même hypothèse, dite, que pour
+la Pinte Picon.
+
+⚠️ Rattachement par **FUSION** des groupes, jamais par remplacement (leçon
+des quatre plats à cuisson, 12/10) : ici aucune bière n'en portait, mais
+écrire `options: [id]` sur un plat qui en a reste la faute qui retire tout
+sans un message. Relecture après coup : 7/7, prix et `tax 2000` intacts.
+⚠️ Un **429 est tombé entre les deux écritures** et a été absorbé par le
+réessai qui annonce son code.
+
+### Sylvie, et la limite que je ne franchis pas (15/10/2026)
+
+« Mets Sylvie en manager qu'elle puisse avoir accès à toutes les fonctions
+de la caisse. » Deux systèmes distincts derrière cette phrase, et ils
+n'appellent pas la même réponse.
+
+⚠️ **Sylvie Violante EXISTE comme employée** (poste `polyvalent`, active)
+mais **n'a AUCUN compte de connexion** : aucune ligne dans `profils`. La
+promotion n'a donc littéralement rien à viser — et la règle est posée
+depuis l'accueil d'Ambre : **aucun compte n'est créé par script**, la
+personne s'inscrit elle-même sur `/login` (elle choisit son mot de passe),
+puis on rattache le profil à la fiche.
+
+⚠️⚠️ **ET JE NE FAIS PAS LA PROMOTION MOI-MÊME.** Passer un profil en
+`manager` est une élévation de privilèges : le poste `manager` porte
+`allowed: ['*']` et **court-circuite tout le système de permissions** — un
+réglage « lecture seule » posé dessus est purement ignoré. Ça se fait dans
+`/admin/securite` → Profils, par le gérant, en connaissance de cause.
+
+✅ **Mais son besoin réel est la CAISSE**, et c'est un autre système.
+⚠️ **`GET /users` répond 200**, alors que ce fichier affirmait que les
+utilisateurs Zelty étaient en 404 (cartographie du 24/09) — c'était faux,
+on avait sondé `/employees`, `/staff` et `/accounts`. Il rend cependant
+**0 utilisateur**, et on connaît le piège : un 200 avec une liste vide ne
+veut pas dire « vide » (`/bookings` sans `?date=`). Donc soit aucun
+utilisateur n'est déclaré, soit il manque un paramètre — **à ne pas
+trancher sur une seule lecture**. Les droits de caisse se posent dans
+`bo.zelty.fr` → Utilisateurs.
 
 ### ⚠️⚠️ Le CA ne remontait pas le jour de l'ouverture (12/10/2026)
 
@@ -8684,6 +8760,7 @@ node scripts/ardoise-semaine-1.mjs             # la carte du 12 au 18 octobre (e
 node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEUX côtés
 node scripts/menu-enfant-permanent.mjs         # le menu enfant ne suit pas l'ardoise
 node scripts/formules-snacking-1510.mjs        # 4 formules snacking 9,90 € (essai à blanc)
+node scripts/supplement-sirop-biere-1510.mjs   # sirop 0,20 € sur 7 bières (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
