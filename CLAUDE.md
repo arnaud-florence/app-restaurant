@@ -8636,15 +8636,62 @@ occurrence du motif** après `test-rh`, `test-rbac-snack-livreur`, `test-stock`
 et le cron `zelty-clients` — et cette fois il a failli masquer la
 requalification du Gommé. 27/27 après correction.
 
-⚠️ **TOUJOURS PAS FAITS : « fetus 2,00 € » et « baby 4 € »**, demandés le
-13/10 en même temps que le Gommé. Je ne sais pas ce que ces deux-là désignent
-— un « baby » est un petit verre d'alcool dans certaines régions, « fetus »
-n'évoque rien de sûr — et la TVA dépend de la présence d'alcool. À faire
-préciser plutôt qu'à deviner : le « etc » des jus Euro-Cash a déjà coûté une
-création, un retrait et un doute.
+⚠️ **« baby 4 € » est FAIT le 16/10 (voir ci-dessous) ; « fetus 2,00 € » ne
+l'est toujours pas** — je ne sais pas ce que ce mot désigne, et la TVA comme
+le point de vente dépendent de la présence d'alcool. À faire préciser plutôt
+qu'à deviner : le « etc » des jus Euro-Cash a déjà coûté une création, un
+retrait et un doute. **Attendre trois jours valait mieux que créer faux.**
 
 Contrôles : carte **199/199 conformes, 0 écart** · `test-matieres-bar` 27/27 ·
 carte imprimée et affichage légal vérifiés sur la page réelle.
+
+### Le « baby » — un petit whisky à 4,00 € (16/10/2026)
+
+`node scripts/baby-whisky-1610.mjs [--ecrire] [--cl=N] [--prix=N]`.
+Demandé le 13/10 (« baby 4 € »), précisé le 16 : « c'est un petit whisky ».
+**Resté non fait trois jours, et c'était la bonne décision** — la TVA et le
+point de vente dépendent tous deux de la présence d'alcool.
+
+| | |
+|---|---|
+| 2 cl · **4,00 €** · famille Alcool · BAR | TVA 20 % les deux modes |
+| coût **0,3640 €** · `unites_par_achat` 35 | matière Grant's Triple Wood 70 cl |
+| food cost **11 %** | le plus bas du bar |
+
+⚠️ **LA DOSE DE 2 cl N'EST PAS DONNÉE PAR LE GÉRANT, elle est ancrée sur sa
+PROPRE carte** : « petit » y vaut 2 cl partout — Ricard 2 cl, Pastis 51 2 cl,
+et surtout **« Shot tequila 2 cl »**, qui est le même geste sur un autre
+spiritueux. `--cl=3` suffit à changer d'avis.
+
+⚠️ **LE PATRON EXISTAIT DÉJÀ ET IL EST VÉRIFIÉ AVANT D'ÉCRIRE.** Le shot de
+tequila est dérivé de « Tequila 4 cl » : même matière, `unites_par_achat`
+DOUBLÉ (35 au lieu de 17,5 — deux fois plus de doses dans la bouteille), coût
+exactement la moitié. Le script contrôle ce témoin et refuse si le ratio a
+bougé. Même discipline que la Pinte Picon et le Gommé.
+
+⚠️⚠️ **LE PRIX EST PROPORTIONNELLEMENT PLUS CHER QUE LE SHOT, et c'est DIT
+plutôt que corrigé** : 4,00 € pour 2 cl, c'est **80 %** du prix du whisky
+4 cl (5,00 €), quand le shot de tequila est à **60 %** du sien. Un client qui
+compare prendra le whisky entier pour un euro de plus — ce qui est peut-être
+l'intention. C'est le prix du gérant, pas une erreur.
+
+⚠️ **AUCUN ALLERGÈNE, et c'est JUSTE ici** — à l'inverse du Gommé de la
+veille. Les distillats (whisky, vodka, gin, rhum) sont **exemptés
+d'étiquetage gluten** par l'annexe II du règlement, même issus de céréales.
+Ajouté à `AUCUN` dans `prefill-allergenes.mjs`.
+
+✅ **Rien à changer dans `print/carte-bar/page.tsx` cette fois** : les
+« Alcools » y sont filtrés par CATÉGORIE, pas par nom — contrairement aux
+bières pression, dont la liste `PRESSION` a dû suivre quatre fois.
+
+⚠️ `libelle_achat` et `reference_fournisseur` sont COPIÉS du gabarit, et
+c'est voulu : c'est la MÊME bouteille. Au prochain scan Grant's, la
+propagation divisera le prix par `unites_par_achat` (35) et tombera juste sur
+la dose. Rien à voir avec les desserts, où le gabarit portait le libellé d'un
+AUTRE produit et devait être effacé.
+
+Contrôles : carte **200/200 conformes, 0 écart** · `test-matieres-bar` 27/27 ·
+`test-carte-fournil` 13/13.
 
 ### Sylvie, et la limite que je ne franchis pas (15/10/2026)
 

@@ -48,7 +48,7 @@ const CERTAIN = [
 // une fiche « aucun allergène » sur une bière est exactement la faute de
 // la 0138, et celle-ci serait partie sur le QR code de la salle.
 const AUCUN = ['Café expresso','Café allongé','Thé','Ricard 2 cl','Whisky 4 cl',
-  'Whisky premium 4 cl','Rhum 4 cl','Vodka 4 cl','Gin 4 cl']
+  'Baby whisky 2 cl','Whisky premium 4 cl','Rhum 4 cl','Vodka 4 cl','Gin 4 cl']
 
 const r = await sb('recettes?select=id,nom,categorie,allergenes_complementaires&actif=eq.true')
 const plan=[], incertains=[]
