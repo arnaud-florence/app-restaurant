@@ -8649,6 +8649,73 @@ tickets ce raisonnement ne tient que si on **RELIT**. On relit toujours.
 
 Contrôles : carte **201/201 conformes, 0 écart** · `test-matieres-bar` 23/23 ·
 `test-carte-fournil` 13/13.
+
+### Le Coca 33 cl visible aussi au bar — un produit, deux rayons (16/10/2026)
+
+`node scripts/coca-33-en-salle-1610.mjs [--ecrire] [--aussi-zero]
+[--aussi-cherry]`. Le gérant : « peux-tu ajouter un coca 33 cl », puis, quand
+j'ai répondu qu'il existait : « non c'est le coca 25 cl qui est présent ».
+
+⚠️⚠️ **IL N'Y AVAIT RIEN À CRÉER, ET LE CRÉER AURAIT COÛTÉ CHER.** Le produit
+existe — plat caisse #2173093, 2,00 € à emporter / 2,80 € en salle, coût
+0,60 €, photo, en ligne. Ce qui manquait, c'est sa **PLACE** : il est en
+famille « Boisson fraîche », le rayon du comptoir, et le bar travaille dans
+« Boisson salle », où seul le 25 cl figurait. **Conséquence directe de la
+séparation des deux familles du 13/10**, et elle était prévisible.
+
+Une seconde fiche aurait **coupé en deux le CA par produit et le stock** du
+même Coca — le défaut de « Lin tournesol » / « Pain lin-tournesol », qu'il a
+fallu fusionner à la main. ⚠️ Et Zelty ne sait pas supprimer un plat : la
+fiche en trop serait restée pour toujours.
+
+✅ **`tags` EST UN TABLEAU : un plat porte plusieurs familles.** Un seul
+produit, un seul prix, un seul stock, un seul CA — visible aux deux endroits.
+C'est la bonne réponse ici parce que le produit porte **déjà** deux prix
+(`price` 2,80 en salle, `price_togo` 2,00 à emporter) : **le rayon ne décide
+pas du prix, c'est le MODE du ticket qui le fait.** Le même bouton facture
+donc juste au comptoir comme à table.
+
+⚠️ **ON NE TOUCHE PAS `recettes.categorie`.** Elle est UNE chaîne et pilote
+bien autre chose que la caisse : les exclusions d'inventaire, les invendus, la
+commande conseillée, les rayons de `catalogue-achats`, la carte imprimée. Le
+second rayon est un fait de CAISSE, il reste en caisse.
+
+⚠️ Le contrôle de carte l'accepte, et c'était à vérifier avant d'écrire : il
+exige que notre `categorie` soit **PARMI** les familles du plat
+(`fams.includes`), pas qu'elle soit la seule. `pousser-familles-zelty.mjs`
+**SAUTE** un plat qui porte déjà sa famille, donc il ne l'effacera pas.
+⚠️ Mais il écrit `tags: [famille]` sur un plat qui ne l'a pas encore : **si la
+`categorie` du Coca 33 cl changeait un jour, ce script le repousserait seul et
+le second rayon disparaîtrait en silence.**
+
+✅ **LE REPÈRE QUI JUSTIFIE LE GESTE, et il est fort** — à prix de salle
+ÉGAL (2,80 € tous les deux) :
+
+| | coût | marge HT | food cost |
+|---|---|---|---|
+| Coca-Cola **25 cl** (verre consigné France Boissons) | 1,1283 € | 1,42 € | **44 %** |
+| Coca-Cola **33 cl** (Euro-Cash) | 0,6000 € | **1,95 €** | **24 %** |
+
+**+0,53 € par verre, pour un contenant plus grand.** Servir le 33 cl en salle
+rapporte donc nettement plus que le 25 cl — à arbitrer avec la consigne et le
+geste de service, mais le chiffre est là.
+
+⚠️ **L'inventaire le comptera au FOURNIL, pas au bar** : le produit est
+rattaché à ce point de vente et `(ops)/inventaire?poste=` filtre là-dessus.
+S'il y a deux frigos, le comptage du bar ne le verra pas.
+
+⚠️ Le Zéro et le Cherry 33 cl sont dans le même cas ; le gérant n'a nommé que
+le Coca, donc ils restent dehors — un mot suffit (`--aussi-zero`).
+
+⚠️⚠️ **LE RÉSEAU A RENDU DES `UND_ERR_CONNECT_TIMEOUT` SUR LES DEUX API** ce
+jour-là (Supabase 6,9 s de latence, un appel Zelty perdu à 12 s). Le script
+réessaie donc **côté base aussi**, et il a échoué proprement sur la LECTURE
+sans rien écrire — c'est le bon comportement : on ne construit pas un upsert
+sans avoir lu. Un script de lecture qui meurt sur un timeout de connexion fait
+chercher un défaut de données là où il n'y a qu'une liaison instable.
+
+Contrôle : carte **201/201 conformes, 0 écart**.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9201,6 +9268,7 @@ node scripts/menu-enfant-permanent.mjs         # le menu enfant ne suit pas l'ar
 node scripts/formules-snacking-1510.mjs        # 4 formules snacking 9,90 € (essai à blanc)
 node scripts/supplement-sirop-biere-1510.mjs   # sirop 0,20 € sur 7 bières (essai à blanc)
 node scripts/supplement-sirop-boissons-1610.mjs # sirop sur les 61 boissons, deux prix (essai à blanc)
+node scripts/coca-33-en-salle-1610.mjs         # un produit, deux rayons de caisse (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
