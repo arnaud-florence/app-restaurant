@@ -29,7 +29,14 @@
 //   node scripts/supplement-sirop-biere-1510.mjs [--ecrire]
 import fs from 'node:fs'
 
-const GROUPE = 'Suppléments bière'
+// ⚠️ ÉLARGI LE 16/10/2026 : ce groupe n'est plus propre à la bière — il
+// porte les 24 alcools servis au verre, et un second groupe à 0,40 € porte
+// les softs (voir supplement-sirop-boissons-1610.mjs). Le nom suit, le
+// `remote_id` NON : c'est la clé d'idempotence, le changer créerait un
+// second groupe et les bières resteraient sur l'ancien.
+// ⚠️ Laissé à « Suppléments bière », ce script RENOMMERAIT le groupe en
+// arrière à chaque rejeu — le piège de prix-anises-1310 avec le Gommé.
+const GROUPE = 'Supplément sirop'
 const RID = 'supp-biere'
 const VALEUR = 'Sirop'
 const PRIX_C = 20                 // centimes TTC — l'écart Monaco/Panaché

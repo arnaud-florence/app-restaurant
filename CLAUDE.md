@@ -8564,6 +8564,91 @@ sans un message. Relecture après coup : 7/7, prix et `tax 2000` intacts.
 ⚠️ Un **429 est tombé entre les deux écritures** et a été absorbé par le
 réessai qui annonce son code.
 
+### Le sirop sur TOUTES les boissons — et deux prix, pas un (16/10/2026)
+
+`node scripts/supplement-sirop-boissons-1610.mjs [--ecrire]`. Demande du
+gérant : « met supplément sirop partout dans toutes les catégories de
+boisson ». Il n'existait que sur 7 bières. **61 produits** le portent.
+
+⚠️⚠️ **LE PRIX N'EST PAS LE MÊME PARTOUT, ET C'EST SA CARTE QUI LE DIT.**
+Deux couples de SES propres produits donnent le trait de sirop, et ils ne
+tombent pas sur le même nombre :
+
+    Monaco 3,00 − Panaché 2,80          = 0,20 €   dans un alcool
+    Mauresque 2,20 − Ricard 2,00        = 0,20 €   idem, second témoin
+    Diabolo 3,20 − Limonade 25 cl 2,80  = 0,40 €   dans un soft
+
+D'où **DEUX groupes**, comme « Cuisson » et « Cuisson du burger » :
+
+| Groupe | Prix | Périmètre |
+|---|---|---|
+| **Supplément sirop** #301378 | 0,20 € | 24 — 7 bières, 11 apéritifs, 6 spiritueux |
+| **Supplément sirop boisson** #301520 | 0,40 € | 37 — 18 boissons fraîches, 11 de salle, 8 chaudes |
+
+⚠️⚠️ **UN SEUL GROUPE À 0,20 € AURAIT TUÉ LE DIABOLO.** « Limonade + Sirop »
+serait sorti à **3,00 € face au Diabolo à 3,20 €** : un second chemin, MOINS
+CHER, vers exactement la même boisson — 0,20 € perdus à chaque verre, et un
+bouton qui ne sert plus. C'est la raison même qui avait écarté Monaco et
+Panaché du supplément la veille, par l'autre bout.
+
+⚠️ L'écart 0,20 / 0,40 est une **incohérence de la CARTE**, pas du script :
+le même trait de sirop vaut le double dans un Coca que dans une bière. Dit
+plutôt que tranché en silence — un mot suffit à l'unifier (aligner le Diabolo
+à 3,00 €, ou les deux groupes sur 0,40 €). Food cost 21 % dans les deux cas.
+
+⚠️⚠️ **LA FENÊTRE NE S'OUVRE PAS D'ELLE-MÊME SUR LES SOFTS**
+(`donotpresent: true`). Pour la bière c'était assumé : 7 produits, un bar en
+service posé, et un panaché est courant. Ici le groupe touche **8 boissons
+chaudes et 18 boissons fraîches — les deux articles les plus vendus du
+comptoir à 6 h 20** : une fenêtre à fermer sur chaque café vendu ralentit la
+file, et un sirop dans un café est l'exception. Le serveur l'ouvre quand le
+client demande. ⚠️ Contrepartie connue et assumée : le supplément n'est plus
+**découvrable** par quelqu'un qui ne connaît pas la caisse — à inverser d'un
+mot (`DONOTPRESENT_SOFT = false`) si le comptoir le réclame.
+
+⚠️ **UN SEUL SIROP, SANS PARFUM, et c'est MESURÉ** : « Sirop (litre) » est la
+SEULE matière sirop suivie. Grenadine et menthe fraîche existent en base mais
+ne sont **pas** `stocke` — proposer « grenadine » mettrait au comptoir une
+bouteille dont rien ne dit qu'elle est en stock. Le script REFUSE de
+construire sans cette matière.
+
+**QUATRE RAISONS D'EXCLURE, 29 produits, chacun nommé** — et la liste des
+écartés est imprimée à chaque exécution : sans elle, dans six mois, on ne
+saura plus si une absence est un oubli ou une décision.
+
+| Raison | Qui |
+|---|---|
+| **déjà aromatisé** — second chemin vers la même boisson | Monaco, Panaché, Gommé, Picon bière, Pinte Picon, Mauresque, Tomate, Perroquet, Spritz, Diabolo, Sirop à l'eau |
+| **digestif bu sec** | Baileys, Cognac, Cointreau, Digestif, Limoncello, Marc de Provence |
+| **bouteille entière vendue fermée** | les 6 bouteilles de spiritueux 70 cl |
+| **format familial à emporter** | les 5 bouteilles de 1,5 L |
+
+⚠️ **LE VIN EST EXCLU EN BLOC** : vin + sirop, c'est un **Kir**, qui existe
+déjà en produit (comme le Kir royal). Et on ne verse pas de sirop dans un
+verre de Château La Lieue.
+
+⚠️ Le `remote_id` du groupe bière reste **`supp-biere`** alors que son nom
+devient « Supplément sirop » : c'est la **clé d'idempotence**. Le changer
+créerait un second groupe, et les 7 bières resteraient accrochées à l'ancien.
+
+⚠️⚠️ **DEUX COMPORTEMENTS OPPOSÉS SUR LE MÊME VERBE, et il faut les deux** :
+un plat **PRÉSERVE** les groupes qu'on omet (mesuré le 12/10) — donc on
+**FUSIONNE** `options`, sinon écrire `options: [sirop]` sur une bière
+retirerait ses autres groupes sans un message ; mais une option **REMPLACE**
+ses `values` (vérifié le 10/10) — donc le groupe bière est renvoyé avec sa
+valeur « Sirop » **recopiée telle quelle**, l'omettre l'aurait EFFACÉE.
+Relecture après coup : les 7 groupes gardent leurs valeurs (31/35/5/4/3/1/1)
+et les 4 plats à cuisson leurs deux groupes.
+
+⚠️⚠️ **UN `ETIMEDOUT` NE DIT PAS QUE L'ÉCRITURE A ÉCHOUÉ.** Le POST des 54
+plats a coupé en `read ETIMEDOUT`… **après être passé** : la relecture montre
+les 61 plats rattachés. Conclure de ce timeout que rien n'était écrit aurait
+mené à relancer en croyant repartir de zéro — sans danger ici, le script étant
+idempotent par fusion, mais sur un endpoint qui peut écraser le prix des
+tickets ce raisonnement ne tient que si on **RELIT**. On relit toujours.
+
+Contrôles : carte **201/201 conformes, 0 écart** · `test-matieres-bar` 23/23 ·
+`test-carte-fournil` 13/13.
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9115,6 +9200,7 @@ node scripts/ardoise-pause.mjs                 # éteindre hors ardoise, des DEU
 node scripts/menu-enfant-permanent.mjs         # le menu enfant ne suit pas l'ardoise
 node scripts/formules-snacking-1510.mjs        # 4 formules snacking 9,90 € (essai à blanc)
 node scripts/supplement-sirop-biere-1510.mjs   # sirop 0,20 € sur 7 bières (essai à blanc)
+node scripts/supplement-sirop-boissons-1610.mjs # sirop sur les 61 boissons, deux prix (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
