@@ -8636,14 +8636,66 @@ occurrence du motif** après `test-rh`, `test-rbac-snack-livreur`, `test-stock`
 et le cron `zelty-clients` — et cette fois il a failli masquer la
 requalification du Gommé. 27/27 après correction.
 
-⚠️ **« baby 4 € » est FAIT le 16/10 (voir ci-dessous) ; « fetus 2,00 € » ne
-l'est toujours pas** — je ne sais pas ce que ce mot désigne, et la TVA comme
-le point de vente dépendent de la présence d'alcool. À faire préciser plutôt
-qu'à deviner : le « etc » des jus Euro-Cash a déjà coûté une création, un
-retrait et un doute. **Attendre trois jours valait mieux que créer faux.**
+✅ **« baby » et « fetus » sont FAITS le 16/10** (voir ci-dessous).
+**Attendre trois jours valait mieux que créer faux** : interrogé, le gérant a
+d'abord répondu « fetus, c'est un petit pastis » — ce qui décrivait EXACTEMENT
+le Ricard 2 cl déjà à 2,00 € — avant de corriger : « c'est du whisky ». Créer
+sur la première réponse aurait posé un troisième bouton « pastis 2 cl à
+2,00 € » indiscernable du Ricard et du 51, et Zelty ne sait pas supprimer un
+plat.
 
 Contrôles : carte **199/199 conformes, 0 écart** · `test-matieres-bar` 27/27 ·
 carte imprimée et affichage légal vérifiés sur la page réelle.
+
+### Les petits whiskies, et le whisky passé en apéritif (16/10/2026)
+
+**La grille complète, donnée par le gérant le 16/10** : « le 1 cl est le
+fetus, le 2 cl est le baby, et le whisky est 4 cl ».
+
+| | dose | prix | **€/cl** | coût | food cost |
+|---|---|---|---|---|---|
+| **Fetus whisky** | 1 cl | 2,00 € | **2,00** | 0,1820 | 11 % |
+| **Baby whisky** | 2 cl | 4,00 € | **2,00** | 0,3640 | 11 % |
+| Whisky | 4 cl | 5,00 € | **1,25** | 0,7280 | 17 % |
+
+✅ **CETTE GRILLE VALIDE L'HYPOTHÈSE DE LA VEILLE ET ANNULE MON
+AVERTISSEMENT.** J'avais signalé que le baby était « proportionnellement plus
+cher que le shot de tequila » (80 % du prix plein contre 60 %). Avec le fetus,
+on voit que c'est une **grille à deux niveaux délibérée** : les deux petites
+doses au même tarif au centilitre, la dose pleine dégressive. Ce n'était pas
+une anomalie.
+
+⚠️ **Et la phrase qui le disait était écrite EN DUR dans le script** — vraie
+pour le baby, FAUSSE pour le fetus (40 % contre 60 %). Une ligne figée dans
+une sortie se lit comme un fait : elle se calcule désormais, et affiche aussi
+le prix au centilitre, qui est le vrai repère.
+
+**LES WHISKIES PASSENT EN FAMILLE « APÉRITIF »** — décision du gérant.
+`node scripts/whiskies-en-aperitif-1610.mjs [--ecrire]`, caisse d'abord.
+
+⚠️ **Ce n'est pas un détail d'affichage** : la famille range le bouton sur
+l'écran de caisse ET décide de la section de la carte imprimée. Les quatre
+whiskies quittent « Alcools » pour « Apéritifs ».
+
+✅ **`print/carte-bar` a suivi tout seul, et c'est vérifié** : ses sections
+« Apéritifs » et « Alcools » sont des filtres `categorie === …`, pas des
+listes de noms — contrairement à `PRESSION`, qu'il a fallu corriger quatre
+fois. Relu sur la page réelle après coup.
+
+⚠️ **Le contrôle de cohérence des taux par famille est rejoué AVANT
+d'écrire**, pas après : tous les apéritifs sont à 20 %, un whisky aussi. Le
+script refuse si le déplacement mettait deux taux dans une même famille —
+c'est ce contrôle qui avait trouvé le Pago à 5,5 % parmi seize boissons
+à 10 %.
+
+⚠️ **Rien ne part en ligne au passage** : le garde-fou de
+`generer-visuels-sans-photo.mjs` tient sur `contient_alcool` et sur le point
+de vente, **pas sur la famille**. Un changement de famille ne peut donc pas
+mettre un alcool sur casatasia.fr.
+
+⚠️ **La « Bouteille de whisky 70 cl » (69,00 €) RESTE en Alcools** : le gérant
+a nommé trois produits, pas celui-là, et une bouteille entière à emporter
+n'est pas un apéritif servi au verre. À déplacer d'un mot si c'était l'idée.
 
 ### Le « baby » — un petit whisky à 4,00 € (16/10/2026)
 

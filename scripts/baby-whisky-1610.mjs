@@ -1,14 +1,21 @@
-// LE « BABY » — un petit whisky, 4,00 € (16/10/2026).
+// LES PETITS WHISKIES — « baby » et « fetus » (16/10/2026).
 //
-// Demandé par le gérant le 13/10 (« baby 4 € »), précisé le 16 : « c'est un
-// petit whisky ». Resté non fait trois jours faute de savoir ce que c'était —
-// et c'était la bonne décision : la TVA dépend de la présence d'alcool, et le
-// point de vente aussi (le Fournil n'en vend aucun).
+// Demandés par le gérant le 13/10 (« fetus 2,00 € », « baby 4 € »), précisés
+// le 16 : « le 1 cl est le fetus, le 2 cl est le baby, et le whisky est 4 cl ».
+// Restés non faits trois jours faute de savoir ce que c'était — et c'était la
+// bonne décision : la TVA dépend de la présence d'alcool, et le point de vente
+// aussi (le Fournil n'en vend aucun). ⚠️ « Fetus » avait même été annoncé
+// comme un PASTIS avant d'être corrigé : le créer sur cette lecture aurait
+// produit un troisième bouton indiscernable du Ricard et du 51.
 //
-// ⚠️ LA DOSE DE 2 cl N'EST PAS DONNÉE PAR LE GÉRANT, elle est ANCRÉE SUR SA
-// PROPRE CARTE : « petit » y vaut 2 cl partout — Ricard 2 cl, Pastis 51 2 cl,
-// et surtout « Shot tequila 2 cl », qui est le MÊME geste sur un autre
-// spiritueux. Changer d'avis coûte `--cl=3`, pas une réécriture.
+// ⚠️ LA GRILLE EST COHÉRENTE AU CENTILITRE, et c'est ce qui la valide :
+//     fetus 1 cl → 2,00 €  = 2,00 €/cl
+//     baby  2 cl → 4,00 €  = 2,00 €/cl
+//     whisky 4 cl → 5,00 € = 1,25 €/cl
+// Les deux petites doses au même tarif, la dose pleine dégressive. L'avertis-
+// sement émis la veille (« le baby est proportionnellement plus cher que le
+// shot de tequila ») tombe donc : ce n'est pas une anomalie, c'est une grille
+// à deux niveaux voulue.
 //
 // ⚠️ LE PATRON EXISTE DÉJÀ, on ne l'invente pas : « Shot tequila 2 cl » est
 // dérivé de « Tequila 4 cl » — même matière, `unites_par_achat` DOUBLÉ (35 au
@@ -25,13 +32,18 @@
 // ⚠️ `vendable_online: false` — l'alcool n'est JAMAIS en ligne, aucun contrôle
 // d'âge sur le click & collect (0144).
 //
-//   node scripts/baby-whisky-1610.mjs [--ecrire] [--cl=N] [--prix=N]
+//   node scripts/baby-whisky-1610.mjs [--ecrire] [--cl=N] [--prix=N] [--nom=…]
+//   baby  : --cl=2 --prix=4            (défauts)
+//   fetus : --nom="Fetus whisky" --cl=1 --prix=2
 import fs from 'node:fs'
 
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? Number(a.split('=')[1]) : d }
+const argS = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d }
 const CL = arg('cl', 2)
 const TTC = arg('prix', 4.00)
-const NOM = `Baby whisky ${CL} cl`
+// ⚠️ Le nom porte la contenance, comme « Shot tequila 2 cl » : deux doses du
+// même spiritueux sur le même écran de caisse ne se départagent pas sans elle.
+const NOM = `${argS('nom', 'Baby whisky')} ${CL} cl`
 const GABARIT = 'Whisky 4 cl'          // la dose pleine, dont on dérive tout
 const TEMOIN = 'Shot tequila 2 cl'     // le même geste, déjà à la carte
 const ECRIRE = process.argv.includes('--ecrire')
@@ -97,9 +109,18 @@ console.log(`   marge ${(ht - cout).toFixed(2)} € HT · food cost ${(fc * 100)
 const pleinTTC = g.prix_vente_ht * (1 + g.tva / 100)
 const temoinTTC = t.prix_vente_ht * (1 + t.tva / 100)
 const tqTTC = tq.prix_vente_ht * (1 + tq.tva / 100)
-console.log(`\n   ⚠ part du prix plein : ${NOM} ${(TTC / pleinTTC * 100).toFixed(0)} % de ${GABARIT} (${pleinTTC.toFixed(2)} €)`)
-console.log(`     à comparer : ${TEMOIN} ${(temoinTTC / tqTTC * 100).toFixed(0)} % de Tequila 4 cl`)
-console.log(`     le baby est donc proportionnellement PLUS cher que le shot — dit, pas corrigé`)
+const partCe = TTC / pleinTTC, partTemoin = temoinTTC / tqTTC
+console.log(`\n   part du prix plein : ${NOM} ${(partCe * 100).toFixed(0)} % de ${GABARIT} (${pleinTTC.toFixed(2)} €)`)
+console.log(`     à comparer : ${TEMOIN} ${(partTemoin * 100).toFixed(0)} % de Tequila 4 cl`)
+// ⚠️ Cette ligne était écrite EN DUR (« plus cher que le shot »), vraie pour
+// le baby et FAUSSE pour le fetus (40 % contre 60 %). Une phrase figée dans
+// une sortie se lit comme un fait : elle se calcule.
+console.log(partCe > partTemoin + 0.05
+  ? `     ⚠ proportionnellement PLUS cher que le shot — dit, pas corrigé`
+  : partCe < partTemoin - 0.05
+    ? `     ✓ proportionnellement MOINS cher que le shot`
+    : `     ✓ même logique de prix que le shot`)
+console.log(`     ${(TTC / CL).toFixed(2)} €/cl, contre ${(pleinTTC / 4).toFixed(2)} €/cl sur la dose pleine`)
 if (fc < 0.15) console.log(`   ⚠ food cost ${(fc * 100).toFixed(0)} % : le plus bas du bar, normal sur une petite dose à prix rond`)
 
 if (par[NOM]) {
