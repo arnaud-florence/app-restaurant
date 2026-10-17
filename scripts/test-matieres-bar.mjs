@@ -37,8 +37,13 @@ const bar = await q('recettes?select=nom,categorie,nom_matiere,unites_par_achat,
 // ignoré, et celui-ci a failli masquer la requalification du Gommé.
 // ⚠️ « Gommé » reste ici : bière citron depuis le 15/10, donc fût + sirop —
 // toujours DEUX matières, même si ce n'est plus du pastis.
+// ⚠️ « Cocktail » ajouté le 17/10/2026, LE JOUR DE SA CRÉATION et dans le même
+// commit — c'est la leçon de la Pinte Picon, oubliée deux jours. Un bouton
+// générique est le composite par excellence : son contenu se choisit, donc
+// AUCUNE matière ne le représente. Conséquence assumée : le réassort ne voit
+// pas partir le rhum.
 const COMPOSITES = ['Kir', 'Kir royal', 'Spritz', 'Monaco', 'Panaché', 'Picon bière',
-  'Pinte Picon', 'Diabolo', 'Alcool + soft',
+  'Pinte Picon', 'Diabolo', 'Alcool + soft', 'Cocktail',
   'Mauresque', 'Tomate', 'Perroquet', 'Gommé', 'Rosé pamplemousse', 'Planteur']
 const A_TRANCHER = ['Pichet 25 cl', 'Pichet 50 cl']
 

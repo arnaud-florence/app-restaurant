@@ -8716,6 +8716,85 @@ chercher un défaut de données là où il n'y a qu'une liaison instable.
 
 Contrôle : carte **201/201 conformes, 0 écart**.
 
+### Le Coca 33 cl à 3,20 € en salle, et un bouton « Cocktail » (17/10/2026)
+
+`node scripts/coca-33-prix-salle-1710.mjs [--ecrire] [--prix=N]` et
+`node scripts/cocktail-generique-1710.mjs [--ecrire] [--prix=N]`.
+
+**Le Coca 33 cl : 2,80 → 3,20 € EN SALLE, et le comptoir ne bouge pas.**
+Marge 1,95 → **2,31 € HT**, food cost 24 → 21 %.
+
+⚠️ **C'est le prix de SALLE qui change, pas celui du comptoir.** Le fil
+portait sur le bar depuis deux messages, et 3,20 € est exactement le prix de
+salle du Diabolo — le palier au-dessus des 2,80 € où se tiennent 25 softs.
+Appliquer 3,20 € au comptoir aurait été une **hausse de 60 %** sur une canette
+du Fournil, que personne n'a demandée.
+
+⚠️ `price_togo` est **OMIS** de l'upsert, donc préservé (mesuré le 12/10), et
+le script **VÉRIFIE après coup qu'il n'a pas bougé** — l'écrire risquerait
+d'emporter le 2,00 € du comptoir. Les deux rayons posés la veille survivent
+pour la même raison : `tags` omis.
+
+⚠️ Le **25 cl reste à 2,80 €** : le gérant n'a nommé que le 33. Celui-ci
+devient donc plus cher — cohérent, il est plus grand — et rapporte en plus
+beaucoup plus : coût 0,60 € contre 1,13 € pour le verre consigné.
+
+---
+
+**Le « Cocktail » à 8,00 €** — bouton **générique**, famille Apéritif, BAR,
+TVA 20 % les deux modes, pas en ligne.
+
+⚠️⚠️ **LA QUESTION VALAIT L'ALLER-RETOUR.** « Ajoute le cocktail a 8€ » :
+aucun cocktail n'existait sur la carte, et « LE cocktail » au singulier sans
+nom pouvait aussi bien désigner un mojito précis — qui aurait eu une
+composition, donc un coût et une sortie de stock. **Zelty ne sait pas
+supprimer un plat** : un bouton créé de travers reste pour toujours. Même
+discipline que le fetus (« un petit pastis » → « c'est du whisky ») et que les
+six parfums de jus inventés puis retirés. Réponse : générique.
+
+⚠️ **Le patron existait déjà sur cette carte** — « Digestif 4 cl » (4,00 €),
+« Alcool + soft », « Whisky premium 4 cl » sont des boutons génériques. On
+suit la convention de la maison plutôt que d'en inventer une.
+
+⚠️ **Famille Apéritif, avec le Spritz.** Une famille « Cocktail » à un seul
+produit n'a pas sa place sur une caisse (règle posée en rangeant la Focaccia
+en Sandwich) ; elle se créera le jour où il y en aura trois.
+
+⚠️⚠️ **AUCUN COÛT D'ACHAT, et c'est le point.** Le contenu se CHOISIT : le
+chiffrer sur une recette fixe mentirait pour tous les autres cocktails —
+exactement la règle de « Formule CasaTasia » et du menu enfant. Il sort en
+« coût inconnu » (gris), jamais à zéro, qui se lirait « gratuit » (0150).
+Repère non écrit en base : le Spritz coûte 1,54 €, soit ~23 % à ce prix.
+
+⚠️⚠️ **LE GABARIT PORTAIT `["sulfites"]`** — le Spritz est un prosecco. Copiés
+tels quels, la fiche aurait déclaré des sulfites que personne n'a lus, et le
+prochain scan de facture aurait écrit le prix du Spritz sur le Cocktail. Les
+champs d'achat (`cout_achat_ht`, `libelle_achat`, `reference_fournisseur`,
+`nom_matiere`) **et les allergènes** sont effacés, et le script REFUSE de
+conclure si l'un d'eux a survécu. C'est la leçon des quatre desserts du 13/10
+et du Gommé qui avait hérité des sulfites du Martini.
+
+⚠️ **Pas de `nom_matiere`** : il mélange plusieurs matières. Conséquence
+assumée — le réassort ne voit pas partir le rhum.
+
+⚠️⚠️ **DÉCLARÉ COMPOSITE LE JOUR MÊME, dans les DEUX fichiers** — c'est la
+leçon de la Pinte Picon, oubliée deux jours : `test-matieres-bar.mjs` est
+sorti rouge à la création (« ni rattaché ni justifié — Cocktail »), et
+`matieres-bar.mjs` recopie la même liste. Un bouton générique est le composite
+par excellence. **Tout produit du bar sans `nom_matiere` doit entrer dans
+`COMPOSITES` au moment de sa création, pas au prochain test rouge.**
+
+⚠️ **Pas de `id_fabrication_place` à la création** : Zelty répond 500 (vécu le
+12/10 sur les jus). Et la reprise se fait sur la **correspondance de caisse**,
+pas sur le nom — un produit peut exister chez nous et pas en caisse.
+
+✅ La carte imprimée suit toute seule : sa section « Apéritifs » filtre par
+CATÉGORIE, et sa requête prend `tag_destination = BAR`. Contrairement à
+`PRESSION`, qui range les bières par leur NOM et a dû être corrigée quatre fois.
+
+Contrôles : carte **202/202 conformes, 0 écart** · `test-matieres-bar` 24/24 ·
+`test-carte-fournil` 13/13.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9269,6 +9348,8 @@ node scripts/formules-snacking-1510.mjs        # 4 formules snacking 9,90 € (e
 node scripts/supplement-sirop-biere-1510.mjs   # sirop 0,20 € sur 7 bières (essai à blanc)
 node scripts/supplement-sirop-boissons-1610.mjs # sirop sur les 61 boissons, deux prix (essai à blanc)
 node scripts/coca-33-en-salle-1610.mjs         # un produit, deux rayons de caisse (essai à blanc)
+node scripts/coca-33-prix-salle-1710.mjs       # 3,20 € en salle, le comptoir intact
+node scripts/cocktail-generique-1710.mjs       # bouton générique « Cocktail » 8 € (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)

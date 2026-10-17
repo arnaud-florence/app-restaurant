@@ -99,6 +99,9 @@ const COMPOSITES = {
   'Picon bière':  'bière pression + Picon',
   'Diabolo':      'sirop + limonade',
   'Alcool + soft':'spiritueux + soda',
+  // Bouton générique créé le 17/10/2026 : son contenu se CHOISIT, donc
+  // aucune matière ne le représente — le composite par excellence.
+  'Cocktail':     'spiritueux + jus ou soda, au choix',
   // Pastis de couleur et rosé pamplemousse (21/09/2026)
   'Mauresque':    'pastis + sirop d\'orgeat',
   'Tomate':       'pastis + sirop de grenadine',
