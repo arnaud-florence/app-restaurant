@@ -24,7 +24,11 @@
 //   node scripts/coca-33-prix-salle-1710.mjs [--ecrire] [--prix=N]
 import fs from 'node:fs'
 
-const NOM = 'Coca-Cola 33 cl'
+// ⚠️ Paramétré par `--nom=` le 19/10/2026 : le gérant a demandé le même
+// prix de salle pour le Zéro 33 cl. Même geste, mêmes garde-fous — un second
+// script quasi identique aurait fini par divergir de celui-ci.
+const argS = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d }
+const NOM = argS('nom', 'Coca-Cola 33 cl')
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? Number(a.split('=')[1]) : d }
 const SALLE = arg('prix', 3.20)
 const ECRIRE = process.argv.includes('--ecrire')

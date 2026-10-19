@@ -732,7 +732,11 @@ export type Rayon = {
 
 export const RAYONS: Rayon[] = [
   { cle: 'boulangerie', nom: 'Boulangerie', emoji: '🥖', teinte: 'bg-amber-400',
-    categories: ['Pain', 'Viennoiserie', 'Pâtisserie', 'Boulangerie', 'Gourmandise', 'Dessert'] },
+    // ⚠️ « Snacking salé » (19/10/2026) : le croque-monsieur, les quiches et les
+    // feuilletés s'achètent surgelés chez Gineys, comme le reste du Fournil.
+    // Sans cette clé la ligne tombait dans « Autres » au réassort.
+    categories: ['Pain', 'Viennoiserie', 'Pâtisserie', 'Boulangerie', 'Gourmandise', 'Dessert',
+      'Snacking salé'] },
   { cle: 'pizzeria', nom: 'Pizzeria', emoji: '🍕', teinte: 'bg-red-500',
     categories: ['Pizzeria', 'Pizza'] },
   { cle: 'restaurant', nom: 'Restaurant', emoji: '🍽️', teinte: 'bg-orange-500',

@@ -37,7 +37,7 @@ for (const l of fs.readFileSync('.env.local', 'utf8').split('\n')) {
   env[l.slice(0, i).trim()] = l.slice(i + 1).trim().replace(/^["']|["']$/g, '')
 }
 const sb = async (c, o = {}) => {
-  let der
+  let der, fatal = false
   for (let n = 1; n <= 5; n++) {
     try {
       const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/${c}`, { ...o,
@@ -48,11 +48,15 @@ const sb = async (c, o = {}) => {
       const t = await r.text()
       if (r.ok) return t ? JSON.parse(t) : null
       der = `Supabase ${r.status} :: ${t.slice(0, 220)}`
-      if (r.status < 500) throw new Error(der)
+      // ⚠️⚠️ UN 4xx NE SE CORRIGERA PAS EN RÉESSAYANT, et le `throw` d'ici
+      // était attrapé par le `catch` juste en dessous : un PGRST204 (colonne
+      // inconnue) était rejoué cinq fois, puis annoncé « Supabase injoignable »
+      // — trente secondes perdues et un message qui désigne la mauvaise cause.
+      if (r.status < 500) { fatal = true; break }
     } catch (e) { der = e.cause?.code ?? e.message; console.log(`   base, tentative ${n} → ${der}`) }
     await new Promise(s => setTimeout(s, 2000 * n))
   }
-  throw new Error(`Supabase injoignable : ${der}`)
+  throw new Error(fatal ? der : `Supabase injoignable : ${der}`)
 }
 const zl = async (p, o = {}) => {
   let d = { status: 0, body: {} }

@@ -32,6 +32,10 @@ const zl = async (p, o = {}) => {
 // L'ordre du service : à 6 h 20 on vend du pain et du café, pas des pizzas.
 const ORDRE = ['Pain', 'Viennoiserie', 'Boisson chaude', 'Formule petit-déjeuner',
   'Pâtisserie', 'Gourmandise', 'Glace', 'Sandwich', 'Panini', 'Salade', 'Pizza',
+  // ⚠️ « Snacking salé » (19/10/2026) : croque-monsieur, quiches, feuilletés.
+  // Rangée AVEC le snacking du Fournil, pas en fin de liste — c'est du
+  // comptoir du midi, pas un rayon d'appoint.
+  'Snacking salé',
   'Formule', 'Boisson fraîche',
   // Le bar sert ses softs en verre consigné, à un autre prix : famille à part
   // pour que le comptoir ne confonde pas les deux (13/10/2026).

@@ -8922,6 +8922,119 @@ Contrôles : carte **203/203 conformes, 0 écart** · `test-carte-fournil` 13/13
 · `test-reassort` **78/78** · `test-cibles-stock` **33/33** · `tsc` propre.
 `CACHE_VERSION` → v313.
 
+### La carte de la semaine du 19 octobre, et « Snacking salé » (19/10/2026)
+
+Six demandes en une. **Trois des produits nommés existaient déjà**, et c'est
+ce qui a demandé le plus d'attention.
+
+**1. Les deux Coca 33 cl à 3,20 € en salle.**
+`coca-33-en-salle-1610.mjs --aussi-zero` puis `coca-33-prix-salle-1710.mjs
+--nom="Coca-Cola Zéro 33 cl"`. Les deux portent maintenant les rayons
+« Boisson fraîche » ET « Boisson salle », **3,20 € en salle, 2,00 € au
+comptoir**. ⚠️ Le second script a été paramétré par `--nom=` plutôt que
+recopié : un script quasi identique finit par divergir de son jumeau.
+
+**2. ⚠️⚠️ « Entrecôte grillée » ÉTAIT DÉJÀ À 19,90 €**, active, avec son groupe
+de cuisson. La citer confirmait qu'elle reste à l'ardoise — rien à faire.
+Troisième fois qu'un « ajout » demandé est en réalité un produit en place
+(après le Monaco et les jus d'orange/pomme) : **on regarde la base avant de
+créer.**
+
+**3. ⚠️⚠️ « SALADE ITALIENNE » EXISTE DÉJÀ, à 5,40 €**, en famille « Salade » —
+la barquette du comptoir. Créer une seconde « Salade italienne » à 15,90 €
+aurait mis **deux libellés identiques sur les tickets, à 10 € d'écart** : le
+serveur s'y tromperait, et le rapprochement des ventes par le nom aussi. La
+grande salade s'appelle donc **« Grande salade italienne »**. ⚠️ C'est MON
+choix de nom, pas celui du gérant — à renommer d'un mot.
+
+**4. Le plat du jour à TROIS prix.** Un produit ne porte qu'un prix, et le
+gérant dit que le prix change selon le jour : **trois boutons**, 12,90 /
+13,90 / 14,90 €. L'existant (15,90 €) est **RENOMMÉ** en « Plat du jour
+12,90 € » plutôt que désactivé — il est référencé par **six lignes
+d'ardoise** (`plats_du_jour.recette_id`), et l'éteindre aurait laissé cet
+historique pointer sur un produit mort.
+
+⚠️ **Le nom porte son prix, donc il devient FAUX si le prix bouge** : les deux
+changent ensemble, comme `AFFICHES` et les prix. ⚠️ Et c'est au gérant de
+pointer l'ardoise du jour sur le bon des trois dans `/admin/ardoise`.
+
+**5. La famille « Snacking salé » à 3,80 €**, avec le croque-monsieur.
+
+⚠️⚠️ **LE DÉPLACEMENT LE REND STOCKABLE, ET C'EST UNE CORRECTION.**
+« Sandwich » est dans `CATEGORIES_ASSEMBLEES` parce qu'un sandwich s'ASSEMBLE
+(0133) — mais un croque-monsieur Carigel s'ACHÈTE surgelé : il porte
+`libelle_achat = « CROQUE MONSIEUR JAMBON TOASTE 180G CARIGEL C=26 »` et un
+coût de 0,7615 €. Rangé en Sandwich, **il n'apparaissait ni à l'inventaire ni
+au réassort alors qu'il faut bien le commander.** « Snacking salé » n'entre
+donc PAS dans `CATEGORIES_ASSEMBLEES`. Food cost 24 → 22 %.
+
+⚠️⚠️ **IL SORT DE LA « FORMULE SANDWICH » À 9,90 €**, qui sert les produits de
+la famille Sandwich. Et son panier à la carte passe de 9,30 € à 9,60 €, donc
+la formule est plus chère de 0,30 € au lieu de 0,60 € — la « seule exception »
+documentée plus haut s'atténue, elle ne disparaît pas.
+
+⚠️ **PAS dans `JAMAIS_EN_LIGNE`** : le croque est `vendable_online` et doit le
+rester, c'est du snacking de comptoir. **PAS dans `TVA_REDUITE`** : le
+snacking est à 10 %, pas 5,5 %. **Mais dans `RAYONS`** (catalogue-achats),
+sinon la ligne tombe dans « Autres » au réassort maintenant qu'elle y entre.
+
+⚠️ **LES FEUILLETÉS ET LES QUICHES NE SONT PAS CRÉÉS** : le gérant les a
+nommés au PLURIEL, sans liste. Inventer six parfums de jus a coûté une
+création et un retrait le 12/10 — « le *etc* d'un gérant pressé n'est pas une
+liste ». La famille les attend.
+
+**6. « Boc » n'est pas créé** : un bock à 2,50 € serait plus petit que le demi
+à 2,80 €, mais la contenance décide de tout — 20 cl donne 100 verres par fût
+(coût 0,73 €, food cost 35 %), 12,5 cl en donne 160 (coût 0,46 €, 22 %). Sans
+elle, le coût serait inventé.
+
+**Résultat : 2 retirés** (Burger Montagnard, Salade Chèvre chaud) **et 6
+créés**. Carte restauration active : 11 produits.
+
+⚠️⚠️ **AUCUN DES QUATRE NOUVEAUX PLATS N'A DE COMPOSITION**, et
+`recette_ingredients` est une autre table qu'une copie de gabarit n'emporte
+pas. Ils sortent en « coût inconnu » (0150) et surtout **le réassort ne
+commandera rien pour eux** : la cible des matières de la restauration se
+calcule depuis ce qui est réellement servi (0167). C'est le chantier qui
+reste.
+
+⚠️⚠️ **ET L'ARDOISE 12-18 OCTOBRE EST PÉRIMÉE** : plus aucune ligne de
+`plats_du_jour` ne couvre aujourd'hui, donc le réassort est retombé sur son
+repli — `stock_cible`, dimensionné sur la carte ENTIÈRE, soit le scénario le
+plus coûteux en reliquat (231 €/sem contre 133 €). Poser la semaine du 19 au
+25 dans `/admin/ardoise` est le geste qui le corrige.
+
+⚠️⚠️ **LES ALLERGÈNES DU GABARIT SONT EFFACÉS**, puis on ne pose QUE ce qui est
+vrai PAR DÉFINITION : gluten sur un burger (le pain) et sur des tortellini (la
+pâte), lait sur un Saint-Félicien (c'est un fromage), **rien** sur la grande
+salade ni sur les plats du jour. Le gabarit de la salade portait
+`["lait","fruits_a_coque"]` : copié tel quel, la salade italienne aurait
+déclaré **des noix qu'elle ne contient pas**. Aucun n'est SIGNÉ. Quatrième
+occurrence après les desserts, le Cocktail et le sac de la veille.
+
+⚠️⚠️ **DEUX DÉFAUTS DE MES PROPRES SCRIPTS, trouvés à l'exécution :**
+
+1. **`recettes.stock_seuil` N'EXISTE PAS** — les colonnes sont `stock_cible`
+   et **`stock_minimum`**. PostgREST a répondu `PGRST204`, et rien n'a été
+   créé : l'échec est tombé sur la première insertion, après que les
+   modifications soient passées. État mixte, mais propre et repris au
+   deuxième passage.
+2. ⚠️⚠️ **UN 4xx ÉTAIT RÉESSAYÉ CINQ FOIS.** Le `throw` qui devait sortir de
+   la boucle était **à l'intérieur du `try`**, donc attrapé par le `catch`
+   juste en dessous : une colonne inconnue était rejouée cinq fois avec des
+   attentes croissantes, puis annoncée « **Supabase injoignable** » — trente
+   secondes perdues et un message qui désigne la mauvaise cause. Corrigé dans
+   les **cinq** scripts qui portaient ce patron. Un réessai ne doit couvrir
+   que ce qui peut changer d'avis : 429 et 5xx.
+
+⚠️ Le script est **rejouable** : après le premier passage le plat du jour
+porte déjà son nouveau nom, donc chercher l'ancien seul en aurait fait un
+script à usage unique.
+
+Contrôles : carte **207/207 conformes, 0 écart** · `test-carte-fournil` 13/13
+· `test-reassort` 78/78 · `test-cibles-stock` 33/33 · `tsc` propre.
+`CACHE_VERSION` → v314.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9479,6 +9592,8 @@ node scripts/coca-33-prix-salle-1710.mjs       # 3,20 € en salle, le comptoir 
 node scripts/cocktail-generique-1710.mjs       # bouton générique « Cocktail » 8 € (essai à blanc)
 node scripts/sac-viennoiseries-veille-1910.mjs # les invendus de la veille en sac, 2 € (essai à blanc)
 node scripts/deplacer-famille.mjs --nom="…" --vers="…"   # ranger un produit ailleurs, des DEUX côtés
+node scripts/snacking-sale-1910.mjs            # famille « Snacking salé » à 3,80 € (essai à blanc)
+node scripts/ardoise-semaine-1910.mjs          # la carte de la semaine du 19/10 (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
