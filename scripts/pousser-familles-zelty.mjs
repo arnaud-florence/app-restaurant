@@ -42,6 +42,10 @@ const ORDRE = ['Pain', 'Viennoiserie', 'Boisson chaude', 'Formule petit-déjeune
   // ── Pizzeria et brasserie (octobre 2026) — en fin de liste : ajoutées
   //    après coup, elles ne décalent pas l'ordre des familles existantes.
   'Pizzeria', 'Burger', 'Plat', 'Grande salade', 'Planche', 'Menu', 'Dessert',
+  // ── Anti-gaspi (19/10/2026) — après les cartes : on ne vend les invendus
+  //    de la veille qu'une fois le frais proposé. Le rayon accueillera le
+  //    pain de la veille et le panier surprise.
+  'Anti-gaspi',
   // ── Non alimentaire (octobre 2026) — en DERNIER : à 6 h 20 on vend du pain,
   //    pas des feuilles. Le rayon pipier d'Euro-Cash viendra la remplir.
   'Tabac']

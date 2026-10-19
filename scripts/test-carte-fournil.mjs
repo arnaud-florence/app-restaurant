@@ -105,7 +105,13 @@ const AFFICHES = {
 // « Glace » est née le 28/08/2026 pour quatre produits arrivés par les tickets
 // SumUp et qui ne se rangeaient nulle part. Vendues à emporter, elles suivent
 // le taux réduit comme les autres gourmandises.
-const TVA_REDUITE = new Set(['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise', 'Glace'])
+// « Anti-gaspi » est née le 19/10/2026 pour le sac de viennoiseries de la
+// veille : c'est de la viennoiserie, donc le taux réduit.
+// ⚠️ LE JOUR OÙ CE RAYON ACCUEILLERA AUTRE CHOSE QU'UNE VIENNOISERIE — un sac
+// de sandwichs de la veille serait à 10 % — le contrôle de cohérence des taux
+// par famille rougira, à raison : deux taux dans une même famille. Il faudra
+// alors scinder le rayon, pas assouplir le contrôle.
+const TVA_REDUITE = new Set(['Pain', 'Viennoiserie', 'Pâtisserie', 'Gourmandise', 'Glace', 'Anti-gaspi'])
 // Produits indicatifs de la carte de démarrage 0095 : ne doivent plus être vendus.
 const CARTE_0095 = ['Pain', 'Pain de campagne', 'Baguette tradition',
   'Brioche', 'Macaron', 'Mille-feuille', 'Tarte aux pommes (part)', 'Soda / Eau', 'Café crème',
@@ -126,6 +132,11 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Anti-gaspi, 19/10/2026 : les invendus de la veille en sac à 2,00 €. Aucune
+  // affiche ne les porte, et ils n'ont PAS de photo — le contenu change chaque
+  // matin, une photo montrerait le sac d'un autre jour. Hors ligne aussi : le
+  // stock n'est connu qu'au matin (`HORS_LIGNE_VOULU` le reprend d'ici).
+  'Sac de viennoiseries de la veille',
   // Les quatre formules snacking à 9,90 € (gérant, 15/10/2026). Aucune
   // affiche ne les porte encore — le prix vient de lui, pas d'un panneau.
   // ⚠️ `HORS_LIGNE_VOULU` les reprend par `...HORS_AFFICHE` : les formules

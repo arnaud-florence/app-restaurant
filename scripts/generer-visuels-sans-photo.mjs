@@ -49,7 +49,12 @@ const BASE_URL = 'https://app-restaurant-livid.vercel.app/produits'
 // OCB) : ce script met en ligne toute famille absente d'ici, donc un seul
 // passage aurait mis les feuilles à rouler et les briquets en vente sur
 // casatasia.fr — sans contrôle d'âge, et sans que rien ne le signale.
-const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Boisson salle', 'Tabac', 'Formule', 'Formule petit-déjeuner'])
+// ⚠️ « Anti-gaspi » (19/10/2026) : le stock d'un sac de la veille n'est connu
+// qu'au matin et varie chaque jour. En ligne, on promettrait ce qu'on n'a
+// peut-être pas — et un client qui vient pour rien le raconte. TROISIÈME fois
+// que cette liste se fait déborder par une famille créée après elle, après
+// « Tabac » et « Boisson salle » : toute famille nouvelle doit y être examinée.
+const JAMAIS_EN_LIGNE = new Set(['Boisson chaude', 'Boisson salle', 'Tabac', 'Formule', 'Formule petit-déjeuner', 'Anti-gaspi'])
 
 // ⚠️ Une règle par FAMILLE ne suffit plus depuis la carte du bar (28/08/2026).
 // Les familles Bière, Apéritif, Alcool et Vin n'y figuraient pas, donc le

@@ -351,6 +351,14 @@ export const CATEGORIES_ASSEMBLEES = new Set([
   // complet) passaient au travers : un lot n'a pas de stock, ses
   // composants en ont un.
   'Formule petit-déjeuner',
+  // ⚠️⚠️ « Anti-gaspi » ajoutée ICI LE JOUR DE SA CRÉATION (19/10/2026),
+  // avant même que la liste ne se fasse déborder une quatrième fois. Un sac
+  // de viennoiseries de la veille ne s'ACHÈTE pas : il est fait de produits
+  // déjà achetés, déjà comptés, et déjà valorisés en casse par
+  // `(ops)/invendus`. Rangé en « Viennoiserie » il serait devenu stockable :
+  // une ligne à compter chaque semaine pour un produit qui n'existe que le
+  // matin, et une ligne « à paramétrer » au réassort.
+  'Anti-gaspi',
   // ⚠️⚠️ TROISIÈME FOIS QUE CETTE LISTE SE FAIT DÉBORDER PAR UNE CATÉGORIE
   // CRÉÉE APRÈS ELLE. « Plat du jour » (0167) est arrivé le 04/10/2026 et
   // s'est retrouvé dans la commande d'ouverture, sans prix d'achat — un plat

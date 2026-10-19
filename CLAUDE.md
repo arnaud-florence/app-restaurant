@@ -8795,6 +8795,105 @@ CATÉGORIE, et sa requête prend `tag_destination = BAR`. Contrairement à
 Contrôles : carte **202/202 conformes, 0 écart** · `test-matieres-bar` 24/24 ·
 `test-carte-fournil` 13/13.
 
+### Le sac de viennoiseries de la veille — et une famille « Anti-gaspi » (19/10/2026)
+
+`node scripts/sac-viennoiseries-veille-1910.mjs [--ecrire] [--prix=N]`.
+**2,00 € TTC**, FOURNIL, 5,5 % à emporter / 10 % sur place.
+
+⚠️⚠️ **CE PRODUIT NE SE JUGE PAS AU FOOD COST, ET C'EST TOUT SON INTÉRÊT.**
+Les quatre viennoiseries coûtent 0,37 à 0,59 € et se vendent 1,40 € :
+
+| contenu du sac | coût | food cost |
+|---|---|---|
+| 2 pièces | ~1,02 € | 54 % |
+| 3 pièces | ~1,53 € | **80 %** |
+| 4 pièces | ~2,03 € | **107 %** |
+
+Lu ainsi, le produit paraît absurde. Mais **l'alternative n'est pas de le
+vendre plus cher, c'est de JETER** : chaque sac vendu est 2,00 € reprise sur
+une perte déjà consommée. Le bon repère n'est pas le ratio, c'est
+`(ops)/invendus`, qui chiffre la casse.
+
+⚠️⚠️ **AUCUN COÛT D'ACHAT, POUR DEUX RAISONS QUI SE CUMULENT :**
+
+1. le **contenu VARIE** — trois croissants, ou deux pains au chocolat et un
+   chausson. Le chiffrer sur une composition fixe mentirait pour tous les
+   autres sacs : la règle de « Formule CasaTasia », du menu enfant et du
+   bouton « Cocktail » ;
+2. surtout, **il serait compté DEUX FOIS.** Ces viennoiseries ont déjà été
+   saisies en casse la veille au soir, avec leur coût FIGÉ au tarif du jour
+   (0129). Leur redonner un coût ici ferait payer deux fois la même
+   marchandise, **et ça ne se verrait nulle part.**
+
+Il sort donc en « coût inconnu » (gris), jamais à zéro — un zéro se lirait
+« gratuit » et le ferait passer pour le meilleur produit de la carte (0150).
+La raison est écrite dans `recettes.procedure`, donc sur la fiche imprimable.
+
+⚠️⚠️ **FAMILLE « Anti-gaspi », PAS « Viennoiserie », et ce n'est pas un détail
+d'affichage.** `estStockable()` exclut par CATÉGORIE : rangé en Viennoiserie,
+ce sac devenait **stockable** — une ligne à compter chaque semaine à
+`(ops)/inventaire` pour un produit qui n'existe que le matin, et une ligne
+« à paramétrer » au réassort. Deux faux **silencieux**, contre une seule
+erreur possible dans l'autre sens — un rayon mal placé, que le comptoir
+signale le premier matin. **Une erreur visible vaut mieux qu'une erreur
+silencieuse.**
+
+✅ **`CATEGORIES_ASSEMBLEES` A ÉTÉ COMPLÉTÉE LE JOUR MÊME**, avant que la
+liste ne se fasse déborder une **quatrième** fois (après `Formule
+petit-déjeuner`, les familles de la brasserie et `Plat du jour`). C'est la
+première fois que ce motif est traité à la création plutôt qu'au prochain
+test rouge.
+
+⚠️ Une famille à un seul produit n'a normalement pas sa place sur une caisse
+(règle posée en rangeant la Focaccia en Sandwich). C'est la **seconde
+exception assumée après « Tabac »**, et pour la même raison : le rayon va se
+remplir — pain de la veille, panier surprise.
+
+**QUATRE LISTES TRAVERSÉES, et chacune cassait quelque chose :**
+
+| Liste | Ce qui cassait sans elle |
+|---|---|
+| `CATEGORIES_ASSEMBLEES` (`src/lib/reassort.ts`) | sac compté à l'inventaire et proposé au réassort |
+| `ORDRE` (`pousser-familles-zelty.mjs`) | famille inconnue de la caisse → **bouton sans famille, introuvable** |
+| `JAMAIS_EN_LIGNE` (`generer-visuels-sans-photo.mjs`) | un passage le mettait **en vente sur casatasia.fr** |
+| `TVA_REDUITE` + `HORS_AFFICHE` (`test-carte-fournil.mjs`) | 5 échecs : hors référence, TVA, photo, hors ligne |
+
+⚠️ **TROISIÈME fois que `JAMAIS_EN_LIGNE` se fait déborder** par une famille
+créée après elle, après « Tabac » et « Boisson salle » — et le stock d'un sac
+de la veille n'est connu qu'au matin : en ligne, on promettrait ce qu'on n'a
+peut-être pas.
+
+⚠️ **GLUTEN déclaré, vrai PAR DÉFINITION** — une viennoiserie est à base de
+farine, quel qu'en soit le contenu. Mais `allergenes_valides_le` reste NULL :
+personne n'a lu les emballages, et le lait et les œufs sont probables sans
+être définitionnels. Le public lira « information non disponible » (0138).
+
+⚠️⚠️ **LE GABARIT PORTAIT `libelle_achat = « CROISSANT COURBE PREPOUSSE 90G
+VENDOME C »`** — copié tel quel, le prochain scan de facture Gineys aurait
+écrit **le prix du croissant sur le sac**, et une marge fausse ne se signale
+pas. Les quatre champs d'achat sont effacés et le script **refuse de conclure**
+si l'un d'eux a survécu. Troisième occurrence après les desserts du 13/10 et
+le Cocktail.
+
+⚠️ **PAS de photo, délibérément** : le contenu change chaque matin, une photo
+montrerait le sac d'un autre jour. C'est la règle du « Pain aux céréales »
+dont la photo Unsplash a été retirée — assumer qu'on n'a pas photographié vaut
+mieux que montrer autre chose. Sans objet de toute façon, il n'est pas en ligne.
+
+⚠️ **Le jour où ce rayon accueillera autre chose qu'une viennoiserie** — un
+sac de sandwichs de la veille serait à 10 % — le contrôle de cohérence des
+taux par famille rougira, à raison. Il faudra scinder le rayon, pas assouplir
+le contrôle.
+
+⚠️ Un **429 est tombé entre la création de la famille et celle du plat**,
+absorbé par le réessai qui annonce son code. Le script reprend sur la
+CORRESPONDANCE de caisse, pas sur le nom : sans ça, un produit resté en base
+et absent de la caisse serait invisible du comptoir pour toujours.
+
+Contrôles : carte **203/203 conformes, 0 écart** · `test-carte-fournil` 13/13
+· `test-reassort` 76/76 · `test-cibles-stock` 31/31 · `tsc` propre.
+`CACHE_VERSION` → v313.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9350,6 +9449,7 @@ node scripts/supplement-sirop-boissons-1610.mjs # sirop sur les 61 boissons, deu
 node scripts/coca-33-en-salle-1610.mjs         # un produit, deux rayons de caisse (essai à blanc)
 node scripts/coca-33-prix-salle-1710.mjs       # 3,20 € en salle, le comptoir intact
 node scripts/cocktail-generique-1710.mjs       # bouton générique « Cocktail » 8 € (essai à blanc)
+node scripts/sac-viennoiseries-veille-1910.mjs # les invendus de la veille en sac, 2 € (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
