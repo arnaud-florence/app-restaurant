@@ -132,6 +132,10 @@ const actifs = carte.filter(r => r.actif)
 // tickets SumUp (cf. 0121). Ils n'ont ni photo ni panneau : c'est normal, ils
 // n'ont jamais été imprimés. La caisse fait foi, pas l'affiche.
 const HORS_AFFICHE = new Set([
+  // Snacking salé, 19/10/2026 : deux boutons GÉNÉRIQUES à 3,80 €, le patron
+  // des six focaccias fondues en une — la garniture se choisit au comptoir.
+  // Aucune affiche ne les porte, leur prix vient de la famille.
+  'Feuilleté', 'Quiche',
   // Anti-gaspi, 19/10/2026 : les invendus de la veille en sac à 2,00 €. Aucune
   // affiche ne les porte, et ils n'ont PAS de photo — le contenu change chaque
   // matin, une photo montrerait le sac d'un autre jour. Hors ligne aussi : le

@@ -14,6 +14,14 @@ for(const r of nous){
   const p=parRemote.get(String(r.id)); if(!p) continue
   if(p.image===r.image_url) continue
   if(p.name==null||p.price==null||p.tax==null){refus.push(`${r.nom} : champ obligatoire manquant — refus`);continue}
+  // ⚠️⚠️ ZELTY VA CHERCHER L'URL : poussée avant le déploiement, elle
+  // enregistre un 404 et le plat reste sans image pour toujours sans qu'aucune
+  // erreur ne le dise. CLAUDE.md affirmait depuis le 13/10 que ce script
+  // vérifiait le 200 — il ne le faisait PAS. Une épreuve documentée mais
+  // absente est pire qu'une épreuve manquante : on la croit faite.
+  let vu = 0
+  try { vu = (await fetch(r.image_url, { method: 'HEAD' })).status } catch (e) { vu = 0 }
+  if (vu !== 200) { refus.push(`${r.nom} : ${r.image_url} répond ${vu || 'rien'} — déployer d'abord`); continue }
   corps.push({id:p.id,name:p.name,price:p.price,price_togo:p.price_togo,tax:p.tax,tax_takeaway:p.tax_takeaway,image:r.image_url})
 }
 console.log(`\n  visuels à poser dans la caisse : ${corps.length}`)

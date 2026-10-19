@@ -9111,6 +9111,62 @@ petit-déjeuner, Glace, Planche, Anti-gaspi) : ouverts, ils ne montrent rien.
 
 Contrôles : carte **207/207 conformes, 0 écart** · `test-reassort` 78/78.
 
+### « Je vois que croque monsieur dans snacking salés » (19/10/2026)
+
+`node scripts/snacking-sale-feuilletes-1910.mjs [--ecrire]`. **« Feuilleté » et
+« Quiche », deux boutons GÉNÉRIQUES à 3,80 €.** Le rayon avait été créé le
+matin avec le seul croque-monsieur, parce que le gérant avait nommé « les
+feuilletés et quiches » au PLURIEL, sans liste.
+
+✅ **LA MAISON AVAIT DÉJÀ LE PATRON, et il valait mieux qu'une question.** Les
+SIX focaccias ont été fondues en UNE seule le 28/08 parce qu'elles « ne se
+distinguaient que par leur garniture, qui se choisit au comptoir ». Un
+feuilleté et une quiche sont exactement ce cas — comme « Digestif 4 cl »,
+« Alcool + soft » et le « Cocktail » du 17/10. Demander une liste de
+garnitures aurait produit une gamme à maintenir là où deux boutons suffisent.
+
+⚠️ **AUCUN COÛT, et pour une raison factuelle** : aucun feuilleté ni quiche ne
+figure dans nos factures, et la garniture varie. Pas de `libelle_achat` non
+plus — l'inventer produirait une clé qui ne correspondrait à rien (règle des
+matières du bar). Ils sortent en « coût inconnu » (0150).
+
+⚠️ **ILS SONT STOCKABLES, et c'est voulu** : « Snacking salé » n'est PAS dans
+`CATEGORIES_ASSEMBLEES` — un feuilleté surgelé s'ACHÈTE, comme le croque. Ils
+apparaissent donc au réassort en « à paramétrer », sans fournisseur : c'est la
+vérité, et c'est ce qui les rend visibles comme à compléter.
+
+⚠️ **ALLERGÈNES VRAIS PAR DÉFINITION, jamais par probabilité, jamais signés** :
+gluten sur le feuilleté (la pâte est de la farine ; le beurre est probable
+mais une pâte feuilletée industrielle peut être à la margarine), et **gluten +
+œufs + lait sur la quiche** — l'appareil à quiche EST un mélange d'œufs et de
+crème, c'est sa définition. `allergenes_valides_le` reste NULL.
+
+⚠️ Les champs d'achat du gabarit sont effacés : le croque porte
+`libelle_achat = « CROQUE MONSIEUR JAMBON TOASTE 180G CARIGEL C=26 »` et un
+coût de 0,7615 €. Copiés, le prochain scan Gineys écrivait **le prix du croque
+sur une quiche**. Quatrième occurrence après les desserts, le Cocktail et le
+sac de la veille.
+
+⚠️⚠️ **ET LE GARDE-FOU DES IMAGES ÉTAIT DOCUMENTÉ SANS EXISTER.** Ce fichier
+affirmait depuis le 13/10 que `pousser-visuels-zelty.mjs` « vérifie le
+`HTTP 200` de chaque image avant de l'envoyer et refuse sinon ». **Il ne le
+faisait PAS.** Or Zelty va CHERCHER l'URL : poussée avant le déploiement, elle
+enregistre un 404 et le plat reste sans image pour toujours, sans qu'aucune
+erreur ne le dise.
+
+C'est le même motif que l'épreuve ① de `base-prix-eurocash.mjs`, décrite en
+tête du script et absente du code : **une épreuve documentée mais absente est
+pire qu'une épreuve manquante — on la croit faite.** Ajoutée, et vérifiée en
+situation : les deux plaques fraîchement générées sont refusées avec
+« répond 404 — déployer d'abord ».
+
+⚠️ L'ordre est donc : créer → générer la plaque → **déployer** → pousser
+l'image en caisse. Le contrôle de carte signale l'écart entre-temps
+(« attendu une image, Zelty a aucune »), et c'est ce qu'il doit faire.
+
+Contrôles : `test-carte-fournil` 13/13 · carte 209/209 après la poussée des
+deux images.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9671,6 +9727,8 @@ node scripts/deplacer-famille.mjs --nom="…" --vers="…"   # ranger un produit
 node scripts/snacking-sale-1910.mjs            # famille « Snacking salé » à 3,80 € (essai à blanc)
 node scripts/ardoise-semaine-1910.mjs          # la carte de la semaine du 19/10 (essai à blanc)
 node scripts/poser-ardoise-1910.mjs            # l'ardoise 19-25 : 23 plats (essai à blanc)
+node scripts/snacking-sale-feuilletes-1910.mjs # Feuilleté et Quiche 3,80 € (essai à blanc)
+node scripts/pousser-visuels-zelty.mjs         # les photos en caisse — refuse un 404
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
