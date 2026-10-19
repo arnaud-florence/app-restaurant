@@ -32,6 +32,10 @@
 // tableau NU, un seul appel. Aucun `id` envoyé sur une création — notre uuid
 // part dans `remote_id`, ce qui rend la correspondance exacte dès le départ.
 
+// ✅ LE FOURNISSEUR EST HÉRITÉ DU GABARIT, ET C'EST VOULU : le gérant a dit
+// « les nouveaux jus de fruits de chez euro cash ». Ce n'est pas une déduction
+// de copie (le défaut corrigé le 19/10 sur Brownie et le sac de la veille),
+// c'est une information. Ne PAS l'effacer en croyant appliquer la règle.
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 

@@ -107,7 +107,7 @@ if (Number(gab.tva) !== 10) throw new Error(`« ${GABARIT} » est à ${gab.tva} 
 
 const ht = Number((TTC / (1 + gab.tva / 100)).toFixed(4))
 console.log(`   famille ${FAMILLE} · ${gab.tag_destination} · TVA ${gab.tva} % · ${TTC.toFixed(2)} € = ${ht.toFixed(4)} € HT`)
-console.log(`   effacés du gabarit : coût ${Number(gab.cout_achat_ht).toFixed(4)}, libelle_achat « ${String(gab.libelle_achat).slice(0, 38)}… », reference_fournisseur, nom_matiere, allergènes ${JSON.stringify(gab.allergenes_complementaires ?? [])}`)
+console.log(`   effacés du gabarit : coût ${Number(gab.cout_achat_ht).toFixed(4)}, libelle_achat « ${String(gab.libelle_achat).slice(0, 38)}… », reference_fournisseur, nom_matiere, fournisseur_id, allergènes ${JSON.stringify(gab.allergenes_complementaires ?? [])}`)
 console.log(`   en ligne ${gab.vendable_online} (repris du gabarit) · stockable OUI — « ${FAMILLE} » n'est pas une catégorie assemblée`)
 
 const etat = []
@@ -132,6 +132,13 @@ for (const n of etat) {
       nom: n.nom, nom_caisse: n.nom, categorie: FAMILLE, actif: true,
       prix_vente_ht: ht, prix_sur_place_ttc: null,
       cout_achat_ht: null, libelle_achat: null, reference_fournisseur: null,
+      // ⚠⚠ CINQUIÈME champ d'achat, et je l'avais OUBLIÉ au premier passage :
+      // le croque porte `fournisseur_id` = Gineys (Nicolas), parce qu'une LIGNE
+      // DE FACTURE le prouve. Copié, il attribuait le feuilleté et la quiche à
+      // Gineys sans qu'aucun fait ne l'étaye — et un bon serait parti là-bas
+      // pour un produit qu'on n'y achète peut-être pas (0164 : trois sources
+      // factuelles, jamais une déduction).
+      fournisseur_id: null,
       nom_matiere: null, unites_par_achat: 1,
       allergenes_complementaires: n.alg, allergenes_valides_le: null, allergenes_valides_par: null,
       description: n.desc, procedure: null, poids_portion_g: null,
@@ -173,14 +180,14 @@ const T = Object.fromEntries(tags.map(t => [t.id, t.name]))
 let ok = true
 console.log('')
 for (const { p, n } of aPousser) {
-  const [b] = await sb(`recettes?id=eq.${p.id}&select=nom,categorie,prix_vente_ht,tva,cout_achat_ht,libelle_achat,nom_matiere,vendable_online,allergenes_complementaires,allergenes_valides_le`)
+  const [b] = await sb(`recettes?id=eq.${p.id}&select=nom,categorie,prix_vente_ht,tva,cout_achat_ht,libelle_achat,nom_matiere,fournisseur_id,vendable_online,allergenes_complementaires,allergenes_valides_le`)
   const z = apres.find(x => String(x.remote_id) === p.id)
   const ttc = b.prix_vente_ht * (1 + b.tva / 100)
   const bon = z && !z.disable && b.categorie === FAMILLE && Math.abs(ttc - TTC) < 0.005
     && z.price === Math.round(TTC * 100) && b.cout_achat_ht == null && b.libelle_achat == null
-    && b.allergenes_valides_le == null
+    && b.fournisseur_id == null && b.allergenes_valides_le == null
   if (!bon) ok = false
-  console.log(`   ${bon ? '✓' : '✗'} ${b.nom.padEnd(12)} ${ttc.toFixed(2)} € · caisse ${z ? (z.price / 100).toFixed(2) + ' € ' + JSON.stringify((z.tags ?? []).map(t => T[t])) : 'ABSENT'} · coût ${b.cout_achat_ht ?? 'AUCUN'} · libelle_achat ${b.libelle_achat ?? 'AUCUN'} · ${JSON.stringify(b.allergenes_complementaires)} signé ${b.allergenes_valides_le ?? 'non'}`)
+  console.log(`   ${bon ? '✓' : '✗'} ${b.nom.padEnd(12)} ${ttc.toFixed(2)} € · caisse ${z ? (z.price / 100).toFixed(2) + ' € ' + JSON.stringify((z.tags ?? []).map(t => T[t])) : 'ABSENT'} · coût ${b.cout_achat_ht ?? 'AUCUN'} · libelle_achat ${b.libelle_achat ?? 'AUCUN'} · fournisseur ${b.fournisseur_id ?? 'AUCUN'} · ${JSON.stringify(b.allergenes_complementaires)} signé ${b.allergenes_valides_le ?? 'non'}`)
 }
 if (!ok) process.exit(1)
 console.log(`\n✅ « ${FAMILLE} » compte maintenant ${1 + aPousser.length} boutons.\n`)

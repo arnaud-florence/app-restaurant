@@ -101,6 +101,10 @@ for (const n of aFaire) {
     prix_sur_place_ttc: null,
     // ⚠️ les trois champs d'achat du gabarit sont EFFACÉS, voir l'en-tête
     libelle_achat: null, cout_achat_ht: null, reference_fournisseur: null,
+    // ⚠⚠ CINQUIÈME champ d'achat (ajouté le 19/10) : sans lui, le Brownie et le
+    // Gâteau pomme noix héritaient du fournisseur de l'Éclair au chocolat (Gineys)
+    // sans qu'aucun fait ne l'étaye. La 0164 exige trois sources factuelles.
+    fournisseur_id: null,
     nom_matiere: null, unites_par_achat: 1,   // NOT NULL en base
     image_url: null, actif: true,
     allergenes_complementaires: n.allerg,

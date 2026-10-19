@@ -35,6 +35,9 @@
 //   node scripts/baby-whisky-1610.mjs [--ecrire] [--cl=N] [--prix=N] [--nom=…]
 //   baby  : --cl=2 --prix=4            (défauts)
 //   fetus : --nom="Fetus whisky" --cl=1 --prix=2
+// ✅ LE FOURNISSEUR, LE LIBELLÉ D'ACHAT ET LA RÉFÉRENCE SONT HÉRITÉS, ET C'EST
+// VOULU : c'est la MÊME bouteille Grant's que le gabarit. Ne PAS les effacer en
+// croyant appliquer la règle du 19/10 — elle vise la copie SANS fait derrière.
 import fs from 'node:fs'
 
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(`--${k}=`)); return a ? Number(a.split('=')[1]) : d }

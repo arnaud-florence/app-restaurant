@@ -136,6 +136,12 @@ if (!prod) {
     prix_vente_ht: ht, prix_sur_place_ttc: null, tva: 20,
     contient_alcool: true, vendable_online: false, actif: true,
     cout_achat_ht: null, libelle_achat: null, reference_fournisseur: null,
+      // ⚠⚠ CINQUIÈME champ d'achat (ajouté le 19/10) : `fournisseur_id` se
+      // copiait avec le gabarit, attribuant le produit à un fournisseur que RIEN
+      // ne prouve — et un bon serait parti là-bas. La 0164 est explicite : trois
+      // sources factuelles (facture, référence au catalogue, relevé), jamais une
+      // déduction.
+      fournisseur_id: null,
     nom_matiere: null, unites_par_achat: 1,
     allergenes_complementaires: [], allergenes_valides_le: null, allergenes_valides_par: null,
     description: 'Cocktail du bar, préparé au comptoir.',

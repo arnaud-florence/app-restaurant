@@ -9167,6 +9167,57 @@ l'image en caisse. Le contrôle de carte signale l'écart entre-temps
 Contrôles : `test-carte-fournil` 13/13 · carte 209/209 après la poussée des
 deux images.
 
+### ⚠️⚠️ `fournisseur_id` est le CINQUIÈME champ d'achat, et je l'oubliais (19/10/2026)
+
+Trouvé en relisant le rayon « Snacking salé » juste après l'avoir créé : le
+**Feuilleté** et la **Quiche** affichaient « fourn. oui ». Je venais d'effacer
+soigneusement `cout_achat_ht`, `libelle_achat`, `reference_fournisseur` et
+`nom_matiere` du gabarit — et j'avais laissé passer `fournisseur_id`.
+
+Les deux étaient donc attribués à **Gineys (Nicolas)**, parce que le
+croque-monsieur l'est : lui, **une ligne de facture le prouve**. Pour un
+feuilleté et une quiche, rien. **Un bon de commande serait parti chez Gineys
+pour un produit qu'on n'y achète peut-être pas** — et « un bon parti chez le
+mauvais interlocuteur se découvre à la livraison ».
+
+La 0164 est explicite : `recettes.fournisseur_id` se remplit depuis **trois
+sources factuelles** — une ligne de facture, une référence retrouvée au
+catalogue, un relevé fournisseur. **Jamais une déduction.** Une copie de
+gabarit est une déduction qu'on n'a même pas décidée.
+
+**L'audit a trouvé QUATRE cas, et ils ne se valent pas** — c'est pourquoi ils
+ont été jugés un par un plutôt qu'effacés en bloc. Le critère : un fournisseur
+SANS coût NI libellé d'achat est suspect, mais suspect n'est pas faux.
+
+| Produit | Verdict |
+|---|---|
+| **Brownie**, **Gâteau pomme noix** | ⚠️ effacés — gabarit « Éclair au chocolat », rien ne prouve Gineys |
+| **Sac de viennoiseries de la veille** | ⚠️ effacé — et il ne s'ACHÈTE même pas : il est fait de produits déjà achetés, lui donner un fournisseur suggère qu'on pourrait le commander |
+| **Jus de poire 33 cl** | ✅ gardé — le gérant a dit « les nouveaux jus de fruits de chez euro cash » (12/10). C'est une INFORMATION, pas une copie |
+| **Baby / Fetus whisky** | ✅ gardés — c'est la MÊME bouteille Grant's que le gabarit, avec son libellé et son coût (déjà documenté le 16/10) |
+
+⚠️ **Les deux cas GARDÉS portent désormais une note en tête de leur script**,
+pour qu'on ne les « corrige » pas plus tard en croyant appliquer la règle. La
+règle vise la copie **sans fait derrière**, pas l'héritage légitime.
+
+**Cinq scripts corrigés** — `cocktail-generique-1710`,
+`sac-viennoiseries-veille-1910`, `desserts-1310`, `ardoise-semaine-1910` et
+`snacking-sale-feuilletes-1910` : un rejeu ne remettra plus le fournisseur.
+Et la relecture du dernier l'EXIGE désormais à NULL, donc il refuse de
+conclure si le champ a survécu — comme pour les quatre autres.
+
+⚠️ **La liste complète des champs à effacer d'un gabarit est donc :**
+`cout_achat_ht`, `libelle_achat`, `reference_fournisseur`, `nom_matiere`,
+**`fournisseur_id`**, et les **allergènes** (+ `allergenes_valides_le`).
+Six champs, et chacun a déjà été oublié au moins une fois.
+
+⚠️ Le risque réel était borné : les trois produits effacés n'ont pas de cible
+de stock, donc aucun bon n'était encore parti. Mais le champ était faux, et un
+champ faux ne se signale pas — c'est tout l'objet de ce fichier.
+
+Contrôles : carte **209/209 conformes, 0 écart** · `test-carte-fournil` 13/13 ·
+`test-reassort` 78/78 · `tsc` propre.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit

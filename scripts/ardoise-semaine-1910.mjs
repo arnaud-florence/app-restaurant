@@ -215,6 +215,12 @@ for (const n of NOUVEAUX) {
       nom: n.nom, nom_caisse: n.nom, actif: true,
       prix_vente_ht: Number((n.ttc / (1 + g.tva / 100)).toFixed(4)), prix_sur_place_ttc: null,
       cout_achat_ht: null, libelle_achat: null, reference_fournisseur: null,
+      // ⚠⚠ CINQUIÈME champ d'achat (ajouté le 19/10) : `fournisseur_id` se
+      // copiait avec le gabarit, attribuant le produit à un fournisseur que RIEN
+      // ne prouve — et un bon serait parti là-bas. La 0164 est explicite : trois
+      // sources factuelles (facture, référence au catalogue, relevé), jamais une
+      // déduction.
+      fournisseur_id: null,
       nom_matiere: null, unites_par_achat: 1,
       allergenes_complementaires: n.alg, allergenes_valides_le: null, allergenes_valides_par: null,
       description: null, procedure: null, poids_portion_g: null,

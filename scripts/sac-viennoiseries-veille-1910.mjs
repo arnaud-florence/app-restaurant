@@ -168,6 +168,12 @@ if (!prod) {
     prix_vente_ht: ht, prix_sur_place_ttc: null, tva: 5.5,
     contient_alcool: false, vendable_online: false, actif: true,
     cout_achat_ht: null, libelle_achat: null, reference_fournisseur: null,
+      // ⚠⚠ CINQUIÈME champ d'achat (ajouté le 19/10) : `fournisseur_id` se
+      // copiait avec le gabarit, attribuant le produit à un fournisseur que RIEN
+      // ne prouve — et un bon serait parti là-bas. La 0164 est explicite : trois
+      // sources factuelles (facture, référence au catalogue, relevé), jamais une
+      // déduction.
+      fournisseur_id: null,
     nom_matiere: null, unites_par_achat: 1,
     allergenes_complementaires: ['gluten'], allergenes_valides_le: null, allergenes_valides_par: null,
     description: 'Les viennoiseries non vendues la veille, en sac.',
