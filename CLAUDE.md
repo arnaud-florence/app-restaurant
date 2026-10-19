@@ -8795,7 +8795,7 @@ CATÉGORIE, et sa requête prend `tag_destination = BAR`. Contrairement à
 Contrôles : carte **202/202 conformes, 0 écart** · `test-matieres-bar` 24/24 ·
 `test-carte-fournil` 13/13.
 
-### Le sac de viennoiseries de la veille — et une famille « Anti-gaspi » (19/10/2026)
+### Le sac de viennoiseries de la veille, à 2,00 € (19/10/2026)
 
 `node scripts/sac-viennoiseries-veille-1910.mjs [--ecrire] [--prix=N]`.
 **2,00 € TTC**, FOURNIL, 5,5 % à emporter / 10 % sur place.
@@ -8829,34 +8829,56 @@ Il sort donc en « coût inconnu » (gris), jamais à zéro — un zéro se lira
 « gratuit » et le ferait passer pour le meilleur produit de la carte (0150).
 La raison est écrite dans `recettes.procedure`, donc sur la fiche imprimable.
 
-⚠️⚠️ **FAMILLE « Anti-gaspi », PAS « Viennoiserie », et ce n'est pas un détail
-d'affichage.** `estStockable()` exclut par CATÉGORIE : rangé en Viennoiserie,
-ce sac devenait **stockable** — une ligne à compter chaque semaine à
-`(ops)/inventaire` pour un produit qui n'existe que le matin, et une ligne
-« à paramétrer » au réassort. Deux faux **silencieux**, contre une seule
-erreur possible dans l'autre sens — un rayon mal placé, que le comptoir
-signale le premier matin. **Une erreur visible vaut mieux qu'une erreur
-silencieuse.**
+⚠️⚠️ **IL EST RANGÉ EN « VIENNOISERIE » — décision du gérant, qui a TRANCHÉ
+CONTRE MON PREMIER CHOIX.** Je l'avais mis dans une famille « Anti-gaspi »
+créée pour lui ; il a répondu « laisse-le dans viennoiserie ». Il a raison sur
+le point qui compte : **c'est là que le client le demande et là que le
+comptoir le cherche à 6 h 20.** Un rayon de un produit, en fin de liste, est
+un bouton qu'on ne trouve pas.
 
-✅ **`CATEGORIES_ASSEMBLEES` A ÉTÉ COMPLÉTÉE LE JOUR MÊME**, avant que la
-liste ne se fasse déborder une **quatrième** fois (après `Formule
-petit-déjeuner`, les familles de la brasserie et `Plat du jour`). C'est la
-première fois que ce motif est traité à la création plutôt qu'au prochain
-test rouge.
+⚠️⚠️ **MAIS LA FAMILLE DÉCIDE AUSSI SI LE PRODUIT SE STOCKE**, et c'était la
+raison de mon choix : `estStockable()` exclut par CATÉGORIE, donc rangé en
+Viennoiserie ce sac devenait **stockable** — une ligne à compter chaque semaine
+à `(ops)/inventaire` pour un produit qui n'existe que le matin, et une ligne
+« à paramétrer » au réassort.
 
-⚠️ Une famille à un seul produit n'a normalement pas sa place sur une caisse
-(règle posée en rangeant la Focaccia en Sandwich). C'est la **seconde
-exception assumée après « Tabac »**, et pour la même raison : le rayon va se
-remplir — pain de la veille, panier surprise.
+✅ **LES DEUX OBJECTIFS TIENNENT ENSEMBLE : `PRODUITS_HORS_STOCK`** (dans
+`src/lib/reassort.ts`) exclut **PAR PRODUIT**, et c'est le seul cas de la base.
+Le bouton reste où le comptoir le cherche, le stock reste propre. C'était un
+faux dilemme — et c'est une décision du gérant qui a forcé à le voir.
 
-**QUATRE LISTES TRAVERSÉES, et chacune cassait quelque chose :**
+⚠️⚠️ **UNE LISTE PAR NOM SE VIDE EN SILENCE À UN RENOMMAGE**, et le produit
+reviendrait au stock sans que rien ne le dise — le défaut de `PRESSION` dans
+`print/carte-bar`, corrigé quatre fois. D'où l'assertion de
+`test-reassort.mjs` : **chaque nom de la liste doit désigner un produit ACTIF
+en base.** Vérifiée en la cassant — un nom périmé fait bien rougir le test
+(77 ✓ 1 ✗), et il repasse au vert une fois restauré.
+
+⚠️ **Et l'exclusion ne doit PAS déborder sur la famille** : une seconde
+assertion vérifie que le **Croissant reste stockable**. Une exclusion trop
+large viderait l'inventaire du Fournil en silence.
+
+✅ **`CATEGORIES_ASSEMBLEES` a quand même été complétée avec « Anti-gaspi », et
+elle le reste** — première fois que ce motif est traité à la création plutôt
+qu'au prochain test rouge (la liste s'était fait déborder trois fois : `Formule
+petit-déjeuner`, les familles de la brasserie, `Plat du jour`). La famille est
+vide aujourd'hui, comme `Glace`, `Formule` et `Formule petit-déjeuner` : **une
+famille vide ne casse rien, et la rouvrir coûte un clic** — alors que retirer
+la clé des trois listes rouvrirait le piège le jour où un « pain de la veille »
+arrivera. ⚠️ Son tag subsiste donc en caisse : un rayon vide de plus, à retirer
+si le comptoir le trouve gênant.
+
+**CINQ LISTES TRAVERSÉES, et chacune cassait quelque chose.** Les deux
+premières portent le produit, les trois autres la famille désormais vide —
+posées pour le jour où un « pain de la veille » arrivera.
 
 | Liste | Ce qui cassait sans elle |
 |---|---|
-| `CATEGORIES_ASSEMBLEES` (`src/lib/reassort.ts`) | sac compté à l'inventaire et proposé au réassort |
+| `PRODUITS_HORS_STOCK` (`src/lib/reassort.ts`) | sac compté à l'inventaire et proposé au réassort |
+| `HORS_AFFICHE` (`test-carte-fournil.mjs`) | 4 échecs : hors référence, produit inconnu, photo, hors ligne |
+| `CATEGORIES_ASSEMBLEES` (`reassort.ts`) | le piège rouvert dès qu'« Anti-gaspi » resservira |
 | `ORDRE` (`pousser-familles-zelty.mjs`) | famille inconnue de la caisse → **bouton sans famille, introuvable** |
-| `JAMAIS_EN_LIGNE` (`generer-visuels-sans-photo.mjs`) | un passage le mettait **en vente sur casatasia.fr** |
-| `TVA_REDUITE` + `HORS_AFFICHE` (`test-carte-fournil.mjs`) | 5 échecs : hors référence, TVA, photo, hors ligne |
+| `JAMAIS_EN_LIGNE` (`generer-visuels-sans-photo.mjs`) | un passage la mettait **en vente sur casatasia.fr** |
 
 ⚠️ **TROISIÈME fois que `JAMAIS_EN_LIGNE` se fait déborder** par une famille
 créée après elle, après « Tabac » et « Boisson salle » — et le stock d'un sac
@@ -8890,8 +8912,14 @@ absorbé par le réessai qui annonce son code. Le script reprend sur la
 CORRESPONDANCE de caisse, pas sur le nom : sans ça, un produit resté en base
 et absent de la caisse serait invisible du comptoir pour toujours.
 
+⚠️ `scripts/deplacer-famille.mjs` généralise `whiskies-en-aperitif-1610.mjs` :
+caisse d'abord, cohérence des taux rejouée AVANT d'écrire, et il **DIT ce que
+le déplacement change pour le stock** (« stockable : non → OUI — mais exclu par
+PRODUITS_HORS_STOCK »). Un déplacement de famille a des effets en cascade qu'il
+faut voir avant, pas découvrir après.
+
 Contrôles : carte **203/203 conformes, 0 écart** · `test-carte-fournil` 13/13
-· `test-reassort` 76/76 · `test-cibles-stock` 31/31 · `tsc` propre.
+· `test-reassort` **78/78** · `test-cibles-stock` **33/33** · `tsc` propre.
 `CACHE_VERSION` → v313.
 
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
@@ -9450,6 +9478,7 @@ node scripts/coca-33-en-salle-1610.mjs         # un produit, deux rayons de cais
 node scripts/coca-33-prix-salle-1710.mjs       # 3,20 € en salle, le comptoir intact
 node scripts/cocktail-generique-1710.mjs       # bouton générique « Cocktail » 8 € (essai à blanc)
 node scripts/sac-viennoiseries-veille-1910.mjs # les invendus de la veille en sac, 2 € (essai à blanc)
+node scripts/deplacer-famille.mjs --nom="…" --vers="…"   # ranger un produit ailleurs, des DEUX côtés
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)

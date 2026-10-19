@@ -15,8 +15,13 @@ const CATEGORIES_ASSEMBLEES = new Set([
   'Formule petit-déjeuner',
   'Plat du jour',
 ])
+// ⚠️ Recopiée de `PRODUITS_HORS_STOCK` (src/lib/reassort.ts) : exclusion par
+// PRODUIT, le seul cas. Le sac de la veille est rangé en Viennoiserie par
+// décision du gérant, mais il ne s'achète pas — sa casse est déjà comptée.
+const PRODUITS_HORS_STOCK = new Set(['Sac de viennoiseries de la veille'])
 const estStockable = p => {
   if (p.categorie && CATEGORIES_ASSEMBLEES.has(p.categorie)) return false
+  if (PRODUITS_HORS_STOCK.has(p.nom)) return false
   if (p.nom.startsWith('Formule —')) return false
   if (p.tag_destination === 'BAR' && !p.nom_matiere) return false
   return true
@@ -56,6 +61,17 @@ t('une formule du matin est un lot, pas un stock',
 // plat au lieu de ses composants.
 t('⚠️ « Plat du jour » ne se stocke pas — ce sont ses composants qui se stockent',
   !estStockable({ nom: 'Plat du jour', categorie: 'Plat du jour', tag_destination: 'CUISINE' }))
+
+// ⚠️⚠️ EXCLUSION PAR PRODUIT — le seul cas de la base. Décision du gérant
+// (19/10/2026) : le sac de la veille reste rangé en « Viennoiserie », là où le
+// comptoir le trouve. Il ne s'achète pourtant pas — sa casse est déjà
+// valorisée la veille par `(ops)/invendus` — donc il sort du stock par son NOM.
+t('le sac de la veille reste en Viennoiserie et sort quand même du stock',
+  !estStockable({ nom: 'Sac de viennoiseries de la veille', categorie: 'Viennoiserie', tag_destination: 'FOURNIL' }))
+// ⚠️ ET LE CROISSANT, LUI, DOIT RESTER STOCKABLE : une exclusion par nom qui
+// déborderait sur sa famille viderait l'inventaire du Fournil en silence.
+t('la famille Viennoiserie reste stockable',
+  estStockable({ nom: 'Croissant', categorie: 'Viennoiserie', tag_destination: 'FOURNIL' }))
 
 console.log('\n── Un comptage périmé n’est pas un stock ──')
 // ⚠️ RECOPIE de PEREMPTION_COMPTAGE_JOURS (src/lib/reassort.ts).

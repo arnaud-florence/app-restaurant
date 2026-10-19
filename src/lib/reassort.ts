@@ -369,6 +369,26 @@ export const CATEGORIES_ASSEMBLEES = new Set([
   'Plat du jour',
 ])
 
+// ⚠️⚠️ EXCLUSION PAR PRODUIT, pas par catégorie — et c'est le seul cas.
+// Décision du gérant (19/10/2026) : le sac de viennoiseries de la veille est
+// rangé en « Viennoiserie », parce que c'est là que le client le demande et
+// là que le comptoir le trouve à 6 h 20. L'ergonomie de caisse prime.
+//
+// Mais ce sac ne s'ACHÈTE pas : il est fait de produits déjà achetés, déjà
+// comptés, et déjà valorisés en casse par `(ops)/invendus` la veille au soir.
+// Laissé stockable, il ajoutait une ligne à compter chaque semaine pour un
+// produit qui n'existe que le matin, et une ligne « à paramétrer » au
+// réassort. La famille « Anti-gaspi » réglait ça mais déplaçait le bouton.
+//
+// ⚠️ UNE LISTE PAR NOM EST FRAGILE : un renommage la vide EN SILENCE, et le
+// sac reviendrait à l'inventaire sans que rien ne le dise. C'est le défaut de
+// `PRESSION` dans `print/carte-bar`, corrigé quatre fois. D'où l'assertion de
+// `test-cibles-stock.mjs` qui vérifie que chaque nom désigné ICI existe encore
+// en base — une liste périmée doit faire rougir, pas se taire.
+export const PRODUITS_HORS_STOCK = new Set([
+  'Sac de viennoiseries de la veille',
+])
+
 export function estStockable(p: {
   nom: string
   categorie: string | null
@@ -376,6 +396,7 @@ export function estStockable(p: {
   nom_matiere?: string | null
 }): boolean {
   if (p.categorie && CATEGORIES_ASSEMBLEES.has(p.categorie)) return false
+  if (PRODUITS_HORS_STOCK.has(p.nom)) return false
   if (p.nom.startsWith('Formule —')) return false
   // ⚠️ Au bar, un produit sans `nom_matiere` MÉLANGE deux matières (Kir,
   // Spritz, Panaché, Pichet…) : le rattacher à une seule perdrait l'autre,

@@ -411,5 +411,22 @@ console.log('\n── Un comptage périmé est neutralisé pour TOUS les lecteur
     /offres\.map\(o =>/.test(cli) && /offre\(s\) moins chère\(s\)/.test(cli))
 }
 
+// ⚠⚠ UNE LISTE PAR NOM SE VIDE EN SILENCE À UN RENOMMAGE, et le produit
+// reviendrait au stock sans que rien ne le dise — le défaut de `PRESSION`
+// dans `print/carte-bar`, corrigé quatre fois. Chaque nom de
+// `PRODUITS_HORS_STOCK` doit donc désigner un produit ACTIF en base : une
+// liste périmée fait rougir, elle ne se tait pas.
+{
+  const src = fs.readFileSync('src/lib/reassort.ts', 'utf8')
+  const bloc = src.match(/PRODUITS_HORS_STOCK = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
+  const noms = [...bloc.matchAll(/'([^']+)'/g)].map(m => m[1])
+  t('PRODUITS_HORS_STOCK n’est pas vide', noms.length > 0)
+  for (const n of noms) {
+    const r = await sb(`recettes?select=nom,categorie,actif&nom=eq.${encodeURIComponent(n)}`)
+    t(`« ${n} » existe et est actif — sinon la liste est périmée`,
+      r.length === 1 && r[0].actif === true)
+  }
+}
+
 console.log(`\n═══ ${ok} ✓   ${ko} ✗ ═══\n`)
 process.exit(ko ? 1 : 0)
