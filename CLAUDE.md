@@ -9035,6 +9035,82 @@ Contrôles : carte **207/207 conformes, 0 écart** · `test-carte-fournil` 13/13
 · `test-reassort` 78/78 · `test-cibles-stock` 33/33 · `tsc` propre.
 `CACHE_VERSION` → v314.
 
+### L'ardoise du 19 au 25, et le steak haché qui tombe à zéro (19/10/2026)
+
+`node scripts/poser-ardoise-1910.mjs [--ecrire]`. **23 plats** — 16 pizzas,
+5 plats, l'American burger et la Grande salade italienne. Celle du 12-18 était
+périmée depuis la veille, donc le réassort était retombé sur `stock_cible`,
+dimensionné sur la carte ENTIÈRE (231 €/sem de reliquat contre 133 €).
+
+⚠️⚠️ **POSER UNE ARDOISE MAL FAITE EST PIRE QUE PAS D'ARDOISE**, et c'est
+pourquoi le script MESURE avant d'écrire. `cibleMatiere()` met à ZÉRO toute
+matière de la Restauration absente de l'ardoise : une ardoise amputée ne fait
+pas « commander un peu moins », elle fait **CESSER DE COMMANDER** ce qui n'y
+figure pas, en silence.
+
+⚠️⚠️ **ET LA MESURE A TROUVÉ UN TROU RÉEL : LE STEAK HACHÉ PASSE À ZÉRO.**
+Deux matières de la restauration ne sont servies **que par le Menu enfant**,
+le permanent écarté de l'ardoise :
+
+| matière | cible | servie par |
+|---|---|---|
+| **Steak haché de bœuf 150 g** | 34 pièces | Menu enfant SEUL |
+| Sirop (litre) | 0,2 L | Menu enfant SEUL |
+
+Le sirop était déjà connu (~1 €, documenté le 15/10). **Le steak haché, non** :
+il était porté par le **Burger Montagnard**, éteint le 19/10 avec l'ardoise de
+la semaine passée. Son remplaçant, **l'American burger, n'a AUCUNE fiche** —
+donc plus aucun plat actif ne réclame de steak haché, alors que DEUX en
+servent. C'est une rupture programmée sur le cœur du burger.
+
+⚠️ **ET POSER UNE CIBLE À LA MAIN N'Y CHANGERAIT RIEN** : pour une matière de
+la restauration, `stock_cible` est IGNORÉ au profit du calcul sur l'ardoise
+(0167). La seule correction est **la fiche technique de l'American burger** —
+qui ne s'invente pas : inventer sa garniture écrirait un food cost faux, et
+une fiche PARTIELLE serait pire qu'aucune (elle s'afficherait comme complète,
+l'inverse de `statutFoodCost(0)` en gris).
+
+⚠️ **LE MENU ENFANT RESTE ÉCARTÉ DE L'ARDOISE**, et c'est délibéré :
+`portionsSemaine()` répartit les portions UNIFORMÉMENT, donc l'y ajouter
+fausserait le volume des 23 autres plats. La doctrine du 15/10 le disait déjà
+— « ne pas le bricoler en ajoutant le plat à l'ardoise ». Le vrai correctif
+reste que `chargerLignesReassort()` traite les permanents comme servis.
+
+⚠️ **LES 3 « Plat du jour » NE SONT PAS DANS L'ARDOISE HEBDO.** Ce sont les
+SUPPORTS de caisse : leur composition est attachée à l'OCCURRENCE du jour
+(`plat_du_jour_ingredients`, 0167), pas au produit. Les y mettre les ferait
+compter comme trois plats servis toute la semaine. ⚠️ Corollaire : **les plats
+du jour du 19 au 25 restent à saisir** — sans eux, les 140 couverts du midi se
+commandent à l'aveugle, ce qui est le plus gros volume de la semaine.
+
+⚠️ **QUATRE DES 23 PLATS NE PÈSENT RIEN** — American burger, Tortellini,
+Saint-Félicien, Grande salade italienne. Ils entrent dans l'ardoise parce
+qu'ils sont RÉELLEMENT SERVIS, mais `recette_ingredients` est vide, donc
+aucune matière ne leur est imputée. **45 matières sont considérées comme
+servies**, toutes venues des 19 plats à fiche.
+
+⚠️ Le script reproduit `poserArdoise()` À LA LETTRE : il REMPLACE les lignes
+de la semaine (`date_debut = debut` ET `date_fin = fin`) et ne touche JAMAIS
+les lignes d'un JOUR précis — relecture après coup, **6 plats du jour
+intacts**. La composition part AVANT la ligne : `on delete cascade` s'en
+chargerait, mais une suppression qui dépend d'une cascade est une suppression
+qu'on ne voit pas dans le code.
+
+**✅ CONTRÔLE DE CE QUI A ÉTÉ ENTRÉ — « je vois pas tout » (gérant).**
+La base et la caisse concordent : **207/207 conformes, 0 écart, 0 plat sans
+contrepartie**, et surtout **AUCUN produit actif sans famille** — donc rien
+n'est invisible au comptoir. 24 rayons, du Pain au Tabac.
+
+⚠️ **Deux explications possibles à ce qu'il ne voit pas, et aucune n'est la
+base** : le catalogue de l'app Zelty sur l'iPad ne se resynchronise pas tout
+seul, et **73 plats sont ÉTEINTS exprès** — les 9 formules, les 4 glaces, les
+3 burgers et les 2 grandes salades de la semaine passée, les 9 Pago, les
+7 plats de brasserie hors ardoise. Chercher un produit retiré et ne pas le
+voir n'est pas une panne. ⚠️ Et **4 rayons sont VIDES** (Formule
+petit-déjeuner, Glace, Planche, Anti-gaspi) : ouverts, ils ne montrent rien.
+
+Contrôles : carte **207/207 conformes, 0 écart** · `test-reassort` 78/78.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9594,6 +9670,7 @@ node scripts/sac-viennoiseries-veille-1910.mjs # les invendus de la veille en sa
 node scripts/deplacer-famille.mjs --nom="…" --vers="…"   # ranger un produit ailleurs, des DEUX côtés
 node scripts/snacking-sale-1910.mjs            # famille « Snacking salé » à 3,80 € (essai à blanc)
 node scripts/ardoise-semaine-1910.mjs          # la carte de la semaine du 19/10 (essai à blanc)
+node scripts/poser-ardoise-1910.mjs            # l'ardoise 19-25 : 23 plats (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
