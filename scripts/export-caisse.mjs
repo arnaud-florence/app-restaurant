@@ -72,6 +72,16 @@ const plats = (await zl('catalog/dishes?show_all=true&limit=0'))?.dishes ?? []
 const tags = (await zl('catalog/tags'))?.tags ?? []
 const fab = await zl('fabrication-places')
 
+// Ce qu'il faut pour INSTALLER la caisse, et qui n'est pas un produit.
+// ⚠️ Les clients sont lus SANS `allergies` (donnée de SANTÉ) et SANS
+// `opt_in_marketing` : un consentement ne se transfère pas d'un prestataire à
+// l'autre par défaut — c'est la règle du pont client, et une erreur ici ne
+// produit pas un message d'erreur, elle produit une plainte CNIL.
+const paiements = await zl('transaction-methods')
+const tables = await q('tables_restaurant?select=numero,zone,capacite&order=zone,numero')
+const clients = await q('clients?select=nom,prenom,telephone,email,total_depense,nb_visites,niveau_fidelite,points_fidelite,caisse_externe_id,notes_internes&order=total_depense.desc')
+const employes = await q('employes?select=prenom,nom,poste,actif&actif=eq.true&order=prenom')
+
 // ⚠️ une lecture de catalogue qui rend moins de 100 plats est une lecture
 // RATÉE, pas un catalogue vide (règle éprouvée depuis le 28/08). Ici elle ne
 // bloque pas l'export — on retombe sur la base — mais elle doit être DITE,
@@ -79,7 +89,9 @@ const fab = await zl('fabrication-places')
 if (plats.length < 100) console.log(`   ⚠ la caisse n'a rendu que ${plats.length} plats : prix et taux viendront de la BASE pour les autres`)
 
 console.log(`   ${recettes.length} produits · ${plats.length} plats en caisse · ${opts.length} groupes d'options · ${tags.length} familles`)
+const nbPaiements = (paiements?.transaction_methods ?? paiements?.data ?? []).length
+console.log(`   ${nbPaiements} modes de paiement · ${tables.length} tables · ${clients.length} comptes clients · ${employes.length} employés actifs`)
 fs.mkdirSync('data', { recursive: true })
-fs.writeFileSync('data/export-caisse.json', JSON.stringify({ recettes, ets, opts, plats, tags, fab }, null, 1))
+fs.writeFileSync('data/export-caisse.json', JSON.stringify({ recettes, ets, opts, plats, tags, fab, paiements, tables, clients, employes }, null, 1))
 
 console.log(execFileSync('python3', ['scripts/export-caisse-xlsx.py', 'data'], { encoding: 'utf8' }))

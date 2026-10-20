@@ -7193,6 +7193,69 @@ gérant pose la sienne — 26 lignes. Il vérifie désormais que SES lignes sont
 parties, pas que la production est vide. Même famille d'erreur que
 `test-zelty-webhook.mjs`, qui effaçait tous les événements au lieu des siens.
 
+### L'export de caisse ne s'arrête pas aux produits (20/10/2026)
+
+« Le catalogue contient pas tout les produits avec leurs prix ? Il a pas besoin
+de ça aussi ? » — la question valait la vérification, et la réponse est en deux
+parties.
+
+✅ **Côté VENTE, rien ne manquait** : 209 produits actifs, **zéro sans prix,
+zéro sans TVA**, dont 21 à deux prix différents (Coca 33 cl : 3,20 € en salle /
+2,00 € à emporter). Plus les 81 fiches éteintes, **avec leurs prix aussi** —
+une caisse doit pouvoir rattacher un ticket tardif sans recréer la fiche.
+
+⚠️ **Mais l'export n'avait rien de ce qu'il faut pour INSTALLER la caisse**, et
+aucun de ces éléments n'est un produit. Quatre onglets ajoutés :
+
+| Onglet | Pourquoi sans lui l'installation cale |
+|---|---|
+| **Modes de paiement** (8) | il n'en existait AUCUN avant septembre, pas même les espèces : la caisse ne pouvait solder aucun ticket |
+| **Tables et zones** (24, 104 couverts) | Bar 4 · Salle 10 · Terrasse 8 · Privatif 2 |
+| **Comptes clients** (3) | la supérette porte une **note en compte** — son ardoise, pas un détail de CRM |
+| **Postes et imprimantes** | Cuisine · Pizza · Caisse, et les trois Epson avec leurs IP |
+
+⚠️⚠️ **CE QUI RESTE VOLONTAIREMENT DEHORS : TOUT LE CÔTÉ ACHAT.** Aucun
+`cout_achat_ht`, aucun fournisseur, aucune référence fournisseur. Une caisse
+n'en a pas besoin pour encaisser, et ce sont des **conditions négociées** — même
+règle que le dépôt public. Et la leçon Zelty vaut d'être rappelée avant de
+saisir quoi que ce soit dans un module de gestion de stock d'un éditeur :
+mercuriale, fiches techniques, fournisseurs et inventaire **ne ressortaient pas
+de leur API**. Ce qu'on y met est prisonnier. **L'outil reste le dépositaire des
+stocks, des achats et des marges.**
+
+⚠️ **Le `accounting_code` des 8 modes est VIDE**, et l'onglet le dit en toutes
+lettres (« ⚠ à définir avec le comptable »). C'est lui qui dira où ranger ces
+lignes — personne ne peut l'inventer à sa place, et la note **en compte** entre
+dans le CA et dans le Z sans que l'argent soit rentré.
+
+⚠️ **L'onglet client porte une alerte et peut être SUPPRIMÉ avant envoi** :
+2 des 3 fiches sont le gérant lui-même, dont un doublon d'adresse. Ni les
+**allergies** (donnée de santé) ni l'**opt-in marketing** ne sont exportés : un
+consentement se recueille, il ne se transfère pas d'un prestataire à l'autre, et
+une erreur ici ne produit pas un message d'erreur — elle produit une plainte
+CNIL.
+
+⚠️⚠️ **CHAQUE ENDPOINT ZELTY A SA PROPRE CLÉ D'ENVELOPPE, et aucune règle ne
+s'en déduit** : `dishes`, `tags`, `options`, `orders`, **`data`** pour
+`/fabrication-places`, **`transaction_methods`** pour `/transaction-methods`.
+Lire la mauvaise rend une liste **VIDE sans la moindre erreur** — mon log
+annonçait « 0 modes de paiement » pendant que le classeur en contenait 8. Un
+chiffre faux dans une sortie fait douter de tout le reste, et c'est précisément
+comment on conclut qu'une donnée manque alors qu'elle est là. Même famille que
+`expand[]=items` oublié et `GET /bookings` sans `?date=`.
+
+⚠️⚠️ **DEUXIÈME DÉCALAGE DE COLONNE DU MÊME CLASSEUR.** Les lignes imprimantes
+portaient l'IP en 2ᵉ position face à un en-tête « Nature » : l'adresse
+`192.168.1.196` s'affichait comme la nature de l'imprimante. Aucune erreur,
+aucun avertissement — **un décalage de colonne rend des valeurs plausibles à la
+mauvaise place**, et c'est le lecteur qui le découvre. Même faute que la colonne
+« Poste de production » la veille. Le contrôle qui l'attrape est de **relire
+chaque nouvel onglet ligne à ligne**, jamais de se fier au comptage.
+
+Export rejouable d'un geste : `node scripts/export-caisse.mjs` → 11 onglets
+dans `data/`. ⚠️ Le classeur n'est PAS committé : il porte des coordonnées
+clients.
+
 ### Corrections de carte du 11/10/2026 — 23 retraits, 2 créations
 
 `node scripts/carte-corrections-1110.mjs [--ecrire]`, essai à blanc par

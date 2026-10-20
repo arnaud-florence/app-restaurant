@@ -7,6 +7,9 @@ S = sys.argv[1]
 d = json.load(io.open(S + '/export-caisse.json', encoding='utf-8'))
 recettes, ets, opts, plats, tags = d['recettes'], d['ets'], d['opts'], d['plats'], d['tags']
 fab = {f['id']: f['name'] for f in (d.get('fab') or {}).get('data', [])}
+POSTES = (d.get('fab') or {}).get('data', [])
+PAIEMENTS = (d.get('paiements') or {}).get('data', []) or (d.get('paiements') or {}).get('transaction_methods', [])
+TABLES, CLIENTS, EMPLOYES = d.get('tables') or [], d.get('clients') or [], d.get('employes') or []
 NOM_ET = {e['id']: e['nom'] for e in ets}
 PAR_REMOTE = {str(p.get('remote_id') or ''): p for p in plats}
 NOM_TAG = {t['id']: t['name'] for t in tags}
@@ -228,6 +231,73 @@ for a in ALL14:
 feuille('Allergènes', ['Allergène (14 réglementaires)','Clé','Produits actifs concernés','Lesquels'],
         al, [30,16,22,110])
 
+# ───────────────── 7. MODES DE PAIEMENT ──────────────────────
+# Une caisse ne peut rien solder sans eux, et il n'en existait AUCUN avant
+# septembre — pas même les espèces. Le type « account » est celui qui permet la
+# note EN COMPTE : la vente est faite, l'argent n'est pas rentré. Il doit rester
+# DISTINCT des espèces et de la CB, sinon le comptage du tiroir crie un écart
+# chaque soir.
+TYPE_FR = {'cash': 'espèces (rendu monnaie, tiroir, comptage)',
+           'ingenico': 'TPE Ingenico — le montant part de la caisse vers le terminal',
+           'tr': 'titre-restaurant', 'account': 'EN COMPTE — ardoise client, rien n’est encaissé'}
+pl = [[m.get('order') or 0, m['name'], m.get('type') or '(aucun)', TYPE_FR.get(m.get('type') or '', ''),
+       'oui' if m.get('open_drawer') else 'non',
+       {'change': 'rendu monnaie', 'allow': 'autorisé', 'disallow': 'interdit'}.get(m.get('overflow') or '', m.get('overflow') or ''),
+       'oui' if m.get('allow_negative_transacion') else 'non',
+       'DÉSACTIVÉ' if m.get('disable') else 'actif',
+       m.get('accounting_code') or '⚠ à définir avec le comptable']
+      for m in sorted(PAIEMENTS, key=lambda m: m.get('order') or 0)]
+feuille('Modes de paiement', ['Ordre','Mode','Type technique','Ce que le type implique','Ouvre le tiroir',
+                              'Surplus','Montant négatif','État','Code comptable'],
+        pl, [8,22,16,52,15,15,16,12,30])
+
+# ───────────────── 8. TABLES ET ZONES ────────────────────────
+tl = [[t.get('zone') or '—', t.get('numero'), t.get('capacite') or 0] for t in TABLES]
+zones = {}
+for t in TABLES:
+    z = t.get('zone') or '—'
+    zones[z] = (zones.get(z, (0, 0))[0] + 1, zones.get(z, (0, 0))[1] + (t.get('capacite') or 0))
+ws = feuille('Tables et zones', ['Zone','Table','Couverts'], tl, [18,12,12])
+ws.append([]); ws.append(['TOTAL', f'{len(TABLES)} tables', sum(t.get('capacite') or 0 for t in TABLES)])
+for c in ws[ws.max_row]: c.font = GRAS
+for z, (n, cv) in sorted(zones.items()):
+    ws.append([z, f'{n} tables', cv])
+    for c in ws[ws.max_row]: c.font = NORM
+
+# ───────────────── 9. COMPTES CLIENTS ────────────────────────
+# ⚠️ NI allergies (donnée de SANTÉ) NI consentement marketing : un consentement
+# ne se transfère pas d'un prestataire à l'autre, et il se recueille — il ne
+# s'hérite pas d'une valeur par défaut. Le total est en HT (base de la fidélité).
+cl = [[f"{(c.get('prenom') or '').strip()} {(c.get('nom') or '').strip()}".strip(),
+       c.get('telephone') or '', c.get('email') or '',
+       c.get('caisse_externe_id') or '', c.get('total_depense') or 0, c.get('nb_visites') or 0,
+       c.get('niveau_fidelite') or '', c.get('points_fidelite') or 0]
+      for c in CLIENTS]
+feuille('Comptes clients', ['Nom','Téléphone','Email','Id caisse actuelle','Total dépensé € HT',
+                            'Visites','Niveau fidélité','Points'],
+        cl, [30,16,32,18,18,10,16,10])
+ws = wb['Comptes clients']
+ws.append([])
+ws.append(['⚠ Données personnelles : cet onglet peut être SUPPRIMÉ avant envoi. Le seul compte utile à la '
+           'caisse est le compte PRO, qui porte une note en compte.'])
+ws.cell(ws.max_row, 1).font = ALERTE
+
+# ───────────────── 10. POSTES ET IMPRIMANTES ─────────────────
+# Les trois Epson TM-T88VI sont relevées à la main (ticket d'état de chaque
+# imprimante) : elles ne sont dans aucune base. ⚠️ Les IP sont en DHCP et
+# doivent être RÉSERVÉES par adresse MAC dans la box — l'iPad est déjà passé de
+# .69 à .199, et la même dérive sur une imprimante enverrait les bons de la
+# cuisine chez le pizzaiolo, sans le moindre signalement.
+IMPR = [['Comptoir', 'imprimante 80 mm', '192.168.1.196', 'MAC 44:D2:44:C4:61:2E · câble Ethernet sur la box', 'Epson TM-T88VI'],
+        ['Cuisine',  'imprimante 80 mm', '192.168.1.47',  'nom réseau EPSON199BBE · via le répéteur TP-Link RE505X', 'Epson TM-T88VI'],
+        ['Pizza',    'imprimante 80 mm', 'à brancher',    'il manque un switch 5 ports', 'Epson TM-T88VI']]
+ws = feuille('Postes et imprimantes', ['Nom','Nature','Adresse IP','MAC / raccordement','Matériel'],
+             [[p['name'], 'poste de production', '', '', ''] for p in POSTES] + IMPR,
+             [20,24,18,32,22])
+ws.append([])
+ws.append(['', 'Réseau : box 192.168.1.254, SSID CASATASIA. Les IP sont en DHCP — à réserver par MAC.'])
+ws.cell(ws.max_row, 2).font = ALERTE
+
 # ── le sommaire du Lire-moi, écrit après coup pour porter les vrais comptes ──
 ws = wb['LIRE-MOI']
 for t, n in [('Produits', f'{len(actifs)} produits ACTIFS — c’est l’onglet à importer'),
@@ -235,7 +305,11 @@ for t, n in [('Produits', f'{len(actifs)} produits ACTIFS — c’est l’onglet
              ('Familles', f'{len(fl)} rayons, dans leur ordre d’affichage'),
              ('Options', f'{len(ol)} valeurs réparties en {len(opts)} groupes'),
              ('Options par produit', f'{len(rl)} rattachements'),
-             ('Allergènes', 'les 14 réglementaires et les produits concernés')]:
+             ('Allergènes', 'les 14 réglementaires et les produits concernés'),
+             ('Modes de paiement', f'{len(pl)} modes, dont la note EN COMPTE'),
+             ('Tables et zones', f'{len(TABLES)} tables, {sum(t.get("capacite") or 0 for t in TABLES)} couverts'),
+             ('Comptes clients', f'{len(cl)} comptes (sans donnée de santé ni consentement marketing)'),
+             ('Postes et imprimantes', f'{len(POSTES)} postes de production et 3 imprimantes 80 mm')]:
     ws.append(['', f'   · {t} — {n}'])
     ws.cell(ws.max_row, 2).font = NORM
 if sans_caisse:
@@ -248,3 +322,4 @@ wb.save(out)
 print('✓ écrit :', out)
 print(f'  Produits {len(lignes)} · Familles {len(fl)} · Options {len(ol)} · Rattachements {len(rl)}')
 print(f'  sans contrepartie caisse : {len(sans_caisse)}')
+print(f'  Paiements {len(pl)} · Tables {len(TABLES)} · Clients {len(cl)} · Postes {len(POSTES)}')
