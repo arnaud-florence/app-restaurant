@@ -9218,6 +9218,87 @@ champ faux ne se signale pas — c'est tout l'objet de ce fichier.
 Contrôles : carte **209/209 conformes, 0 écart** · `test-carte-fournil` 13/13 ·
 `test-reassort` 78/78 · `tsc` propre.
 
+### ⚠️⚠️ CHANGEMENT DE CAISSE : Zelty → CASH MAG (20/10/2026)
+
+Décision du gérant : **la maison passe sur Cash Mag**, qui prépare et importe
+les produits dans la caisse qu'ils mettront en place. Toute la section Zelty
+de ce fichier décrit donc un système en fin de vie — elle reste parce qu'elle
+porte des leçons qui se rejoueront chez le suivant.
+
+`node scripts/export-caisse.mjs` produit le classeur à leur envoyer :
+`data/export-caisse-casatasia-AAAA-MM-JJ.xlsx` (gitignoré, comme tout ce qui
+part chez un tiers). **Sept onglets**, rejouable en une commande — un
+intégrateur demande toujours des ajustements.
+
+| Onglet | Contenu |
+|---|---|
+| **LIRE-MOI** | les cinq points qui ne se devinent pas |
+| **Produits** | les **209 actifs** — c'est l'onglet à importer |
+| **Éteints (ne pas vendre)** | 81 fiches avec la RAISON du retrait |
+| Familles | 28 rayons, dans leur ordre d'affichage |
+| Options | 80 valeurs en 7 groupes, avec leur prix |
+| Options par produit | 109 rattachements |
+| Allergènes | les 14 réglementaires et qui les porte |
+
+⚠️⚠️ **AUCUN PRIX D'ACHAT, AUCUN FOURNISSEUR, AUCUNE RÉFÉRENCE FOURNISSEUR.**
+Une caisse n'en a pas besoin pour encaisser, et ce sont des conditions
+NÉGOCIÉES : la même règle que le dépôt public s'applique à un prestataire.
+
+⚠️ **LES PRIX ET LES TAUX SONT LUS SUR LA CAISSE, pas recalculés.** Ils y sont
+déjà contrôlés — 209/209 conformes, 0 écart. Les recalculer rouvrirait le
+risque d'un arrondi divergent sur le document qui servira de référence à
+l'import. Les 8 fiches sans contrepartie (toutes éteintes et obsolètes :
+focaccias fondues, Pago, « Lin tournesol ») retombent sur la base.
+
+**LES CINQ POINTS DU LIRE-MOI** — chacun est une leçon payée cette année :
+
+1. **deux prix par produit**, et 21 ont un écart réel (Coca 33 cl : 2,00 € au
+   comptoir, 3,20 € en salle). N'en importer qu'un vendrait la salle au tarif
+   du comptoir — l'erreur exacte que la 0144 a corrigée ;
+2. **deux taux de TVA**, imposés par la loi. Un taux trop BAS est le seul qui
+   ne se rattrape pas ;
+3. **deux groupes d'options sont OBLIGATOIRES** (`min = 1`) : Cuisson et
+   Cuisson du burger. Et ils sont distincts à dessein — « bleu » ne se sert
+   pas sur un steak haché, et le menu enfant n'en reçoit aucun ;
+4. **les éteints ne doivent pas être mis en vente**, mais pas être supprimés
+   non plus : 16 reviendront avec l'ardoise ;
+5. **garder notre code produit**. C'est ce qui a rendu le pont Zelty exact dès
+   le premier jour (84/84 appariés par `remote_id`, aucun rapprochement par le
+   nom). Sans lui, tout rapprochement passe par le libellé — et un libellé qui
+   change coupe la série statistique en deux, sans erreur visible.
+
+⚠️⚠️ **DÉCALAGE DE COLONNES, trouvé au contrôle du fichier.** J'avais retiré la
+colonne « Actif » des LIGNES de l'onglet Produits sans la retirer des
+EN-TÊTES : 18 titres pour 17 valeurs, donc tout glissait d'un cran à partir
+de là, et un groupe d'options s'affichait sous « Poste de production ». Aucune
+erreur — **un décalage rend des valeurs PLAUSIBLES à la mauvaise place**, et
+c'est l'intégrateur qui l'aurait importé tel quel. Le contrôle d'après
+écriture vérifie désormais que la colonne a disparu des deux côtés, et que
+« Poste de production » ne contient que Cuisine, Pizza ou rien.
+
+⚠️ **UN NOM D'ONGLET DE PLUS DE 31 CARACTÈRES FAIT REFUSER LE FICHIER** par
+certaines applications. openpyxl ne lève qu'un **avertissement** : le fichier
+part, et c'est le destinataire qui ne peut plus l'ouvrir. « Éteints — ne pas
+mettre en vente » faisait 32 caractères.
+
+**CE QUI NE S'EXPORTE PAS, et qu'il faudra refaire chez Cash Mag** — à savoir
+avant de croire la bascule faite :
+
+| | |
+|---|---|
+| le pont de vente | webhooks, miroir du catalogue, émission des commandes web, ruptures montantes et descendantes, clôtures (le Z) |
+| les 5 crons `pg_cron` | `zelty-commandes`, `-catalogue`, `-disponibilites`, `-ruptures-entrantes`, `caisse-rapprochement` |
+| les correspondances (0137) | la table qui lie nos produits aux identifiants de la caisse |
+| le mode **Compte client** | créé à la main le 14/10 (#36739, type `account`) pour les notes de la supérette |
+| le rôle **Caisse** et le compte de Sylvie | 70 droits, back-office fermé |
+| les imprimantes | 3 Epson TM-T88VI déclarées, et les lieux de fabrication Cuisine/Pizza |
+
+⚠️ **Le connecteur, lui, est source-agnostique et doit le rester** :
+`encaissements_externes.source_caisse` fait déjà cohabiter l'historique SumUp
+(426 tickets d'août) et le flux Zelty. Cash Mag s'y branchera de la même
+façon — **ne jamais purger les sources précédentes**, c'est tout l'historique
+de vente de la maison.
+
 ### ⚠️⚠️ Le Gommé est une BIÈRE CITRON — corrigé après deux erreurs (15/10/2026)
 
 `node scripts/gomme-biere-citron-1510.mjs [--ecrire]`. Le gérant l'a dit
@@ -9780,6 +9861,7 @@ node scripts/ardoise-semaine-1910.mjs          # la carte de la semaine du 19/10
 node scripts/poser-ardoise-1910.mjs            # l'ardoise 19-25 : 23 plats (essai à blanc)
 node scripts/snacking-sale-feuilletes-1910.mjs # Feuilleté et Quiche 3,80 € (essai à blanc)
 node scripts/pousser-visuels-zelty.mjs         # les photos en caisse — refuse un 404
+node scripts/export-caisse.mjs                 # le classeur pour Cash Mag (7 onglets)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)

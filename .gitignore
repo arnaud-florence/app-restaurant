@@ -100,3 +100,5 @@ data/courses-*
 
 data/manque-*
 data/commande-felix-potin-*.json
+data/export-caisse-*.xlsx
+data/export-caisse.json
