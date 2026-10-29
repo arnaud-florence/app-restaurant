@@ -9281,6 +9281,65 @@ champ faux ne se signale pas — c'est tout l'objet de ce fichier.
 Contrôles : carte **209/209 conformes, 0 écart** · `test-carte-fournil` 13/13 ·
 `test-reassort` 78/78 · `tsc` propre.
 
+### Le relevé d'un compte client — et le flux qui s'est arrêté (29/10/2026)
+
+« Sors-moi toutes les commandes dans la caisse du compte supérette de
+l'Issole. » `node scripts/releve-client.mjs --nom="Supérette" [--mois=AAAA-MM]
+[--csv]` — c'est le **total par client et par MOIS** noté comme manquant
+depuis le 13/10, et qui bloquait la facturation de fin de mois.
+
+**3 tickets, 51,10 € TTC / 47,94 € HT** — concorde au centime avec
+`clients.total_depense` et avec la somme des lignes.
+
+⚠️⚠️ **MAIS LE RELEVÉ S'ARRÊTE AU 15/10 POUR UNE RAISON QUI N'EST PAS LE
+CLIENT : PLUS AUCUNE VENTE N'ENTRE DANS L'OUTIL DEPUIS LE 22/10 À 9 H 52.**
+Mesuré dans le journal des échanges :
+
+| | |
+|---|---|
+| dernier `order.ended` reçu | **22/10 19 h 59**, suivi d'un `till.close` |
+| webhooks reçus depuis | `booking.update`, `customer.update` (27/10) — **la liaison VIT** |
+| cron `tickets` | passe toutes les heures, statut **succès**, `recues: 0` |
+| `GET /info` | **200** — la clé et le compte répondent |
+
+La liaison fonctionne, le sondage tourne, l'API répond : **ce n'est pas une
+panne, c'est qu'il n'y a plus de ventes sur Zelty.** Cohérent avec la bascule
+Cash Mag décidée le 20/10 — et le `till.close` du 22 au soir est littéralement
+le Z de la dernière journée.
+
+⚠️ **CE QUE ÇA COÛTE SI ON NE LE DIT PAS** : facturer la supérette sur ce
+relevé, c'est facturer jusqu'au 15/10 en croyant facturer le mois. Tout ce
+qu'elle a pris depuis le 22 est sur la nouvelle caisse et **nulle part ici**.
+D'où la ligne que le script imprime toujours : « dernier ticket entré dans
+l'outil : … — complet jusqu'à cette date, et muet au-delà ». Un relevé amputé
+sans sa borne se lit comme un relevé à jour — même famille que le comptage de
+stock périmé (0163) et que `statutFoodCost(0)` en vert.
+
+⚠️ **Les deux `echec` du 22/10 19 h 56 ne sont PAS un défaut** : statut 192,
+commandes ANNULÉES, refusées par le mapper comme prévu. Un journal qui les
+marque « echec » est trompeur à la relecture — c'est le comportement attendu.
+
+⚠️ **LE WEBHOOK ÉCRIT UNE LIGNE PAR ARTICLE, `quantite = 1`** : dix baguettes
+font dix lignes « 1 × Baguette classique ». Le relevé REGROUPE par produit et
+par prix — une facture qui répète la même ligne dix fois se fait contester, et
+« 10 × » ne dit pas la même chose que dix lignes identiques.
+
+⚠️ **Le script REFUSE d'agir si plusieurs clients correspondent** : on ne tire
+pas au sort le destinataire d'une facture. Et il DIT ce qui manque pour
+facturer — la supérette n'a **ni téléphone, ni e-mail, ni adresse**, donc
+aucune facture ne peut partir : le relevé est à copier à la main.
+
+⚠️ **Le total est en HT ET en TTC.** `total_depense` somme le HT (choix du
+calcul de fidélité) : c'est la bonne base pour un professionnel, mais le
+présenter seul sous-dit ce qui a été encaissé (47,94 € contre 51,10 €).
+
+⚠️⚠️ **J'AI REFAIT LE DÉFAUT DU 19/10 DANS LE MÊME SCRIPT.** Les valeurs de
+`.env.local` sont **entre guillemets** : mon parseur les gardait, l'URL valait
+`"https://…`, et `fetch` levait `ERR_INVALID_URL` — **rejoué quatre fois** avant
+d'annoncer « Supabase injoignable », soit un message qui désigne la mauvaise
+cause. Le réessai ne couvre plus que ce qui peut changer d'avis, et une URL
+illisible se dit à la première ligne.
+
 ### ⚠️⚠️ CHANGEMENT DE CAISSE : Zelty → CASH MAG (20/10/2026)
 
 Décision du gérant : **la maison passe sur Cash Mag**, qui prépare et importe
@@ -9925,6 +9984,7 @@ node scripts/poser-ardoise-1910.mjs            # l'ardoise 19-25 : 23 plats (ess
 node scripts/snacking-sale-feuilletes-1910.mjs # Feuilleté et Quiche 3,80 € (essai à blanc)
 node scripts/pousser-visuels-zelty.mjs         # les photos en caisse — refuse un 404
 node scripts/export-caisse.mjs                 # le classeur pour Cash Mag (7 onglets)
+node scripts/releve-client.mjs --nom="…" [--mois=AAAA-MM] [--csv]   # facturer un compte client
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
