@@ -9340,6 +9340,92 @@ d'annoncer « Supabase injoignable », soit un message qui désigne la mauvaise
 cause. Le réessai ne couvre plus que ce qui peut changer d'avis, et une URL
 illisible se dit à la première ligne.
 
+### Les livraisons de pain non saisies — rattrapage (29/10/2026)
+
+Décision du gérant : « ajoute 10 baguettes et 10 Jeannette chaque jour non
+entré dans la caisse, du 12 octobre jusqu'au dernier jour de trafic ». La
+supérette était livrée tous les jours ; la caisse n'en a gardé que **deux**.
+`node scripts/livraisons-superette-oct.mjs [--jour=AAAA-MM-JJ] [--ecrire]` —
+essai à blanc par défaut. **9 jours créés, 175,50 € TTC.**
+
+⚠️⚠️ **CE SCRIPT CRÉE DU CA QUI N'EXISTE PAS DANS LA CAISSE AGRÉÉE**, et ça
+heurte de front la frontière du 24/08 (« un second encaissement produit un CA
+parallèle sans valeur fiscale »). La nuance qui l'autorise : **la marchandise
+est PARTIE** — c'est une créance réelle, pas du chiffre inventé. Mais elle n'a
+jamais été tapée, donc elle n'est **ni dans le Z, ni dans le CA fiscal**.
+Trois conséquences, toutes assumées et rendues visibles :
+
+| | |
+|---|---|
+| **aucune** ligne dans `encaissements_externes` | inventer un ticket ferait croire au rapprochement (0139) qu'il existe chez la caisse |
+| `mode_paiement = 'compte_client'` | `paiements.ts` le lit **« En compte », `encaisse: false »`** : la vente est faite, l'argent n'est pas rentré |
+| `source = 'COMPTOIR'`, pas `CAISSE` | elles ne viennent pas d'elle |
+
+✅ Vérifié après coup sur la période : **175,50 € en « En compte », 0 € d'argent
+rentré** — la trésorerie n'est pas gonflée d'un centime.
+
+⚠️⚠️ **LES PRIX DE CE CLIENT NE SONT PAS CEUX DU CATALOGUE, et c'est le piège
+qui coûtait le plus cher** : baguette classique **0,90 € contre 1,20 €** au
+panneau, Jeannette **1,05 € contre 1,40 €** — exactement **−25 %**, le tarif
+d'un revendeur (la supérette revend le pain). Prendre le catalogue aurait
+**surfacturé d'un quart**, soit 43,88 € de trop sur 175,50 €, et une facture
+trop élevée se conteste. Le script RELIT les prix sur le ticket réel du 14/10
+et REFUSE d'écrire s'ils ont changé.
+
+⚠️⚠️ **L'ARITHMÉTIQUE DE TVA DE LA CAISSE EST COMPRISE, PAS RECOPIÉE.** Le
+ticket dit 19,50 TTC / **18,50 HT / 1,00 de TVA**, quand le calcul exact donne
+18,48 / 1,02. L'écart venait d'un arrondi **PAR UNITÉ** à 2 décimales
+(0,90 → 0,85 + 0,05 ; 1,05 → 1,00 + 0,05), puis sommé. On le reproduit pour
+que la facture ne mélange pas deux arrondis selon le jour — mais seulement
+après avoir trouvé la règle : un arrondi recopié sans sa raison est une
+coquille qu'on propage.
+
+⚠️ **DEUX AMBIGUÏTÉS TRANCHÉES PAR LE GÉRANT, pas par moi** — chacune valait
+19,50 € sur la facture :
+
+1. **le 13/10** porte un ticket de 12,10 € mais **aucune baguette** (Monaco,
+   jus, pain restaurant, donuts, Perrier — une consommation). Sa livraison
+   n'avait donc pas été saisie : le jour est inclus ;
+2. **le dimanche 18** (29 tickets, journée creuse) : la supérette prend son
+   pain **7 jours sur 7** — inclus.
+
+⚠️ **L'heure (07:00) est une CONVENTION, et le script le dit** : une livraison
+de pain part le matin, mais les deux tickets réels portent 14 h 48 et 18 h 25,
+soit l'heure de passage en caisse. Seule la DATE compte pour facturer.
+
+⚠️ **Idempotent par jour** : un jour qui porte déjà des baguettes pour ce
+client est **sauté**. Vérifié en relançant après avoir écrit le 12 — il est
+bien ressorti « sauté ». Relancer ne double jamais une facture.
+
+⚠️ **Écrit UN SEUL jour d'abord, puis relu intégralement.** `compte_client` et
+`COMPTOIR` pouvaient être refusés par une contrainte CHECK : les écrire tous
+d'un coup aurait laissé un état mixte. Contrôle après coup — somme des
+20 lignes = en-tête au centime, et HT + TVA = TTC.
+
+⚠️ **La forme suit les tickets de la caisse : une ligne par unité, `quantite`
+à 1.** Dix baguettes font donc dix lignes. C'est laid, mais `tva_eur` y est la
+TVA de la LIGNE, et avec une quantité de 1 aucun lecteur existant ne peut se
+tromper sur son interprétation — un `tva_eur` sur une ligne de quantité 10 se
+lit « unitaire » par la moitié du code et « total » par l'autre.
+
+⚠️ **`clients.total_depense` est une COLONNE** (13/10) : sans recalcul,
+`/admin/clients` serait resté à 47,94 €. `recalculerStatsClient()` est une
+server action, inappelable d'un script — sa logique a donc été **reproduite à
+la lettre** (HT, `statut = encaisse`, et pour ce client ni email ni téléphone
+donc `client_id` seul ; niveau par `calculerNiveau`, lib/clients.ts:76). Le
+script DIT de lancer le recalcul plutôt que de le laisser deviner.
+Résultat : **12 visites, 214,44 € HT, niveau bronze**.
+
+**Relevé final : 226,60 € TTC / 214,44 € HT** — 110 baguettes classiques,
+110 Jeannette, plus la consommation du 13. Contrôle : 11 × 19,50 + 12,10 =
+226,60 ✓.
+
+⚠️ **CE QUI RESTE À FAIRE, et que ce script ne peut pas faire** : tout ce que
+la supérette a pris **depuis le 23 octobre** est sur la caisse Cash Mag et
+**nulle part ici** — le flux Zelty s'est arrêté le 22/10 à 9 h 52. Le relevé
+le dit en pied de page, et c'est la seule protection contre une facture
+amputée présentée comme complète.
+
 ### ⚠️⚠️ CHANGEMENT DE CAISSE : Zelty → CASH MAG (20/10/2026)
 
 Décision du gérant : **la maison passe sur Cash Mag**, qui prépare et importe
@@ -9985,6 +10071,7 @@ node scripts/snacking-sale-feuilletes-1910.mjs # Feuilleté et Quiche 3,80 € (
 node scripts/pousser-visuels-zelty.mjs         # les photos en caisse — refuse un 404
 node scripts/export-caisse.mjs                 # le classeur pour Cash Mag (7 onglets)
 node scripts/releve-client.mjs --nom="…" [--mois=AAAA-MM] [--csv]   # facturer un compte client
+node scripts/livraisons-superette-oct.mjs       # livraisons non saisies (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)
 node scripts/jus-eurocash-1210.mjs             # les jus Euro-Cash en caisse (essai à blanc)
