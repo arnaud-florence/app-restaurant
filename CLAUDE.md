@@ -9340,6 +9340,65 @@ d'annoncer « Supabase injoignable », soit un message qui désigne la mauvaise
 cause. Le réessai ne couvre plus que ce qui peut changer d'avis, et une URL
 illisible se dit à la première ligne.
 
+### Le relevé passe en JOUR PAR JOUR (29/10/2026)
+
+« Marque-moi chaque date et chaque jour de consommation pour que la facture
+soit carrée. » Le relevé groupait tout **par produit** — « 110 × Baguette
+Jeannette » — et **ne portait aucune date**. Un client qui vérifie sa facture
+compte ses JOURNÉES, pas ses baguettes : c'était exactement la forme qui se
+conteste.
+
+Chaque date porte désormais ses tickets, le détail de chaque ticket, et un
+sous-total de journée dès qu'il y en a plusieurs. **Octobre : 11 journées
+consécutives, 12 tickets, 226,60 € TTC / 214,44 € HT.** Le récapitulatif par
+produit reste, APRÈS le jour par jour — il sert à contrôler, pas à facturer.
+
+⚠️⚠️ **LE JOUR SE CALCULE EN HEURE DE PARIS, jamais en découpant la chaîne
+ISO.** `created_at` est en UTC : un ticket de soirée à 00 h 30 — le bar ferme
+à 1 h une fois par mois — s'y lit **22 h 30 la VEILLE**, et la facture
+l'imputerait au mauvais jour. Même piège que `booking_for` côté Zelty, déjà
+payé en septembre. Ici l'écart ne se voit pas (les tickets sont à 7 h et
+15-20 h UTC), donc il serait passé inaperçu jusqu'à la première soirée.
+
+⚠️⚠️ **LES JOURS SANS LIGNE SONT NOMMÉS, et c'est la moitié du contrôle.** Un
+jour manquant n'est pas « pas de livraison », c'est peut-être une livraison
+non saisie — le trou que le rattrapage de ce matin a comblé sur neuf jours.
+Le relevé dit donc « ✓ aucun jour sans ligne : 11 journées consécutives », ou
+les liste. Sans cette phrase, une facture amputée se lit comme une facture
+complète.
+
+⚠️⚠️ **UNE COMMANDE NON ENCAISSÉE N'ENTRE PAS DANS UNE FACTURE — défaut
+trouvé en relisant.** Le relevé ne filtrait PAS `statut` : une commande
+annulée ou restée en attente l'aurait gonflé **en silence**, et il aurait
+divergé de `clients.total_depense`, qui filtre sur `encaisse`
+(`lib/clients.ts`). Deux chiffres pour la même question, et on ne sait plus
+lequel croire. Les 12 commandes de ce client sont toutes `encaisse`, donc le
+total ne bouge pas — mais le filtre manquait. Ce qui est écarté est **compté
+et dit** en tête du relevé, jamais masqué.
+
+⚠️ **« 5.5 » est un point ANGLAIS.** Sur une facture française ça se remarque,
+et dans le CSV **un Excel FR lit la colonne TVA comme du TEXTE** — donc
+incalculable, sur le document censé justifier le montant. Un taux se formate
+(`pct()`), il ne se concatène pas.
+
+⚠️ **LE CSV PORTE LA DATE SUR CHAQUE LIGNE**, plus une ligne `TOTAL JOURNEE`
+par jour et deux lignes de total (TTC puis HT). L'ancien CSV était groupé par
+produit sans dates : il ne pouvait justifier aucune facture. 40 lignes pour
+octobre.
+
+⚠️ **L'heure des lignes `LIVR-` est marquée d'une astérisque** : c'est la
+convention de 7 h posée au rattrapage, pas un horaire relevé — les tickets
+réels portent 16 h 48 et 20 h 25, l'heure de passage en caisse. **Seule la
+DATE fait foi** pour facturer, et le relevé l'écrit sous le tableau.
+
+⚠️ Le sous-total de journée ne s'affiche **que s'il y a plusieurs tickets** :
+sur une journée à un seul ticket il répéterait le montant juste au-dessus.
+Le 13/10 est le seul concerné — livraison 19,50 € + consommation 12,10 € =
+**31,60 €**, et c'est précisément le jour qu'on aurait mal facturé.
+
+Contrôle : 11 × 19,50 + 12,10 = **226,60 €** ✓, identique avec et sans
+`--mois`, et égal à `clients.total_depense` au centime côté HT.
+
 ### Les livraisons de pain non saisies — rattrapage (29/10/2026)
 
 Décision du gérant : « ajoute 10 baguettes et 10 Jeannette chaque jour non
