@@ -9399,6 +9399,48 @@ Le 13/10 est le seul concerné — livraison 19,50 € + consommation 12,10 € 
 Contrôle : 11 × 19,50 + 12,10 = **226,60 €** ✓, identique avec et sans
 `--mois`, et égal à `clients.total_depense` au centime côté HT.
 
+### Le relevé en classeur Excel (29/10/2026)
+
+« Mets-moi ça en fichiers dans les téléchargements de mon ordi. » Trois
+fichiers, le même relevé sous trois formes :
+`CASATASIA-releve-<client>-<mois>.{xlsx, txt, csv}`.
+
+    node scripts/releve-client.mjs --nom="…" --mois=2026-10 --csv
+    python3 scripts/releve-client-xlsx.py data/releve-….csv [sortie.xlsx]
+
+Même patron que l'export caisse : **node sort les données, python met en
+forme**. Deux onglets — « Releve jour par jour » (c'est celui qui facture) et
+« Par produit », qui sert à CONTRÔLER et le dit en toutes lettres : il ne
+dit pas quel jour la marchandise est partie.
+
+⚠️⚠️ **LES MONTANTS SONT ÉCRITS COMME NOMBRES, jamais comme texte**, avec un
+format `#,##0.00 €`. Un total qu'Excel ne sait pas sommer est inutile sur le
+document qui justifie une facture — c'est le même défaut que la TVA en
+« 5.5 », par l'autre bout.
+
+⚠️⚠️ **LE CLASSEUR PORTE LA BORNE DU FLUX EN TÊTE, EN ROUGE**, plus les
+manques de la fiche et les jours sans ligne. C'est la raison du
+`.meta.json` écrit à côté du CSV : un CSV seul ne transporte ni la date du
+dernier ticket ingéré ni « cette fiche n'a pas d'adresse », et **un relevé
+envoyé sans sa borne se lit comme un relevé à jour**. Le fichier qui part
+chez le client doit porter ses propres réserves.
+
+⚠️ **CONTRÔLE D'APRÈS ÉCRITURE, et il est obligatoire ici** : le script
+RELIT le classeur produit, vérifie que les en-têtes sont à leur place et que
+**la somme des lignes de détail égale le total** (226,60 € ✓). Deux décalages
+de colonne ont déjà été vécus sur le classeur de la caisse — un décalage ne
+lève aucune erreur, il met des valeurs **plausibles** au mauvais endroit, et
+c'est le destinataire qui le découvre. Une assertion compare aussi
+`len(EN)` au nombre de colonnes du CSV : si le relevé gagne une colonne, le
+script s'arrête au lieu de tout glisser d'un cran.
+
+⚠️ Les noms d'onglets sont vérifiés sous 31 caractères — au-delà, openpyxl ne
+lève qu'un AVERTISSEMENT et c'est le destinataire qui ne peut plus ouvrir le
+fichier (leçon de « Éteints — ne pas mettre en vente », 32 caractères).
+
+⚠️ `data/releve-*` est gitignoré **en entier**, `.meta.json` compris : la
+règle ne couvrait que `*.csv`, et les métadonnées portent le nom du client.
+
 ### Les livraisons de pain non saisies — rattrapage (29/10/2026)
 
 Décision du gérant : « ajoute 10 baguettes et 10 Jeannette chaque jour non
@@ -10130,6 +10172,7 @@ node scripts/snacking-sale-feuilletes-1910.mjs # Feuilleté et Quiche 3,80 € (
 node scripts/pousser-visuels-zelty.mjs         # les photos en caisse — refuse un 404
 node scripts/export-caisse.mjs                 # le classeur pour Cash Mag (7 onglets)
 node scripts/releve-client.mjs --nom="…" [--mois=AAAA-MM] [--csv]   # facturer un compte client
+python3 scripts/releve-client-xlsx.py data/releve-….csv       # le meme releve en classeur Excel
 node scripts/livraisons-superette-oct.mjs       # livraisons non saisies (essai à blanc)
 node scripts/carte-corrections-1110.mjs        # retraits/créations du 11/10 (essai à blanc)
 node scripts/prix-familles-1110.mjs            # une famille, un prix (essai à blanc)

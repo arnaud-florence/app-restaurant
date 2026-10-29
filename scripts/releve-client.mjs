@@ -231,4 +231,21 @@ if (CSV) {
   fs.mkdirSync('data', { recursive: true })
   fs.writeFileSync(nf, '\ufeff' + l.join('\n'), 'utf8')   // BOM : Excel lit l'UTF-8
   console.log(`\n   ✓ écrit : ${nf}  (${l.length - 1} lignes, date sur chacune)`)
+
+  // ⚠️ Les métadonnées partent À CÔTÉ du CSV, pour que le classeur Excel
+  // porte la BORNE du flux et les manques de la fiche. Un relevé envoyé sans
+  // sa date de dernier ticket se lit comme un relevé à jour — c'est la faute
+  // que ce projet traque partout. Même patron que `export-caisse.mjs` :
+  // node produit les données, python met en forme.
+  const meta = {
+    client: titre, periode: MOIS ?? 'tout l\u2019historique',
+    tickets: cmds.length, journees: parJour.length,
+    ttc, ht, borne: borne ?? null, trous,
+    manques: [
+      !cl.telephone && !cl.email ? 'fiche sans téléphone ni e-mail : aucune facture ne peut partir' : null,
+      !cl.adresse ? 'aucune adresse de facturation' : null,
+      ecartees.length ? `${ecartees.length} commande(s) non encaissée(s), écartée(s) du relevé` : null,
+    ].filter(Boolean),
+  }
+  fs.writeFileSync(nf.replace(/\.csv$/, '.meta.json'), JSON.stringify(meta, null, 2), 'utf8')
 }
