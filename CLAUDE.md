@@ -9527,6 +9527,137 @@ la supérette a pris **depuis le 23 octobre** est sur la caisse Cash Mag et
 le dit en pied de page, et c'est la seule protection contre une facture
 amputée présentée comme complète.
 
+### ⚠️⚠️ LE DOMAINE casatasia.fr EST DÉPUBLIÉ — `clientHold` (04/11/2026)
+
+« Le site internet ne fonctionne plus. » Ce n'est **pas le site** : c'est le
+**domaine**, et il a disparu du DNS mondial.
+
+| Mesure | Résultat |
+|---|---|
+| `casatasia.fr`, `www` | aucune réponse (connexion impossible) |
+| trois résolveurs publics (8.8.8.8, 1.1.1.1, 9.9.9.9) | **NXDOMAIN** |
+| délégation dans la zone `.fr` (`@d.nic.fr`) | **NXDOMAIN** |
+| RDAP AFNIC | `whoisStatus: ACTIVE` · expiration **18/08/2027** |
+| statuts du registre | `clientTransferProhibited` · `clientDeleteProhibited` · **`clientHold`** |
+
+⚠️⚠️ **`clientHold` EST LA CAUSE, ET IL N'A RIEN À VOIR AVEC UNE EXPIRATION.**
+Le domaine est payé jusqu'en **août 2027** et toujours actif au registre ; ses
+serveurs de noms sont toujours déclarés (`dns106.ovh.net`, `ns106.ovh.net`).
+`clientHold` est un drapeau posé par le **registrar** (OVH) qui demande au
+registre de **retirer le domaine de la zone** — donc plus aucune résolution,
+pour tout le monde, d'un coup. Chercher la panne dans Vercel, dans le code ou
+dans la zone DNS ne pouvait rien donner : rien de tout ça n'est en cause.
+
+⚠️ **ET LA MESSAGERIE TOMBE AVEC.** Les MX répondent NXDOMAIN eux aussi : les
+trois `mx{1,2,3}.mail.ovh.net` documentés sont intacts dans la zone, mais la
+zone n'est plus servie. Toute adresse `@casatasia.fr` est donc **injoignable**,
+et un expéditeur reçoit un rejet définitif. Le site est la partie visible ;
+le courrier est la partie qu'on ne voit pas.
+
+✅ **Le titulaire est joignable, et c'est une chance** : le contact du registre
+est **casatasia83136@gmail.com**, pas une adresse du domaine. Si OVH avait
+écrit à `contact@casatasia.fr`, l'avis de dépublication serait tombé dans un
+domaine dépublié — boucle fermée.
+
+⚠️ **CE N'EST PAS RÉPARABLE DEPUIS L'OUTIL.** La levée du `clientHold` se fait
+dans l'espace client OVH (`xj9701-ovh`) ou par leur support — avec les
+identifiants du gérant, qui ne se saisissent pas à sa place. Les causes
+habituelles chez OVH, par ordre de probabilité pour un domaine créé le
+**18/08/2026** :
+
+1. **vérification d'identité du titulaire non confirmée** — l'AFNIC exige que
+   le titulaire soit identifiable, OVH envoie un courriel de validation puis
+   dépublie à défaut de réponse. Un domaine de moins de trois mois est le cas
+   typique ;
+2. un **impayé** sur le compte, même si le domaine lui-même est réglé ;
+3. un signalement (`abuse@ovh.net` figure au registre).
+
+⚠️ **Piste à vérifier, pas un fait** : le registre indique une modification du
+domaine le **03/10/2026 à 6 h 41** — le jour même où le prélèvement Zelty a été
+refusé par la banque (carte •••• 1732). Si c'est la même carte chez OVH, les
+deux pannes ont une cause commune. ⚠️ Mais `last changed` couvre n'importe
+quelle modification : **ce champ ne prouve pas la date du hold.**
+
+⚠️⚠️ **ET LE SITE RÉPONDAIT ENCORE LE 21/10** : une commande web réelle est
+entrée ce jour-là. Donc **la panne est postérieure au 21 octobre**, pas du
+3 octobre comme la date du registre le suggère. Conclure de `last changed`
+aurait fait chercher un mois trop tôt.
+
+✅ **Tout le reste est intact, et c'est vérifié** — il n'y a donc rien à
+reconstruire :
+
+| | |
+|---|---|
+| l'outil (`app-restaurant-livid.vercel.app`) | répond, 307 vers `/login` |
+| `/api/public/menu`, `/activation`, `/creneaux-retrait` | **401 « Header x-api-key manquant »** — vivantes, elles attendent la clé du site |
+| les photos produit | sur `app-restaurant-livid.vercel.app`, **jamais sur le domaine** (0113) — aucune n'est perdue |
+| les e-mails | `EMAIL_FROM` a pour repli `onboarding@resend.dev` ; **si la variable posée sur Vercel est une adresse `@casatasia.fr`, tous les envois sont cassés** — à vérifier dans Resend |
+
+⚠️ `site-restaurant.vercel.app` répond 200 mais rend `<title>Document` : **ce
+n'est pas notre site**, c'est un autre projet qui porte ce nom. L'URL Vercel
+réelle du projet (`prj_O7ttbBJSJ6mCcm4sxR3NO7wwFKtF`) se relève dans le
+tableau de bord — c'est le repli immédiat en attendant OVH, et le seul moyen
+de republier sans le domaine.
+
+### ⚠️⚠️ UNE COMMANDE WEB RÉELLE N'A JAMAIS ÉTÉ SERVIE (trouvée le 04/11/2026)
+
+`WEB-261021-8908` — deux pizzas (La Camembert 15,90 € + La CasaTasia
+Signature 17,50 €), **33,40 €**, à emporter, créneau du **21/10 à 19 h**.
+Statut : **`en_attente`**. Elle y est restée deux semaines.
+
+⚠️ Le nom, le téléphone et l'adresse du client **ne sont PAS repris ici** : ce
+dépôt est public. Ils sont sur la commande en base, c'est là qu'on les lit.
+
+C'est la **SEULE** commande ONLINE de tout l'historique, et elle est tombée
+dans le vide. Le défaut n'est pas le site — la commande est bien arrivée en
+base, avec le bon créneau et le bon panier. Le défaut est **qu'elle n'arrive
+nulle part où quelqu'un regarde** :
+
+⚠️⚠️ **La cuisine travaille sur la CAISSE, et la commande web n'y entre pas.**
+C'est écrit depuis le 25/09 — « le ticket d'une commande web pizza arrive
+UNIQUEMENT dans notre KDS, la caisse n'en sait rien, l'émission étant bloquée
+faute de mode de paiement » — et c'était présenté comme un risque. **Le risque
+s'est réalisé** : un client a commandé, personne n'a vu.
+
+→ **Tant que la commande web n'entre pas dans la caisse, la commande en ligne
+ne doit pas être proposée.** Ce n'est pas une préférence d'architecture : c'est
+la différence entre une vente et un client qui se déplace pour rien.
+
+### Commande et paiement en ligne avec Cash Mag — l'ordre est contraint
+
+Demande du gérant (04/11/2026). Trois verrous, et ils ne sont pas
+interchangeables :
+
+1. **le domaine** — sans lui, pas de site, donc pas de commande en ligne ;
+2. **une API de commande chez Cash Mag** — on n'en sait **RIEN** : aucune clé,
+   aucune documentation, aucune trace dans le dépôt hors le script d'export ;
+3. **un mode de paiement « en ligne » déclaré dans la caisse**, dont il faut le
+   libellé EXACT.
+
+⚠️⚠️ **LA DOCTRINE DU 23/09 TIENT, ET ELLE N'EST PAS UNE PRUDENCE
+D'INGÉNIEUR** : la caisse agréée est la source légale (NF525). Un paiement
+encaissé par le site sans être repris dans la caisse produit un CA parallèle
+sans valeur fiscale, à rapprocher à la main chaque jour. On ne branche donc
+pas le paiement avant de savoir si Cash Mag sait recevoir une commande
+**déjà réglée**. C'est exactement ce qui a tenu l'émission Zelty fermée
+pendant six semaines.
+
+⚠️ **ET LE PIÈGE QUI COÛTE DE L'ARGENT EST À RE-POSER À CASH MAG** : chez
+Zelty, un total envoyé **inférieur** au total recalculé était accepté **en
+silence**, avec une remise globale égale à l'écart — la marge fuyait sur
+chaque commande web, invisiblement. La question « que faites-vous d'un total
+qui ne concorde pas ? » doit avoir une réponse avant le premier envoi.
+
+`docs/questions-cashmag.md` porte les **cinq blocs à leur envoyer** : recevoir
+une commande payée, identifier les produits, lire les ventes, les ruptures, le
+paiement. Chaque question y porte sa CONSÉQUENCE — un intégrateur répond mieux
+à « que se passe-t-il si le total diffère » qu'à « avez-vous une API ».
+
+⚠️ Le bloc 2 demande un **champ libre pour notre identifiant produit**. C'est
+ce qui a rendu le pont Zelty exact dès le premier jour (84/84 appariés par
+`remote_id`, aucun rapprochement par le nom). À demander AVANT l'import des
+209 produits : après, le lien se refait à la main.
+
 ### ⚠️⚠️ CHANGEMENT DE CAISSE : Zelty → CASH MAG (20/10/2026)
 
 Décision du gérant : **la maison passe sur Cash Mag**, qui prépare et importe
