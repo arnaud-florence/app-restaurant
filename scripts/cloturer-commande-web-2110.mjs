@@ -19,6 +19,9 @@
  * Idempotent : si le statut n'est plus `en_attente`, le script sort sans rien
  * écrire. Il RELIT après écriture — on ne conclut pas sur un code 200.
  *
+ * ⚠️ Seule la COMMANDE passe à `annule`. Les articles restent `en_attente` :
+ * leur contrainte CHECK ne connaît pas ce statut (voir plus bas).
+ *
  *   node scripts/cloturer-commande-web-2110.mjs            # essai à blanc
  *   node scripts/cloturer-commande-web-2110.mjs --ecrire
  */
@@ -67,13 +70,19 @@ const NOTE = 'Annulée le 04/11/2026 : commande jamais vue ni servie (restée en
 
 if (!ECRIRE) {
   console.log('\n— essai à blanc —')
-  console.log('  commande + 2 articles → statut « annule »')
+  console.log('  commande → statut « annule » (les articles restent en_attente)')
   console.log('  note ajoutée :', NOTE)
   console.log('\nRelancer avec --ecrire')
   process.exit(0)
 }
 
-await sb(`commande_articles?commande_id=eq.${c.id}`, { method: 'PATCH', body: JSON.stringify({ statut: 'annule' }) })
+// ⚠️⚠️ ON NE TOUCHE PAS AUX ARTICLES. `commande_articles.statut` n'admet que
+// en_attente / en_preparation / pret / servi (contrainte CHECK, migration 0001) :
+// y écrire 'annule' fait échouer le PATCH en 23514. L'annulation est une
+// propriété du TICKET, pas de la ligne — et la synchronisation de l'agrégat
+// (CLAUDE.md §5) ne peut pas la défaire : « ne jamais rétrograder depuis
+// encaisse ou annule ». Les deux articles restent donc en_attente, et c'est
+// correct : ils n'ont jamais été préparés.
 await sb(`commandes?id=eq.${c.id}`, {
   method: 'PATCH',
   body: JSON.stringify({ statut: 'annule', notes: [c.notes, NOTE].filter(Boolean).join('\n') }),
@@ -83,6 +92,6 @@ await sb(`commandes?id=eq.${c.id}`, {
 const [v] = await sb(`commandes?numero=eq.${NUMERO}&select=numero,statut`)
 const va = await sb(`commande_articles?commande_id=eq.${c.id}&select=statut`)
 const enc = await sb(`encaissements_externes?select=id&ticket_externe=eq.${NUMERO}&limit=1`)
-console.log(`\n✓ ${v.numero} · ${v.statut} · articles ${va.map(x => x.statut).join('/')}`)
+console.log(`\n✓ ${v.numero} · ${v.statut} · articles laissés en ${va.map(x => x.statut).join('/')}`)
 console.log(`✓ aucun encaissement rattaché : ${enc.length === 0}`)
-if (v.statut !== 'annule' || va.some(x => x.statut !== 'annule')) process.exit(1)
+if (v.statut !== 'annule') process.exit(1)
