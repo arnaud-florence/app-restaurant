@@ -28,8 +28,28 @@
 import { readFileSync } from 'fs'
 
 const ECRIRE = process.argv.includes('--ecrire')
-const MODULES = ['restaurant_salle', 'bar', 'pizzeria']
-const PDV = ['le-relais-des-saveurs', 'bar']   // PDV_PAR_MODULE, dédoublonné
+
+// ⚠️⚠️ CES DEUX-LÀ NE S'OUVRENT JAMAIS PAR CE SCRIPT, même demandés : le site
+// annoncerait un service inexistant (snacking abandonné le 25/09, tag sans
+// aucun produit) ou ferait réserver ce qui n'existe pas (chambres, calendrier
+// vide). Les ouvrir est une décision qui mérite son propre geste, pas un
+// argument de ligne de commande.
+const JAMAIS = ['snack_emporter', 'chambres']
+
+const BASE = ['restaurant_salle', 'bar', 'pizzeria']
+const aussi = (process.argv.find(a => a.startsWith('--aussi='))?.slice(8) ?? '')
+  .split(',').map(x => x.trim()).filter(Boolean)
+for (const m of aussi) {
+  if (JAMAIS.includes(m)) { console.error(`✗ ${m} est écarté par construction — voir le commentaire JAMAIS`); process.exit(1) }
+}
+const MODULES = [...new Set([...BASE, ...aussi])]
+
+// PDV_PAR_MODULE, dédoublonné. `evenementiel` n'y figure pas : il ne pilote
+// aucun point de vente, seulement /admin/groupes et deux pages du site
+// (/evenements, /privatisation) dont le contenu est STATIQUE — rien à y lire,
+// donc aucune liste vide à afficher. Vérifié dans le dépôt du site.
+const PDV_DE = { restaurant_salle: ['le-relais-des-saveurs'], pizzeria: ['le-relais-des-saveurs'], bar: ['bar'] }
+const PDV = [...new Set(MODULES.flatMap(m => PDV_DE[m] ?? []))]
 
 const env = {}
 for (const l of readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n')) {
@@ -62,7 +82,7 @@ for (const e of pdvAvant) console.log(`   PdV ${e.slug.padEnd(22)} actif=${e.act
 console.log('\n— intacts, délibérément —')
 console.log('   snack_emporter  abandonné le 25/09, aucun produit sous le tag')
 console.log('   chambres        aucune disponibilité à proposer')
-console.log('   evenementiel    hors demande, à trancher à part')
+if (!MODULES.includes('evenementiel')) console.log('   evenementiel    hors demande — s\'ouvre avec --aussi=evenementiel')
 
 if (!ECRIRE) { console.log('\nRelancer avec --ecrire'); process.exit(0) }
 
@@ -75,7 +95,7 @@ await sb(`etablissements?slug=in.(${PDV.join(',')})`, { method: 'PATCH', body: J
 // ⚠️ relecture : un PATCH qui répond 200 n'a pas prouvé son effet.
 const apres = (await sb('activites_modules?select=cle,actif')).filter(m => MODULES.includes(m.cle))
 const pdvApres = await sb(`etablissements?select=slug,actif&slug=in.(${PDV.join(',')})`)
-const intacts = (await sb('activites_modules?select=cle,actif')).filter(m => ['snack_emporter', 'chambres', 'evenementiel'].includes(m.cle))
+const intacts = (await sb('activites_modules?select=cle,actif')).filter(m => JAMAIS.includes(m.cle))
 
 console.log('\n— après —')
 for (const m of apres) console.log(`   ${m.cle.padEnd(18)} actif=${m.actif}`)
